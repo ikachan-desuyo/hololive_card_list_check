@@ -122,9 +122,13 @@
       let hierarchy = new cv.Mat();
       cv.findContours(edges, contours, hierarchy, cv.RETR_EXTERNAL, cv.CHAIN_APPROX_SIMPLE);
 
-      let cardContours = [];
       const CARD_RATIO = 88 / 63; // 縦横比
+      const MIN_AREA = canvas.width * canvas.height * 0.01; // 最小面積 (画面の1%)
+      const frameCenterX = canvas.width / 2;
+      const frameCenterY = canvas.height / 2;
       let bestRect = null;
+      let bestScore = -1;
+
       for (let i = 0; i < contours.size(); i++) {
         let contour = contours.get(i);
 
@@ -135,31 +139,33 @@
         // 四角形かつ縦横比がカードに近いものを選択
         if (approx.rows === 4) {
           let rect = cv.boundingRect(approx);
+          let area = rect.width * rect.height;
 
-          // 中心位置を考慮 (修正ポイント)
-          let centerX = rect.x + rect.width / 2;
-          let centerY = rect.y + rect.height / 2;
-          let frameCenterX = canvas.width / 2;
-          let frameCenterY = canvas.height / 2;
-          let distanceToCenter = Math.sqrt(
-            Math.pow(centerX - frameCenterX, 2) + Math.pow(centerY - frameCenterY, 2)
-          );
+          // 最小面積フィルタ
+          if (area >= MIN_AREA) {
+            // 中心位置を計算
+            let centerX = rect.x + rect.width / 2;
+            let centerY = rect.y + rect.height / 2;
+            let distanceToCenter = Math.sqrt(
+              Math.pow(centerX - frameCenterX, 2) + Math.pow(centerY - frameCenterY, 2)
+            );
 
-          // 縦横比と位置でさらに絞り込む
-          let aspectRatio = rect.height / rect.width;
-          if (0.9 * CARD_RATIO < aspectRatio && aspectRatio < 1.1 * CARD_RATIO) {
-            if (
-              !bestRect ||
-              (rect.width * rect.height > bestRect.width * bestRect.height &&
-                distanceToCenter < canvas.width * 0.25) // 中心付近を優先
-            ) {
-              bestRect = rect; // 最大のカード枠を選択
+            // 縦横比を厳密にチェック (±5%の許容範囲)
+            let aspectRatio = rect.height / rect.width;
+            if (0.95 * CARD_RATIO < aspectRatio && aspectRatio < 1.05 * CARD_RATIO) {
+              // スコア計算: 面積と中心からの距離を考慮
+              let normalizedDistance = distanceToCenter / Math.sqrt(canvas.width * canvas.width + canvas.height * canvas.height);
+              let normalizedArea = area / (canvas.width * canvas.height);
+              let score = normalizedArea * (1 - normalizedDistance); // 面積が大きく、中心に近いほど高スコア
+
+              if (score > bestScore) {
+                bestRect = rect;
+                bestScore = score;
+              }
             }
           }
-          approx.delete();
-        } else {
-          approx.delete();
         }
+        approx.delete();
       }
 
       if (bestRect) {
@@ -172,13 +178,13 @@
       // 検出結果をキャンバスに表示
       cv.imshow('canvasOutput', src);
 
-      // リソース解放
+      // リソース解放 - より体系的なクリーンアップ
       src.delete();
       gray.delete();
       edges.delete();
+      edgeCanvasMat.delete();
       contours.delete();
       hierarchy.delete();
-      edgeCanvasMat.delete();
     }
   </script>
 </body>
