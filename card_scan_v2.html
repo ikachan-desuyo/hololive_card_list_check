@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <title>ホロライブカード枠検出</title>
-  <script async src="https://docs.opencv.org/4.x/opencv.js" onload="onOpenCvReady();"></script>
+  <script async src="libs/opencv.js" onload="onOpenCvReady();"></script>
   <style>
     video, canvas {
       display: block;
@@ -123,8 +123,10 @@
       cv.findContours(edges, contours, hierarchy, cv.RETR_EXTERNAL, cv.CHAIN_APPROX_SIMPLE);
 
       let cardContours = [];
-      const CARD_RATIO = 88 / 63; // 縦横比
+      const CARD_RATIO = 88 / 63; // 縦横比 (約1.396)
+      const MIN_AREA = (canvas.width * canvas.height) * 0.01; // 最小面積閾値（画面の1%）
       let bestRect = null;
+      let bestScore = -1;
       for (let i = 0; i < contours.size(); i++) {
         let contour = contours.get(i);
 
@@ -135,8 +137,22 @@
         // 四角形かつ縦横比がカードに近いものを選択
         if (approx.rows === 4) {
           let rect = cv.boundingRect(approx);
+          let area = rect.width * rect.height;
 
-          // 中心位置を考慮 (修正ポイント)
+          // 最小面積フィルタ
+          if (area < MIN_AREA) {
+            approx.delete();
+            continue;
+          }
+
+          // より厳密な縦横比チェック (±5%に縮小)
+          let aspectRatio = rect.height / rect.width;
+          if (aspectRatio < 0.95 * CARD_RATIO || aspectRatio > 1.05 * CARD_RATIO) {
+            approx.delete();
+            continue;
+          }
+
+          // 中心位置を考慮した優先度スコア計算
           let centerX = rect.x + rect.width / 2;
           let centerY = rect.y + rect.height / 2;
           let frameCenterX = canvas.width / 2;
@@ -144,17 +160,16 @@
           let distanceToCenter = Math.sqrt(
             Math.pow(centerX - frameCenterX, 2) + Math.pow(centerY - frameCenterY, 2)
           );
+          
+          // スコア計算: 面積を重視し、中心距離でペナルティ
+          let maxDistance = Math.sqrt(Math.pow(canvas.width / 2, 2) + Math.pow(canvas.height / 2, 2));
+          let distanceScore = 1 - (distanceToCenter / maxDistance);
+          let areaScore = area / (canvas.width * canvas.height);
+          let score = areaScore * 0.7 + distanceScore * 0.3;
 
-          // 縦横比と位置でさらに絞り込む
-          let aspectRatio = rect.height / rect.width;
-          if (0.9 * CARD_RATIO < aspectRatio && aspectRatio < 1.1 * CARD_RATIO) {
-            if (
-              !bestRect ||
-              (rect.width * rect.height > bestRect.width * bestRect.height &&
-                distanceToCenter < canvas.width * 0.25) // 中心付近を優先
-            ) {
-              bestRect = rect; // 最大のカード枠を選択
-            }
+          if (score > bestScore) {
+            bestRect = rect;
+            bestScore = score;
           }
           approx.delete();
         } else {
@@ -173,6 +188,9 @@
       cv.imshow('canvasOutput', src);
 
       // リソース解放
+      for (let i = 0; i < contours.size(); i++) {
+        contours.get(i).delete();
+      }
       src.delete();
       gray.delete();
       edges.delete();
