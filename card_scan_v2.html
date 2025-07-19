@@ -124,9 +124,15 @@
 
       let cardContours = [];
       const CARD_RATIO = 88 / 63; // 縦横比
+      const MIN_AREA = 5000; // 最小面積閾値
       let bestRect = null;
       for (let i = 0; i < contours.size(); i++) {
         let contour = contours.get(i);
+
+        // 最小面積フィルタ
+        if (cv.contourArea(contour) < MIN_AREA) {
+          continue;
+        }
 
         // 輪郭を近似
         let approx = new cv.Mat();
@@ -136,7 +142,7 @@
         if (approx.rows === 4) {
           let rect = cv.boundingRect(approx);
 
-          // 中心位置を考慮 (修正ポイント)
+          // 中心位置を考慮
           let centerX = rect.x + rect.width / 2;
           let centerY = rect.y + rect.height / 2;
           let frameCenterX = canvas.width / 2;
@@ -145,15 +151,18 @@
             Math.pow(centerX - frameCenterX, 2) + Math.pow(centerY - frameCenterY, 2)
           );
 
-          // 縦横比と位置でさらに絞り込む
+          // 縦横比を5%の許容範囲で絞り込む
           let aspectRatio = rect.height / rect.width;
-          if (0.9 * CARD_RATIO < aspectRatio && aspectRatio < 1.1 * CARD_RATIO) {
-            if (
-              !bestRect ||
-              (rect.width * rect.height > bestRect.width * bestRect.height &&
-                distanceToCenter < canvas.width * 0.25) // 中心付近を優先
-            ) {
-              bestRect = rect; // 最大のカード枠を選択
+          if (0.95 * CARD_RATIO < aspectRatio && aspectRatio < 1.05 * CARD_RATIO) {
+            // 中心距離を正規化して優先度を計算
+            let maxDistance = Math.sqrt(Math.pow(canvas.width / 2, 2) + Math.pow(canvas.height / 2, 2));
+            let centerPriority = 1 - (distanceToCenter / maxDistance);
+            let area = rect.width * rect.height;
+            let score = area * centerPriority; // 面積と中心位置の複合スコア
+
+            if (!bestRect || score > (bestRect.width * bestRect.height * bestRect.centerPriority)) {
+              bestRect = rect;
+              bestRect.centerPriority = centerPriority;
             }
           }
           approx.delete();
