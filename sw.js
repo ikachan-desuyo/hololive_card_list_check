@@ -1,5 +1,5 @@
 // Service Worker for offline caching with centralized version management
-// Version: 4.6.0-BINDER-SETTINGS
+// Version: 4.10.0-VERSION-SYNC-UPDATE
 
 // Import version configuration and utility functions
 importScripts('./sw-version.js', './sw-utils.js', './sw-handlers.js');
