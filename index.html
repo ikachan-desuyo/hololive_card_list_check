@@ -1,6 +1,6 @@
 <!DOCTYPE html>
 <html lang="ja">
-<!-- Version: 4.10.0-DarkMode-Button-Color-Fix - ダークモードボタン配色修正 -->
+<!-- Version: 4.11.1-DarkMode-Button-Color-Fix - ダークモードボタン配色修正 -->
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
@@ -211,7 +211,7 @@
 <body>
   <div class="container">
     <h1>ホロライブカードゲーム<br>管理ツール
-      <span style="font-size: 0.4em; color: #999; display: block; margin-top: 5px; font-weight: normal;" id="versionDisplay">[v4.10.0-VERSION-SYNC-UPDATE]</span>
+      <span style="font-size: 0.4em; color: #999; display: block; margin-top: 5px; font-weight: normal;" id="versionDisplay">[v4.11.1-DarkMode-Button-Color-Fix]</span>
     </h1>
 
     <div class="menu-grid">
@@ -315,6 +315,21 @@
       return await sendMessageToSW('CHECK_OUTDATED_PAGES');
     }
 
+    // ✅ バージョン表示を更新
+    async function updateVersionDisplay() {
+      try {
+        const versionInfo = await getVersionInfo();
+        if (versionInfo && versionInfo.data) {
+          const versionElement = document.getElementById('versionDisplay');
+          if (versionElement) {
+            versionElement.textContent = `[v${versionInfo.data.appVersion}-${versionInfo.data.versionDescription}]`;
+          }
+        }
+      } catch (error) {
+        console.log('Failed to update version display:', error);
+      }
+    }
+
     // Service Worker registration with centralized version management
     if ('serviceWorker' in navigator) {
       window.addEventListener('load', () => {
@@ -326,6 +341,9 @@
 
             // モバイル向け：即座に更新チェック
             registration.update();
+
+            // ✅ バージョン表示を初期化
+            setTimeout(() => updateVersionDisplay(), 1000);
 
             // ✅ 新しいバージョン管理システムで更新確認
             const checkForUpdates = async () => {

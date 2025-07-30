@@ -6,12 +6,12 @@ const VERSION_DESCRIPTION = "DarkMode-Button-Color-Fix";
 
 // ✅ 各ページのバージョン情報を一元管理
 const PAGE_VERSIONS = {
-  "index.html": "4.10.0-DarkMode-Button-Color-Fix",  // ダークモードボタン配色修正
-  "binder_collection.html": "4.10.0-DarkMode-Button-Color-Fix",  // ダークモードボタン配色修正
-  "collection_binder.html": "4.10.0-DarkMode-Button-Color-Fix",  // ダークモードボタン配色修正
+  "index.html": "4.11.1-DarkMode-Button-Color-Fix",  // ダークモードボタン配色修正
+  "binder_collection.html": "4.11.1-DarkMode-Button-Color-Fix",  // ダークモードボタン配色修正
+  "collection_binder.html": "4.11.1-DarkMode-Button-Color-Fix",  // ダークモードボタン配色修正
   "card_list.html": "4.11.1-DarkMode-Button-Color-Fix",  // ダークモードボタン配色修正
-  "holoca_skill_page.html": "4.10.0-DarkMode-Button-Color-Fix",  // ダークモードボタン配色修正
-  "deck_builder.html": "4.10.0-DarkMode-Button-Color-Fix"  // ダークモードボタン配色修正
+  "holoca_skill_page.html": "4.11.1-DarkMode-Button-Color-Fix",  // ダークモードボタン配色修正
+  "deck_builder.html": "4.11.1-DarkMode-Button-Color-Fix"  // ダークモードボタン配色修正
 };
 
 // ✅ 更新内容の詳細情報
