@@ -45,8 +45,8 @@ async function checkPageVersions() {
       
       const htmlText = await response.text();
       // より柔軟なバージョン検出：ヘッダーコメントと表示バージョンの両方をチェック
-      const versionMatch = htmlText.match(/<!-- Version: ([\d\.]+-?[A-Z-]*)/);
-      const displayVersionMatch = htmlText.match(/\[v([\d\.]+)-/);
+      const versionMatch = htmlText.match(/<!-- Version: ([\d\.]+-?[A-Za-z-]*)/);
+      const displayVersionMatch = htmlText.match(/\[v([\d\.]+-?[A-Za-z-]*)\]/);
       
       let actualVersion = null;
       if (versionMatch) {
@@ -64,8 +64,8 @@ async function checkPageVersions() {
       
       if (cachedResponse) {
         const cachedText = await cachedResponse.text();
-        const cachedVersionMatch = cachedText.match(/<!-- Version: ([\d\.]+-?[A-Z-]*)/);
-        const cachedDisplayVersionMatch = cachedText.match(/\[v([\d\.]+)-/);
+        const cachedVersionMatch = cachedText.match(/<!-- Version: ([\d\.]+-?[A-Za-z-]*)/);
+        const cachedDisplayVersionMatch = cachedText.match(/\[v([\d\.]+-?[A-Za-z-]*)\]/);
         
         if (cachedVersionMatch) {
           cachedVersion = cachedVersionMatch[1]; // サフィックスを削除しない
