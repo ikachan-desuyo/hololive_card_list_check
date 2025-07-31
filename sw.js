@@ -118,8 +118,20 @@ self.addEventListener('activate', function(event) {
 
 // Fetch event - Network First for HTML, Cache First for other resources
 self.addEventListener('fetch', function(event) {
-  // Skip non-GET requests and external URLs
-  if (event.request.method !== 'GET' || !event.request.url.startsWith(self.location.origin)) {
+  // Skip non-GET requests
+  if (event.request.method !== 'GET') {
+    return;
+  }
+
+  // 外部画像URL（hololive-official-cardgame.com）も処理対象にする
+  const isExternalImage = event.request.url.includes('hololive-official-cardgame.com') &&
+                          (event.request.url.includes('.jpg') ||
+                           event.request.url.includes('.png') ||
+                           event.request.url.includes('.jpeg') ||
+                           event.request.url.includes('.webp'));
+
+  // 内部リソースまたは外部画像URLの場合のみ処理
+  if (!event.request.url.startsWith(self.location.origin) && !isExternalImage) {
     return;
   }
 
@@ -128,7 +140,40 @@ self.addEventListener('fetch', function(event) {
                      event.request.url === self.location.origin + '/' ||
                      event.request.url.endsWith('/');
 
-  if (isHTMLFile) {
+  if (isExternalImage) {
+    // 外部画像の場合は特別な処理
+    console.log('🖼️ Service Worker: Handling external image:', event.request.url);
+    
+    event.respondWith(
+      caches.match(event.request)
+        .then(function(response) {
+          if (response) {
+            console.log('Serving cached image:', event.request.url);
+            return response;
+          }
+          
+          // キャッシュになければネットワークから取得（no-corsモード）
+          return fetch(event.request, { mode: 'no-cors' }).then(function(response) {
+            if (response && response.type === 'opaque') {
+              // opaqueレスポンスをキャッシュに保存
+              const responseToCache = response.clone();
+              caches.open(CACHE_NAME).then(function(cache) {
+                cache.put(event.request, responseToCache).then(() => {
+                  console.log('🖼️ Successfully cached external image:', event.request.url);
+                }).catch((error) => {
+                  console.warn('⚠️ Failed to cache external image:', event.request.url, error);
+                });
+              });
+            }
+            return response;
+          }).catch(function() {
+            // ネットワーク失敗時はプレースホルダーを提供
+            console.log('Network failed for external image, using placeholder:', event.request.url);
+            return caches.match('./images/placeholder.png');
+          });
+        })
+    );
+  } else if (isHTMLFile) {
     // ログを減らすために、HTMLファイルのリクエストのみログ出力
     console.log('%c🌐 Service Worker: Fetching HTML with Network First', event.request.url, 'color: #607D8B;');
     
@@ -182,11 +227,17 @@ self.addEventListener('fetch', function(event) {
             
             caches.open(CACHE_NAME)
               .then(function(cache) {
-                // カード画像を動的にキャッシュ
-                if (event.request.url.includes('hololive-official-cardgame.com/cardlist/image/') ||
+                // カード画像を動的にキャッシュ（優先度を上げる・ログ追加）
+                if (event.request.url.includes('hololive-official-cardgame.com') ||
                     event.request.url.includes('.jpg') ||
-                    event.request.url.includes('.png')) {
-                  cache.put(event.request, responseToCache);
+                    event.request.url.includes('.png') ||
+                    event.request.url.includes('.jpeg') ||
+                    event.request.url.includes('.webp')) {
+                  cache.put(event.request, responseToCache).then(() => {
+                    console.log('🖼️ Successfully cached image:', event.request.url);
+                  }).catch((error) => {
+                    console.warn('⚠️ Failed to cache image:', event.request.url, error);
+                  });
                 }
               });
             

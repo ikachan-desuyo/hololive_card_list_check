@@ -1280,3 +1280,253 @@ window.addEventListener("pageshow", () => {
     updateViewModeButton();
   }
 });
+
+// ===== 画像一括ダウンロード機能 =====
+
+let imageDownloadInProgress = false;
+
+// 画像ダウンロード確認ダイアログを表示
+function showImageDownloadDialog() {
+  // モバイル版のみ表示（より厳密な判定）
+  const isMobile = window.innerWidth <= 768 || /Android|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent);
+  if (!isMobile) {
+    console.log('Image bulk download is available only on mobile devices');
+    return;
+  }
+  
+  if (imageDownloadInProgress) {
+    alert('画像ダウンロードが実行中です。しばらくお待ちください。');
+    return;
+  }
+
+  const modal = document.getElementById('imageDownloadModal');
+  const totalImageCountEl = document.getElementById('totalImageCount');
+  const estimatedSizeEl = document.getElementById('estimatedSize');
+  
+  // 画像数を計算
+  const imageUrls = extractImageUrls();
+  const totalCount = imageUrls.length;
+  
+  console.log(`Found ${totalCount} images to download`);
+  
+  // 推定サイズを計算（1枚あたり150-200KBで計算）
+  const avgSizeKB = 175; // 平均サイズ
+  const estimatedSizeMB = Math.round((totalCount * avgSizeKB) / 1024 * 10) / 10;
+  
+  totalImageCountEl.textContent = totalCount.toLocaleString();
+  estimatedSizeEl.textContent = `約 ${estimatedSizeMB.toLocaleString()} MB`;
+  
+  modal.style.display = 'block';
+}
+
+// 画像ダウンロード確認ダイアログを非表示
+function hideImageDownloadDialog() {
+  const modal = document.getElementById('imageDownloadModal');
+  
+  if (imageDownloadInProgress) {
+    const confirmClose = confirm('ダウンロードが実行中です。中断しますか？');
+    if (!confirmClose) return;
+    
+    // 中断フラグを設定
+    imageDownloadInProgress = false;
+    console.log('Image download was cancelled by user');
+  }
+  
+  modal.style.display = 'none';
+  
+  // プログレスをリセット
+  resetDownloadProgress();
+}
+
+// カードデータから画像URLを抽出
+function extractImageUrls() {
+  const imageUrls = [];
+  const seenUrls = new Set();
+  
+  console.log('Cards array length:', cards.length);
+  console.log('Sample card:', cards[0]);
+  
+  for (const card of cards) {
+    // image プロパティから画像URLを取得
+    if (card.image && !seenUrls.has(card.image)) {
+      imageUrls.push(card.image);
+      seenUrls.add(card.image);
+    }
+  }
+  
+  console.log(`Extracted ${imageUrls.length} unique image URLs`);
+  console.log('Sample image URL:', imageUrls[0]);
+  return imageUrls;
+}
+
+// ダウンロード進捗をリセット
+function resetDownloadProgress() {
+  const progressDiv = document.getElementById('downloadProgress');
+  const progressBar = document.getElementById('progressBar');
+  const progressText = document.getElementById('progressText');
+  const startBtn = document.getElementById('startDownloadBtn');
+  const cancelBtn = document.getElementById('cancelDownloadBtn');
+  
+  progressDiv.style.display = 'none';
+  progressBar.style.width = '0%';
+  progressText.textContent = '準備中...';
+  startBtn.disabled = false;
+  startBtn.textContent = '📥 ダウンロード開始';
+  cancelBtn.textContent = 'キャンセル';
+}
+
+// 画像一括ダウンロード開始
+async function startImageDownload() {
+  if (imageDownloadInProgress) return;
+  
+  imageDownloadInProgress = true;
+  
+  const progressDiv = document.getElementById('downloadProgress');
+  const progressBar = document.getElementById('progressBar');
+  const progressText = document.getElementById('progressText');
+  const startBtn = document.getElementById('startDownloadBtn');
+  const cancelBtn = document.getElementById('cancelDownloadBtn');
+  
+  // UIを更新
+  progressDiv.style.display = 'block';
+  startBtn.disabled = true;
+  startBtn.textContent = 'ダウンロード中...';
+  cancelBtn.textContent = '中断';
+  
+  try {
+    const imageUrls = extractImageUrls();
+    const totalCount = imageUrls.length;
+    let successCount = 0;
+    let failureCount = 0;
+    
+    console.log(`Starting download of ${totalCount} images`);
+    
+    progressText.textContent = `画像を事前読み込み中... (Service Workerキャッシュ利用)`;
+    
+    // バッチサイズ（同時ダウンロード数）
+    const batchSize = 3; // バッチサイズを小さくして安定性向上
+    
+    for (let i = 0; i < imageUrls.length; i += batchSize) {
+      if (!imageDownloadInProgress) {
+        console.log('Download was cancelled by user');
+        break; // 中断された場合
+      }
+      
+      const batch = imageUrls.slice(i, i + batchSize);
+      console.log(`Processing batch ${Math.floor(i/batchSize) + 1}/${Math.ceil(imageUrls.length/batchSize)}`);
+      
+      const batchPromises = batch.map(async (url) => {
+        return new Promise(async (resolve) => {
+          try {
+            const timeout = setTimeout(() => {
+              console.warn(`Timeout for: ${url}`);
+              resolve({ success: false, url, error: 'Timeout' });
+            }, 15000); // 15秒タイムアウトに戻す
+            
+            // Service Workerがキャッシュに保存するようにfetchを実行
+            const response = await fetch(url);
+            
+            clearTimeout(timeout);
+            
+            // レスポンス状態をチェック
+            if (response.ok || response.type === 'opaque') {
+              console.log(`Successfully fetched: ${url} (status: ${response.status || 'opaque'})`);
+              resolve({ success: true, url, cached: true });
+            } else {
+              console.warn(`Failed to fetch: ${url} - Status: ${response.status}`);
+              resolve({ success: false, url, error: `HTTP ${response.status}` });
+            }
+            
+          } catch (error) {
+            console.warn(`Fetch failed for: ${url} - ${error.message}`);
+            
+            // fetch失敗の場合、Imageオブジェクトでフォールバック
+            try {
+              const img = new Image();
+              const imgTimeout = setTimeout(() => {
+                resolve({ success: false, url, error: 'Image load timeout' });
+              }, 10000);
+              
+              img.onload = () => {
+                clearTimeout(imgTimeout);
+                console.log(`Image fallback succeeded for: ${url}`);
+                resolve({ success: true, url, cached: false });
+              };
+              
+              img.onerror = () => {
+                clearTimeout(imgTimeout);
+                resolve({ success: false, url, error: 'Image load failed' });
+              };
+              
+              img.src = url;
+            } catch (imgError) {
+              resolve({ success: false, url, error: `Both fetch and image failed: ${error.message}` });
+            }
+          }
+        });
+      });
+      
+      // バッチ実行
+      const batchResults = await Promise.all(batchPromises);
+      
+      // 結果を集計
+      batchResults.forEach(result => {
+        if (result.success) {
+          successCount++;
+        } else {
+          failureCount++;
+          console.warn(`Failed: ${result.url} - ${result.error}`);
+        }
+      });
+      
+      // プログレス更新
+      const progress = Math.round((successCount + failureCount) / totalCount * 100);
+      progressBar.style.width = `${progress}%`;
+      progressText.textContent = `${successCount + failureCount} / ${totalCount} 完了 (成功: ${successCount}, 失敗: ${failureCount})`;
+      
+      // 少し待機（サーバー負荷軽減）
+      await new Promise(resolve => setTimeout(resolve, 300));
+    }
+    
+    if (imageDownloadInProgress) {
+      // 完了メッセージ
+      if (failureCount === 0) {
+        progressText.textContent = `✅ 全ての画像のダウンロードが完了しました！ (${successCount}枚)`;
+        alert(`画像一括ダウンロードが完了しました！\n\n成功: ${successCount}枚\n失敗: ${failureCount}枚\n\nオフラインでも画像が表示されるようになりました。`);
+      } else {
+        progressText.textContent = `⚠️ ダウンロード完了 (成功: ${successCount}枚, 失敗: ${failureCount}枚)`;
+        alert(`画像一括ダウンロードが完了しました。\n\n成功: ${successCount}枚\n失敗: ${failureCount}枚\n\n成功した画像はオフラインでも表示されます。`);
+      }
+      
+      startBtn.textContent = '✅ 完了';
+      cancelBtn.textContent = '閉じる';
+    } else {
+      // 中断された場合
+      progressText.textContent = `❌ ダウンロードが中断されました (成功: ${successCount}枚, 失敗: ${failureCount}枚)`;
+      startBtn.textContent = '中断済み';
+      cancelBtn.textContent = '閉じる';
+    }
+    
+  } catch (error) {
+    console.error('Image download error:', error);
+    progressText.textContent = '❌ ダウンロードエラーが発生しました';
+    alert(`画像ダウンロード中にエラーが発生しました：${error.message}`);
+    
+    startBtn.textContent = '❌ エラー';
+    cancelBtn.textContent = '閉じる';
+  } finally {
+    imageDownloadInProgress = false;
+    startBtn.disabled = false;
+  }
+}
+
+// 現在のキャッシュ名を取得
+async function getCurrentCacheName() {
+  // Service Workerに依存せず、固定のキャッシュ名を使用
+  return 'hololive-card-tool-images';
+}
+
+// グローバル関数として公開
+window.showImageDownloadDialog = showImageDownloadDialog;
+window.hideImageDownloadDialog = hideImageDownloadDialog;
+window.startImageDownload = startImageDownload;

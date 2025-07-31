@@ -238,6 +238,14 @@ async function handleMessage(event) {
       }
       break;
       
+    case 'GET_CACHE_NAME':
+      // 現在のキャッシュ名を返す
+      event.ports[0]?.postMessage({
+        type: 'CACHE_NAME_RESPONSE',
+        cacheName: CACHE_NAME
+      });
+      break;
+      
     default:
       // 従来のメッセージハンドリング
       if (event.data && event.data.type === 'GET_VERSION_INFO') {
