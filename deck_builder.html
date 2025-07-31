@@ -16,10 +16,10 @@
     <!-- ✅ 1段目：ナビゲーションバー的配置 -->
     <div class="deck-nav-row">
       <div>
-        <button onclick="location.href='index.html'">🏠 ホーム</button>
-        <button onclick="location.href='card_list.html'">🃏 カード一覧</button>
-        <button onclick="location.href='collection_binder.html'">🎴 バインダー</button>
-        <button onclick="location.href='holoca_skill_page.html'">🗂 カード詳細検索</button>
+        <button onclick="navigateToPage('index.html')">🏠 ホーム</button>
+        <button onclick="navigateToPage('card_list.html')">🃏 カード一覧</button>
+        <button onclick="navigateToPage('collection_binder.html')">🎴 バインダー</button>
+        <button onclick="navigateToPage('holoca_skill_page.html')">🗂 カード詳細検索</button>
       </div>
       <h2 class="deck-title">デッキ作成
         <span style="font-size: 12px; color: #999; font-weight: normal; margin-left: 10px;" id="versionDisplay">[v4.10.0-DarkMode-Button-Color-Fix]</span>
@@ -134,5 +134,33 @@
 
 
   <script src="js/deck_builder.js"></script>
+  <!-- オフライン状態管理 -->
+  <script src="js/offline-utils.js"></script>
+  
+  <script>
+    // セーフナビゲーション関数（フォールバック付き）
+    function safeNavigate(url) {
+      console.log('Deck Builder: Attempting to navigate to:', url);
+      
+      // offline-utils.js が読み込まれているかチェック
+      if (typeof window.navigateToPage === 'function') {
+        console.log('Using offline-aware navigation');
+        window.navigateToPage(url);
+      } else {
+        console.log('offline-utils.js not loaded, using fallback navigation');
+        // フォールバック: 通常のナビゲーション
+        if (navigator.onLine) {
+          window.location.href = url;
+        } else {
+          // オフライン時の簡易チェック
+          if (confirm('オフライン状態です。このページが利用できない可能性があります。\n移動しますか？')) {
+            window.location.href = url;
+          }
+        }
+      }
+    }
+  </script>
+</body>
+</html></script>
 </body>
 </html>

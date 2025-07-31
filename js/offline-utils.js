@@ -1,0 +1,246 @@
+// オフライン状態管理とナビゲーションのユーティリティ
+// Version: 1.0.0
+
+// オフライン状態インジケーターを作成・表示
+function createOfflineIndicator() {
+  // 既に存在する場合は削除
+  const existing = document.getElementById('offline-indicator');
+  if (existing) {
+    existing.remove();
+  }
+
+  const indicator = document.createElement('div');
+  indicator.id = 'offline-indicator';
+  indicator.style.cssText = `
+    position: fixed;
+    top: 10px;
+    right: 10px;
+    background: #dc3545;
+    color: white;
+    padding: 8px 12px;
+    border-radius: 20px;
+    font-size: 12px;
+    font-weight: bold;
+    z-index: 9999;
+    box-shadow: 0 2px 8px rgba(0,0,0,0.3);
+    display: none;
+    animation: slideIn 0.3s ease-out;
+    cursor: pointer;
+  `;
+  indicator.innerHTML = '🚫 オフライン (クリックでメニュー)';
+  
+  // クリックでオフラインナビゲーションメニューを表示
+  indicator.addEventListener('click', showOfflineNavigation);
+
+  // アニメーション用CSS
+  const style = document.createElement('style');
+  style.textContent = `
+    @keyframes slideIn {
+      from { transform: translateX(100%); opacity: 0; }
+      to { transform: translateX(0); opacity: 1; }
+    }
+  `;
+  document.head.appendChild(style);
+  document.body.appendChild(indicator);
+
+  return indicator;
+}
+
+// オンライン状態インジケーターを作成・表示
+function createOnlineIndicator() {
+  // 既に存在する場合は削除
+  const existing = document.getElementById('online-indicator');
+  if (existing) {
+    existing.remove();
+  }
+
+  const indicator = document.createElement('div');
+  indicator.id = 'online-indicator';
+  indicator.style.cssText = `
+    position: fixed;
+    top: 10px;
+    right: 10px;
+    background: #28a745;
+    color: white;
+    padding: 8px 12px;
+    border-radius: 20px;
+    font-size: 12px;
+    font-weight: bold;
+    z-index: 9999;
+    box-shadow: 0 2px 8px rgba(0,0,0,0.3);
+    display: none;
+    animation: slideIn 0.3s ease-out;
+  `;
+  indicator.innerHTML = '✅ オンライン復帰';
+
+  document.body.appendChild(indicator);
+  return indicator;
+}
+
+// オフライン状態の監視を開始
+function initOfflineMonitoring() {
+  const offlineIndicator = createOfflineIndicator();
+  const onlineIndicator = createOnlineIndicator();
+
+  function updateOnlineStatus() {
+    console.log('Network status changed:', navigator.onLine ? 'Online' : 'Offline');
+    
+    if (navigator.onLine) {
+      // オンライン状態
+      offlineIndicator.style.display = 'none';
+      onlineIndicator.style.display = 'block';
+      
+      // 3秒後にオンライン表示を隠す
+      setTimeout(() => {
+        onlineIndicator.style.display = 'none';
+      }, 3000);
+    } else {
+      // オフライン状態
+      onlineIndicator.style.display = 'none';
+      offlineIndicator.style.display = 'block';
+    }
+  }
+
+  // 初期状態をチェック
+  if (!navigator.onLine) {
+    offlineIndicator.style.display = 'block';
+  }
+
+  // イベントリスナーを追加
+  window.addEventListener('online', updateOnlineStatus);
+  window.addEventListener('offline', updateOnlineStatus);
+
+  console.log('Offline monitoring initialized');
+}
+
+// ページ間の安全なナビゲーション
+function navigateToPage(url) {
+  console.log('navigateToPage called with:', url);
+  
+  if (navigator.onLine) {
+    // オンライン時は通常のナビゲーション
+    console.log('Online: navigating to', url);
+    window.location.href = url;
+  } else {
+    // オフライン時はキャッシュされているかチェック
+    console.log('Offline: checking page availability for', url);
+    checkPageAvailability(url).then(available => {
+      if (available) {
+        console.log('Page available offline, navigating to', url);
+        window.location.href = url;
+      } else {
+        console.log('Page not available offline:', url);
+        alert('このページはオフラインでは利用できません。\nインターネット接続を確認してから再度お試しください。');
+      }
+    });
+  }
+}
+
+// ページがキャッシュされているかチェック
+async function checkPageAvailability(url) {
+  try {
+    // Service Workerがアクティブかチェック
+    if (!('serviceWorker' in navigator) || !navigator.serviceWorker.controller) {
+      console.log('Service Worker not available');
+      return false;
+    }
+
+    // キャッシュをチェック
+    const cacheNames = await caches.keys();
+    for (const cacheName of cacheNames) {
+      const cache = await caches.open(cacheName);
+      const response = await cache.match(url);
+      if (response) {
+        console.log('Page found in cache:', url);
+        return true;
+      }
+    }
+    
+    console.log('Page not found in cache:', url);
+    return false;
+  } catch (error) {
+    console.error('Page availability check failed:', error);
+    return false;
+  }
+}
+
+// オフライン利用可能なページのリスト
+function getOfflineAvailablePages() {
+  return [
+    { url: './index.html', name: 'ホーム' },
+    { url: './card_list.html', name: 'カード一覧' },
+    { url: './collection_binder.html', name: 'コレクションバインダー' },
+    { url: './binder_collection.html', name: 'バインダーコレクション' },
+    { url: './holoca_skill_page.html', name: 'ホロカスキル' },
+    { url: './deck_builder.html', name: 'デッキビルダー' }
+  ];
+}
+
+// オフライン時のナビゲーションメニューを表示
+function showOfflineNavigation() {
+  const pages = getOfflineAvailablePages();
+  const currentPage = window.location.pathname.split('/').pop() || 'index.html';
+  
+  let menu = 'オフラインで利用可能なページ:\n\n';
+  pages.forEach((page, index) => {
+    const isCurrent = page.url.includes(currentPage);
+    menu += `${index + 1}. ${page.name}${isCurrent ? ' (現在のページ)' : ''}\n`;
+  });
+  
+  menu += '\n移動したいページの番号を選択してください。';
+  
+  const choice = prompt(menu);
+  const pageIndex = parseInt(choice) - 1;
+  
+  if (pageIndex >= 0 && pageIndex < pages.length) {
+    const selectedPage = pages[pageIndex];
+    if (!selectedPage.url.includes(currentPage)) {
+      navigateToPage(selectedPage.url);
+    }
+  }
+}
+
+// ページ読み込み時に実行
+if (typeof window !== 'undefined') {
+  // DOM読み込み完了後にオフライン監視を開始
+  if (document.readyState === 'loading') {
+    document.addEventListener('DOMContentLoaded', initOfflineMonitoring);
+  } else {
+    initOfflineMonitoring();
+  }
+}
+
+// グローバル関数として公開
+if (typeof window !== 'undefined') {
+  window.navigateToPage = navigateToPage;
+  window.showOfflineNavigation = showOfflineNavigation;
+  window.checkPageAvailability = checkPageAvailability;
+  window.getOfflineAvailablePages = getOfflineAvailablePages;
+  
+  // デバッグ用: オフライン状態をシミュレート
+  window.simulateOffline = function() {
+    if (navigator.onLine) {
+      const indicator = document.getElementById('offline-indicator');
+      if (indicator) {
+        indicator.style.display = 'block';
+        console.log('オフライン状態をシミュレート中...');
+      }
+    }
+  };
+  
+  // デバッグ用: オンライン状態に戻す
+  window.simulateOnline = function() {
+    const offlineIndicator = document.getElementById('offline-indicator');
+    const onlineIndicator = document.getElementById('online-indicator');
+    if (offlineIndicator) offlineIndicator.style.display = 'none';
+    if (onlineIndicator) {
+      onlineIndicator.style.display = 'block';
+      setTimeout(() => {
+        onlineIndicator.style.display = 'none';
+      }, 3000);
+    }
+    console.log('オンライン状態に復帰');
+  };
+  
+  console.log('Offline utilities loaded successfully');
+}

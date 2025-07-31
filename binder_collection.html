@@ -548,7 +548,7 @@
     function openBinder(binderId) {
       // バインダーIDをURLパラメータとして渡して、collection_binder.htmlを開く
       const url = `collection_binder.html?binderId=${binderId}`;
-      window.location.href = url;
+      navigateToPage(url);
     }
 
     // バインダー編集フォームの送信
@@ -955,7 +955,7 @@
     }
 
     function goHome() {
-      window.location.href = 'index.html';
+      navigateToPage('index.html');
     }
 
     function formatDate(dateString) {
@@ -986,5 +986,7 @@
     });
   </script>
   <script src="js/binder_collection.js"></script>
+  <!-- オフライン状態管理 -->
+  <script src="js/offline-utils.js"></script>
 </body>
 </html>

@@ -17,10 +17,10 @@
     <div class="top-bar">
       <div class="nav-row">
         <div>
-          <button onclick="location.href='index.html'">🏠 ホーム</button>
-          <button onclick="location.href='card_list.html'">🃏 カード一覧</button>
-          <button onclick="location.href='collection_binder.html'">🎴 バインダー</button>
-          <button onclick="location.href='deck_builder.html'">⚔️ デッキ作成</button>
+          <button onclick="navigateToPage('index.html')">🏠 ホーム</button>
+          <button onclick="navigateToPage('card_list.html')">🃏 カード一覧</button>
+          <button onclick="navigateToPage('collection_binder.html')">🎴 バインダー</button>
+          <button onclick="navigateToPage('deck_builder.html')">⚔️ デッキ作成</button>
         </div>
                 <h2 style="margin: 0;">カード詳細検索
           <span style="font-size: 12px; color: #999; font-weight: normal;" id="versionDisplay">[v4.10.0-DarkMode-Button-Color-Fix]</span>
@@ -129,5 +129,7 @@
 
 
     <script src="js/holoca_skill_page.js"></script>
+    <!-- オフライン状態管理 -->
+    <script src="js/offline-utils.js"></script>
 </body>
 </html>

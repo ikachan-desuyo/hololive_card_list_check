@@ -215,37 +215,37 @@
     </h1>
 
     <div class="menu-grid">
-      <a href="card_list.html" class="menu-card">
+      <div class="menu-card" onclick="safeNavigate('card_list.html')" style="cursor: pointer;">
         <span class="menu-icon">🃏</span>
         <div class="menu-title">カード一覧</div>
         <div class="menu-description">
           全カードの一覧表示・検索・フィルタリング機能。所持状況の管理やCSVでのデータ管理が可能です。
         </div>
-      </a>
+      </div>
 
-      <a href="binder_collection.html" class="menu-card">
+      <div class="menu-card" onclick="safeNavigate('binder_collection.html')" style="cursor: pointer;">
         <span class="menu-icon">📚</span>
         <div class="menu-title">バインダーコレクション</div>
         <div class="menu-description">
           複数のバインダーを管理。お気に入りの表紙画像を設定して、テーマ別にカードをコレクションできます。
         </div>
-      </a>
+      </div>
 
-      <a href="holoca_skill_page.html" class="menu-card">
+      <div class="menu-card" onclick="safeNavigate('holoca_skill_page.html')" style="cursor: pointer;">
         <span class="menu-icon">🗂️</span>
         <div class="menu-title">カード詳細検索</div>
         <div class="menu-description">
           詳細な条件でカードを検索。スキル・能力・コストなど様々な条件で絞り込めます。
         </div>
-      </a>
+      </div>
 
-      <a href="deck_builder.html" class="menu-card">
+      <div class="menu-card" onclick="safeNavigate('deck_builder.html')" style="cursor: pointer;">
         <span class="menu-icon">⚔️</span>
         <div class="menu-title">デッキ作成</div>
         <div class="menu-description">
           戦略的なデッキを構築。カードの組み合わせを考えながら最適なデッキを作成できます。
         </div>
-      </a>
+      </div>
     </div>
 
     <!-- 更新確認ボタン -->
@@ -598,6 +598,30 @@
         btnEl.textContent = '🔄 更新確認';
       }
     }
+
+    // セーフナビゲーション関数（フォールバック付き）
+    function safeNavigate(url) {
+      console.log('Attempting to navigate to:', url);
+      
+      // offline-utils.js が読み込まれているかチェック
+      if (typeof window.navigateToPage === 'function') {
+        console.log('Using offline-aware navigation');
+        window.navigateToPage(url);
+      } else {
+        console.log('offline-utils.js not loaded, using fallback navigation');
+        // フォールバック: 通常のナビゲーション
+        if (navigator.onLine) {
+          window.location.href = url;
+        } else {
+          // オフライン時の簡易チェック
+          if (confirm('オフライン状態です。このページが利用できない可能性があります。\n移動しますか？')) {
+            window.location.href = url;
+          }
+        }
+      }
+    }
   </script>
+  <!-- オフライン状態管理 -->
+  <script src="js/offline-utils.js"></script>
 </body>
 </html>

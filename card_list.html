@@ -20,10 +20,10 @@
       </h2>
 
         <div class="top-nav">
-          <button onclick="location.href='index.html'">🏠 ホーム</button>
-          <button onclick="location.href='binder_collection.html'">🎴 バインダー</button>
-          <button onclick="location.href='holoca_skill_page.html'">🗂 カード詳細検索</button>
-          <button onclick="location.href='deck_builder.html'">⚔️ デッキ作成</button>
+          <button onclick="navigateToPage('index.html')">🏠 ホーム</button>
+          <button onclick="navigateToPage('binder_collection.html')">🎴 バインダー</button>
+          <button onclick="navigateToPage('holoca_skill_page.html')">🗂 カード詳細検索</button>
+          <button onclick="navigateToPage('deck_builder.html')">⚔️ デッキ作成</button>
         </div>      <div class="top-controls">
         <!-- CSV機能を最上部に移動 -->
         <div class="top-controls-row csv-row">
@@ -225,5 +225,7 @@
 </div>
 
   <script src="js/card_list.js"></script>
+  <!-- オフライン状態管理 -->
+  <script src="js/offline-utils.js"></script>
 </body>
 </html>
