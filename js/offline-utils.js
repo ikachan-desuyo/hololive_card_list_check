@@ -1,7 +1,7 @@
 // オフライン状態管理とナビゲーションのユーティリティ
 // Version: 1.0.0
 
-// オフライン状態インジケーターを作成・表示
+// オフライン状態インジケーターを作成・表示（右下にシンプル表示）
 function createOfflineIndicator() {
   // 既に存在する場合は削除
   const existing = document.getElementById('offline-indicator');
@@ -13,31 +13,29 @@ function createOfflineIndicator() {
   indicator.id = 'offline-indicator';
   indicator.style.cssText = `
     position: fixed;
-    top: 10px;
-    right: 10px;
-    background: #dc3545;
+    bottom: 20px;
+    right: 20px;
+    background: rgba(220, 53, 69, 0.9);
     color: white;
-    padding: 8px 12px;
-    border-radius: 20px;
-    font-size: 12px;
-    font-weight: bold;
+    padding: 6px 10px;
+    border-radius: 15px;
+    font-size: 11px;
+    font-weight: 500;
     z-index: 9999;
-    box-shadow: 0 2px 8px rgba(0,0,0,0.3);
+    box-shadow: 0 2px 6px rgba(0,0,0,0.2);
     display: none;
-    animation: slideIn 0.3s ease-out;
-    cursor: pointer;
+    animation: fadeIn 0.3s ease-out;
+    backdrop-filter: blur(5px);
+    border: 1px solid rgba(255,255,255,0.2);
   `;
-  indicator.innerHTML = '🚫 オフライン (クリックでメニュー)';
-  
-  // クリックでオフラインナビゲーションメニューを表示
-  indicator.addEventListener('click', showOfflineNavigation);
+  indicator.innerHTML = '� オフライン';
 
   // アニメーション用CSS
   const style = document.createElement('style');
   style.textContent = `
-    @keyframes slideIn {
-      from { transform: translateX(100%); opacity: 0; }
-      to { transform: translateX(0); opacity: 1; }
+    @keyframes fadeIn {
+      from { opacity: 0; transform: translateY(10px); }
+      to { opacity: 1; transform: translateY(0); }
     }
   `;
   document.head.appendChild(style);
@@ -46,7 +44,7 @@ function createOfflineIndicator() {
   return indicator;
 }
 
-// オンライン状態インジケーターを作成・表示
+// オンライン状態インジケーターを作成・表示（右下にシンプル表示）
 function createOnlineIndicator() {
   // 既に存在する場合は削除
   const existing = document.getElementById('online-indicator');
@@ -58,20 +56,22 @@ function createOnlineIndicator() {
   indicator.id = 'online-indicator';
   indicator.style.cssText = `
     position: fixed;
-    top: 10px;
-    right: 10px;
-    background: #28a745;
+    bottom: 20px;
+    right: 20px;
+    background: rgba(40, 167, 69, 0.9);
     color: white;
-    padding: 8px 12px;
-    border-radius: 20px;
-    font-size: 12px;
-    font-weight: bold;
+    padding: 6px 10px;
+    border-radius: 15px;
+    font-size: 11px;
+    font-weight: 500;
     z-index: 9999;
-    box-shadow: 0 2px 8px rgba(0,0,0,0.3);
+    box-shadow: 0 2px 6px rgba(0,0,0,0.2);
     display: none;
-    animation: slideIn 0.3s ease-out;
+    animation: fadeIn 0.3s ease-out;
+    backdrop-filter: blur(5px);
+    border: 1px solid rgba(255,255,255,0.2);
   `;
-  indicator.innerHTML = '✅ オンライン復帰';
+  indicator.innerHTML = '🟢 オンライン復帰';
 
   document.body.appendChild(indicator);
   return indicator;
@@ -176,30 +176,6 @@ function getOfflineAvailablePages() {
   ];
 }
 
-// オフライン時のナビゲーションメニューを表示
-function showOfflineNavigation() {
-  const pages = getOfflineAvailablePages();
-  const currentPage = window.location.pathname.split('/').pop() || 'index.html';
-  
-  let menu = 'オフラインで利用可能なページ:\n\n';
-  pages.forEach((page, index) => {
-    const isCurrent = page.url.includes(currentPage);
-    menu += `${index + 1}. ${page.name}${isCurrent ? ' (現在のページ)' : ''}\n`;
-  });
-  
-  menu += '\n移動したいページの番号を選択してください。';
-  
-  const choice = prompt(menu);
-  const pageIndex = parseInt(choice) - 1;
-  
-  if (pageIndex >= 0 && pageIndex < pages.length) {
-    const selectedPage = pages[pageIndex];
-    if (!selectedPage.url.includes(currentPage)) {
-      navigateToPage(selectedPage.url);
-    }
-  }
-}
-
 // ページ読み込み時に実行
 if (typeof window !== 'undefined') {
   // DOM読み込み完了後にオフライン監視を開始
@@ -213,7 +189,6 @@ if (typeof window !== 'undefined') {
 // グローバル関数として公開
 if (typeof window !== 'undefined') {
   window.navigateToPage = navigateToPage;
-  window.showOfflineNavigation = showOfflineNavigation;
   window.checkPageAvailability = checkPageAvailability;
   window.getOfflineAvailablePages = getOfflineAvailablePages;
   
