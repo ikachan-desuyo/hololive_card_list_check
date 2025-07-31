@@ -959,6 +959,83 @@ textarea {
   animation: modalSlideIn 0.3s ease-out;
 }
 
+/* ダークモード用のモーダルスタイル */
+.dark #imageDownloadModal > div {
+  background: #333 !important;
+  color: #eee !important;
+  border: 1px solid #555 !important;
+}
+
+.dark #imageDownloadModal h3 {
+  color: #eee !important;
+  border-bottom: 1px solid #555;
+}
+
+.dark #imageDownloadModal p {
+  color: #ccc !important;
+}
+
+.dark #imageDownloadModal > div > div > div {
+  background: #444 !important;
+  border: 1px solid #555 !important;
+}
+
+.dark #imageDownloadModal > div > div > div:nth-child(4) {
+  background: #3d3d3d !important;
+  border: 1px solid #6c5d00 !important;
+  color: #ffc107 !important;
+}
+
+.dark #imageDownloadModal #progressText {
+  color: #eee !important;
+  white-space: pre-line; /* 改行を有効にする */
+}
+
+.dark #imageDownloadModal #downloadProgress {
+  background: #444 !important;
+  border: 1px solid #555 !important;
+  border-radius: 5px !important;
+  padding: 10px !important;
+}
+
+.dark #imageDownloadModal button {
+  background: #444 !important;
+  color: #eee !important;
+  border: 1px solid #666 !important;
+}
+
+.dark #imageDownloadModal button:hover {
+  background: #555 !important;
+  border-color: #777 !important;
+}
+
+.dark #imageDownloadModal #startDownloadBtn {
+  background: linear-gradient(90deg, #007bff 0%, #0056b3 100%) !important;
+  color: white !important;
+}
+
+.dark #imageDownloadModal #startDownloadBtn:hover:not(:disabled) {
+  background: linear-gradient(90deg, #0056b3 0%, #007bff 100%) !important;
+}
+
+.dark #imageDownloadModal #cancelDownloadBtn {
+  background: #6c757d !important;
+  color: white !important;
+}
+
+.dark #imageDownloadModal #cancelDownloadBtn:hover {
+  background: #5a6268 !important;
+}
+
+.dark #imageDownloadModal #clearCacheBtn {
+  background: #dc3545 !important;
+  color: white !important;
+}
+
+.dark #imageDownloadModal #clearCacheBtn:hover:not(:disabled) {
+  background: #c82333 !important;
+}
+
 @keyframes modalSlideIn {
   from {
     opacity: 0;

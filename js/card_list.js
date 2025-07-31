@@ -1302,6 +1302,8 @@ function showImageDownloadDialog() {
   const modal = document.getElementById('imageDownloadModal');
   const totalImageCountEl = document.getElementById('totalImageCount');
   const estimatedSizeEl = document.getElementById('estimatedSize');
+  const currentCacheInfoEl = document.getElementById('currentCacheInfo');
+  const startBtn = document.getElementById('startDownloadBtn');
   
   // 画像数を計算
   const imageUrls = extractImageUrls();
@@ -1315,6 +1317,49 @@ function showImageDownloadDialog() {
   
   totalImageCountEl.textContent = totalCount.toLocaleString();
   estimatedSizeEl.textContent = `約 ${estimatedSizeMB.toLocaleString()} MB`;
+  
+  // 詳細なキャッシュ状況を非同期で取得
+  currentCacheInfoEl.textContent = '確認中...';
+  startBtn.disabled = true;
+  startBtn.textContent = '確認中...';
+  
+  checkCacheStatus().then(cacheStatus => {
+    if (cacheStatus.cached === cacheStatus.total && cacheStatus.total > 0) {
+      // 全てキャッシュ済み
+      currentCacheInfoEl.innerHTML = `✅ <strong>全画像キャッシュ済み</strong> (${cacheStatus.cached}/${cacheStatus.total}枚)`;
+      startBtn.disabled = true;
+      startBtn.textContent = '📥 ダウンロード済み';
+      startBtn.style.background = '#28a745';
+    } else if (cacheStatus.cached > 0) {
+      // 一部キャッシュ済み
+      currentCacheInfoEl.innerHTML = `⚠️ <strong>一部キャッシュ済み</strong> (${cacheStatus.cached}/${cacheStatus.total}枚)<br>未キャッシュ: ${cacheStatus.uncached}枚`;
+      startBtn.disabled = false;
+      startBtn.textContent = `📥 残り${cacheStatus.uncached}枚をダウンロード`;
+      startBtn.style.background = '#ffc107';
+      startBtn.style.color = '#212529';
+    } else {
+      // キャッシュなし
+      currentCacheInfoEl.innerHTML = `❌ <strong>キャッシュなし</strong> (0/${cacheStatus.total}枚)`;
+      startBtn.disabled = false;
+      startBtn.textContent = '📥 ダウンロード開始';
+      startBtn.style.background = '#007bff';
+      startBtn.style.color = 'white';
+    }
+    
+    // 推定ダウンロードサイズを未キャッシュ分のみで再計算
+    if (cacheStatus.uncached > 0) {
+      const uncachedSizeMB = Math.round((cacheStatus.uncached * avgSizeKB) / 1024 * 10) / 10;
+      estimatedSizeEl.textContent = `約 ${uncachedSizeMB.toLocaleString()} MB (未キャッシュ分)`;
+    } else if (cacheStatus.cached > 0) {
+      estimatedSizeEl.textContent = `ダウンロード不要`;
+    }
+    
+  }).catch(error => {
+    console.error('Cache status error:', error);
+    currentCacheInfoEl.textContent = '❌ 情報取得失敗';
+    startBtn.disabled = false;
+    startBtn.textContent = '📥 ダウンロード開始';
+  });
   
   modal.style.display = 'block';
 }
@@ -1394,14 +1439,27 @@ async function startImageDownload() {
   cancelBtn.textContent = '中断';
   
   try {
-    const imageUrls = extractImageUrls();
+    // キャッシュ状況をチェックして、未キャッシュの画像のみを対象にする
+    progressText.textContent = 'キャッシュ状況を確認中...';
+    const cacheStatus = await checkCacheStatus();
+    
+    if (cacheStatus.uncached === 0) {
+      // 全てキャッシュ済み
+      progressText.textContent = '✅ 全ての画像は既にキャッシュされています';
+      startBtn.textContent = '✅ 完了';
+      cancelBtn.textContent = '閉じる';
+      alert('全ての画像は既にキャッシュされているため、ダウンロードの必要はありません。');
+      return;
+    }
+    
+    const imageUrls = cacheStatus.uncachedUrls; // 未キャッシュの画像のみ
     const totalCount = imageUrls.length;
     let successCount = 0;
     let failureCount = 0;
     
-    console.log(`Starting download of ${totalCount} images`);
+    console.log(`Starting download of ${totalCount} uncached images`);
     
-    progressText.textContent = `画像を事前読み込み中... (Service Workerキャッシュ利用)`;
+    progressText.textContent = `未キャッシュ画像を事前読み込み中... (${totalCount}枚)`;
     
     // バッチサイズ（同時ダウンロード数）
     const batchSize = 3; // バッチサイズを小さくして安定性向上
@@ -1482,7 +1540,11 @@ async function startImageDownload() {
       // プログレス更新
       const progress = Math.round((successCount + failureCount) / totalCount * 100);
       progressBar.style.width = `${progress}%`;
-      progressText.textContent = `${successCount + failureCount} / ${totalCount} 完了 (成功: ${successCount}, 失敗: ${failureCount})`;
+      
+      // 全体の進捗情報を表示（既キャッシュ + 新規ダウンロード）
+      const totalCachedNow = cacheStatus.cached + successCount;
+      const grandTotal = cacheStatus.total;
+      progressText.textContent = `${successCount + failureCount} / ${totalCount} 完了 (成功: ${successCount}, 失敗: ${failureCount})\n全体: ${totalCachedNow}/${grandTotal}枚がキャッシュ済み`;
       
       // 少し待機（サーバー負荷軽減）
       await new Promise(resolve => setTimeout(resolve, 300));
@@ -1490,19 +1552,24 @@ async function startImageDownload() {
     
     if (imageDownloadInProgress) {
       // 完了メッセージ
+      const totalCachedFinal = cacheStatus.cached + successCount;
+      const grandTotal = cacheStatus.total;
+      
       if (failureCount === 0) {
-        progressText.textContent = `✅ 全ての画像のダウンロードが完了しました！ (${successCount}枚)`;
-        alert(`画像一括ダウンロードが完了しました！\n\n成功: ${successCount}枚\n失敗: ${failureCount}枚\n\nオフラインでも画像が表示されるようになりました。`);
+        progressText.textContent = `✅ 新規画像のダウンロードが完了しました！ (${successCount}枚)\n全体: ${totalCachedFinal}/${grandTotal}枚がキャッシュ済み`;
+        alert(`画像一括ダウンロードが完了しました！\n\n新規ダウンロード: ${successCount}枚\n既存キャッシュ: ${cacheStatus.cached}枚\n合計: ${totalCachedFinal}/${grandTotal}枚\n\nオフラインでも画像が表示されるようになりました。`);
       } else {
-        progressText.textContent = `⚠️ ダウンロード完了 (成功: ${successCount}枚, 失敗: ${failureCount}枚)`;
-        alert(`画像一括ダウンロードが完了しました。\n\n成功: ${successCount}枚\n失敗: ${failureCount}枚\n\n成功した画像はオフラインでも表示されます。`);
+        progressText.textContent = `⚠️ ダウンロード完了 (成功: ${successCount}枚, 失敗: ${failureCount}枚)\n全体: ${totalCachedFinal}/${grandTotal}枚がキャッシュ済み`;
+        alert(`画像一括ダウンロードが完了しました。\n\n新規成功: ${successCount}枚\n失敗: ${failureCount}枚\n既存キャッシュ: ${cacheStatus.cached}枚\n\n成功した画像はオフラインでも表示されます。`);
       }
       
       startBtn.textContent = '✅ 完了';
       cancelBtn.textContent = '閉じる';
     } else {
       // 中断された場合
-      progressText.textContent = `❌ ダウンロードが中断されました (成功: ${successCount}枚, 失敗: ${failureCount}枚)`;
+      const totalCachedFinal = cacheStatus.cached + successCount;
+      const grandTotal = cacheStatus.total;
+      progressText.textContent = `❌ ダウンロードが中断されました (成功: ${successCount}枚, 失敗: ${failureCount}枚)\n全体: ${totalCachedFinal}/${grandTotal}枚がキャッシュ済み`;
       startBtn.textContent = '中断済み';
       cancelBtn.textContent = '閉じる';
     }
@@ -1526,7 +1593,182 @@ async function getCurrentCacheName() {
   return 'hololive-card-tool-images';
 }
 
+// 画像キャッシュを削除
+async function clearImageCache() {
+  if (!confirm('画像キャッシュを削除しますか？\n\n削除後は再度ダウンロードが必要になります。')) {
+    return;
+  }
+
+  const clearBtn = document.getElementById('clearCacheBtn');
+  const originalText = clearBtn.textContent;
+  
+  try {
+    clearBtn.disabled = true;
+    clearBtn.textContent = '削除中...';
+    
+    // すべてのキャッシュを取得
+    const cacheNames = await caches.keys();
+    console.log('Available caches:', cacheNames);
+    
+    let deletedCount = 0;
+    let totalSize = 0;
+    
+    // 画像関連のキャッシュエントリを削除
+    for (const cacheName of cacheNames) {
+      const cache = await caches.open(cacheName);
+      const requests = await cache.keys();
+      
+      for (const request of requests) {
+        // 画像URLまたはhololive-official-cardgame.comのリクエストを削除
+        if (request.url.includes('hololive-official-cardgame.com') ||
+            request.url.includes('.jpg') ||
+            request.url.includes('.png') ||
+            request.url.includes('.jpeg') ||
+            request.url.includes('.webp')) {
+          
+          const response = await cache.match(request);
+          if (response) {
+            const clonedResponse = response.clone();
+            try {
+              // レスポンスサイズを推定（可能であれば）
+              const blob = await clonedResponse.blob();
+              totalSize += blob.size;
+            } catch (e) {
+              // サイズ取得失敗は無視
+            }
+          }
+          
+          await cache.delete(request);
+          deletedCount++;
+          console.log('Deleted cached image:', request.url);
+        }
+      }
+    }
+    
+    // サイズを人間が読める形式に変換
+    const sizeText = totalSize > 0 ? 
+      `約 ${(totalSize / (1024 * 1024)).toFixed(1)} MB` : 
+      '不明';
+    
+    clearBtn.textContent = '✅ 削除完了';
+    
+    alert(`画像キャッシュを削除しました！\n\n削除した画像数: ${deletedCount}枚\n削除したサイズ: ${sizeText}\n\n次回表示時にはネットワークから画像を読み込みます。`);
+    
+    // UIをリセット
+    setTimeout(() => {
+      clearBtn.textContent = originalText;
+      clearBtn.disabled = false;
+    }, 2000);
+    
+  } catch (error) {
+    console.error('Cache clear error:', error);
+    clearBtn.textContent = '❌ エラー';
+    alert(`キャッシュ削除中にエラーが発生しました：${error.message}`);
+    
+    setTimeout(() => {
+      clearBtn.textContent = originalText;
+      clearBtn.disabled = false;
+    }, 2000);
+  }
+}
+
+// キャッシュ状況を詳細チェック
+async function checkCacheStatus() {
+  try {
+    const imageUrls = extractImageUrls();
+    const cacheNames = await caches.keys();
+    
+    let cachedUrls = new Set();
+    let uncachedUrls = [];
+    
+    // すべてのキャッシュをチェック
+    for (const cacheName of cacheNames) {
+      const cache = await caches.open(cacheName);
+      
+      for (const url of imageUrls) {
+        const response = await cache.match(url);
+        if (response) {
+          cachedUrls.add(url);
+        }
+      }
+    }
+    
+    // キャッシュされていないURLを特定
+    for (const url of imageUrls) {
+      if (!cachedUrls.has(url)) {
+        uncachedUrls.push(url);
+      }
+    }
+    
+    return {
+      total: imageUrls.length,
+      cached: cachedUrls.size,
+      uncached: uncachedUrls.length,
+      cachedUrls: Array.from(cachedUrls),
+      uncachedUrls: uncachedUrls
+    };
+    
+  } catch (error) {
+    console.error('Cache status check error:', error);
+    return {
+      total: 0,
+      cached: 0,
+      uncached: 0,
+      cachedUrls: [],
+      uncachedUrls: []
+    };
+  }
+}
+
+// キャッシュサイズを推定
+async function estimateCacheSize() {
+  try {
+    const cacheNames = await caches.keys();
+    let totalSize = 0;
+    let imageCount = 0;
+    
+    for (const cacheName of cacheNames) {
+      const cache = await caches.open(cacheName);
+      const requests = await cache.keys();
+      
+      for (const request of requests) {
+        if (request.url.includes('hololive-official-cardgame.com') ||
+            request.url.includes('.jpg') ||
+            request.url.includes('.png') ||
+            request.url.includes('.jpeg') ||
+            request.url.includes('.webp')) {
+          
+          imageCount++;
+          const response = await cache.match(request);
+          if (response) {
+            try {
+              const clonedResponse = response.clone();
+              const blob = await clonedResponse.blob();
+              totalSize += blob.size;
+            } catch (e) {
+              // サイズ取得失敗時は平均サイズで推定
+              totalSize += 175 * 1024; // 175KB
+            }
+          }
+        }
+      }
+    }
+    
+    return { 
+      count: imageCount, 
+      size: totalSize,
+      sizeText: totalSize > 0 ? `約 ${(totalSize / (1024 * 1024)).toFixed(1)} MB` : '不明'
+    };
+  } catch (error) {
+    console.error('Cache size estimation error:', error);
+    return { count: 0, size: 0, sizeText: '取得失敗' };
+  }
+}
+
 // グローバル関数として公開
 window.showImageDownloadDialog = showImageDownloadDialog;
 window.hideImageDownloadDialog = hideImageDownloadDialog;
 window.startImageDownload = startImageDownload;
+window.clearImageCache = clearImageCache;
+window.estimateCacheSize = estimateCacheSize;
+window.checkCacheStatus = checkCacheStatus;
