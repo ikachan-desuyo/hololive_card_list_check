@@ -1,26 +1,28 @@
 // Version Management Configuration
 // このファイルはバージョンアップ時に更新されます
 
-const APP_VERSION = "4.11.1";
-const VERSION_DESCRIPTION = "DarkMode-Button-Color-Fix";
+const APP_VERSION = "4.11.0";
+const VERSION_DESCRIPTION = "Offline-Display-Improvement";
 
 // ✅ 各ページのバージョン情報を一元管理
 const PAGE_VERSIONS = {
-  "index.html": "4.10.0-DarkMode-Button-Color-Fix",  // ダークモードボタン配色修正
-  "binder_collection.html": "4.10.0-DarkMode-Button-Color-Fix",  // ダークモードボタン配色修正
-  "collection_binder.html": "4.10.0-DarkMode-Button-Color-Fix",  // ダークモードボタン配色修正
-  "card_list.html": "4.11.1-DarkMode-Button-Color-Fix",  // ダークモードボタン配色修正
-  "holoca_skill_page.html": "4.10.0-DarkMode-Button-Color-Fix",  // ダークモードボタン配色修正
-  "deck_builder.html": "4.10.0-DarkMode-Button-Color-Fix"  // ダークモードボタン配色修正
+  "index.html": "4.11.0-Offline-Display-Improvement",  // オフライン表示改善
+  "binder_collection.html": "4.11.0-Offline-Display-Improvement",  // オフライン表示改善
+  "collection_binder.html": "4.11.0-Offline-Display-Improvement",  // オフライン表示改善
+  "card_list.html": "4.11.0-Offline-Display-Improvement",  // オフライン表示改善
+  "holoca_skill_page.html": "4.11.0-Offline-Display-Improvement",  // オフライン表示改善
+  "deck_builder.html": "4.11.0-Offline-Display-Improvement"  // オフライン表示改善
 };
 
 // ✅ 更新内容の詳細情報
 const UPDATE_DETAILS = {
-  title: "🎨 ダークモードボタン配色修正 v4.11.0",
-  description: "ダークモード時の全ボタン配色を明示的に上書き（背景・文字色・ボーダー色・ホバー時も明示）",
+  title: "🔴 オフライン表示改善 v4.11.0",
+  description: "オフライン状態表示を右下にシンプル化、重複表示削除、統一されたデザイン",
   changes: [
-    "� ダークモード時の全ボタン配色を明示的に上書き（背景・文字色・ボーダー色・ホバー時も明示）",
-    "� その他UI/UX改善"
+    "🔴 オフライン表示を右下にシンプル化（邪魔なボタン削除）",
+    "🧹 重複するオフライン表示を削除（カード詳細検索・デッキ作成）",
+    "📚 バインダー機能のオフライン対応確認済み",
+    "✨ 統一されたオフライン状態表示デザイン"
   ]
 };
 
