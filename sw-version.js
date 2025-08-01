@@ -1,40 +1,40 @@
 // Version Management Configuration
 // このファイルはバージョンアップ時に更新されます
 
-const APP_VERSION = "4.11.0";
-const VERSION_DESCRIPTION = "Offline-Display-Improvement";
+const APP_VERSION = "4.11.1";
+const VERSION_DESCRIPTION = "Complete-Cache-Enhancement";
 
 // ✅ 各ページのバージョン情報を一元管理
 const PAGE_VERSIONS = {
-  "index.html": "4.11.0-Offline-Display-Improvement",  // オフライン表示改善
-  "binder_collection.html": "4.11.0-Offline-Display-Improvement",  // オフライン表示改善
-  "collection_binder.html": "4.11.0-Offline-Display-Improvement",  // オフライン表示改善
-  "card_list.html": "4.11.0-Offline-Display-Improvement",  // オフライン表示改善
-  "holoca_skill_page.html": "4.11.0-Offline-Display-Improvement",  // オフライン表示改善
-  "deck_builder.html": "4.11.0-Offline-Display-Improvement"  // オフライン表示改善
+  "index.html": "4.11.1-Complete-Cache-Enhancement",  // 完全なキャッシュ強化
+  "binder_collection.html": "4.11.1-Complete-Cache-Enhancement",  // 完全なキャッシュ強化
+  "collection_binder.html": "4.11.1-Complete-Cache-Enhancement",  // 完全なキャッシュ強化
+  "card_list.html": "4.11.1-Complete-Cache-Enhancement",  // 完全なキャッシュ強化
+  "holoca_skill_page.html": "4.11.1-Complete-Cache-Enhancement",  // 完全なキャッシュ強化
+  "deck_builder.html": "4.11.1-Complete-Cache-Enhancement"  // 完全なキャッシュ強化
 };
 
 // ✅ 短縮表示用のバージョン情報（表示のみに使用）
 const DISPLAY_VERSIONS = {
-  "index.html": "v4.11.0",
-  "binder_collection.html": "v4.11.0",
-  "collection_binder.html": "v4.11.0",
-  "card_list.html": "v4.11.0",
-  "holoca_skill_page.html": "v4.11.0",
-  "deck_builder.html": "v4.11.0"
+  "index.html": "v4.11.1",
+  "binder_collection.html": "v4.11.1",
+  "collection_binder.html": "v4.11.1",
+  "card_list.html": "v4.11.1",
+  "holoca_skill_page.html": "v4.11.1",
+  "deck_builder.html": "v4.11.1"
 };
 
 // ✅ 更新内容の詳細情報
 const UPDATE_DETAILS = {
-  title: "🔴 オフライン表示改善 v4.11.0",
-  description: "オフライン状態表示を右下にシンプル化、重複表示削除、統一されたデザイン、画像一括DL機能追加",
+  title: "� 完全なキャッシュ強化 v4.11.1",
+  description: "全ページのCSS・JSファイルをキャッシュ対象に追加、コレクションバインダーを含む全機能のオフライン対応完了",
   changes: [
-    "🔴 オフライン表示を右下にシンプル化（邪魔なボタン削除）",
-    "🧹 重複するオフライン表示を削除（カード詳細検索・デッキ作成）",
-    "📚 バインダー機能のオフライン対応確認済み",
-    "📥 index.htmlに画像一括DL機能追加（モバイル限定）",
-    "✨ 統一されたオフライン状態表示デザイン",
-    "📝 バージョン表記の短縮化（機能は維持）"
+    "� コレクションバインダーのCSS・JSファイルをキャッシュ対象に追加",
+    "📚 バインダーコレクション機能の完全オフライン対応",
+    "🎨 全ページのCSSファイルをキャッシュ化（統一されたオフライン表示）",
+    "⚡ 全ページのJavaScriptファイルをキャッシュ化（完全な機能提供）",
+    "🖼️ ロゴファイルもキャッシュ対象に追加",
+    "🔄 包括的なオフライン体験の実現"
   ]
 };
 
