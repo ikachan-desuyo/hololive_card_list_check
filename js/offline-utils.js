@@ -113,26 +113,37 @@ function initOfflineMonitoring() {
   console.log('Offline monitoring initialized');
 }
 
-// ページ間の安全なナビゲーション
+// ページ間の安全なナビゲーション（Service Worker信頼版）
 function navigateToPage(url) {
   console.log('navigateToPage called with:', url);
   
+  // Service Workerがアクティブな場合は、オンライン/オフライン関係なく
+  // Service Workerのキャッシュ戦略に任せる
+  if ('serviceWorker' in navigator && navigator.serviceWorker.controller) {
+    console.log('Service Worker active, navigating with SW cache support:', url);
+    window.location.href = url;
+    return;
+  }
+  
   if (navigator.onLine) {
-    // オンライン時は通常のナビゲーション
-    console.log('Online: navigating to', url);
+    // Service Worker無効でオンライン時は通常のナビゲーション
+    console.log('No SW, online: navigating to', url);
     window.location.href = url;
   } else {
-    // オフライン時はキャッシュされているかチェック
-    console.log('Offline: checking page availability for', url);
-    checkPageAvailability(url).then(available => {
-      if (available) {
-        console.log('Page available offline, navigating to', url);
-        window.location.href = url;
-      } else {
-        console.log('Page not available offline:', url);
-        alert('このページはオフラインでは利用できません。\nインターネット接続を確認してから再度お試しください。');
-      }
-    });
+    // Service Worker無効でオフライン時のみ警告
+    console.log('No SW, offline: showing warning for', url);
+    
+    const debugInfo = `このページはオフラインでは利用できません。
+
+Service Workerが無効のため、オフラインキャッシュを利用できません。
+インターネット接続を確認してから再度お試しください。
+
+デバッグ情報:
+- 要求されたURL: ${url}
+- Service Worker: 無効
+- オンライン状態: オフライン`;
+    
+    alert(debugInfo);
   }
 }
 
@@ -145,18 +156,39 @@ async function checkPageAvailability(url) {
       return false;
     }
 
+    // 複数のURL形式でチェック（相対パス、絶対パス、末尾スラッシュ対応）
+    const urlsToCheck = [
+      url,
+      `./${url}`,
+      url.startsWith('./') ? url.substring(2) : `./${url}`,
+      new URL(url, window.location.origin).href,
+      url.replace(/^\.\//, ''),
+    ];
+
+    console.log('Checking availability for URLs:', urlsToCheck);
+
     // キャッシュをチェック
     const cacheNames = await caches.keys();
+    console.log('Available cache names:', cacheNames);
+    
     for (const cacheName of cacheNames) {
       const cache = await caches.open(cacheName);
-      const response = await cache.match(url);
-      if (response) {
-        console.log('Page found in cache:', url);
-        return true;
+      
+      // 各URL形式でチェック
+      for (const checkUrl of urlsToCheck) {
+        try {
+          const response = await cache.match(checkUrl);
+          if (response) {
+            console.log('Page found in cache:', checkUrl, 'in cache:', cacheName);
+            return true;
+          }
+        } catch (matchError) {
+          console.warn('Cache match error for', checkUrl, ':', matchError);
+        }
       }
     }
     
-    console.log('Page not found in cache:', url);
+    console.log('Page not found in any cache for:', url);
     return false;
   } catch (error) {
     console.error('Page availability check failed:', error);

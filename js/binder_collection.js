@@ -321,11 +321,19 @@
       }
     }
 
-    // バインダーを開く
+    // バインダーを開く（オフライン対応）
     function openBinder(binderId) {
       // バインダーIDをURLパラメータとして渡して、collection_binder.htmlを開く
       const url = `collection_binder.html?binderId=${binderId}`;
-      window.location.href = url;
+      
+      // オフライン対応ナビゲーションを使用
+      if (typeof window.navigateToPage === 'function') {
+        console.log('Using offline-aware navigation for binder');
+        window.navigateToPage(url);
+      } else {
+        console.log('Fallback to direct navigation for binder');
+        window.location.href = url;
+      }
     }
 
     // バインダーの編集（リッチUI対応）
