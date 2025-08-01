@@ -26,6 +26,7 @@ class HololiveBattleEngine {
 
     this.cardDatabase = null;
     this.stageData = null;
+    this.modalUI = new ModalUI(); // モーダルUI追加
     
     this.phaseNames = [
       'リセットステップ',
@@ -1144,29 +1145,10 @@ class HololiveBattleEngine {
   }
 
   showTurnOrderPopup(suggestedPlayer) {
-    const randomResult = suggestedPlayer === 1 ? 'あなたが先行' : '相手が先行';
-    
-    const userChoice = confirm(
-      `先行・後攻の決定\n\n` +
-      `ランダム結果: ${randomResult}\n\n` +
-      `ランダム結果で決定しますか？\n` +
-      `「OK」= ランダム結果で決定\n` +
-      `「キャンセル」= 手動で選択`
-    );
-    
-    if (userChoice) {
-      // ランダム結果で決定
-      this.setFirstPlayer(suggestedPlayer, false);
-    } else {
-      // 手動選択
-      const manualChoice = confirm(
-        `手動選択\n\n` +
-        `「OK」= あなたが先行\n` +
-        `「キャンセル」= 相手が先行`
-      );
-      
-      this.setFirstPlayer(manualChoice ? 1 : 2, true);
-    }
+    // モーダルUIで選択
+    this.modalUI.showTurnOrderModal(0.5, suggestedPlayer, (playerId, isManual) => {
+      this.setFirstPlayer(playerId, isManual);
+    });
   }
 
   setFirstPlayer(playerId, isManual) {
@@ -1263,47 +1245,17 @@ class HololiveBattleEngine {
   }
 
   showMulliganUI(playerId, isForced) {
-    const playerName = playerId === 1 ? 'あなた' : '相手';
     const player = this.players[playerId];
+    const mulliganCount = this.gameState.mulliganCount[playerId];
     
-    const debutCards = player.hand.filter(card => 
-      card.card_type && card.card_type.includes('ホロメン') && card.bloom_level === 'Debut'
-    );
-    
-    if (isForced) {
-      // 強制マリガンの場合
-      alert(
-        `${playerName}のマリガン\n\n` +
-        `現在の手札: ${player.hand.length}枚\n` +
-        `Debutホロメン: ${debutCards.length}枚\n\n` +
-        `※ Debutホロメンがないため、マリガンが必要です\n` +
-        `全ての手札をデッキに戻してシャッフルし、新しい手札を引きます`
-      );
-      
-      this.executeMulligan(playerId);
-    } else {
-      // 選択可能な場合
-      const mulliganCount = this.gameState.mulliganCount[playerId];
-      const newHandSize = 7 - mulliganCount;
-      const penalty = mulliganCount > 0 ? `手札が${mulliganCount}枚減って${newHandSize}枚` : `ペナルティなしで7枚`;
-      
-      const userChoice = confirm(
-        `${playerName}のマリガン\n\n` +
-        `現在の手札: ${player.hand.length}枚\n` +
-        `Debutホロメン: ${debutCards.length}枚\n\n` +
-        `マリガンを行いますか？\n` +
-        `マリガンすると：${penalty}になります\n\n` +
-        `「OK」= マリガンする\n` +
-        `「キャンセル」= マリガンしない`
-      );
-      
-      if (userChoice) {
+    // モーダルUIでマリガン選択
+    this.modalUI.showMulliganModal(playerId, isForced, player.hand, mulliganCount, (doMulligan) => {
+      if (doMulligan) {
         this.executeMulligan(playerId);
       } else {
-        // マリガンを拒否した場合、次のプレイヤーに進む
         this.skipMulligan(playerId);
       }
-    }
+    });
   }
 
   executeMulligan(playerId) {
