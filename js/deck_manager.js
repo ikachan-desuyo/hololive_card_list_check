@@ -123,8 +123,9 @@ class DeckManager {
  * デッキ選択UI
  */
 class DeckSelectionUI {
-  constructor(battleEngine) {
+  constructor(battleEngine, playerId = 1) {
     this.battleEngine = battleEngine;
+    this.playerId = playerId;
     this.deckManager = new DeckManager();
     this.selectedDeck = null;
   }
@@ -137,13 +138,14 @@ class DeckSelectionUI {
   }
 
   createDeckSelectionModal() {
+    const playerName = this.playerId === 1 ? 'プレイヤー' : '相手';
     const modal = document.createElement('div');
     modal.id = 'deck-selection-modal';
     modal.className = 'deck-modal';
     modal.innerHTML = `
       <div class="deck-modal-content">
         <div class="deck-modal-header">
-          <h2>📚 デッキ選択</h2>
+          <h2>📚 ${playerName}デッキ選択</h2>
           <button class="deck-modal-close" onclick="this.closest('.deck-modal').remove()">×</button>
         </div>
         
@@ -163,7 +165,7 @@ class DeckSelectionUI {
             
             <div class="deck-actions">
               <button id="confirm-deck-selection" class="deck-button deck-button-primary" disabled>
-                このデッキを使用
+                このデッキを${playerName}用に使用
               </button>
               <button class="deck-button deck-button-secondary" onclick="window.open('deck_builder.html', '_blank')">
                 新しいデッキを作成
@@ -529,7 +531,8 @@ class DeckSelectionUI {
       // モーダルを閉じる
       document.getElementById('deck-selection-modal').remove();
 
-      alert(`デッキ「${this.selectedDeck}」が適用されました！`);
+      const playerName = this.playerId === 1 ? 'プレイヤー' : '相手';
+      alert(`デッキ「${this.selectedDeck}」が${playerName}用に適用されました！`);
 
     } catch (error) {
       console.error("デッキ適用エラー:", error);
@@ -538,9 +541,12 @@ class DeckSelectionUI {
   }
 
   applyDeckToBattle(deck) {
-    if (!this.battleEngine.players[1]) return;
+    if (!this.battleEngine.players[this.playerId]) {
+      console.error(`プレイヤー${this.playerId}が存在しません!`);
+      return;
+    }
 
-    const player = this.battleEngine.players[1];
+    const player = this.battleEngine.players[this.playerId];
 
     // デッキをクリア
     player.deck = [];
@@ -553,17 +559,15 @@ class DeckSelectionUI {
     player.oshi = deck.oshi;
 
     // デッキをシャッフル
-    this.battleEngine.shuffleDeck(1);
+    this.battleEngine.shuffleDeck(this.playerId);
 
-    console.log(`デッキ「${this.selectedDeck}」を適用しました`);
+    console.log(`デッキ「${this.selectedDeck}」をプレイヤー${this.playerId}に適用しました`);
     
     // UIを更新
     this.battleEngine.updateUI();
     
     // ゲーム状況も更新
-    if (typeof this.battleEngine.updateGameStatus === 'function') {
-      this.battleEngine.updateGameStatus();
-    }
+    this.battleEngine.updateGameStatus();
   }
 }
 

@@ -11,7 +11,12 @@ class HololiveBattleEngine {
       turnCount: 1,
       gameStarted: false,
       gameEnded: false,
-      winner: null
+      winner: null,
+      firstPlayer: null, // 先行プレイヤー (1 or 2)
+      turnOrderDecided: false,
+      mulliganPhase: false, // マリガン中かどうか
+      mulliganCount: { 1: 0, 2: 0 }, // 各プレイヤーのマリガン回数
+      mulliganCompleted: { 1: false, 2: false } // 各プレイヤーのマリガン完了状態
     };
 
     this.players = {
@@ -166,10 +171,12 @@ class HololiveBattleEngine {
     controlPanel.innerHTML = `
       <div class="game-status" id="game-status">
         <h3>🎮 ゲーム状況</h3>
-        <div id="deck-status">デッキ: 未設定</div>
+        <div id="deck-status">プレイヤーデッキ: 未設定</div>
+        <div id="opponent-deck-status">相手デッキ: 未設定</div>
         <div id="ready-status">準備: 未完了</div>
       </div>
-      <button class="control-button" id="select-deck">📚 デッキ選択</button>
+      <button class="control-button" id="select-deck">📚 プレイヤーデッキ選択</button>
+      <button class="control-button" id="select-opponent-deck">🤖 相手デッキ選択</button>
       <button class="control-button" id="start-game" disabled>ゲーム開始</button>
       <button class="control-button" id="next-phase" disabled>次のフェーズ</button>
       <button class="control-button" id="end-turn" disabled>ターン終了</button>
@@ -180,7 +187,8 @@ class HololiveBattleEngine {
     document.body.appendChild(controlPanel);
 
     // イベントリスナーの設定
-    document.getElementById('select-deck').addEventListener('click', () => this.showDeckSelection());
+    document.getElementById('select-deck').addEventListener('click', () => this.showDeckSelection(1));
+    document.getElementById('select-opponent-deck').addEventListener('click', () => this.showDeckSelection(2));
     document.getElementById('start-game').addEventListener('click', () => this.startGame());
     document.getElementById('next-phase').addEventListener('click', () => this.nextPhase());
     document.getElementById('end-turn').addEventListener('click', () => this.endTurn());
@@ -193,30 +201,56 @@ class HololiveBattleEngine {
 
   updateGameStatus() {
     const deckStatus = document.getElementById('deck-status');
+    const opponentDeckStatus = document.getElementById('opponent-deck-status');
     const readyStatus = document.getElementById('ready-status');
     const startButton = document.getElementById('start-game');
     
-    if (!deckStatus || !readyStatus || !startButton) return;
+    if (!deckStatus || !opponentDeckStatus || !readyStatus || !startButton) return;
     
+    // プレイヤーデッキ状況
     const player = this.players[1];
-    const hasDeck = player.deck.length > 0 || player.yellDeck.length > 0;
-    const hasOshi = !!player.oshi;
+    const hasPlayerDeck = player.deck.length > 0 || player.yellDeck.length > 0;
+    const hasPlayerOshi = !!player.oshi;
     
-    if (hasDeck && hasOshi) {
-      deckStatus.innerHTML = `デッキ: ✅ 設定済み<br><small>メイン${player.deck.length}枚 / エール${player.yellDeck.length}枚 / 推し${player.oshi.name}</small>`;
+    // 相手デッキ状況
+    const opponent = this.players[2];
+    const hasOpponentDeck = opponent.deck.length > 0 || opponent.yellDeck.length > 0;
+    const hasOpponentOshi = !!opponent.oshi;
+    
+    // プレイヤーデッキ表示
+    if (hasPlayerDeck && hasPlayerOshi) {
+      deckStatus.innerHTML = `プレイヤーデッキ: ✅ 設定済み<br><small>メイン${player.deck.length}枚 / エール${player.yellDeck.length}枚 / 推し${player.oshi.name}</small>`;
+    } else if (hasPlayerDeck) {
+      deckStatus.innerHTML = `プレイヤーデッキ: ⚠️ 部分設定<br><small>メイン${player.deck.length}枚 / エール${player.yellDeck.length}枚</small>`;
+    } else {
+      deckStatus.innerHTML = 'プレイヤーデッキ: ❌ 未設定';
+    }
+    
+    // 相手デッキ表示
+    if (hasOpponentDeck && hasOpponentOshi) {
+      opponentDeckStatus.innerHTML = `相手デッキ: ✅ 設定済み<br><small>メイン${opponent.deck.length}枚 / エール${opponent.yellDeck.length}枚 / 推し${opponent.oshi.name}</small>`;
+    } else if (hasOpponentDeck) {
+      opponentDeckStatus.innerHTML = `相手デッキ: ⚠️ 部分設定<br><small>メイン${opponent.deck.length}枚 / エール${opponent.yellDeck.length}枚</small>`;
+    } else {
+      opponentDeckStatus.innerHTML = '相手デッキ: ❌ 未設定';
+    }
+    
+    // 準備状況とゲーム開始ボタン
+    const bothReady = (hasPlayerDeck && hasPlayerOshi) && (hasOpponentDeck && hasOpponentOshi);
+    const partialReady = (hasPlayerDeck || hasOpponentDeck);
+    
+    if (bothReady) {
       readyStatus.innerHTML = '準備: ✅ 完了';
       startButton.disabled = false;
       startButton.style.background = '#4CAF50';
-    } else if (hasDeck) {
-      deckStatus.innerHTML = `デッキ: ⚠️ 部分設定<br><small>メイン${player.deck.length}枚 / エール${player.yellDeck.length}枚</small>`;
-      readyStatus.innerHTML = '準備: ⚠️ 推しホロメン未設定';
+    } else if (partialReady) {
+      readyStatus.innerHTML = '準備: ⚠️ 両方のデッキを設定してください';
       startButton.disabled = false;
-      startButton.style.background = '#ff9800';
+      startButton.style.background = '#FF9800';
     } else {
-      deckStatus.innerHTML = 'デッキ: ❌ 未設定';
-      readyStatus.innerHTML = '準備: ❌ デッキを選択してください';
-      startButton.disabled = false; // テストデッキでも開始可能
-      startButton.style.background = '#2196f3';
+      readyStatus.innerHTML = '準備: ❌ デッキ未設定';
+      startButton.disabled = true;
+      startButton.style.background = '#ccc';
     }
   }
 
@@ -250,29 +284,43 @@ class HololiveBattleEngine {
     turnInfo.textContent = `${playerName}のターン - ${phaseName} (ターン${this.gameState.turnCount})`;
   }
 
-  showDeckSelection() {
+  showDeckSelection(playerId = 1) {
     if (!window.DeckSelectionUI) {
       alert('デッキ管理システムが読み込まれていません');
       return;
     }
 
-    const deckSelectionUI = new window.DeckSelectionUI(this);
+    const deckSelectionUI = new window.DeckSelectionUI(this, playerId);
     deckSelectionUI.showDeckSelectionModal();
   }
 
   startGame() {
     console.log('ゲーム開始準備チェック');
     
-    // デッキチェック
+    // プレイヤーデッキチェック
     if (this.players[1].deck.length === 0 && this.players[1].yellDeck.length === 0) {
-      alert('デッキが設定されていません。\n\n📚「デッキ選択」ボタンからデッキを選択してください。\n\nまたはテストデッキで始めることもできます。');
+      alert('プレイヤーデッキが設定されていません。\n\n📚「プレイヤーデッキ選択」ボタンからデッキを選択してください。\n\nまたはテストデッキで始めることもできます。');
       
       if (confirm('テストデッキでゲームを開始しますか？\n\n⚠️ 注意: テストデッキは学習目的のみで、バランスが調整されていません。')) {
         // テストデッキで続行
         console.log('テストデッキでゲーム開始');
       } else {
-        // デッキ選択画面を開く
-        this.showDeckSelection();
+        // プレイヤーデッキ選択画面を開く
+        this.showDeckSelection(1);
+        return;
+      }
+    }
+    
+    // 相手デッキチェック
+    if (this.players[2].deck.length === 0 && this.players[2].yellDeck.length === 0) {
+      alert('相手デッキが設定されていません。\n\n🤖「相手デッキ選択」ボタンからデッキを選択してください。\n\nまたはテストデッキで始めることもできます。');
+      
+      if (confirm('相手もテストデッキでゲームを開始しますか？')) {
+        // 相手もテストデッキで続行
+        console.log('相手もテストデッキでゲーム開始');
+      } else {
+        // 相手デッキ選択画面を開く
+        this.showDeckSelection(2);
         return;
       }
     }
@@ -345,6 +393,9 @@ class HololiveBattleEngine {
   executeGameSetup() {
     console.log('ゲームセットアップ実行');
     
+    // 0. 先行・後攻の決定
+    this.decideTurnOrder();
+    
     // テストデッキの作成（必要に応じて）
     this.createTestDecks();
     
@@ -367,6 +418,8 @@ class HololiveBattleEngine {
     
     // 5. ゲーム状況を表示
     this.logGameStatus();
+    
+    // 注意: マリガン処理は先行・後攻決定後に setFirstPlayer() で開始される
   }
 
   setupLifeCards() {
@@ -432,13 +485,16 @@ class HololiveBattleEngine {
       console.log(`プレイヤー1テストデッキ作成: メイン${this.players[1].deck.length}枚, エール${this.players[1].yellDeck.length}枚`);
     }
     
-    // プレイヤー2（CPU）のテストデッキを作成（独立したデッキ）
-    const testCards2 = this.getTestCards();
-    this.players[2].deck = [...testCards2.holomen, ...testCards2.support];
-    this.players[2].yellDeck = [...testCards2.yell];
-    this.players[2].oshi = testCards2.oshi;
-    
-    console.log(`プレイヤー2テストデッキ作成: メイン${this.players[2].deck.length}枚, エール${this.players[2].yellDeck.length}枚`);
+    // プレイヤー2のデッキが空の場合のみテストデッキを作成
+    if (this.players[2].deck.length === 0) {
+      console.log('プレイヤー2のデッキが設定されていません。テストデッキを作成します。');
+      const testCards2 = this.getTestCards();
+      this.players[2].deck = [...testCards2.holomen, ...testCards2.support];
+      this.players[2].yellDeck = [...testCards2.yell];
+      this.players[2].oshi = testCards2.oshi;
+      
+      console.log(`プレイヤー2テストデッキ作成: メイン${this.players[2].deck.length}枚, エール${this.players[2].yellDeck.length}枚`);
+    }
     
     // デッキシャッフルと推しホロメン配置は executeGameSetup() で行うため削除
   }
@@ -661,7 +717,11 @@ class HololiveBattleEngine {
       turnCount: 1,
       gameStarted: false,
       gameEnded: false,
-      winner: null
+      winner: null,
+      mulliganPhase: false,
+      mulliganCount: { 1: 0, 2: 0 },
+      mulliganCompleted: { 1: false, 2: false },
+      debutPlacementCompleted: { 1: false, 2: false }
     };
     
     // プレイヤー状態のリセット
@@ -745,17 +805,35 @@ class HololiveBattleEngine {
     const handArea = document.getElementById('player-hand');
     const player = this.players[1]; // プレイヤーの手札のみ表示
     
+    // 既存の手札を完全にクリア
     handArea.innerHTML = '';
     
-    player.hand.forEach((card, index) => {
-      const cardElement = document.createElement('div');
-      cardElement.className = 'hand-card';
-      cardElement.style.backgroundImage = `url(${card.image_url})`;
-      cardElement.title = card.name;
-      cardElement.addEventListener('click', () => this.handleHandCardClick(card, index));
+    // 手札が存在する場合のみ表示
+    if (player.hand && Array.isArray(player.hand)) {
+      player.hand.forEach((card, index) => {
+        const cardElement = document.createElement('div');
+        cardElement.className = 'hand-card';
+        
+        // 画像URLの確認とフォールバック
+        const imageUrl = card.image_url || 'images/placeholder.png';
+        cardElement.style.backgroundImage = `url(${imageUrl})`;
+        cardElement.style.backgroundSize = 'cover';
+        cardElement.style.backgroundPosition = 'center';
+        cardElement.style.backgroundRepeat = 'no-repeat';
+        
+        cardElement.title = card.name || 'カード';
+        cardElement.setAttribute('data-card-id', card.id || index);
+        
+        // クリックイベント
+        cardElement.addEventListener('click', () => this.handleHandCardClick(card, index));
+        
+        handArea.appendChild(cardElement);
+      });
       
-      handArea.appendChild(cardElement);
-    });
+      console.log(`手札表示更新完了: ${player.hand.length}枚`);
+    } else {
+      console.log('手札が空です');
+    }
   }
 
   updateCardAreas() {
@@ -831,7 +909,7 @@ class HololiveBattleEngine {
 
     // カードを表示
     cards.forEach((card, index) => {
-      const cardElement = this.createCardElement(card, displayType, index);
+      const cardElement = this.createCardElement(card, displayType, index, areaId);
       area.appendChild(cardElement);
     });
 
@@ -845,16 +923,32 @@ class HololiveBattleEngine {
     }
   }
 
-  createCardElement(card, displayType, index) {
+  createCardElement(card, displayType, index, areaId = null) {
     const cardElement = document.createElement('div');
     cardElement.className = 'card face-down'; // デフォルトは裏向き
     
-    // カードの種類による表示切り替え
-    if (card && card.card_type === '推しホロメン') {
+    // 表向きで表示すべきエリアかどうかを判定
+    const shouldShowFaceUp = this.shouldCardBeFaceUp(card, areaId);
+    
+    if (shouldShowFaceUp && card) {
       cardElement.classList.remove('face-down');
       cardElement.classList.add('face-up');
+      
+      // カード画像の設定
       if (card.image_url) {
         cardElement.style.backgroundImage = `url(${card.image_url})`;
+        cardElement.style.backgroundSize = 'cover';
+        cardElement.style.backgroundPosition = 'center';
+      }
+      
+      // カード名表示（画像がない場合のフォールバック）
+      if (!card.image_url) {
+        cardElement.innerHTML = `
+          <div class="card-content">
+            <div class="card-name">${card.name || 'Unknown'}</div>
+            <div class="card-type">${card.card_type || ''}</div>
+          </div>
+        `;
       }
     }
     
@@ -880,6 +974,19 @@ class HololiveBattleEngine {
     }
     
     return cardElement;
+  }
+
+  shouldCardBeFaceUp(card, areaId) {
+    if (!card) return false;
+    
+    // 推しホロメンは常に表向き
+    if (card.card_type === '推しホロメン') {
+      return true;
+    }
+    
+    // 表向きで表示すべきエリア
+    const faceUpAreas = ['front1', 'front2', 'backs', 'archive'];
+    return faceUpAreas.includes(areaId);
   }
 
   getCardCount(player, areaId) {
@@ -1020,6 +1127,880 @@ class HololiveBattleEngine {
     player.hand.splice(handIndex, 1);
     player.archive.push(card);
     
+    this.updateUI();
+  }
+
+  // 先行・後攻の決定
+  decideTurnOrder() {
+    if (this.gameState.turnOrderDecided) {
+      return;
+    }
+
+    // ランダムで先行・後攻を決定
+    const randomFirstPlayer = Math.random() < 0.5 ? 1 : 2;
+    
+    // ポップアップで選択
+    this.showTurnOrderPopup(randomFirstPlayer);
+  }
+
+  showTurnOrderPopup(suggestedPlayer) {
+    const randomResult = suggestedPlayer === 1 ? 'あなたが先行' : '相手が先行';
+    
+    const userChoice = confirm(
+      `先行・後攻の決定\n\n` +
+      `ランダム結果: ${randomResult}\n\n` +
+      `ランダム結果で決定しますか？\n` +
+      `「OK」= ランダム結果で決定\n` +
+      `「キャンセル」= 手動で選択`
+    );
+    
+    if (userChoice) {
+      // ランダム結果で決定
+      this.setFirstPlayer(suggestedPlayer, false);
+    } else {
+      // 手動選択
+      const manualChoice = confirm(
+        `手動選択\n\n` +
+        `「OK」= あなたが先行\n` +
+        `「キャンセル」= 相手が先行`
+      );
+      
+      this.setFirstPlayer(manualChoice ? 1 : 2, true);
+    }
+  }
+
+  setFirstPlayer(playerId, isManual) {
+    this.gameState.firstPlayer = playerId;
+    this.gameState.currentPlayer = playerId;
+    this.gameState.turnOrderDecided = true;
+    
+    const methodText = isManual ? '手動選択' : 'ランダム';
+    const playerText = playerId === 1 ? 'プレイヤー' : '相手';
+    
+    console.log(`${methodText}により${playerText}が先行です`);
+    
+    // メッセージ表示
+    alert(`${methodText}により${playerId === 1 ? 'あなた' : '相手'}が先行です`);
+    
+    // 先行・後攻決定後にマリガンフェーズを開始
+    setTimeout(() => {
+      this.startMulliganPhase();
+    }, 500);
+  }
+
+  showGameMessage(message) {
+    const messageArea = document.querySelector('.game-message') || this.createGameMessageArea();
+    messageArea.textContent = message;
+    messageArea.style.display = 'block';
+    
+    // 3秒後に非表示
+    setTimeout(() => {
+      messageArea.style.display = 'none';
+    }, 3000);
+  }
+
+  createGameMessageArea() {
+    const messageArea = document.createElement('div');
+    messageArea.className = 'game-message';
+    messageArea.style.cssText = `
+      position: fixed;
+      top: 50%;
+      left: 50%;
+      transform: translate(-50%, -50%);
+      background: rgba(0, 0, 0, 0.8);
+      color: white;
+      padding: 20px;
+      border-radius: 10px;
+      font-size: 18px;
+      z-index: 1000;
+      display: none;
+    `;
+    document.body.appendChild(messageArea);
+    return messageArea;
+  }
+
+  // マリガン処理開始
+  startMulliganPhase() {
+    // 先行・後攻が決定されているか確認
+    if (!this.gameState.firstPlayer) {
+      console.error('先行・後攻が決定されていません');
+      return;
+    }
+    
+    this.gameState.mulliganPhase = true;
+    console.log('マリガンフェーズ開始');
+    
+    // 先行プレイヤーから順番にマリガンチェック
+    this.checkMulligan(this.gameState.firstPlayer);
+  }
+
+  checkMulligan(playerId) {
+    // プレイヤーの存在確認
+    if (!playerId || !this.players[playerId]) {
+      console.error(`無効なプレイヤーID: ${playerId}`);
+      return;
+    }
+    
+    const player = this.players[playerId];
+    
+    // 手札の存在確認
+    if (!player.hand || !Array.isArray(player.hand)) {
+      console.error(`プレイヤー${playerId}の手札が無効です:`, player.hand);
+      return;
+    }
+    
+    const hasDebut = player.hand.some(card => 
+      card.card_type && card.card_type.includes('ホロメン') && card.bloom_level === 'Debut'
+    );
+    
+    if (!hasDebut) {
+      // Debutがない場合は強制マリガン
+      this.showMulliganUI(playerId, true);
+    } else {
+      // Debutがある場合は選択可能
+      this.showMulliganUI(playerId, false);
+    }
+  }
+
+  showMulliganUI(playerId, isForced) {
+    const playerName = playerId === 1 ? 'あなた' : '相手';
+    const player = this.players[playerId];
+    
+    const debutCards = player.hand.filter(card => 
+      card.card_type && card.card_type.includes('ホロメン') && card.bloom_level === 'Debut'
+    );
+    
+    if (isForced) {
+      // 強制マリガンの場合
+      alert(
+        `${playerName}のマリガン\n\n` +
+        `現在の手札: ${player.hand.length}枚\n` +
+        `Debutホロメン: ${debutCards.length}枚\n\n` +
+        `※ Debutホロメンがないため、マリガンが必要です\n` +
+        `全ての手札をデッキに戻してシャッフルし、新しい手札を引きます`
+      );
+      
+      this.executeMulligan(playerId);
+    } else {
+      // 選択可能な場合
+      const mulliganCount = this.gameState.mulliganCount[playerId];
+      const newHandSize = 7 - mulliganCount;
+      const penalty = mulliganCount > 0 ? `手札が${mulliganCount}枚減って${newHandSize}枚` : `ペナルティなしで7枚`;
+      
+      const userChoice = confirm(
+        `${playerName}のマリガン\n\n` +
+        `現在の手札: ${player.hand.length}枚\n` +
+        `Debutホロメン: ${debutCards.length}枚\n\n` +
+        `マリガンを行いますか？\n` +
+        `マリガンすると：${penalty}になります\n\n` +
+        `「OK」= マリガンする\n` +
+        `「キャンセル」= マリガンしない`
+      );
+      
+      if (userChoice) {
+        this.executeMulligan(playerId);
+      } else {
+        // マリガンを拒否した場合、次のプレイヤーに進む
+        this.skipMulligan(playerId);
+      }
+    }
+  }
+
+  executeMulligan(playerId) {
+    const player = this.players[playerId];
+    const mulliganCount = this.gameState.mulliganCount[playerId];
+    
+    console.log(`プレイヤー${playerId}がマリガンを実行（${mulliganCount + 1}回目）`);
+    
+    // 手札をデッキに戻す
+    player.deck.push(...player.hand);
+    player.hand = [];
+    
+    // デッキをシャッフル
+    this.shuffleDeck(playerId);
+    console.log(`プレイヤー${playerId}のデッキをシャッフルしました`);
+    
+    // 新しい手札を配る（ペナルティ適用）
+    const newHandSize = 7 - mulliganCount;
+    for (let i = 0; i < newHandSize; i++) {
+      if (player.deck.length > 0) {
+        const card = player.deck.pop();
+        player.hand.push(card);
+      }
+    }
+    
+    console.log(`プレイヤー${playerId}に新しい手札${newHandSize}枚を配りました`);
+    
+    // マリガン回数を増加
+    this.gameState.mulliganCount[playerId]++;
+    
+    // UIを更新して手札を表示
+    this.updateUI();
+    
+    // 手札表示を強制的に更新（少し遅延を入れる）
+    setTimeout(() => {
+      this.updateHandDisplay();
+    }, 100);
+    
+    // マリガン完了メッセージ
+    const playerName = playerId === 1 ? 'あなた' : '相手';
+    alert(`${playerName}がマリガンを実行しました（${newHandSize}枚配布）`);
+    
+    // 手札にDebutがあるかチェックして、連続マリガンまたは次の処理を決定
+    setTimeout(() => {
+      const hasDebut = player.hand.some(card => 
+        card.card_type && card.card_type.includes('ホロメン') && card.bloom_level === 'Debut'
+      );
+      
+      if (!hasDebut) {
+        // まだDebutがないので、再度マリガンが必要
+        this.checkMulligan(playerId);
+      } else {
+        // Debutが見つかったので、任意でマリガンを選択可能
+        this.checkMulligan(playerId);
+      }
+    }, 500);
+  }
+
+  skipMulligan(playerId) {
+    console.log(`プレイヤー${playerId}がマリガンをスキップ`);
+    
+    // マリガンスキップメッセージ
+    const playerName = playerId === 1 ? 'あなた' : '相手';
+    alert(`${playerName}がマリガンをスキップしました`);
+    
+    // 次のプレイヤーまたはDebut配置フェーズへ
+    setTimeout(() => {
+      this.proceedToNextMulliganPlayer(playerId);
+    }, 500);
+  }
+
+  proceedToNextMulliganPlayer(currentPlayerId) {
+    // マリガン完了状態をマーク
+    this.gameState.mulliganCompleted[currentPlayerId] = true;
+    
+    // 両プレイヤーのマリガンが完了したかチェック
+    if (this.gameState.mulliganCompleted[1] && this.gameState.mulliganCompleted[2]) {
+      // 両プレイヤーのマリガンが完了
+      this.startDebutPlacementPhase();
+      return;
+    }
+    
+    // 次のプレイヤーを決定
+    const nextPlayerId = currentPlayerId === 1 ? 2 : 1;
+    
+    // 次のプレイヤーがまだマリガンを完了していない場合
+    if (!this.gameState.mulliganCompleted[nextPlayerId]) {
+      if (nextPlayerId === 2) {
+        // CPU のマリガン判定
+        this.cpuMulliganDecision(nextPlayerId);
+      } else {
+        // プレイヤー1のマリガン
+        this.checkMulligan(nextPlayerId);
+      }
+    } else {
+      // 次のプレイヤーが既に完了している場合、Debut配置フェーズへ
+      this.startDebutPlacementPhase();
+    }
+  }
+
+  cpuMulliganDecision(playerId) {
+    const player = this.players[playerId];
+    const hasDebut = player.hand.some(card => 
+      card.card_type && card.card_type.includes('ホロメン') && card.bloom_level === 'Debut'
+    );
+    
+    if (!hasDebut) {
+      // Debutがない場合は強制マリガン
+      this.executeMulligan(playerId);
+    } else {
+      // 簡単なAI判定：手札が悪い場合マリガン
+      const goodCards = player.hand.filter(card => 
+        (card.card_type && card.card_type.includes('ホロメン')) || 
+        (card.card_type && card.card_type.includes('サポート'))
+      ).length;
+      
+      if (goodCards < 3 && this.gameState.mulliganCount[playerId] === 0) {
+        this.executeMulligan(playerId);
+      } else {
+        this.skipMulligan(playerId);
+      }
+    }
+  }
+
+  // Debut配置フェーズ開始
+  startDebutPlacementPhase() {
+    this.gameState.mulliganPhase = false;
+    console.log('Debut配置フェーズ開始');
+    
+    alert(
+      'マリガン完了！\n\n' +
+      'Debutホロメンの配置を行います\n' +
+      '・センター2に1枚必須\n' +
+      '・バックに好きなだけ配置可能'
+    );
+    
+    // 先行プレイヤーから順番にDebut配置
+    this.showDebutPlacementUI(this.gameState.firstPlayer);
+  }
+
+  showDebutPlacementUI(playerId) {
+    const player = this.players[playerId];
+    const debutCards = player.hand.filter(card => 
+      card.card_type && card.card_type.includes('ホロメン') && card.bloom_level === 'Debut'
+    );
+    
+    if (debutCards.length === 0) {
+      console.error(`プレイヤー${playerId}にDebutホロメンがありません`);
+      return;
+    }
+    
+    const playerName = playerId === 1 ? 'あなた' : '相手';
+    
+    if (playerId === 1) {
+      // プレイヤー1の場合：手動配置UI
+      this.showManualDebutPlacementUI(playerId);
+    } else {
+      // CPUの場合：自動配置
+      this.cpuDebutPlacement(playerId);
+    }
+  }
+
+  showManualDebutPlacementUI(playerId) {
+    const player = this.players[playerId];
+    const debutCards = player.hand.filter(card => 
+      card.card_type && card.card_type.includes('ホロメン') && card.bloom_level === 'Debut'
+    );
+    
+    // Debut配置状態を初期化
+    this.debutPlacementState = {
+      playerId: playerId,
+      debutCards: [...debutCards],
+      selectedCards: [],
+      centerPlaced: false,
+      backPositions: ['back1', 'back2', 'back3'],
+      usedBackPositions: []
+    };
+    
+    alert(
+      'あなたのDebut配置\n\n' +
+      `Debutホロメン: ${debutCards.length}枚\n\n` +
+      '📌 配置ルール:\n' +
+      '• センター2に1枚必須\n' +
+      '• バックに好きなだけ配置可能\n\n' +
+      '手札のDebutホロメンをクリックして配置してください'
+    );
+    
+    this.showDebutPlacementModal();
+  }
+
+  showDebutPlacementModal() {
+    // 既存のモーダルを削除
+    const existingModal = document.getElementById('debut-placement-modal');
+    if (existingModal) {
+      existingModal.remove();
+    }
+    
+    const modal = document.createElement('div');
+    modal.id = 'debut-placement-modal';
+    modal.className = 'debut-modal';
+    modal.innerHTML = this.createDebutPlacementModalHTML();
+    
+    document.body.appendChild(modal);
+    this.addDebutPlacementStyles();
+    this.setupDebutPlacementEvents();
+    this.updateDebutPlacementDisplay();
+  }
+
+  createDebutPlacementModalHTML() {
+    return `
+      <div class="debut-modal-content">
+        <div class="debut-modal-header">
+          <h2>🎭 Debutホロメン配置</h2>
+          <div class="debut-progress">
+            <span id="center-status">センター2: 未配置</span>
+            <span id="back-status">バック: 0/3</span>
+          </div>
+        </div>
+        
+        <div class="debut-modal-body">
+          <div class="debut-cards-section">
+            <h3>手札のDebutホロメン</h3>
+            <div id="debut-cards-list" class="debut-cards-list">
+              <!-- Debutカードがここに表示される -->
+            </div>
+          </div>
+          
+          <div class="placement-area">
+            <h3>配置エリア</h3>
+            <div class="stage-layout">
+              <div class="center-stage">
+                <div class="stage-position" id="center2-slot" data-position="center2">
+                  <span class="position-label">センター2</span>
+                  <div class="card-slot">必須</div>
+                </div>
+              </div>
+              
+              <div class="back-stage">
+                <div class="stage-position" id="back1-slot" data-position="back1">
+                  <span class="position-label">バック1</span>
+                  <div class="card-slot">任意</div>
+                </div>
+                <div class="stage-position" id="back2-slot" data-position="back2">
+                  <span class="position-label">バック2</span>
+                  <div class="card-slot">任意</div>
+                </div>
+                <div class="stage-position" id="back3-slot" data-position="back3">
+                  <span class="position-label">バック3</span>
+                  <div class="card-slot">任意</div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+        
+        <div class="debut-modal-footer">
+          <button id="confirm-debut-placement" class="debut-button debut-button-primary" disabled>
+            配置完了
+          </button>
+          <button id="auto-debut-placement" class="debut-button debut-button-secondary">
+            自動配置
+          </button>
+        </div>
+      </div>
+    `;
+  }
+
+  addDebutPlacementStyles() {
+    if (document.getElementById('debut-placement-styles')) return;
+
+    const style = document.createElement('style');
+    style.id = 'debut-placement-styles';
+    style.textContent = `
+      .debut-modal {
+        position: fixed;
+        top: 0;
+        left: 0;
+        width: 100%;
+        height: 100%;
+        background: rgba(0, 0, 0, 0.8);
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        z-index: 10000;
+      }
+
+      .debut-modal-content {
+        background: white;
+        border-radius: 15px;
+        width: 90%;
+        max-width: 1000px;
+        max-height: 85%;
+        overflow: hidden;
+        box-shadow: 0 20px 60px rgba(0, 0, 0, 0.5);
+      }
+
+      .debut-modal-header {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        padding: 20px;
+        background: linear-gradient(135deg, #ff6b6b 0%, #feca57 100%);
+        color: white;
+      }
+
+      .debut-modal-header h2 {
+        margin: 0;
+        font-size: 1.5em;
+      }
+
+      .debut-progress {
+        font-size: 0.9em;
+        opacity: 0.9;
+      }
+
+      .debut-modal-body {
+        display: grid;
+        grid-template-columns: 1fr 1fr;
+        gap: 20px;
+        padding: 20px;
+        max-height: 50vh;
+        overflow-y: auto;
+      }
+
+      .debut-cards-list {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 10px;
+        max-height: 300px;
+        overflow-y: auto;
+        padding: 10px;
+        border: 2px dashed #ddd;
+        border-radius: 10px;
+      }
+
+      .debut-card-item {
+        padding: 10px;
+        border: 2px solid #e0e0e0;
+        border-radius: 8px;
+        cursor: pointer;
+        transition: all 0.3s ease;
+        background: #f9f9f9;
+        min-width: 100px;
+        text-align: center;
+      }
+
+      .debut-card-item:hover {
+        border-color: #ff6b6b;
+        background: #ffe0e0;
+        transform: scale(1.05);
+      }
+
+      .debut-card-item.selected {
+        border-color: #ff6b6b;
+        background: #ffebeb;
+        box-shadow: 0 2px 10px rgba(255, 107, 107, 0.3);
+      }
+
+      .stage-layout {
+        display: flex;
+        flex-direction: column;
+        gap: 20px;
+      }
+
+      .center-stage, .back-stage {
+        display: flex;
+        gap: 10px;
+        justify-content: center;
+      }
+
+      .stage-position {
+        text-align: center;
+      }
+
+      .position-label {
+        display: block;
+        font-size: 0.8em;
+        color: #666;
+        margin-bottom: 5px;
+      }
+
+      .card-slot {
+        width: 100px;
+        height: 140px;
+        border: 2px dashed #ddd;
+        border-radius: 8px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        font-size: 0.8em;
+        color: #999;
+        transition: all 0.3s ease;
+      }
+
+      .card-slot.can-drop {
+        border-color: #ff6b6b;
+        background: #ffe0e0;
+      }
+
+      .card-slot.filled {
+        border-color: #4ecdc4;
+        background: #e0f7fa;
+        color: #333;
+      }
+
+      .debut-modal-footer {
+        display: flex;
+        gap: 10px;
+        padding: 20px;
+        border-top: 1px solid #eee;
+      }
+
+      .debut-button {
+        flex: 1;
+        padding: 12px 20px;
+        border: none;
+        border-radius: 8px;
+        font-size: 1em;
+        cursor: pointer;
+        transition: all 0.3s ease;
+      }
+
+      .debut-button-primary {
+        background: #ff6b6b;
+        color: white;
+      }
+
+      .debut-button-primary:enabled:hover {
+        background: #ff5252;
+        transform: translateY(-1px);
+      }
+
+      .debut-button-primary:disabled {
+        background: #ccc;
+        cursor: not-allowed;
+      }
+
+      .debut-button-secondary {
+        background: #f0f0f0;
+        color: #333;
+        border: 1px solid #ccc;
+      }
+
+      .debut-button-secondary:hover {
+        background: #e0e0e0;
+      }
+    `;
+
+    document.head.appendChild(style);
+  }
+
+  setupDebutPlacementEvents() {
+    // 自動配置ボタン
+    document.getElementById('auto-debut-placement').addEventListener('click', () => {
+      this.executeAutoDebutPlacement();
+    });
+
+    // 配置完了ボタン
+    document.getElementById('confirm-debut-placement').addEventListener('click', () => {
+      this.confirmDebutPlacement();
+    });
+  }
+
+  updateDebutPlacementDisplay() {
+    const debutCardsList = document.getElementById('debut-cards-list');
+    const state = this.debutPlacementState;
+    
+    // Debutカードリストを更新
+    debutCardsList.innerHTML = '';
+    state.debutCards.forEach(card => {
+      const cardElement = document.createElement('div');
+      cardElement.className = 'debut-card-item';
+      cardElement.innerHTML = `
+        <div class="card-name">${card.name}</div>
+        <div class="card-hp">HP: ${card.hp || '?'}</div>
+      `;
+      
+      cardElement.addEventListener('click', () => {
+        this.selectDebutCard(card);
+      });
+      
+      debutCardsList.appendChild(cardElement);
+    });
+    
+    // 進捗状況を更新
+    const centerStatus = document.getElementById('center-status');
+    const backStatus = document.getElementById('back-status');
+    
+    centerStatus.textContent = state.centerPlaced ? 'センター2: 配置済み' : 'センター2: 未配置';
+    backStatus.textContent = `バック: ${state.usedBackPositions.length}/3`;
+    
+    // 配置完了ボタンの状態を更新
+    const confirmButton = document.getElementById('confirm-debut-placement');
+    confirmButton.disabled = !state.centerPlaced;
+  }
+
+  selectDebutCard(card) {
+    const state = this.debutPlacementState;
+    
+    if (!state.centerPlaced) {
+      // センター2に配置
+      this.placeCardInPosition(card, 'center2');
+    } else {
+      // バックに配置
+      const availableBack = state.backPositions.find(pos => !state.usedBackPositions.includes(pos));
+      if (availableBack) {
+        this.placeCardInPosition(card, availableBack);
+      } else {
+        alert('バックステージが満員です（最大3枚）');
+      }
+    }
+  }
+
+  placeCardInPosition(card, position) {
+    const state = this.debutPlacementState;
+    const player = this.players[state.playerId];
+    
+    // カードを配置
+    player[position] = card;
+    
+    // 手札から削除
+    const handIndex = player.hand.findIndex(handCard => handCard.id === card.id);
+    player.hand.splice(handIndex, 1);
+    
+    // 状態を更新
+    const cardIndex = state.debutCards.findIndex(debutCard => debutCard.id === card.id);
+    state.debutCards.splice(cardIndex, 1);
+    
+    if (position === 'center2') {
+      state.centerPlaced = true;
+    } else {
+      state.usedBackPositions.push(position);
+    }
+    
+    // スロット表示を更新
+    const slot = document.getElementById(`${position}-slot`).querySelector('.card-slot');
+    slot.textContent = card.name;
+    slot.classList.add('filled');
+    
+    // 表示を更新
+    this.updateDebutPlacementDisplay();
+    this.updateUI();
+    
+    console.log(`${card.name}を${position}に配置`);
+  }
+
+  executeAutoDebutPlacement() {
+    const state = this.debutPlacementState;
+    
+    // モーダルを閉じる
+    document.getElementById('debut-placement-modal').remove();
+    
+    // 自動配置を実行
+    this.autoDebutPlacement(state.playerId);
+  }
+
+  confirmDebutPlacement() {
+    const state = this.debutPlacementState;
+    
+    if (!state.centerPlaced) {
+      alert('センター2への配置は必須です');
+      return;
+    }
+    
+    // モーダルを閉じる
+    document.getElementById('debut-placement-modal').remove();
+    
+    const placedCount = 1 + state.usedBackPositions.length;
+    alert(`Debut配置完了！\n${placedCount}枚のDebutホロメンを配置しました`);
+    
+    // 次のプレイヤーまたは次のフェーズへ
+    this.proceedToNextDebutPlayer(state.playerId);
+  }
+
+  autoDebutPlacement(playerId) {
+    const player = this.players[playerId];
+    const debutCards = player.hand.filter(card => 
+      card.card_type && card.card_type.includes('ホロメン') && card.bloom_level === 'Debut'
+    );
+    
+    // センター2に1枚配置
+    const centerCard = debutCards[0];
+    player.center2 = centerCard;
+    const centerIndex = player.hand.findIndex(card => card.id === centerCard.id);
+    player.hand.splice(centerIndex, 1);
+    
+    console.log(`プレイヤー${playerId}が${centerCard.name}をセンター2に配置`);
+    
+    // 残りのDebutをバックに配置
+    const remainingDebuts = player.hand.filter(card => 
+      card.card_type && card.card_type.includes('ホロメン') && card.bloom_level === 'Debut'
+    );
+    
+    let backPositions = ['back1', 'back2', 'back3'];
+    remainingDebuts.slice(0, 3).forEach((card, index) => {
+      player[backPositions[index]] = card;
+      const handIndex = player.hand.findIndex(handCard => handCard.id === card.id);
+      player.hand.splice(handIndex, 1);
+      console.log(`プレイヤー${playerId}が${card.name}を${backPositions[index]}に配置`);
+    });
+    
+    // UIを更新
+    this.updateUI();
+    this.updateHandDisplay();
+    
+    alert(`${centerCard.name}をセンター2に配置\n残り${remainingDebuts.length}枚をバックに配置しました`);
+    
+    // 次のプレイヤーへ
+    this.proceedToNextDebutPlayer(playerId);
+  }
+
+  proceedToNextDebutPlayer(currentPlayerId) {
+    // Debut配置完了状態を管理するため、状態を追加
+    if (!this.gameState.debutPlacementCompleted) {
+      this.gameState.debutPlacementCompleted = { 1: false, 2: false };
+    }
+    
+    // 現在のプレイヤーの配置を完了としてマーク
+    this.gameState.debutPlacementCompleted[currentPlayerId] = true;
+    
+    // 両プレイヤーの配置が完了したかチェック
+    if (this.gameState.debutPlacementCompleted[1] && this.gameState.debutPlacementCompleted[2]) {
+      // 両プレイヤーの配置が完了
+      this.finishGameSetup();
+      return;
+    }
+    
+    // 次のプレイヤーを決定
+    const nextPlayerId = currentPlayerId === 1 ? 2 : 1;
+    
+    // 次のプレイヤーがまだ配置を完了していない場合
+    if (!this.gameState.debutPlacementCompleted[nextPlayerId]) {
+      if (nextPlayerId === 1) {
+        // プレイヤー1の手動配置
+        this.showDebutPlacementUI(nextPlayerId);
+      } else {
+        // プレイヤー2（CPU）の自動配置
+        this.cpuDebutPlacement(nextPlayerId);
+      }
+    } else {
+      // 次のプレイヤーが既に完了している場合、ゲームセットアップ完了
+      this.finishGameSetup();
+    }
+  }
+
+  cpuDebutPlacement(playerId) {
+    const player = this.players[playerId];
+    const debutCards = player.hand.filter(card => 
+      card.card_type && card.card_type.includes('ホロメン') && card.bloom_level === 'Debut'
+    );
+    
+    if (debutCards.length === 0) {
+      console.error(`CPU（プレイヤー${playerId}）にDebutホロメンがありません`);
+      return;
+    }
+    
+    // センター2に1枚配置
+    const centerCard = debutCards[0];
+    player.center2 = centerCard;
+    const centerIndex = player.hand.findIndex(card => card.id === centerCard.id);
+    player.hand.splice(centerIndex, 1);
+    
+    console.log(`CPU（プレイヤー${playerId}）が${centerCard.name}をセンター2に配置`);
+    
+    // 残りのDebutをバックに配置（簡単なAI）
+    const remainingDebuts = player.hand.filter(card => 
+      card.card_type && card.card_type.includes('ホロメン') && card.bloom_level === 'Debut'
+    );
+    
+    let backPositions = ['back1', 'back2', 'back3'];
+    remainingDebuts.slice(0, 3).forEach((card, index) => {
+      player[backPositions[index]] = card;
+      const handIndex = player.hand.findIndex(handCard => handCard.id === card.id);
+      player.hand.splice(handIndex, 1);
+      console.log(`CPU（プレイヤー${playerId}）が${card.name}を${backPositions[index]}に配置`);
+    });
+    
+    // UIを更新
+    this.updateUI();
+    
+    // 次のプレイヤーへ
+    this.proceedToNextDebutPlayer(playerId);
+  }
+
+  finishGameSetup() {
+    console.log('ゲームセットアップ完了');
+    this.gameState.gameStarted = true;
+    
+    alert('ゲーム開始！');
+    
+    // 最初のターンを開始
+    this.startTurn();
+  }
+
+  startTurn() {
+    console.log(`ターン${this.gameState.turnCount}開始 - プレイヤー${this.gameState.currentPlayer}のターン`);
+    this.gameState.currentPhase = 0; // リセットステップから開始
     this.updateUI();
   }
 }

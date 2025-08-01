@@ -328,6 +328,246 @@ body {
   border-radius: 6px;
   background: white;
   border: 1px solid #ddd;
+
+/* 先行・後攻選択モーダル */
+.turn-order-modal {
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  background: rgba(0, 0, 0, 0.8);
+  display: flex;
+  justify-content: center;
+  align-items: flex-start;
+  z-index: 10000;
+  padding-top: 10vh;
+}
+
+.turn-order-modal .modal-content {
+  background: white;
+  padding: 30px;
+  border-radius: 15px;
+  text-align: center;
+  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.5);
+  min-width: 400px;
+  animation: slideDown 0.3s ease-out;
+}
+
+@keyframes slideDown {
+  from {
+    transform: translateY(-50px);
+    opacity: 0;
+  }
+  to {
+    transform: translateY(0);
+    opacity: 1;
+  }
+}
+
+.turn-order-modal h3 {
+  margin: 0 0 20px 0;
+  color: #333;
+  font-size: 24px;
+  border-bottom: 2px solid #4CAF50;
+  padding-bottom: 10px;
+}
+
+.turn-order-modal p {
+  margin: 0 0 30px 0;
+  color: #666;
+  font-size: 16px;
+  line-height: 1.5;
+}
+
+.turn-order-buttons {
+  display: flex;
+  gap: 15px;
+  justify-content: center;
+  flex-wrap: wrap;
+}
+
+.turn-order-buttons button {
+  padding: 12px 24px;
+  font-size: 16px;
+  border: none;
+  border-radius: 8px;
+  cursor: pointer;
+  background: #4CAF50;
+  color: white;
+  transition: background 0.3s;
+  min-width: 120px;
+}
+
+.turn-order-buttons button:hover {
+  background: #45a049;
+}
+
+.turn-order-buttons button:nth-child(2) {
+  background: #2196F3;
+}
+
+.turn-order-buttons button:nth-child(2):hover {
+  background: #1976D2;
+}
+
+.turn-order-buttons button:nth-child(3) {
+  background: #FF9800;
+}
+
+.turn-order-buttons button:nth-child(3):hover {
+  background: #F57C00;
+}
+
+/* マリガンモーダル */
+.mulligan-modal {
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  background: rgba(0, 0, 0, 0.8);
+  display: flex;
+  justify-content: center;
+  align-items: flex-start;
+  z-index: 10000;
+  padding-top: 10vh;
+}
+
+.mulligan-modal .modal-content {
+  background: white;
+  padding: 30px;
+  border-radius: 15px;
+  text-align: center;
+  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.5);
+  min-width: 400px;
+  animation: slideDown 0.3s ease-out;
+}
+
+.mulligan-buttons {
+  display: flex;
+  gap: 15px;
+  justify-content: center;
+  margin-top: 20px;
+}
+
+.mulligan-buttons button {
+  padding: 12px 24px;
+  font-size: 16px;
+  border: none;
+  border-radius: 8px;
+  cursor: pointer;
+  background: #4CAF50;
+  color: white;
+  transition: all 0.3s;
+  box-shadow: 0 4px 8px rgba(0,0,0,0.2);
+}
+
+.mulligan-buttons button:hover {
+  background: #45a049;
+  transform: translateY(-2px);
+  box-shadow: 0 6px 12px rgba(0,0,0,0.3);
+}
+
+.mulligan-buttons button:nth-child(2) {
+  background: #f44336;
+}
+
+.mulligan-buttons button:nth-child(2):hover {
+  background: #da190b;
+}
+
+/* Debut配置モーダル */
+.debut-placement-modal,
+.back-placement-modal {
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  background: rgba(0, 0, 0, 0.8);
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  z-index: 10000;
+}
+
+.debut-placement-modal .modal-content,
+.back-placement-modal .modal-content {
+  background: white;
+  padding: 30px;
+  border-radius: 15px;
+  text-align: center;
+  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.5);
+  max-width: 600px;
+  max-height: 80vh;
+  overflow-y: auto;
+  position: relative;
+  top: -5%;
+}
+
+.debut-cards {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 15px;
+  justify-content: center;
+  margin: 20px 0;
+}
+
+.debut-card {
+  width: 90px;
+  height: 126px;
+  border: 2px solid #ddd;
+  border-radius: 8px;
+  cursor: pointer;
+  transition: transform 0.2s, border-color 0.2s;
+  background: white;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  padding: 5px;
+}
+
+.debut-card:hover {
+  transform: scale(1.05);
+  border-color: #4CAF50;
+}
+
+.debut-card img {
+  width: 70px;
+  height: 98px;
+  object-fit: cover;
+  border-radius: 4px;
+}
+
+.debut-card p {
+  margin: 5px 0 0 0;
+  font-size: 10px;
+  text-align: center;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  width: 100%;
+}
+
+.back-placement-buttons {
+  margin-top: 20px;
+}
+
+.back-placement-buttons button {
+  padding: 12px 24px;
+  font-size: 16px;
+  border: none;
+  border-radius: 8px;
+  cursor: pointer;
+  background: #2196F3;
+  color: white;
+  transition: background 0.3s;
+}
+
+.back-placement-buttons button:hover {
+  background: #1976D2;
+}
   cursor: pointer;
   transition: all 0.3s ease;
   background-size: cover;
