@@ -111,8 +111,8 @@ function addCardToDeck(cardId) {
     alert("エールカードは最大20枚までです");
     return;
   }
-  if (typeCounts.other > 40) {
-    alert("その他カードは最大40枚までです");
+  if (typeCounts.other > 50) {
+    alert("その他カードは最大50枚までです");
     return;
   }
   deck.push(cardId);
@@ -236,7 +236,7 @@ function addCardToDeck(cardId) {
           let warning = "";
           if (typeCounts.oshi > 1) warning += `💥 推しホロメンは1枚必要です\n`;
           if (typeCounts.cheer > 20) warning += `💥 エールカードは最大20枚までです\n`;
-          if (typeCounts.other > 50) warning += `💥 その他カードは最大40枚までです\n`;
+          if (typeCounts.other > 50) warning += `💥 その他カードは最大50枚までです\n`;
           if (warning) alert(warning);
 
           // ✅ デッキ構成を表示（任意の位置に #deckBreakdown がある前提）
