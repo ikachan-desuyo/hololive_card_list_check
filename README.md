@@ -275,7 +275,8 @@
 
 ### 商標・権利表記
 - 「ホロライブ」「hololive」は株式会社カバーの商標です
-- このツールは株式会社カバーとは無関係の非公式ファンメイドツールです
+- 「ホロライブオフィシャルカードゲーム」は株式会社ブシロードの商標です
+- このツールは株式会社カバー・株式会社ブシロードとは無関係の非公式ファンメイドツールです
 - カードデータの著作権は各権利者に帰属します
 
 ### 免責事項
@@ -544,7 +545,8 @@ This project is licensed under the MIT License.
 
 ### Trademark & Copyright Notice
 - "Hololive" and "hololive" are trademarks of Cover Corporation
-- This tool is an unofficial fan-made tool unrelated to Cover Corporation
+- "ホロライブオフィシャルカードゲーム" (Hololive Official Card Game) is a trademark of Bushiroad Inc.
+- This tool is an unofficial fan-made tool unrelated to Cover Corporation or Bushiroad Inc.
 - Copyright of card data belongs to respective rights holders
 
 ### Disclaimer
