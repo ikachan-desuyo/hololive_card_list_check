@@ -1,10 +1,6 @@
-/* ===============================
- * Version: 4.11.2-MobileDarkBG-Fix
- * モバイルダークモード時の検索・ソート・フィルター背景修正
- * 2025-07-29
- *
-   モバイル版レイアウト (max-width: 540px)
-   =============================== */
+/*
+ * Version: 4.11.3
+ */
 @media (max-width: 540px) {
   /* ダーク時はcontainer, container-top, sticky-controlsの背景を透過にしてbody背景を見せる */
   .dark.mobile-layout .container,
@@ -888,7 +884,7 @@ textarea {
 }
 
 /* =============================== */
-/* ダークモード時の全ボタン配色を明示的に上書き（v4.11.1） */
+/* ダークモード時の全ボタン配色を明示的に上書き（v4.11.3） */
 .dark button {
   background: linear-gradient(90deg, #22334a 0%, #334e68 100%) !important;
   color: #eaf6ff !important;

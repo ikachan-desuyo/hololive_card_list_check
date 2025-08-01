@@ -2,29 +2,25 @@
 // このファイルはバージョンアップ時に更新されます
 
 const APP_VERSION = "4.11.3";
-const VERSION_DESCRIPTION = "Navigation-Consistency-Fix";
+const VERSION_DESCRIPTION = "4.11.3";
 
 // ✅ 各ページのバージョン情報を一元管理
 const PAGE_VERSIONS = {
-  "index.html": "4.11.3-Navigation-Consistency-Fix",  // ナビゲーション整合性修正
-  "binder_collection.html": "4.11.3-Navigation-Consistency-Fix",  // ナビゲーション整合性修正
-  "collection_binder.html": "4.11.3-Navigation-Consistency-Fix",  // ナビゲーション整合性修正
-  "card_list.html": "4.11.3-Navigation-Consistency-Fix",  // ナビゲーション整合性修正
-  "holoca_skill_page.html": "4.11.3-Navigation-Consistency-Fix",  // ナビゲーション整合性修正
-  "deck_builder.html": "4.11.3-Navigation-Consistency-Fix"  // ナビゲーション整合性修正
+  "index.html": "4.11.3",
+  "binder_collection.html": "4.11.3",
+  "collection_binder.html": "4.11.3",
+  "card_list.html": "4.11.3",
+  "holoca_skill_page.html": "4.11.3",
+  "deck_builder.html": "4.11.3"
 };
 
 // ✅ 更新内容の詳細情報
 const UPDATE_DETAILS = {
-  title: "🔧 ナビゲーション整合性修正 v4.11.3",
-  description: "カード詳細検索ページのバインダーボタンをバインダーコレクションページに変更、DISPLAY_VERSIONS削除",
+  title: "v4.11.3",
+  description: "ナビゲーション整合性修正",
   changes: [
-    "🔧 カード詳細検索ページのバインダーボタンの遷移先を修正",
-    "📚 バインダーボタンがバインダーコレクションページ(binder_collection.html)に正しく遷移",
-    "🗑️ 未使用のDISPLAY_VERSIONSを削除してコードをクリーンアップ",
-    "✅ 全ページのナビゲーション整合性を統一",
-    "🎯 ユーザー体験の向上（期待通りのページに遷移）",
-    "🔄 UI/UX の一貫性確保"
+    "バインダーボタンの遷移先を修正",
+    "ナビゲーション整合性を統一"
   ]
 };
 
