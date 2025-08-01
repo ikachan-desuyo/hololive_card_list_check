@@ -1,0 +1,101 @@
+{
+  "positions": {
+    "life": {
+      "name": "ライフ",
+      "description": "推しホロメンのライフの数だけエールカードが置かれる場所",
+      "max_cards": 6,
+      "orientation": "vertical_stack"
+    },
+    "center1": {
+      "name": "センター①",
+      "description": "メインのホロメンが立つステージ",
+      "max_cards": 1,
+      "type": "stage"
+    },
+    "center2": {
+      "name": "センター②", 
+      "description": "コラボホロメンが立つステージ",
+      "max_cards": 1,
+      "type": "stage"
+    },
+    "oshi": {
+      "name": "推しポジション",
+      "description": "推しホロメンカードを置く場所",
+      "max_cards": 1,
+      "type": "oshi"
+    },
+    "holo_power": {
+      "name": "ホロパワー",
+      "description": "ホロパワーとなったカードを裏向きに置く場所",
+      "max_cards": 99,
+      "orientation": "stack"
+    },
+    "deck": {
+      "name": "デッキ",
+      "description": "デッキを裏向きにして置く場所",
+      "max_cards": 60,
+      "orientation": "stack"
+    },
+    "yell_deck": {
+      "name": "エールデッキ",
+      "description": "エールデッキを裏向きに置く場所",
+      "max_cards": 20,
+      "orientation": "stack"
+    },
+    "back1": {
+      "name": "バック①",
+      "description": "バックホロメンが立つステージ",
+      "max_cards": 1,
+      "type": "stage"
+    },
+    "back2": {
+      "name": "バック②",
+      "description": "バックホロメンが立つステージ",
+      "max_cards": 1,
+      "type": "stage"
+    },
+    "back3": {
+      "name": "バック③",
+      "description": "バックホロメンが立つステージ",
+      "max_cards": 1,
+      "type": "stage"
+    },
+    "archive": {
+      "name": "アーカイブ",
+      "description": "使用したサポートカードやダウンしたホロメンを表向きに置く場所",
+      "max_cards": 99,
+      "orientation": "stack"
+    }
+  },
+  "turn_phases": [
+    {
+      "name": "リセットステップ",
+      "description": "お休みホロメンをアクティブにし、コラボホロメンをお休みさせる"
+    },
+    {
+      "name": "手札ステップ",
+      "description": "デッキの上からカードを1枚引く"
+    },
+    {
+      "name": "エールステップ",
+      "description": "エールデッキの上から1枚を表向きにしてホロメンに送る"
+    },
+    {
+      "name": "メインステップ",
+      "description": "手札からホロメンを出したり、サポートカードを使ったり、コラボさせる"
+    },
+    {
+      "name": "パフォーマンスステップ",
+      "description": "センターホロメンとコラボホロメンのアーツを使用"
+    },
+    {
+      "name": "エンドステップ",
+      "description": "ターンを終了し、相手にターンを渡す"
+    }
+  ],
+  "victory_conditions": [
+    "相手のライフを0にする",
+    "相手のステージ上で推しホロメン以外が全員いなくなる",
+    "相手のデッキが0枚の状態で相手が手札ステップでカードを引けない"
+  ]
+}

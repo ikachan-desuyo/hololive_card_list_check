@@ -1,0 +1,52 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>ホロライブTCG バトルシミュレーター</title>
+  <link rel="stylesheet" href="css/battle_view.css">
+</head>
+<body>
+  <!-- ナビゲーションヘッダー -->
+  <nav class="battle-nav">
+    <div class="nav-buttons">
+      <button onclick="window.location.href='index.html'">🏠 ホーム</button>
+      <button onclick="window.location.href='deck_builder.html'">🃏 デッキ作成</button>
+      <button onclick="window.location.href='card_list.html'">📋 カード一覧</button>
+    </div>
+    <h1>⚔️ バトルシミュレーター</h1>
+  </nav>
+
+  <main class="battle-view">
+    <!-- 対戦相手エリア -->
+    <section class="battle-opponent">
+      <div class="card-area life">対戦相手ライフ</div>
+      <div class="card-area front1">対戦相手センター①</div>
+      <div class="card-area front2">対戦相手センター②</div>
+      <div class="card-area oshi">対戦相手推し</div>
+      <div class="card-area holo">対戦相手ホロパワー</div>
+      <div class="card-area deck">対戦相手デッキ</div>
+      <div class="card-area yell-deck">対戦相手エールデッキ</div>
+      <div class="card-area backs">対戦相手バック</div>
+      <div class="card-area archive">対戦相手アーカイブ</div>
+    </section>
+
+    <!-- プレイヤーエリア -->
+    <section class="battle-player">
+      <div class="card-area life">ライフ</div>
+      <div class="card-area front1">センター①</div>
+      <div class="card-area front2">センター②</div>
+      <div class="card-area oshi">推し</div>
+      <div class="card-area holo">ホロパワー</div>
+      <div class="card-area deck">デッキ</div>
+      <div class="card-area yell-deck">エールデッキ</div>
+      <div class="card-area backs">バック</div>
+      <div class="card-area archive">アーカイブ</div>
+    </section>
+  </main>
+
+  <script src="js/deck_manager.js"></script>
+  <script src="js/battle_engine.js"></script>
+  <script src="js/cpu_logic.js"></script>
+</body>
+</html>
