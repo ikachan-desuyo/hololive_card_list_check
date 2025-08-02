@@ -46,6 +46,9 @@ class HololiveBattleEngine {
     
     // 手札管理の初期化
     this.handManager = new HandManager(this);
+    
+    // カード表示管理の初期化
+    this.cardDisplayManager = new CardDisplayManager(this);
   }
 
   createPlayerState() {
@@ -350,6 +353,11 @@ class HololiveBattleEngine {
     // 準備ステップの場合は特別な表示
     if (this.gameState.currentPhase === -1) {
       turnInfo.textContent = '準備ステップ - ゲーム開始準備中';
+      
+      // 情報パネルも更新
+      if (window.updateGameStep) {
+        window.updateGameStep('準備ステップ', 'ゲーム開始準備中', 0, 'system');
+      }
       return;
     }
     
@@ -357,6 +365,12 @@ class HololiveBattleEngine {
     const phaseName = this.phaseNames[this.gameState.currentPhase + 1]; // インデックスを調整
     
     turnInfo.textContent = `${playerName}のターン - ${phaseName} (ターン${this.gameState.turnCount})`;
+    
+    // 情報パネルも更新
+    if (window.updateGameStep) {
+      const currentPlayer = this.gameState.currentPlayer === 1 ? 'player' : 'opponent';
+      window.updateGameStep(phaseName, `${playerName}のターン`, this.gameState.turnCount, currentPlayer);
+    }
   }
 
   showDeckSelection(playerId = 1) {
@@ -415,12 +429,21 @@ class HololiveBattleEngine {
     this.gameState.currentPhase = 0;
     this.gameState.turnCount = 1;
     
+    // ゲーム開始ログ
+    if (window.logGameEvent) {
+      window.logGameEvent('system', 'ゲームが開始されました！');
+      window.logGameEvent('system', `先行: ${this.gameState.firstPlayer === 1 ? 'プレイヤー' : '対戦相手'}`);
+    }
+    
     // セットアップ実行
     this.executeGameSetup();
     
     // UIの更新
     this.updateTurnInfo();
     this.updateUI();
+    
+    // フェーズハイライトを初期化
+    this.updatePhaseHighlight();
     
     // コントロールボタンの状態更新
     document.getElementById('start-game').disabled = true;
@@ -627,7 +650,21 @@ class HololiveBattleEngine {
     if (player.deck.length > 0) {
       const card = player.deck.pop();
       player.hand.push(card);
+      
+      // ログ出力
+      if (window.logCardEvent) {
+        const playerType = playerId === 1 ? 'player' : 'opponent';
+        const cardName = card.name || '不明なカード';
+        window.logCardEvent(playerType, 'ドロー', cardName);
+      }
+      
       return card;
+    } else {
+      // デッキが空の場合のログ
+      if (window.logGameEvent) {
+        const playerType = playerId === 1 ? 'player' : 'opponent';
+        window.logGameEvent(playerType, 'デッキが空のためカードをドローできませんでした');
+      }
     }
     return null;
   }
@@ -656,6 +693,9 @@ class HololiveBattleEngine {
     this.gameState.currentPhase++;
     
     console.log(`フェーズ更新後: ${this.gameState.currentPhase}`);
+    
+    // フェーズハイライトを更新
+    this.updatePhaseHighlight();
     
     // エンドステップ（フェーズ5）の次はターン終了
     if (this.gameState.currentPhase > 5) {
@@ -716,8 +756,12 @@ class HololiveBattleEngine {
     console.log(`=== executeResetStep ===`);
     console.log(`プレイヤー${playerId}のリセットステップを実行`);
     console.log(`現在のcurrentPlayer: ${this.gameState.currentPlayer}`);
+    console.log(`現在のcurrentPhase: ${this.gameState.currentPhase}`);
     console.log(`ターン数: ${this.gameState.turnCount}`);
     console.log(`======================`);
+    
+    // フェーズハイライトを明示的に更新
+    this.updatePhaseHighlight();
     
     const player = this.players[playerId];
     
@@ -777,10 +821,10 @@ class HololiveBattleEngine {
     this.updateUI();
     
     // リセットステップは自動で完了し、次のステップへ移行
-    console.log('リセットステップ完了 - 自動で手札ステップに進みます');
+    console.log('リセットステップ完了 - 自動でドローステップに進みます');
     setTimeout(() => {
       this.nextPhase();
-    }, 1500);
+    }, 2000); // プレイヤーがフェーズを確認できるよう2秒に延長
   }
 
   executeDrawStep(playerId) {
@@ -804,11 +848,11 @@ class HololiveBattleEngine {
     // UI更新
     this.updateUI();
     
-    // 手札ステップは自動で完了し、次のステップへ移行
-    console.log('手札ステップ完了 - 自動でエールステップに進みます');
+    // ドローステップは自動で完了し、次のステップへ移行
+    console.log('ドローステップ完了 - 自動でエールステップに進みます');
     setTimeout(() => {
       this.nextPhase();
-    }, 1000);
+    }, 2000); // プレイヤーがフェーズを確認できるよう2秒に延長
   }
 
   executeYellStep(playerId) {
@@ -877,7 +921,7 @@ class HololiveBattleEngine {
         // 自動で次のステップへ移行
         setTimeout(() => {
           this.nextPhase();
-        }, 1500);
+        }, 2000); // フェーズ確認のため2秒に延長
       }
     } else {
       // ホロメンがいない場合はアーカイブへ
@@ -894,7 +938,7 @@ class HololiveBattleEngine {
         // 自動で次のステップへ移行
         setTimeout(() => {
           this.nextPhase();
-        }, 1000);
+        }, 2000); // フェーズ確認のため2秒に延長
       }
     }
   }
@@ -914,6 +958,9 @@ class HololiveBattleEngine {
   }
 
   endTurn() {
+    console.log(`=== ターン終了処理開始 ===`);
+    console.log(`現在のプレイヤー: ${this.gameState.currentPlayer} → 切り替え後: ${this.gameState.currentPlayer === 1 ? 2 : 1}`);
+    
     // ターン終了
     this.gameState.currentPlayer = this.gameState.currentPlayer === 1 ? 2 : 1;
     this.gameState.currentPhase = 0;
@@ -922,17 +969,24 @@ class HololiveBattleEngine {
       this.gameState.turnCount++;
     }
     
+    console.log(`新しいターン - プレイヤー${this.gameState.currentPlayer}, ターン数: ${this.gameState.turnCount}`);
+    
     this.updateTurnInfo();
     this.updateUI();
+    
+    // フェーズハイライトを更新（重要！）
+    this.updatePhaseHighlight();
     
     // 勝利条件の確認
     this.checkVictoryConditions();
     
     console.log(`ターン終了 - プレイヤー${this.gameState.currentPlayer}のターン開始`);
+    console.log(`=== ターン終了処理完了 ===`);
     
     // 新しいターンのリセットステップ開始
     // 両プレイヤーとも自動でリセットステップを開始
     setTimeout(() => {
+      console.log(`プレイヤー${this.gameState.currentPlayer}のリセットステップ開始`);
       this.executeResetStep(this.gameState.currentPlayer);
     }, 1000);
   }
@@ -1086,313 +1140,58 @@ class HololiveBattleEngine {
   }
 
   updateCardAreas() {
-    // 各カードエリアの状態を更新
-    const areas = ['life', 'front1', 'front2', 'oshi', 'holo', 'deck', 
-                   'yell-deck', 'archive']; // 'backs'を除外
-    
-    // プレイヤーエリアの更新
-    areas.forEach(areaId => {
-      const area = document.querySelector(`.battle-player .${areaId}`);
-      if (area) {
-        area.innerHTML = '';
-        const player = this.players[1];
-        this.displayCardsInArea(area, player, areaId, 1); // プレイヤーID追加
-      }
-    });
-
-    // バックエリアは特別処理（.back-slot要素を保持）
-    this.updateBackSlots(1);
-
-    // 対戦相手エリアの更新
-    areas.forEach(areaId => {
-      const area = document.querySelector(`.battle-opponent .${areaId}`);
-      if (area) {
-        area.innerHTML = '';
-        const opponent = this.players[2];
-        this.displayCardsInArea(area, opponent, areaId, 2); // プレイヤーID追加
-      }
-    });
-    
-    // 対戦相手のバックエリアも特別処理
-    this.updateBackSlots(2);
+    // カード表示管理機能をCardDisplayManagerに委譲
+    this.cardDisplayManager.updateCardAreas();
   }
 
   // バックスロットエリアの更新（.back-slot要素を保持）
   updateBackSlots(playerId) {
-    const sectionClass = playerId === 1 ? '.battle-player' : '.battle-opponent';
-    const backSlots = document.querySelectorAll(`${sectionClass} .back-slot`);
-    const player = this.players[playerId];
-    const backPositions = ['back1', 'back2', 'back3', 'back4', 'back5'];
-    
-    // センター①があるかどうかで最大使用スロット数を決定
-    const maxSlots = player.center1 ? 4 : 5;
-    
-    backSlots.forEach((slot, index) => {
-      // 既存のカード要素をクリア（スロット自体は保持）
-      const existingCards = slot.querySelectorAll('.card');
-      existingCards.forEach(card => card.remove());
-      
-      // 使用不可スロットの処理
-      if (index >= maxSlots) {
-        slot.classList.add('disabled');
-        slot.classList.remove('has-card');
-        slot.style.opacity = '0.3';
-        slot.style.pointerEvents = 'none';
-        slot.textContent = '使用不可';
-        return;
-      } else {
-        slot.classList.remove('disabled');
-        slot.style.opacity = '1';
-        slot.style.pointerEvents = 'auto';
-      }
-      
-      // 対応するバックポジションにカードがある場合は表示
-      const card = player[backPositions[index]];
-      if (card) {
-        const cardElement = this.createCardElement(card, 'single', index, 'backs', playerId); // プレイヤーID追加
-        // バックスロット内でのサイズ調整
-        cardElement.style.width = '100%';
-        cardElement.style.height = '100%';
-        cardElement.style.position = 'absolute';
-        cardElement.style.top = '0';
-        cardElement.style.left = '0';
-        
-        slot.appendChild(cardElement);
-        slot.classList.add('has-card');
-        slot.style.position = 'relative'; // 子要素の絶対配置のため
-        
-        // エールカードがある場合は表示
-        if (card.yellCards && card.yellCards.length > 0) {
-          this.addYellCardsToArea(slot, card, 'backs', index);
-        }
-      } else {
-        slot.classList.remove('has-card');
-        slot.style.position = 'static';
-        // 空のスロットには元のテキストを表示
-        if (slot.children.length === 0) {
-          slot.textContent = `バック${index + 1}`;
-        }
-      }
-    });
+    // バックスロット更新機能をCardDisplayManagerに委譲
+    const playerType = playerId === 1 ? 'player' : 'cpu';
+    this.cardDisplayManager.updateBackSlots(playerType);
   }
 
   displayCardsInArea(area, player, areaId, playerId = 1) {
-    let cards = [];
-    let displayType = 'stack'; // 'stack', 'spread', 'single'
-    
+    // カード表示機能をCardDisplayManagerに委譲
+    // displayCardsInAreaの引数を正しく渡す（area, cards, areaId, player）
+    let cards = null;
     switch (areaId) {
-      case 'life':
-        cards = player.life;
-        displayType = 'vertical';
-        break;
-      case 'front1':
-        if (player.center1) cards = [player.center1];
-        displayType = 'single';
-        break;
-      case 'front2':
-        if (player.center2) cards = [player.center2];
-        displayType = 'single';
-        break;
-      case 'oshi':
-        if (player.oshi) cards = [player.oshi];
-        displayType = 'single';
-        break;
-      case 'holo':
-        cards = player.holoPower;
-        displayType = 'spread';
-        break;
-      case 'deck':
-        cards = player.deck.slice(0, 3); // 上3枚のみ表示
-        displayType = 'stack';
-        break;
-      case 'yell-deck':
-        cards = player.yellDeck.slice(0, 3); // 上3枚のみ表示
-        displayType = 'stack';
-        break;
-      case 'archive':
-        cards = player.archive.slice(0, 3); // 上3枚のみ表示
-        displayType = 'stack';
-        break;
+      case 'life': cards = player.life; break;
+      case 'front1': cards = player.center1; break;
+      case 'front2': cards = player.center2; break;
+      case 'oshi': cards = player.oshi; break;
+      case 'holo': cards = player.holoPower; break;
+      case 'deck': cards = player.deck; break;
+      case 'yell-deck': cards = player.yellDeck; break;
+      case 'archive': cards = player.archive; break;
     }
-
-    // カードを表示
-    cards.forEach((card, index) => {
-      const cardElement = this.createCardElement(card, displayType, index, areaId, playerId);
-      area.appendChild(cardElement);
-      
-      // エールカードがある場合、同じエリア内に兄弟要素として追加
-      if (card && card.yellCards && card.yellCards.length > 0) {
-        this.addYellCardsToArea(area, card, areaId, index);
-      }
-    });
-
-    // カードカウンターの追加
-    const totalCount = this.getCardCount(player, areaId);
-    if (totalCount > 0) {
-      this.updateCardCounter(area, totalCount);
-      area.classList.add('has-card');
-    } else {
-      area.classList.remove('has-card');
-    }
+    this.cardDisplayManager.displayCardsInArea(area, cards, areaId, player);
   }
 
   createCardElement(card, displayType, index, areaId = null, playerId = 1) {
-    const cardElement = document.createElement('div');
-    cardElement.className = 'card face-down'; // デフォルトは裏向き
-    
-    // ホロメンカードのz-indexを確実に設定（!importantに対抗）
-    cardElement.style.zIndex = '100 !important';
-    cardElement.style.position = 'relative'; // z-indexを有効にするため
-    
-    // 横向き状態の判定
-    if (card && card.isResting) {
-      cardElement.classList.add('resting');
-    }
-    
-    // 表向きで表示すべきエリアかどうかを判定
-    const shouldShowFaceUp = this.shouldCardBeFaceUp(card, areaId);
-    
-    if (shouldShowFaceUp && card) {
-      cardElement.classList.remove('face-down');
-      cardElement.classList.add('face-up');
-      
-      // カード画像の設定
-      if (card.image_url) {
-        cardElement.style.backgroundImage = `url(${card.image_url})`;
-        cardElement.style.backgroundSize = 'cover';
-        cardElement.style.backgroundPosition = 'center';
-      }
-      
-      // カード名表示（画像がない場合のフォールバック）
-      if (!card.image_url) {
-        cardElement.innerHTML = `
-          <div class="card-content">
-            <div class="card-name">${card.name || 'Unknown'}</div>
-            <div class="card-type">${card.card_type || ''}</div>
-          </div>
-        `;
-      }
-      
-      // エールカードの追加は別途 addYellCardsToArea で行う
-    }
-    
-    // 配置済みカードのドラッグ機能を追加（プレイヤー1のセンター、バックのホロメンカードのみ）
-    if (playerId === 1 && shouldShowFaceUp && this.isHolomenCard(card) && (areaId === 'front1' || areaId === 'front2' || areaId === 'backs')) {
-      cardElement.draggable = true;
-      cardElement.setAttribute('data-card-id', card.id);
-      cardElement.setAttribute('data-area-id', areaId);
-      cardElement.setAttribute('data-area-index', index);
-      
-      cardElement.addEventListener('dragstart', (e) => this.handlePlacedCardDragStart(e, card, areaId, index));
-      cardElement.addEventListener('dragend', (e) => this.handlePlacedCardDragEnd(e));
-    }
-    
-    // 表示タイプによる位置調整
-    if (displayType === 'stack') {
-      cardElement.style.position = 'absolute';
-      cardElement.style.top = '50%';
-      cardElement.style.left = '50%';
-      if (index === 0) {
-        cardElement.style.transform = 'translate(-50%, -50%)';
-        cardElement.style.zIndex = '10';
-      } else {
-        const offset = index * 2;
-        cardElement.style.transform = `translate(${-50 + offset}%, ${-50 + offset}%)`;
-        cardElement.style.zIndex = `${10 - index}`;
-      }
-    } else if (displayType === 'vertical') {
-      // ライフカード用の縦並び表示（90度回転した横向きカードを重ねて縦に並べる）
-      cardElement.style.position = 'relative';
-      cardElement.style.display = 'block';
-      cardElement.style.margin = '-25px auto'; // 6枚でも収まるよう重ねる
-      cardElement.style.zIndex = `${20 - index}`; // 上のカードほど前面に
-    }
-    
-    return cardElement;
+    // カード要素作成機能をCardDisplayManagerに委譲
+    const isPlayerCard = (playerId === 1);
+    return this.cardDisplayManager.createCardElement(card, areaId, index, isPlayerCard);
   }
 
   shouldCardBeFaceUp(card, areaId) {
-    if (!card) return false;
-    
-    // 推しホロメンは常に表向き
-    if (card.card_type === '推しホロメン') {
-      return true;
-    }
-    
-    // 表向きで表示すべきエリア
-    const faceUpAreas = ['front1', 'front2', 'backs', 'archive'];
-    return faceUpAreas.includes(areaId);
+    // カード表示判定機能をCardDisplayManagerに委譲
+    return this.cardDisplayManager.shouldCardBeFaceUp(card, areaId);
   }
 
   getCardCount(player, areaId) {
-    switch (areaId) {
-      case 'life': return player.life.length;
-      case 'front1': return player.center1 ? 1 : 0;
-      case 'front2': return player.center2 ? 1 : 0;
-      case 'oshi': return player.oshi ? 1 : 0;
-      case 'holo': return player.holoPower.length;
-      case 'deck': return player.deck.length;
-      case 'yell-deck': return player.yellDeck.length;
-      case 'backs': return (player.back1 ? 1 : 0) + (player.back2 ? 1 : 0) + (player.back3 ? 1 : 0) + (player.back4 ? 1 : 0) + (player.back5 ? 1 : 0);
-      case 'archive': return player.archive.length;
-      default: return 0;
-    }
+    // カード数取得機能をCardDisplayManagerに委譲
+    return this.cardDisplayManager.getCardCount(player, areaId);
   }
 
   updateCardCounter(area, count) {
-    let counter = area.querySelector('.card-counter');
-    
-    if (count > 1) { // 2枚以上の時のみカウンター表示
-      if (!counter) {
-        counter = document.createElement('div');
-        counter.className = 'card-counter';
-        area.appendChild(counter);
-      }
-      counter.textContent = count;
-    } else if (counter) {
-      counter.remove();
-    }
+    // カードカウンター更新機能をCardDisplayManagerに委譲
+    this.cardDisplayManager.updateCardCounter(area, count);
   }
 
   updatePhaseHighlight() {
-    // すべてのハイライトを削除
-    document.querySelectorAll('.phase-highlight').forEach(el => {
-      el.classList.remove('phase-highlight');
-    });
-    
-    // 現在のフェーズに応じてハイライト
-    const phase = this.gameState.currentPhase;
-    const currentPlayer = this.gameState.currentPlayer;
-    let targetArea = null;
-    
-    // 現在のプレイヤーのエリアを特定
-    const playerSection = currentPlayer === 1 ? '.battle-player' : '.battle-opponent';
-    
-    switch (phase) {
-      case -1: // 準備ステップ
-        // 準備ステップではハイライトなし
-        break;
-      case 0: // リセットステップ
-        // リセットステップでは全体をハイライト
-        targetArea = document.querySelector(playerSection);
-        break;
-      case 1: // 手札ステップ
-        targetArea = document.querySelector(`${playerSection} .deck`);
-        break;
-      case 2: // エールステップ
-        targetArea = document.querySelector(`${playerSection} .yell-deck`);
-        break;
-      case 3: // メインステップ
-        targetArea = document.querySelector(`${playerSection} .front1`);
-        break;
-      case 4: // パフォーマンスステップ
-        targetArea = document.querySelector(`${playerSection} .front1`);
-        break;
-    }
-    
-    if (targetArea) {
-      targetArea.classList.add('phase-highlight');
-    }
+    // フェーズハイライト機能をCardDisplayManagerに委譲
+    this.cardDisplayManager.updatePhaseHighlight();
   }
 
   updatePhaseButtons() {
@@ -1437,6 +1236,13 @@ class HololiveBattleEngine {
 
   playCard(card, handIndex) {
     const player = this.players[this.gameState.currentPlayer];
+    
+    // カードプレイのログ
+    if (window.logCardEvent) {
+      const playerType = this.gameState.currentPlayer === 1 ? 'player' : 'opponent';
+      const cardName = card.name || '不明なカード';
+      window.logCardEvent(playerType, 'プレイ', cardName);
+    }
     
     if (card.card_type === 'ホロメン') {
       this.playHolomenCard(card, handIndex);
@@ -2699,9 +2505,11 @@ class HololiveBattleEngine {
 
   // サポートドロップゾーン作成
   createSupportDropZone() {
+    console.log('createSupportDropZone() 呼び出し');
     // 既存の要素があれば削除
     const existingZone = document.getElementById('support-drop-zone');
     if (existingZone) {
+      console.log('既存のサポートドロップゾーンを削除');
       existingZone.remove();
     }
     
@@ -2709,6 +2517,14 @@ class HololiveBattleEngine {
     supportZone.className = 'support-drop-zone';
     supportZone.textContent = 'サポートカード効果使用';
     supportZone.id = 'support-drop-zone';
+    
+    // プレイヤーエリアの上端に合わせ、横幅も合わせる
+    supportZone.style.height = '550px'; // 手札エリアと重ならない高さ
+    supportZone.style.width = '100%'; // プレイヤーエリアの横幅に合わせる
+    supportZone.style.top = '0'; // プレイヤーエリアの上端に合わせる
+    supportZone.style.left = '0'; // 左端も合わせる
+    console.log('サポートドロップゾーン要素作成完了:', supportZone);
+    console.log('適用したスタイル - height:', supportZone.style.height, 'width:', supportZone.style.width, 'top:', supportZone.style.top);
     
     // ドロップイベントを追加
     supportZone.addEventListener('dragover', (e) => this.handleDragOver(e));
@@ -2720,16 +2536,23 @@ class HololiveBattleEngine {
     const playerArea = document.querySelector('.battle-player');
     if (playerArea) {
       playerArea.appendChild(supportZone);
+      console.log('サポートドロップゾーンをプレイヤーエリアに追加完了');
     } else {
       document.body.appendChild(supportZone);
+      console.log('プレイヤーエリアが見つからないためbodyに追加');
     }
   }
 
   // サポートドロップゾーン表示/非表示
   showSupportDropZone() {
+    console.log('showSupportDropZone() 呼び出し');
     const supportZone = document.getElementById('support-drop-zone');
+    console.log('support-drop-zone要素:', supportZone);
     if (supportZone) {
       supportZone.classList.add('active');
+      console.log('active クラス追加完了');
+    } else {
+      console.log('support-drop-zone要素が見つかりません');
     }
   }
 
@@ -2896,8 +2719,11 @@ class HololiveBattleEngine {
     
     if (playerId === 1) {
       // プレイヤーの場合は手動操作を待つ（自動進行しない）
-      console.log('メインステップです。カードをプレイした後、「パフォーマンスステップへ」ボタンを押してください。');
-      // 手動操作を待つため、ここでは自動進行しない
+      console.log('メインステップです。カードをプレイした後、「次のフェーズ」ボタンを押してください。');
+      // プレイヤーがフェーズを確認できるよう少し待機
+      setTimeout(() => {
+        console.log('プレイヤーのメインステップ - 操作をお待ちしています');
+      }, 1000);
     } else {
       // CPUの場合は自動進行（CPU AIロジックを呼び出し）
       console.log('CPU用メインステップ処理を開始します');
@@ -2914,7 +2740,7 @@ class HololiveBattleEngine {
           console.error('CPUメインステップでエラー:', error);
           this.nextPhase(); // エラーでも進行は続ける
         }
-      }, 2000);
+      }, 2000); // フェーズ確認のため2秒に延長
     }
   }
 
@@ -2948,169 +2774,135 @@ class HololiveBattleEngine {
 
   // エールカードをエリア内に兄弟要素として追加
   addYellCardsToArea(area, holomenCard, areaId, cardIndex) {
-    if (!holomenCard.yellCards || holomenCard.yellCards.length === 0) return;
-    
-    console.log(`エール表示更新: ${holomenCard.name}に${holomenCard.yellCards.length}枚のエール`);
-    
-    // 既存のエールカードコンテナを削除（重複防止）
-    const existingYellContainer = area.querySelector(`.yell-cards[data-card-index="${cardIndex}"]`);
-    if (existingYellContainer) {
-      existingYellContainer.remove();
-    }
-    
-    const yellContainer = document.createElement('div');
-    yellContainer.className = 'yell-cards';
-    yellContainer.setAttribute('data-card-index', cardIndex);
-    
-    // センターかバックかで配置を変える
-    if (areaId === 'front1' || areaId === 'front2') {
-      yellContainer.classList.add('center');
-    } else {
-      yellContainer.classList.add('back');
-    }
-    
-    // エリア内での絶対配置
-    yellContainer.style.position = 'absolute';
-    yellContainer.style.top = '0';
-    yellContainer.style.left = '0';
-    yellContainer.style.width = '100%';
-    yellContainer.style.height = '100%';
-    yellContainer.style.zIndex = '5'; // ホロメンカードより後ろだが、ホバー時は子要素が前面に
-    yellContainer.style.pointerEvents = 'auto'; // マウスイベントを有効にしてエールカードがホバー可能に
-    
-    holomenCard.yellCards.forEach((yellCard, index) => {
-      const yellElement = document.createElement('div');
-      yellElement.className = 'yell-card';
-      yellElement.title = yellCard.name;
-      
-      // エールカードをライフカードのように重ねて配置
-      yellElement.style.position = 'absolute';
-      yellElement.style.width = '120px'; // 他のカードと同じサイズに統一
-      yellElement.style.height = '168px'; // 他のカードと同じサイズに統一
-      
-      // センターとバックで異なる重なり方（ホロメンカードから少しずらす）
-      if (areaId === 'front1' || areaId === 'front2') {
-        // センター配置：ホロメンカードの下に、右部分が少しはみ出るように配置
-        // 上下は同じ高さ、左右は右にずらして重ねる
-        const offsetX = 30 + (index * 12); // 右にもっと大きくはみ出し
-        const offsetY = 0; // 上下は同じ高さ
-        yellElement.style.transform = `translate(${offsetX}px, ${offsetY}px) scale(1)`;
-        yellElement.style.zIndex = `${5 - index}`; // 通常時は後ろに、ホバー時はCSSで250に
-      } else if (areaId === 'backs') {
-        // バック配置：ホロメンカードの背後に、上部が少しはみ出るように配置
-        // 左右は同じ場所、上下は上にずらして重ねる
-        const offsetX = 0; // 左右は同じ場所
-        const offsetY = -20 - (index * 8); // 上により大きくはみ出し
-        yellElement.style.transform = `translate(${offsetX}px, ${offsetY}px) scale(1)`;
-        yellElement.style.zIndex = `${5 + index}`; // 通常時は後ろに、ホバー時はCSSで250に
-      } else {
-        // その他のエリア：左下にずらして重ねる  
-        const offsetX = -8 - (index * 3);
-        const offsetY = 8 + (index * 3);
-        yellElement.style.transform = `translate(${offsetX}px, ${offsetY}px) scale(1)`;
-        yellElement.style.zIndex = `${5 - index}`;
-      }
-      
-      // エールカードの画像を表示
-      if (yellCard.image_url) {
-        yellElement.style.backgroundImage = `url(${yellCard.image_url})`;
-        yellElement.style.backgroundSize = 'cover';
-        yellElement.style.backgroundPosition = 'center';
-        yellElement.style.backgroundRepeat = 'no-repeat';
-      } else {
-        // 画像がない場合は最初の文字を表示
-        yellElement.textContent = yellCard.name.charAt(0);
-        yellElement.style.display = 'flex';
-        yellElement.style.alignItems = 'center';
-        yellElement.style.justifyContent = 'center';
-        yellElement.style.fontSize = '12px';
-        yellElement.style.fontWeight = 'bold';
-      }
-      
-      yellContainer.appendChild(yellElement);
-    });
-    
-    // エリア内の最初の子要素として追加（ホロメンカードより後ろに）
-    area.insertBefore(yellContainer, area.firstChild);
+    // エールカード表示機能をCardDisplayManagerに委譲
+    this.cardDisplayManager.addYellCardsToArea(area, holomenCard, areaId, cardIndex);
   }
 
   // エールカードをカード表示に追加（旧関数・互換性のため残す）
   addYellCardsToDisplay(cardElement, holomenCard, areaId) {
-    if (!holomenCard.yellCards || holomenCard.yellCards.length === 0) return;
+    // エールカード表示機能をCardDisplayManagerに委譲
+    this.cardDisplayManager.addYellCardsToDisplay(cardElement, holomenCard, areaId);
+  }
+
+  // フェーズハイライト機能
+  updatePhaseHighlight() {
+    console.log(`=== updatePhaseHighlight 呼び出し ===`);
+    console.log(`プレイヤー: ${this.gameState.currentPlayer}, フェーズ: ${this.gameState.currentPhase}`);
     
-    // 既存のエールカードコンテナを削除（重複防止）
-    const existingYellContainer = cardElement.querySelector('.yell-cards');
-    if (existingYellContainer) {
-      existingYellContainer.remove();
-    }
-    
-    const yellContainer = document.createElement('div');
-    yellContainer.className = 'yell-cards';
-    
-    // センターかバックかで配置を変える
-    if (areaId === 'front1' || areaId === 'front2') {
-      yellContainer.classList.add('center');
-    } else {
-      yellContainer.classList.add('back');
-    }
-    
-    // エールカードをホロメンカードの後ろに配置
-    yellContainer.style.position = 'absolute';
-    yellContainer.style.top = '0';
-    yellContainer.style.left = '0';
-    yellContainer.style.width = '100%';
-    yellContainer.style.height = '100%';
-    yellContainer.style.zIndex = '-10'; // ホロメンカードより確実に後ろ
-    yellContainer.style.pointerEvents = 'none'; // マウスイベントはホロメンカードに委ねる
-    
-    holomenCard.yellCards.forEach((yellCard, index) => {
-      const yellElement = document.createElement('div');
-      yellElement.className = 'yell-card';
-      yellElement.title = yellCard.name;
-      
-      // エールカードをライフカードのように重ねて配置
-      yellElement.style.position = 'absolute';
-      yellElement.style.width = '120px'; // 他のカードと同じサイズに統一
-      yellElement.style.height = '168px'; // 他のカードと同じサイズに統一
-      
-      // センターとバックで異なる重なり方（ホロメンカードから少しずらす）
-      if (areaId === 'front1' || areaId === 'front2') {
-        // センター配置：右下にずらして重ねる
-        const offsetX = 8 + (index * 4);
-        const offsetY = 8 + (index * 4);
-        yellElement.style.transform = `translate(${offsetX}px, ${offsetY}px)`;
-        yellElement.style.zIndex = `${-10 - index}`; // 後から配置されるほど後ろに
-      } else {
-        // バック配置：左下にずらして重ねる  
-        const offsetX = -8 - (index * 3);
-        const offsetY = 8 + (index * 3);
-        yellElement.style.transform = `translate(${offsetX}px, ${offsetY}px)`;
-        yellElement.style.zIndex = `${-10 - index}`;
-      }
-      
-      // エールカードの画像を表示
-      if (yellCard.image_url) {
-        yellElement.style.backgroundImage = `url(${yellCard.image_url})`;
-        yellElement.style.backgroundSize = 'cover';
-        yellElement.style.backgroundPosition = 'center';
-        yellElement.style.backgroundRepeat = 'no-repeat';
-      } else {
-        // 画像がない場合は最初の文字を表示
-        yellElement.textContent = yellCard.name.charAt(0);
-        yellElement.style.display = 'flex';
-        yellElement.style.alignItems = 'center';
-        yellElement.style.justifyContent = 'center';
-        yellElement.style.fontSize = '12px';
-        yellElement.style.fontWeight = 'bold';
-      }
-      
-      yellContainer.appendChild(yellElement);
+    // すべてのハイライトを削除
+    const existingHighlights = document.querySelectorAll('.phase-highlight');
+    console.log(`既存のハイライト数: ${existingHighlights.length}`);
+    existingHighlights.forEach(element => {
+      element.classList.remove('phase-highlight');
     });
+
+    const currentPlayer = this.gameState.currentPlayer;
+    const currentPhase = this.gameState.currentPhase;
     
-    // ホロメンカードの後ろに配置（firstChildより前に挿入）
-    cardElement.insertBefore(yellContainer, cardElement.firstChild);
+    console.log(`フェーズハイライト更新: プレイヤー${currentPlayer}, フェーズ${currentPhase}`);
     
-    console.log(`エール表示更新: ${holomenCard.name}に${holomenCard.yellCards.length}枚のエール`);
+    // 現在のプレイヤーのエリアをハイライト
+    this.highlightPhaseArea(currentPlayer, currentPhase);
+    
+    // 更新後のハイライト確認
+    const newHighlights = document.querySelectorAll('.phase-highlight');
+    console.log(`新しいハイライト数: ${newHighlights.length}`);
+    newHighlights.forEach((element, index) => {
+      console.log(`ハイライト${index}: ${element.className}`);
+    });
+    console.log(`=== updatePhaseHighlight 完了 ===`);
+  }
+
+  // 指定プレイヤーのフェーズエリアをハイライト
+  highlightPhaseArea(playerId, phase) {
+    console.log(`=== highlightPhaseArea ===`);
+    console.log(`プレイヤー${playerId}, フェーズ${phase}`);
+    
+    const playerArea = playerId === 1 ? '.battle-player' : '.battle-opponent';
+    console.log(`対象エリア: ${playerArea}`);
+    
+    // フェーズに応じてハイライトを適用
+    switch (phase) {
+      case 0: // リセットステップ
+        console.log('リセットステップ - プレイヤーエリア全体をハイライト');
+        const battleArea = document.querySelector(playerArea);
+        if (battleArea) {
+          battleArea.classList.add('phase-highlight');
+          console.log('✅ リセットステップハイライト適用完了');
+        } else {
+          console.log('❌ プレイヤーエリアが見つかりません');
+        }
+        break;
+      case 1: // ドローステップ
+        console.log('ドローステップ - デッキエリアをハイライト');
+        const deckArea = document.querySelector(`${playerArea} .deck`);
+        if (deckArea) {
+          deckArea.classList.add('phase-highlight');
+          console.log('✅ ドローステップハイライト適用完了');
+        } else {
+          console.log('❌ デッキエリアが見つかりません');
+        }
+        break;
+      case 2: // エールステップ
+        console.log('エールステップ - エールデッキをハイライト');
+        const yellDeck = document.querySelector(`${playerArea} .yell-deck`);
+        if (yellDeck) {
+          yellDeck.classList.add('phase-highlight');
+          console.log('✅ エールステップハイライト適用完了');
+        } else {
+          console.log('❌ エールデッキが見つかりません');
+        }
+        break;
+      case 3: // メインステップ
+        if (playerId === 1) {
+          console.log('メインステップ（プレイヤー） - 手札エリアをハイライト');
+          const handArea = document.querySelector('.hand-area');
+          if (handArea) {
+            handArea.classList.add('phase-highlight');
+            console.log('✅ プレイヤーメインステップハイライト適用完了');
+          } else {
+            console.log('❌ 手札エリアが見つかりません');
+          }
+        } else {
+          console.log('メインステップ（CPU） - プレイヤーエリア全体をハイライト');
+          const battleArea = document.querySelector(playerArea);
+          if (battleArea) {
+            battleArea.classList.add('phase-highlight');
+            console.log('✅ CPUメインステップハイライト適用完了');
+          } else {
+            console.log('❌ CPUプレイヤーエリアが見つかりません');
+          }
+        }
+        break;
+      case 4: // パフォーマンスステップ
+        console.log('パフォーマンスステップ - フロントエリアをハイライト');
+        const front1 = document.querySelector(`${playerArea} .front1`);
+        const front2 = document.querySelector(`${playerArea} .front2`);
+        let highlightCount = 0;
+        if (front1) {
+          front1.classList.add('phase-highlight');
+          highlightCount++;
+        }
+        if (front2) {
+          front2.classList.add('phase-highlight');
+          highlightCount++;
+        }
+        console.log(`✅ パフォーマンスステップハイライト適用完了 (${highlightCount}箇所)`);
+        break;
+      case 5: // エンドステップ
+        console.log('エンドステップ - プレイヤーエリア全体をハイライト');
+        const endBattleArea = document.querySelector(playerArea);
+        if (endBattleArea) {
+          endBattleArea.classList.add('phase-highlight');
+          console.log('✅ エンドステップハイライト適用完了');
+        } else {
+          console.log('❌ エンドステップ用プレイヤーエリアが見つかりません');
+        }
+        break;
+      default:
+        console.log(`⚠️ 未対応のフェーズ: ${phase}`);
+    }
+    console.log(`=== highlightPhaseArea 完了 ===`);
   }
 }
 

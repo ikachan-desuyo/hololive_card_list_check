@@ -65,6 +65,29 @@ class HandManager {
         cardElement.setAttribute('data-card-id', card.id || index);
         cardElement.setAttribute('data-card-index', index);
         
+        // 情報パネル用のdata属性を設定
+        cardElement.setAttribute('data-card-name', card.name || '不明なカード');
+        cardElement.setAttribute('data-card-type', card.card_type || '不明');
+        cardElement.setAttribute('data-card-description', card.description || '');
+        
+        if (card.color && Array.isArray(card.color)) {
+          cardElement.setAttribute('data-card-color', card.color.join('・'));
+        } else if (card.color) {
+          cardElement.setAttribute('data-card-color', card.color);
+        }
+        
+        if (card.level !== undefined) {
+          cardElement.setAttribute('data-card-level', card.level);
+        }
+        
+        if (card.hp !== undefined) {
+          cardElement.setAttribute('data-card-hp', card.hp);
+        }
+        
+        if (card.attack !== undefined) {
+          cardElement.setAttribute('data-card-attack', card.attack);
+        }
+        
         // ドラッグ機能を追加
         cardElement.draggable = true;
         cardElement.addEventListener('dragstart', (e) => this.handleHandCardDragStart(e, card, index));
@@ -110,7 +133,10 @@ class HandManager {
     
     // サポートカードの場合は専用エリアを表示
     if (this.battleEngine.isSupportCard(card)) {
+      console.log('サポートカード判定: true - showSupportDropZone()を呼び出します');
       this.battleEngine.showSupportDropZone();
+    } else {
+      console.log('サポートカード判定: false - 通常のドロップゾーンのみ');
     }
     
     // 有効なドロップゾーンをハイライト
