@@ -128,10 +128,10 @@ class PhaseController {
         this.executeYellStep(currentPlayer);
         break;
       case 3: // メインステップ
-        this.battleEngine.executeMainStep(currentPlayer);
+        this.executeMainStep(currentPlayer);
         break;
       case 4: // パフォーマンスステップ
-        this.battleEngine.executePerformanceStep(currentPlayer);
+        this.executePerformanceStep(currentPlayer);
         break;
       case 5: // エンドステップ
         this.executeEndStep(currentPlayer);
@@ -363,6 +363,91 @@ class PhaseController {
           this.nextPhase();
         }, 2000); // フェーズ確認のため2秒に延長
       }
+    }
+  }
+
+  /**
+   * メインステップの実行
+   * @param {number} playerId - プレイヤーID
+   */
+  executeMainStep(playerId) {
+    console.log(`プレイヤー${playerId}のメインステップ`);
+    
+    // 統合ログを記録
+    if (window.infoPanelManager) {
+      const playerName = playerId === 1 ? 'プレイヤー' : '対戦相手';
+      const action = playerId === 1 ? 'カードをプレイ' : 'CPU実行中';
+      window.infoPanelManager.logStepProgress(this.battleEngine.gameState.turnCount, 'メインステップ', playerName, action);
+    }
+    
+    if (playerId === 1) {
+      // プレイヤーの場合は手動操作を待つ（自動進行しない）
+      console.log('メインステップです。カードをプレイした後、「次のフェーズ」ボタンを押してください。');
+      
+      // 操作待ちログは統合ログで処理されるため削除
+      
+      // プレイヤーがフェーズを確認できるよう少し待機
+      setTimeout(() => {
+        console.log('プレイヤーのメインステップ - 操作をお待ちしています');
+      }, 1000);
+    } else {
+      // CPUの場合は自動進行（CPU AIロジックを呼び出し）
+      console.log('CPU用メインステップ処理を開始します');
+      setTimeout(async () => {
+        try {
+          if (this.battleEngine.cpuLogic) {
+            console.log('CPUメインフェーズ実行中...');
+            await this.battleEngine.cpuLogic.cpuMainPhase();
+            console.log('CPUメインフェーズ完了');
+          }
+          console.log('CPUメインステップからパフォーマンスステップへ移行');
+          this.nextPhase();
+        } catch (error) {
+          console.error('CPUメインステップでエラー:', error);
+          this.nextPhase(); // エラーでも進行は続ける
+        }
+      }, 2000); // フェーズ確認のため2秒に延長
+    }
+  }
+
+  /**
+   * パフォーマンスステップの実行
+   * @param {number} playerId - プレイヤーID
+   */
+  executePerformanceStep(playerId) {
+    console.log(`プレイヤー${playerId}のパフォーマンスステップ`);
+    
+    // 統合ログを記録
+    if (window.infoPanelManager) {
+      const playerName = playerId === 1 ? 'プレイヤー' : '対戦相手';
+      const action = playerId === 1 ? '攻撃・スキル使用' : 'CPU実行中';
+      window.infoPanelManager.logStepProgress(this.battleEngine.gameState.turnCount, 'パフォーマンスステップ', playerName, action);
+    }
+    
+    if (playerId === 1) {
+      // プレイヤーの場合は手動操作を待つ（自動進行しない）
+      console.log('パフォーマンスステップです。攻撃やスキルを使用した後、「ターン終了」ボタンを押してください。');
+      
+      // 操作待ちログは統合ログで処理されるため削除
+      
+      // 手動操作を待つため、ここでは自動進行しない
+    } else {
+      // CPUの場合は自動進行（CPU AIロジックを呼び出し）
+      console.log('CPU用パフォーマンスステップ処理を開始します');
+      setTimeout(async () => {
+        try {
+          if (this.battleEngine.cpuLogic) {
+            console.log('CPUパフォーマンスフェーズ実行中...');
+            await this.battleEngine.cpuLogic.cpuPerformancePhase();
+            console.log('CPUパフォーマンスフェーズ完了');
+          }
+          console.log('CPUパフォーマンスステップからエンドステップへ移行');
+          this.nextPhase();
+        } catch (error) {
+          console.error('CPUパフォーマンスステップでエラー:', error);
+          this.nextPhase(); // エラーでも進行は続ける
+        }
+      }, 2000);
     }
   }
 
