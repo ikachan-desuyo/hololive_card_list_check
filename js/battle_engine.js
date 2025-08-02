@@ -848,7 +848,7 @@ class HololiveBattleEngine {
     // UI更新
     this.updateUI();
     
-    // ドローステップは自動で完了し、次のステップへ移行
+    // ドローステップは自動で完了し、次のステップへ移行（プレイヤー・CPU共通）
     console.log('ドローステップ完了 - 自動でエールステップに進みます');
     setTimeout(() => {
       this.nextPhase();
@@ -950,7 +950,7 @@ class HololiveBattleEngine {
     this.players[playerId].canPlaySupport = true;
     this.players[playerId].usedLimitedThisTurn = [];
     
-    // エンドステップは自動で完了し、相手のターンに移行
+    // エンドステップは自動で完了し、相手のターンに移行（プレイヤー・CPU共通）
     console.log('エンドステップ完了 - 自動で相手のリセットステップに移行します');
     setTimeout(() => {
       this.endTurn();
@@ -2593,12 +2593,16 @@ class HololiveBattleEngine {
     });
     console.log('=============================');
     
-    // エールステップの場合は自動で次のステップに進む
+    // エールステップの場合：プレイヤー1は手動進行、CPUは自動進行
     if (this.gameState.currentPhase === 2 && this.gameState.currentPlayer === playerId) {
-      console.log('エール配置完了 - 自動でメインステップに進みます');
-      setTimeout(() => {
-        this.nextPhase();
-      }, 1500);
+      if (playerId === 1) {
+        console.log('エール配置完了 - 手動でメインステップに進んでください');
+      } else {
+        console.log('CPUエール配置完了 - 自動でメインステップに進みます');
+        setTimeout(() => {
+          this.nextPhase();
+        }, 1500);
+      }
     }
   }
 
