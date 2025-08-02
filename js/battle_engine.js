@@ -689,123 +689,13 @@ class HololiveBattleEngine {
   }
 
   executeYellStep(playerId) {
-    console.log(`=== executeYellStep ===`);
-    console.log(`プレイヤー${playerId}のエールステップを実行`);
-    console.log(`現在のcurrentPlayer: ${this.gameState.currentPlayer}`);
-    console.log(`ターン数: ${this.gameState.turnCount}`);
-    console.log(`======================`);
-    
-    // 統合ログを記録
-    if (window.infoPanelManager) {
-      const playerName = playerId === 1 ? 'プレイヤー' : '対戦相手';
-      window.infoPanelManager.logStepProgress(this.gameState.turnCount, 'エールステップ', playerName, 'エールを配置');
-    }
-    
-    const player = this.players[playerId];
-    
-    if (player.yellDeck.length === 0) {
-      console.log(`プレイヤー${playerId}のエールデッキが空です`);
-      // プレイヤー1・CPU共に自動進行
-      if (playerId === 1) {
-        console.log('エールデッキが空です - 自動でメインステップに進みます');
-        setTimeout(() => {
-          this.nextPhase();
-        }, 1000);
-      } else {
-        // 自動で次のステップへ移行
-        setTimeout(() => {
-          this.nextPhase();
-        }, 1000);
-      }
-      return;
-    }
-    
-    // エールデッキからカードを1枚引く
-    const yellCard = player.yellDeck.pop();
-    console.log(`プレイヤー${playerId}がエールカードを引きました:`, yellCard.name);
-    
-    // 場のホロメンカード（推しホロメン除く）にエールをセット
-    const availableTargets = [];
-    
-    // センターのホロメンをチェック
-    if (player.center1) availableTargets.push({ position: 'center1', card: player.center1 });
-    if (player.center2) availableTargets.push({ position: 'center2', card: player.center2 });
-    
-    // バックのホロメンをチェック
-    const backPositions = ['back1', 'back2', 'back3', 'back4', 'back5'];
-    backPositions.forEach(pos => {
-      if (player[pos]) {
-        availableTargets.push({ position: pos, card: player[pos] });
-      }
-    });
-    
-    console.log(`エール配置可能なターゲット数: ${availableTargets.length}`);
-    availableTargets.forEach((target, index) => {
-      console.log(`ターゲット${index}: ${target.position} - ${target.card.name}`);
-    });
-    
-    if (availableTargets.length > 0) {
-      // プレイヤーの場合は選択UI表示、CPUの場合は自動選択
-      if (playerId === 1) {
-        console.log('プレイヤー用エール選択UIを表示します');
-        this.showYellTargetSelection(playerId, yellCard, availableTargets);
-        // プレイヤーの場合は選択UIで処理するため、ここでは自動進行しない
-      } else {
-        // CPUの場合は自動選択
-        console.log('CPU用自動エール配置を実行します');
-        const target = availableTargets[0];
-        console.log(`CPU選択ターゲット: ${target.position} - ${target.card.name}`);
-        this.attachYellCard(playerId, target.position, yellCard);
-        
-        // UI更新
-        this.updateUI();
-        
-        // 自動で次のステップへ移行
-        setTimeout(() => {
-          this.nextPhase();
-        }, 2000); // フェーズ確認のため2秒に延長
-      }
-    } else {
-      // ホロメンがいない場合はアーカイブへ
-      player.archive.push(yellCard);
-      console.log(`エールカードをアーカイブに送りました: ${yellCard.name}`);
-      
-      // UI更新
-      this.updateUI();
-      
-      // プレイヤー1・CPU共に自動進行
-      if (playerId === 1) {
-        console.log('エールカードをアーカイブに送りました - 自動でメインステップに進みます');
-        setTimeout(() => {
-          this.nextPhase();
-        }, 2000);
-      } else {
-        // 自動で次のステップへ移行
-        setTimeout(() => {
-          this.nextPhase();
-        }, 2000); // フェーズ確認のため2秒に延長
-      }
-    }
+    // PhaseControllerに委譲
+    return this.phaseController.executeYellStep(playerId);
   }
 
   executeEndStep(playerId) {
-    console.log(`プレイヤー${playerId}のエンドステップを実行`);
-    
-    // 統合ログを記録
-    if (window.infoPanelManager) {
-      const playerName = playerId === 1 ? 'プレイヤー' : '対戦相手';
-      window.infoPanelManager.logStepProgress(this.gameState.turnCount, 'エンドステップ', playerName, 'ターン終了処理');
-    }
-    
-    // ターン終了時の処理
-    this.players[playerId].canPlaySupport = true;
-    this.players[playerId].usedLimitedThisTurn = [];
-    
-    // エンドステップは自動で完了し、相手のターンに移行（プレイヤー・CPU共通）
-    console.log('エンドステップ完了 - 自動で相手のリセットステップに移行します');
-    setTimeout(() => {
-      this.endTurn();
-    }, 1000);
+    // PhaseControllerに委譲
+    return this.phaseController.executeEndStep(playerId);
   }
 
   endTurn() {
