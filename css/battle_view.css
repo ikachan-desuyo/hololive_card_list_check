@@ -54,6 +54,7 @@ body {
   min-height: 100vh;
   padding: 20px;
   box-sizing: border-box;
+  align-items: flex-start;
 }
 
 /* プレイヤーエリア */
@@ -80,7 +81,9 @@ body {
   padding: 15px;
   border-radius: 15px;
   backdrop-filter: blur(10px);
-  transform: rotateX(180deg);
+  transform: rotateX(180deg) rotateY(180deg);
+  justify-self: start;
+  align-self: start;
 }
 
 /* カード配置エリア */
