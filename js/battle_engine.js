@@ -43,6 +43,9 @@ class HololiveBattleEngine {
     
     // CPUロジックの初期化
     this.cpuLogic = new HololiveCPULogic(this);
+    
+    // 手札管理の初期化
+    this.handManager = new HandManager(this);
   }
 
   createPlayerState() {
@@ -167,7 +170,7 @@ class HololiveBattleEngine {
     this.setupControlPanel();
     
     // 手札エリアの初期化
-    this.setupHandArea();
+    this.handManager.setupHandArea();
     
     // カードエリアのイベントリスナー設定（少し遅延）
     setTimeout(() => {
@@ -176,6 +179,42 @@ class HololiveBattleEngine {
   }
 
   setupControlPanel() {
+    // HTMLで既に定義されているコントロールパネルを使用
+    // 必要な要素の存在確認
+    const requiredElements = [
+      'select-player-deck',
+      'select-opponent-deck', 
+      'start-game',
+      'next-phase',
+      'end-turn',
+      'reset-game'
+    ];
+    
+    const missingElements = requiredElements.filter(id => !document.getElementById(id));
+    if (missingElements.length > 0) {
+      console.warn('コントロールパネルの要素が見つかりません:', missingElements);
+      console.log('レガシーコントロールパネルを作成します...');
+      // 後方互換性のため、動的作成を実行
+      this.createLegacyControlPanel();
+      return;
+    }
+
+    // イベントリスナーの設定（HTMLで定義された要素用）
+    document.getElementById('select-player-deck').addEventListener('click', () => this.showDeckSelection(1));
+    document.getElementById('select-opponent-deck').addEventListener('click', () => this.showDeckSelection(2));
+    document.getElementById('start-game').addEventListener('click', () => this.startGame());
+    document.getElementById('next-phase').addEventListener('click', () => this.nextPhase());
+    document.getElementById('end-turn').addEventListener('click', () => this.nextPhase());
+    document.getElementById('reset-game').addEventListener('click', () => this.resetGame());
+    
+    // 初期状態の更新
+    this.updateGameStatus();
+  }
+
+  // 後方互換性のため
+  createLegacyControlPanel() {
+    console.log('レガシーコントロールパネルの作成を開始...');
+    
     const controlPanel = document.createElement('div');
     controlPanel.className = 'control-panel';
     controlPanel.innerHTML = `
@@ -185,27 +224,28 @@ class HololiveBattleEngine {
         <div id="opponent-deck-status">相手デッキ: 未設定</div>
         <div id="ready-status">準備: 未完了</div>
       </div>
-      <button class="control-button" id="select-deck">📚 プレイヤーデッキ選択</button>
+      <button class="control-button" id="select-player-deck">📚 プレイヤーデッキ選択</button>
       <button class="control-button" id="select-opponent-deck">🤖 相手デッキ選択</button>
       <button class="control-button" id="start-game" disabled>ゲーム開始</button>
       <button class="control-button" id="next-phase" disabled>次のフェーズ</button>
-      <button class="control-button" id="to-performance" disabled>パフォーマンスステップへ</button>
       <button class="control-button" id="end-turn" disabled>ターン終了</button>
-      <button class="control-button" id="shuffle-deck">デッキシャッフル</button>
       <button class="control-button" id="reset-game">ゲームリセット</button>
     `;
     
     document.body.appendChild(controlPanel);
+    console.log('コントロールパネルをDOMに追加完了');
+    console.log('作成されたコントロールパネル:', controlPanel);
+    console.log('body内の.control-panel要素:', document.querySelectorAll('.control-panel').length);
 
-    // イベントリスナーの設定
-    document.getElementById('select-deck').addEventListener('click', () => this.showDeckSelection(1));
+    // イベントリスナーの設定（レガシー版）
+    document.getElementById('select-player-deck').addEventListener('click', () => this.showDeckSelection(1));
     document.getElementById('select-opponent-deck').addEventListener('click', () => this.showDeckSelection(2));
     document.getElementById('start-game').addEventListener('click', () => this.startGame());
     document.getElementById('next-phase').addEventListener('click', () => this.nextPhase());
-    document.getElementById('to-performance').addEventListener('click', () => this.nextPhase());
     document.getElementById('end-turn').addEventListener('click', () => this.nextPhase());
-    document.getElementById('shuffle-deck').addEventListener('click', () => this.shuffleDeck(1));
     document.getElementById('reset-game').addEventListener('click', () => this.resetGame());
+    
+    console.log('イベントリスナーの設定完了');
     
     // 初期状態の更新
     this.updateGameStatus();
@@ -297,12 +337,7 @@ class HololiveBattleEngine {
     this.createSupportDropZone();
   }
 
-  setupHandArea() {
-    const handArea = document.createElement('div');
-    handArea.className = 'hand-area';
-    handArea.id = 'player-hand';
-    document.body.appendChild(handArea);
-  }
+  // setupHandArea メソッドを削除（HandManagerに移動）
 
   updateTurnInfo() {
     let turnInfo = document.querySelector('.turn-info');
@@ -1028,7 +1063,7 @@ class HololiveBattleEngine {
 
   updateUI() {
     // 手札の更新
-    this.updateHandDisplay();
+    this.handManager.updateHandDisplay();
     
     // カードエリアの更新
     this.updateCardAreas();
@@ -1045,45 +1080,9 @@ class HololiveBattleEngine {
     }
   }
 
+  // 手札表示更新（HandManagerに委任）
   updateHandDisplay() {
-    const handArea = document.getElementById('player-hand');
-    const player = this.players[1]; // プレイヤーの手札のみ表示
-    
-    // 既存の手札を完全にクリア
-    handArea.innerHTML = '';
-    
-    // 手札が存在する場合のみ表示
-    if (player.hand && Array.isArray(player.hand)) {
-      player.hand.forEach((card, index) => {
-        const cardElement = document.createElement('div');
-        cardElement.className = 'hand-card';
-        
-        // 画像URLの確認とフォールバック
-        const imageUrl = card.image_url || 'images/placeholder.png';
-        cardElement.style.backgroundImage = `url(${imageUrl})`;
-        cardElement.style.backgroundSize = 'cover';
-        cardElement.style.backgroundPosition = 'center';
-        cardElement.style.backgroundRepeat = 'no-repeat';
-        
-        cardElement.title = card.name || 'カード';
-        cardElement.setAttribute('data-card-id', card.id || index);
-        cardElement.setAttribute('data-card-index', index);
-        
-        // ドラッグ機能を追加
-        cardElement.draggable = true;
-        cardElement.addEventListener('dragstart', (e) => this.handleHandCardDragStart(e, card, index));
-        cardElement.addEventListener('dragend', (e) => this.handleHandCardDragEnd(e));
-        
-        // クリックイベント
-        cardElement.addEventListener('click', () => this.handleHandCardClick(card, index));
-        
-        handArea.appendChild(cardElement);
-      });
-      
-      console.log(`手札表示更新完了: ${player.hand.length}枚`);
-    } else {
-      console.log('手札が空です');
-    }
+    this.handManager.updateHandDisplay();
   }
 
   updateCardAreas() {
@@ -1431,15 +1430,9 @@ class HololiveBattleEngine {
     }
   }
 
+  // 手札カードクリック処理（HandManagerに委任）
   handleHandCardClick(card, index) {
-    console.log('手札のカードがクリックされました:', card.name);
-    
-    // メインステップでのみカードをプレイ可能
-    if (this.gameState.currentPhase === 3) {
-      this.playCard(card, index);
-    } else {
-      console.log('メインステップでのみカードをプレイできます');
-    }
+    this.handManager.handleHandCardClick(card, index);
   }
 
   playCard(card, handIndex) {
@@ -2186,33 +2179,9 @@ class HololiveBattleEngine {
   }
 
   // ドラッグ&ドロップ関連の関数
+  // 手札ドラッグ開始処理（HandManagerに委任）
   handleHandCardDragStart(e, card, index) {
-    console.log('手札からドラッグ開始:', card.name);
-    
-    // ドラッグ中のカードデータを保存
-    this.draggedCard = {
-      card: card,
-      index: index,
-      source: 'hand'
-    };
-    
-    // ドラッグエフェクトを追加
-    e.target.classList.add('dragging');
-    
-    // サポートカードの場合は専用エリアを表示
-    if (this.isSupportCard(card)) {
-      this.showSupportDropZone();
-    }
-    
-    // 有効なドロップゾーンをハイライト
-    this.highlightValidDropZones(card);
-    
-    e.dataTransfer.effectAllowed = 'move';
-    e.dataTransfer.setData('text/plain', JSON.stringify({
-      cardId: card.id,
-      cardIndex: index,
-      source: 'hand'
-    }));
+    this.handManager.handleHandCardDragStart(e, card, index);
   }
 
   // 配置済みカードのドラッグ開始処理
@@ -2256,20 +2225,9 @@ class HololiveBattleEngine {
     this.draggedCard = null;
   }
 
+  // 手札ドラッグ終了処理（HandManagerに委任）
   handleHandCardDragEnd(e) {
-    console.log('ドラッグ終了');
-    
-    // ドラッグエフェクトを削除
-    e.target.classList.remove('dragging');
-    
-    // サポートエリアを非表示
-    this.hideSupportDropZone();
-    
-    // ハイライトを削除
-    this.clearDropZoneHighlights();
-    
-    // ドラッグ状態をクリア
-    this.draggedCard = null;
+    this.handManager.handleHandCardDragEnd(e);
   }
 
   handleDragOver(e) {
