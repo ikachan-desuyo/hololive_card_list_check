@@ -16,19 +16,9 @@ class HololiveCPULogic {
     
     console.log('CPUのターン開始');
     
-    // フェーズごとの処理
-    while (this.battleEngine.gameState.currentPhase < 6) {
-      await this.processCPUPhase();
-      
-      if (this.battleEngine.gameState.currentPhase < 6) {
-        await this.delay(this.thinkingTime / 3);
-        this.battleEngine.nextPhase();
-      }
-    }
-    
-    // ターン終了
-    await this.delay(this.thinkingTime);
-    this.battleEngine.endTurn();
+    // CPU用の処理は各ステップの中で自動実行される
+    // ここでは手動でフェーズを進める必要はない
+    // battle_engine.jsの各executeXXXStep関数が既に自動進行を管理している
   }
 
   async processCPUPhase() {
@@ -487,16 +477,14 @@ document.addEventListener('DOMContentLoaded', () => {
       cpuLogic = new HololiveCPULogic(window.battleEngine);
       
       // CPUターンの自動実行
+      // CPUの自動実行を無効化（battle_engine.js内で自動実行される）
       const originalEndTurn = window.battleEngine.endTurn.bind(window.battleEngine);
       window.battleEngine.endTurn = function() {
         originalEndTurn();
         
-        // CPUのターンになったら自動実行
-        if (this.gameState.currentPlayer === 2 && this.gameState.gameStarted && !this.gameState.gameEnded) {
-          setTimeout(() => {
-            cpuLogic.executeCPUTurn();
-          }, 500);
-        }
+        // CPUのターンは battle_engine.js の各ステップで自動管理されるため
+        // ここでは追加の自動実行は行わない
+        console.log('ターン終了処理完了 - CPU自動実行はbattle_engine.jsで管理');
       };
       
       console.log('CPUロジック初期化完了');

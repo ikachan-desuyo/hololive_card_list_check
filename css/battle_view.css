@@ -60,11 +60,11 @@ body {
 /* プレイヤーエリア */
 .battle-player {
   display: grid;
-  grid-template-columns: 130px 120px 120px 120px 130px 120px;
-  grid-template-rows: 140px 140px 140px;
-  gap: 15px;
+  grid-template-columns: 160px 120px 120px 120px 160px 140px;
+  grid-template-rows: 160px 160px 160px;
+  gap: 20px;
   background: rgba(255, 255, 255, 0.2);
-  padding: 15px;
+  padding: 20px;
   border-radius: 15px;
   backdrop-filter: blur(10px);
   box-shadow: 0 8px 32px rgba(31, 38, 135, 0.37);
@@ -73,12 +73,12 @@ body {
 /* 対戦相手エリア */
 .battle-opponent {
   display: grid;
-  grid-template-columns: 130px 120px 120px 120px 130px 120px;
-  grid-template-rows: 140px 140px 140px;
-  gap: 15px;
+  grid-template-columns: 160px 120px 120px 120px 160px 140px;
+  grid-template-rows: 160px 160px 160px;
+  gap: 20px;
   margin-bottom: 20px;
   background: rgba(255, 255, 255, 0.1);
-  padding: 15px;
+  padding: 20px;
   border-radius: 15px;
   backdrop-filter: blur(10px);
   transform: rotateX(180deg) rotateY(180deg);
@@ -93,7 +93,7 @@ body {
   display: flex;
   align-items: center;
   justify-content: center;
-  min-height: 130px;
+  min-height: 150px;
   position: relative;
   background: rgba(255, 255, 255, 0.05);
   transition: all 0.3s ease;
@@ -103,6 +103,7 @@ body {
   text-align: center;
   font-weight: bold;
   text-shadow: 1px 1px 2px rgba(0, 0, 0, 0.5);
+  overflow: visible; /* カードカウンターが見えるように */
 }
 
 .card-area:hover {
@@ -121,71 +122,77 @@ body {
 .life {
   grid-column: 1;
   grid-row: 1 / 3;
-  height: 280px;
-  width: 130px;
+  height: 320px;
+  width: 160px;
   display: flex;
   flex-direction: column;
   align-items: center;
   justify-content: flex-start;
   padding-top: 5px;
-  overflow: visible;
+  overflow: visible; /* カードカウンターが見えるように */
 }
 
 .front1 {
+  width: 120px;
+  height: 168px;
   grid-column: 2;
   grid-row: 1;
-  transform: translateX(40px);
+  transform: translateX(50px);
 }
 
 .front1:hover {
   background: rgba(255, 255, 255, 0.15);
   border-color: rgba(255, 255, 255, 0.6);
-  transform: translateX(40px) translateY(-2px);
+  transform: translateX(50px) translateY(-2px);
   box-shadow: 0 4px 15px rgba(0, 0, 0, 0.2);
 }
 
 .front1.drop-zone-hover {
   border: 3px solid #4CAF50 !important;
   background: rgba(76, 175, 80, 0.2) !important;
-  transform: translateX(40px) scale(1.02);
+  transform: translateX(50px) scale(1.02);
 }
 
 .front2 {
+  width: 120px;
+  height: 168px;
   grid-column: 3;
   grid-row: 1;
-  transform: translateX(80px);
+  transform: translateX(100px);
 }
 
 .front2:hover {
   background: rgba(255, 255, 255, 0.15);
   border-color: rgba(255, 255, 255, 0.6);
-  transform: translateX(80px) translateY(-2px);
+  transform: translateX(100px) translateY(-2px);
   box-shadow: 0 4px 15px rgba(0, 0, 0, 0.2);
 }
 
 .front2.drop-zone-hover {
   border: 3px solid #4CAF50 !important;
   background: rgba(76, 175, 80, 0.2) !important;
-  transform: translateX(80px) scale(1.02);
+  transform: translateX(100px) scale(1.02);
 }
 
 .oshi {
+  width: 120px;
+  height: 168px;
   grid-column: 4;
   grid-row: 1;
-  transform: translateX(120px);
+  transform: translateX(150px);
 }
 
 .oshi:hover {
   background: rgba(255, 255, 255, 0.15);
   border-color: rgba(255, 255, 255, 0.6);
-  transform: translateX(120px) translateY(-2px);
+  transform: translateX(150px) translateY(-2px);
   box-shadow: 0 4px 15px rgba(0, 0, 0, 0.2);
 }
 
 .oshi.drop-zone-hover {
   border: 3px solid #4CAF50 !important;
   background: rgba(76, 175, 80, 0.2) !important;
-  transform: translateX(120px) scale(1.02);
+  transform: translateX(150px) scale(1.02);
 }
 
 .holo {
@@ -199,14 +206,17 @@ body {
 .deck {
   grid-column: 6;
   grid-row: 2;
-  height: 140px;
+  height: 160px;
   display: flex;
   flex-direction: column;
   align-items: center;
   justify-content: center;
+  overflow: visible; /* カードカウンターが見えるように */
 }
 
 .yell-deck {
+  width: 120px;
+  height: 168px;
   grid-column: 1;
   grid-row: 3;
   margin-top: 10px;
@@ -220,11 +230,12 @@ body {
   gap: 8px;
   margin-bottom: 60px;
   margin-top: -80px;
+  overflow: visible; /* エールカードが上にはみ出すのを表示するため */
 }
 
 .back-slot {
-  width: 100px;
-  height: 140px;
+  width: 120px;
+  height: 168px;
   border-radius: 8px;
   background: rgba(255, 255, 255, 0.1);
   border: 2px dashed #ccc;
@@ -236,7 +247,7 @@ body {
   transition: all 0.3s ease;
   cursor: pointer;
   position: relative;
-  overflow: hidden;
+  overflow: visible; /* エールカードが上にはみ出すのを表示するため */
 }
 
 .back-slot:hover {
@@ -266,17 +277,17 @@ body {
 }
 
 .archive {
+  width: 120px;
+  height: 168px;
   grid-column: 6;
   grid-row: 3;
 }
 
 /* カードスタイル */
 .card {
-  width: 90px;
-  height: 126px;
+  width: 120px;  /* 統一サイズに変更 */
+  height: 168px; /* 統一サイズに変更（120×1.4のアスペクト比） */
   border-radius: 8px;
-  background: white;
-  border: 1px solid #ddd;
   box-shadow: 0 2px 8px rgba(0, 0, 0, 0.3);
   position: relative;
   cursor: pointer;
@@ -284,27 +295,70 @@ body {
   background-size: cover;
   background-position: center;
   background-repeat: no-repeat;
+  z-index: 20; /* ホロメンカードを確実に前面に配置 */
 }
 
 .card:hover {
   transform: scale(1.05);
-  z-index: 10;
+  z-index: 20; /* ホバー時はさらに前面に */
   box-shadow: 0 4px 20px rgba(0, 0, 0, 0.5);
 }
 
 .card.face-down {
   background-image: url('../images/card_sleeve.jpg');
+  background-size: contain; /* アスペクト比を保ったまま枠内に収める */
+  background-position: center;
+  background-repeat: no-repeat;
+  background-color: transparent; /* 透過背景に変更 */
 }
 
 .card.face-up {
   background-color: white;
 }
 
+/* 横向き（お休み状態）カード */
+.card.resting {
+  transform: rotate(90deg);
+  opacity: 0.7;
+}
+
+.card.resting:hover {
+  transform: rotate(90deg) scale(1.05);
+}
+
+/* エールカード表示 */
+.yell-card {
+  width: 120px;  /* 統一サイズに変更 */
+  height: 168px;  /* 統一サイズに変更 */
+  border-radius: 8px;
+  display: block;
+  font-size: 12px;
+  text-align: center;
+  line-height: 168px;
+  color: #333;
+  background-size: cover;
+  background-position: center;
+  background-repeat: no-repeat;
+  overflow: hidden;
+  position: absolute;
+  transition: all 0.2s ease; /* ホバー効果用のトランジション */
+  pointer-events: auto; /* マウスイベントを有効化 */
+  z-index: 10; /* 確実にホロメンカードより後ろ */
+  cursor: pointer; /* ホバー可能であることを示す */
+}
+
+/* エールカードのホバー効果 */
+.yell-card:hover {
+  z-index: 30 !important; /* ホロメンカードのホバー（20）より高く */
+  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.5); /* ライフカードと同じシャドウ */
+  filter: brightness(1.1); /* 少し明るくしてホバー効果を示す */
+}
+
 /* ライフカード専用スタイル */
 .life .card {
-  width: 90px;  /* 回転前の元の幅 */
-  height: 126px; /* 回転前の元の高さ */
-  margin: -25px 0; /* 6枚でも収まるようにもっと重ねて表示 */
+  width: 120px;  /* 統一サイズに変更 */
+  height: 168px; /* 統一サイズに変更 */
+  margin: -30px 0; /* より多く重ねて表示 */
   transform: rotate(90deg);
   display: block;
   position: relative;
@@ -312,8 +366,8 @@ body {
 
 /* ホロパワーカード専用スタイル */
 .holo .card {
-  width: 90px;  /* 回転前の元の幅 */
-  height: 126px; /* 回転前の元の高さ */
+  width: 120px;  /* 統一サイズに変更 */
+  height: 168px; /* 統一サイズに変更 */
   transform: rotate(90deg);
   margin: 2px 0;
 }
@@ -350,6 +404,7 @@ body {
   font-size: 10px;
   font-weight: bold;
   box-shadow: 0 2px 4px rgba(0, 0, 0, 0.3);
+  z-index: 9999 !important; /* 何よりも優先して表示 */
 }
 
 /* ターン情報 */
@@ -385,8 +440,8 @@ body {
 }
 
 .hand-card {
-  width: 72px;
-  height: 101px;
+  width: 84px;   /* カードと同じアスペクト比（120の0.7倍） */
+  height: 118px; /* カードと同じアスペクト比（168の0.7倍） */
   border-radius: 6px;
   background: white;
   border: 1px solid #ddd;
