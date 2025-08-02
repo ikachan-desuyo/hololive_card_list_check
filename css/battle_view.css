@@ -427,8 +427,8 @@ body {
 /* 手札エリア */
 .hand-area {
   position: absolute;
-  bottom: -280px;
-  left: 50%;
+  bottom: -310px;
+  left: 30%;
   transform: translateX(-50%);
   display: flex;
   gap: 5px;
@@ -445,8 +445,6 @@ body {
   width: 96px;   /* カードと同じアスペクト比（120の0.7倍） */
   height: 134.4px; /* カードと同じアスペクト比（168の0.7倍） */
   border-radius: 6px;
-  background: white;
-  border: 1px solid #ddd;
   cursor: grab;
   transition: all 0.3s ease;
   background-size: cover;
@@ -468,6 +466,12 @@ body {
 .hand-card.dragging {
   opacity: 0.5;
   transform: rotate(5deg);
+}
+
+.hand-card:hover {
+  transform: translateY(-2px) scale(1.1);
+  z-index: 200;
+  box-shadow: 0 8px 25px rgba(0, 0, 0, 0.5);
 }
 
 /* 先行・後攻選択モーダル */
@@ -616,12 +620,6 @@ body {
 
 .mulligan-buttons button:nth-child(2):hover {
   background: #da190b;
-}
-
-.hand-card:hover {
-  transform: translateY(-20px) scale(1.2);
-  z-index: 200;
-  box-shadow: 0 8px 25px rgba(0, 0, 0, 0.5);
 }
 
 /* ドロップゾーン */
