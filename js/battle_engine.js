@@ -674,40 +674,8 @@ class HololiveBattleEngine {
   }
 
   executePhase() {
-    const currentPlayer = this.gameState.currentPlayer;
-    const phase = this.gameState.currentPhase;
-    
-    console.log(`=== executePhase デバッグ ===`);
-    console.log(`currentPlayer: ${currentPlayer}, phase: ${phase}`);
-    console.log(`turnCount: ${this.gameState.turnCount}`);
-    console.log(`window.infoPanelManager exists: ${!!window.infoPanelManager}`);
-    console.log(`==========================`);
-    
-    // 統合ログは各executeXXXStep()で個別に処理
-    
-    switch (phase) {
-      case -1: // 準備ステップ
-        // ゲーム開始前の準備段階、何もしない
-        break;
-      case 0: // リセットステップ
-        this.executeResetStep(currentPlayer);
-        break;
-      case 1: // 手札ステップ
-        this.executeDrawStep(currentPlayer);
-        break;
-      case 2: // エールステップ
-        this.executeYellStep(currentPlayer);
-        break;
-      case 3: // メインステップ
-        this.executeMainStep(currentPlayer);
-        break;
-      case 4: // パフォーマンスステップ
-        this.executePerformanceStep(currentPlayer);
-        break;
-      case 5: // エンドステップ
-        this.executeEndStep(currentPlayer);
-        break;
-    }
+    // PhaseControllerに委譲
+    return this.phaseController.executePhase();
   }
 
   executeResetStep(playerId) {

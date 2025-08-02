@@ -96,7 +96,47 @@ class PhaseController {
     }, 100);
     
     // 現在のフェーズの処理を実行
-    this.battleEngine.executePhase();
+    this.executePhase();
+  }
+
+  /**
+   * 現在のフェーズを実行
+   */
+  executePhase() {
+    const currentPlayer = this.battleEngine.gameState.currentPlayer;
+    const phase = this.battleEngine.gameState.currentPhase;
+    
+    console.log(`=== executePhase デバッグ ===`);
+    console.log(`currentPlayer: ${currentPlayer}, phase: ${phase}`);
+    console.log(`turnCount: ${this.battleEngine.gameState.turnCount}`);
+    console.log(`window.infoPanelManager exists: ${!!window.infoPanelManager}`);
+    console.log(`==========================`);
+    
+    // 統合ログは各executeXXXStep()で個別に処理
+    
+    switch (phase) {
+      case -1: // 準備ステップ
+        // ゲーム開始前の準備段階、何もしない
+        break;
+      case 0: // リセットステップ
+        this.battleEngine.executeResetStep(currentPlayer);
+        break;
+      case 1: // 手札ステップ
+        this.battleEngine.executeDrawStep(currentPlayer);
+        break;
+      case 2: // エールステップ
+        this.battleEngine.executeYellStep(currentPlayer);
+        break;
+      case 3: // メインステップ
+        this.battleEngine.executeMainStep(currentPlayer);
+        break;
+      case 4: // パフォーマンスステップ
+        this.battleEngine.executePerformanceStep(currentPlayer);
+        break;
+      case 5: // エンドステップ
+        this.battleEngine.executeEndStep(currentPlayer);
+        break;
+    }
   }
 }
 
