@@ -27,17 +27,12 @@ class HololiveBattleEngine {
     this.cardDatabase = null;
     this.stageData = null;
     this.modalUI = new ModalUI(); // モーダルUI追加
-    this.phaseInProgress = false; // フェーズ進行制御フラグ
     
-    this.phaseNames = [
-      '準備ステップ', // -1
-      'リセットステップ', // 0
-      '手札ステップ', // 1
-      'エールステップ', // 2
-      'メインステップ', // 3
-      'パフォーマンスステップ', // 4
-      'エンドステップ' // 5
-    ];
+    // フェーズ管理をPhaseControllerに移譲
+    // this.phaseInProgress と this.phaseNames は PhaseController で管理
+
+    // フェーズ管理コントローラーの初期化（早期初期化）
+    this.phaseController = new PhaseController(this);
 
     this.initializeGame();
     
@@ -362,7 +357,11 @@ class HololiveBattleEngine {
     }
     
     const playerName = this.gameState.currentPlayer === 1 ? 'プレイヤー' : '対戦相手';
-    const phaseName = this.phaseNames[this.gameState.currentPhase + 1]; // インデックスを調整
+    
+    // PhaseControllerが初期化されているかチェック
+    const phaseName = this.phaseController 
+      ? this.phaseController.phaseNames[this.gameState.currentPhase + 1] 
+      : '準備中'; // フォールバック
     
     turnInfo.textContent = `${playerName}のターン - ${phaseName} (ターン${this.gameState.turnCount})`;
     
@@ -670,70 +669,8 @@ class HololiveBattleEngine {
   }
 
   nextPhase() {
-    console.log(`=== nextPhase 呼び出し ===`);
-    console.log(`gameStarted: ${this.gameState.gameStarted}, gameEnded: ${this.gameState.gameEnded}`);
-    console.log(`現在のプレイヤー: ${this.gameState.currentPlayer}`);
-    console.log(`現在のフェーズ: ${this.gameState.currentPhase}`);
-    console.log(`ターン数: ${this.gameState.turnCount}`);
-    console.log(`呼び出し元のスタックトレース:`);
-    console.trace();
-    console.log(`========================`);
-    
-    if (!this.gameState.gameStarted || this.gameState.gameEnded) return;
-    
-    // 既にフェーズ進行中の場合は実行を避ける
-    if (this.phaseInProgress) {
-      console.log('フェーズ進行中のため、次のフェーズ呼び出しをスキップします');
-      return;
-    }
-    
-    this.phaseInProgress = true;
-    
-    // 前のステップ名を記録
-    const previousPhase = this.gameState.currentPhase;
-    const previousStepName = this.getPhaseNameByIndex(previousPhase);
-    
-    // 次のフェーズへ移行
-    this.gameState.currentPhase++;
-    
-    console.log(`フェーズ更新後: ${this.gameState.currentPhase}`);
-    
-    // 新しいステップ名を取得
-    const currentStepName = this.getPhaseNameByIndex(this.gameState.currentPhase);
-    const playerName = this.gameState.currentPlayer === 1 ? 'プレイヤー' : '対戦相手';
-    
-    // ステップ遷移ログを削除（統合ログで処理されるため）
-    // if (window.infoPanelManager && previousPhase >= 0) {
-    //   window.infoPanelManager.logStepTransition(
-    //     playerName, 
-    //     previousStepName, 
-    //     currentStepName, 
-    //     this.gameState.turnCount
-    //   );
-    // }
-    
-    // フェーズハイライトを更新
-    this.updatePhaseHighlight();
-    
-    // エンドステップ（フェーズ5）を超えた場合はフェーズ進行を停止
-    // （endTurnはexecuteEndStepで処理される）
-    if (this.gameState.currentPhase > 5) {
-      console.log(`フェーズ5を超えました - executeEndStepでターン終了処理が実行されます`);
-      this.phaseInProgress = false;
-      return;
-    }
-    
-    // UI更新（フェーズ情報を先に更新）
-    this.updateTurnInfo();
-    this.updateUI();
-    
-    // フェーズ進行フラグをリセット（非同期処理完了後）
-    setTimeout(() => {
-      this.phaseInProgress = false;
-    }, 100);
-    
-    // 現在のフェーズの処理を実行
-    this.executePhase();
+    // PhaseControllerに委譲
+    return this.phaseController.nextPhase();
   }
 
   executePhase() {
@@ -2992,10 +2929,7 @@ class HololiveBattleEngine {
    * @param {number} phaseIndex - フェーズインデックス
    * @returns {string} フェーズ名
    */
-  getPhaseNameByIndex(phaseIndex) {
-    if (phaseIndex < 0) return '準備ステップ';
-    return this.phaseNames[phaseIndex] || '不明なフェーズ';
-  }
+  // getPhaseNameByIndex は PhaseController に移譲
 }
 
 // グローバルインスタンス
