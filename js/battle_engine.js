@@ -7,7 +7,7 @@ class HololiveBattleEngine {
   constructor() {
     this.gameState = {
       currentPlayer: 1, // 1: プレイヤー, 2: 対戦相手
-      currentPhase: 0, // 0-5: リセット〜エンド
+      currentPhase: -1, // -1: 準備ステップ, 0-5: リセット〜エンド
       turnCount: 1,
       gameStarted: false,
       gameEnded: false,
@@ -29,12 +29,13 @@ class HololiveBattleEngine {
     this.modalUI = new ModalUI(); // モーダルUI追加
     
     this.phaseNames = [
-      'リセットステップ',
-      '手札ステップ',
-      'エールステップ',
-      'メインステップ',
-      'パフォーマンスステップ',
-      'エンドステップ'
+      '準備ステップ', // -1
+      'リセットステップ', // 0
+      '手札ステップ', // 1
+      'エールステップ', // 2
+      'メインステップ', // 3
+      'パフォーマンスステップ', // 4
+      'エンドステップ' // 5
     ];
 
     this.initializeGame();
@@ -305,8 +306,14 @@ class HololiveBattleEngine {
       document.body.appendChild(turnInfo);
     }
     
+    // 準備ステップの場合は特別な表示
+    if (this.gameState.currentPhase === -1) {
+      turnInfo.textContent = '準備ステップ - ゲーム開始準備中';
+      return;
+    }
+    
     const playerName = this.gameState.currentPlayer === 1 ? 'プレイヤー' : '対戦相手';
-    const phaseName = this.phaseNames[this.gameState.currentPhase];
+    const phaseName = this.phaseNames[this.gameState.currentPhase + 1]; // インデックスを調整
     
     turnInfo.textContent = `${playerName}のターン - ${phaseName} (ターン${this.gameState.turnCount})`;
   }
@@ -593,7 +600,8 @@ class HololiveBattleEngine {
     // 次のフェーズへ
     this.gameState.currentPhase++;
     
-    if (this.gameState.currentPhase >= this.phaseNames.length) {
+    // エンドステップ（フェーズ5）の次はターン終了
+    if (this.gameState.currentPhase > 5) {
       this.endTurn();
     } else {
       this.updateTurnInfo();
@@ -606,6 +614,9 @@ class HololiveBattleEngine {
     const phase = this.gameState.currentPhase;
     
     switch (phase) {
+      case -1: // 準備ステップ
+        // ゲーム開始前の準備段階、何もしない
+        break;
       case 0: // リセットステップ
         this.executeResetStep(currentPlayer);
         break;
@@ -885,7 +896,7 @@ class HololiveBattleEngine {
       if (area) {
         area.innerHTML = '';
         const player = this.players[1];
-        this.displayCardsInArea(area, player, areaId);
+        this.displayCardsInArea(area, player, areaId, 1); // プレイヤーID追加
       }
     });
 
@@ -898,7 +909,7 @@ class HololiveBattleEngine {
       if (area) {
         area.innerHTML = '';
         const opponent = this.players[2];
-        this.displayCardsInArea(area, opponent, areaId);
+        this.displayCardsInArea(area, opponent, areaId, 2); // プレイヤーID追加
       }
     });
     
@@ -938,7 +949,7 @@ class HololiveBattleEngine {
       // 対応するバックポジションにカードがある場合は表示
       const card = player[backPositions[index]];
       if (card) {
-        const cardElement = this.createCardElement(card, 'single', index, 'backs'); // 正しいインデックスを渡す
+        const cardElement = this.createCardElement(card, 'single', index, 'backs', playerId); // プレイヤーID追加
         // バックスロット内でのサイズ調整
         cardElement.style.width = '100%';
         cardElement.style.height = '100%';
@@ -960,7 +971,7 @@ class HololiveBattleEngine {
     });
   }
 
-  displayCardsInArea(area, player, areaId) {
+  displayCardsInArea(area, player, areaId, playerId = 1) {
     let cards = [];
     let displayType = 'stack'; // 'stack', 'spread', 'single'
     
@@ -1001,7 +1012,7 @@ class HololiveBattleEngine {
 
     // カードを表示
     cards.forEach((card, index) => {
-      const cardElement = this.createCardElement(card, displayType, index, areaId);
+      const cardElement = this.createCardElement(card, displayType, index, areaId, playerId);
       area.appendChild(cardElement);
     });
 
@@ -1015,7 +1026,7 @@ class HololiveBattleEngine {
     }
   }
 
-  createCardElement(card, displayType, index, areaId = null) {
+  createCardElement(card, displayType, index, areaId = null, playerId = 1) {
     const cardElement = document.createElement('div');
     cardElement.className = 'card face-down'; // デフォルトは裏向き
     
@@ -1044,8 +1055,8 @@ class HololiveBattleEngine {
       }
     }
     
-    // 配置済みカードのドラッグ機能を追加（センター、バックのホロメンカードのみ）
-    if (shouldShowFaceUp && this.isHolomenCard(card) && (areaId === 'front1' || areaId === 'front2' || areaId === 'backs')) {
+    // 配置済みカードのドラッグ機能を追加（プレイヤー1のセンター、バックのホロメンカードのみ）
+    if (playerId === 1 && shouldShowFaceUp && this.isHolomenCard(card) && (areaId === 'front1' || areaId === 'front2' || areaId === 'backs')) {
       cardElement.draggable = true;
       cardElement.setAttribute('data-card-id', card.id);
       cardElement.setAttribute('data-area-id', areaId);
@@ -1130,20 +1141,31 @@ class HololiveBattleEngine {
     
     // 現在のフェーズに応じてハイライト
     const phase = this.gameState.currentPhase;
+    const currentPlayer = this.gameState.currentPlayer;
     let targetArea = null;
     
+    // 現在のプレイヤーのエリアを特定
+    const playerSection = currentPlayer === 1 ? '.battle-player' : '.battle-opponent';
+    
     switch (phase) {
+      case -1: // 準備ステップ
+        // 準備ステップではハイライトなし
+        break;
+      case 0: // リセットステップ
+        // リセットステップでは全体をハイライト
+        targetArea = document.querySelector(playerSection);
+        break;
       case 1: // 手札ステップ
-        targetArea = document.querySelector('.deck');
+        targetArea = document.querySelector(`${playerSection} .deck`);
         break;
       case 2: // エールステップ
-        targetArea = document.querySelector('.yell-deck');
+        targetArea = document.querySelector(`${playerSection} .yell-deck`);
         break;
       case 3: // メインステップ
-        targetArea = document.querySelector('.front1');
+        targetArea = document.querySelector(`${playerSection} .front1`);
         break;
       case 4: // パフォーマンスステップ
-        targetArea = document.querySelector('.front1');
+        targetArea = document.querySelector(`${playerSection} .front1`);
         break;
     }
     
@@ -1711,30 +1733,65 @@ class HololiveBattleEngine {
   }
 
   autoDebutPlacement(playerId) {
+    console.log(`autoDebutPlacement開始 - プレイヤー${playerId}`);
     const player = this.players[playerId];
+    
+    if (!player) {
+      console.error(`プレイヤー${playerId}が見つかりません`);
+      return;
+    }
+    
+    console.log('プレイヤーの手札:', player.hand);
+    
     const debutCards = player.hand.filter(card => 
-      card.card_type && card.card_type.includes('ホロメン') && card.bloom_level === 'Debut'
+      card && card.card_type && card.card_type.includes('ホロメン') && card.bloom_level === 'Debut'
     );
+    
+    console.log('デビューカード:', debutCards);
+    
+    // デビューカードが存在するかチェック
+    if (!debutCards || debutCards.length === 0) {
+      console.error(`プレイヤー${playerId}の手札にデビューカードが見つかりません`);
+      return;
+    }
     
     // センター2に1枚配置
     const centerCard = debutCards[0];
+    if (!centerCard || !centerCard.id) {
+      console.error('センターカードまたはIDが無効です:', centerCard);
+      return;
+    }
+    
     player.center2 = centerCard;
-    const centerIndex = player.hand.findIndex(card => card.id === centerCard.id);
+    const centerIndex = player.hand.findIndex(card => card && card.id === centerCard.id);
+    if (centerIndex === -1) {
+      console.error('手札からセンターカードが見つかりません:', centerCard);
+      return;
+    }
     player.hand.splice(centerIndex, 1);
     
     console.log(`プレイヤー${playerId}が${centerCard.name}をセンター2に配置`);
     
     // 残りのDebutをバックに配置
     const remainingDebuts = player.hand.filter(card => 
-      card.card_type && card.card_type.includes('ホロメン') && card.bloom_level === 'Debut'
+      card && card.card_type && card.card_type.includes('ホロメン') && card.bloom_level === 'Debut'
     );
     
     let backPositions = ['back1', 'back2', 'back3', 'back4', 'back5'];
     const maxSlots = player.center1 ? 4 : 5; // センター①の存在で制限
     
     remainingDebuts.slice(0, maxSlots).forEach((card, index) => {
+      if (!card || !card.id) {
+        console.error('バックカードまたはIDが無効です:', card);
+        return;
+      }
+      
       player[backPositions[index]] = card;
-      const handIndex = player.hand.findIndex(handCard => handCard.id === card.id);
+      const handIndex = player.hand.findIndex(handCard => handCard && handCard.id === card.id);
+      if (handIndex === -1) {
+        console.error('手札からバックカードが見つかりません:', card);
+        return;
+      }
       player.hand.splice(handIndex, 1);
       console.log(`プレイヤー${playerId}が${card.name}を${backPositions[index]}に配置`);
     });
@@ -1837,6 +1894,7 @@ class HololiveBattleEngine {
   startTurn() {
     console.log(`ターン${this.gameState.turnCount}開始 - プレイヤー${this.gameState.currentPlayer}のターン`);
     this.gameState.currentPhase = 0; // リセットステップから開始
+    this.updateTurnInfo(); // ターン情報を更新
     this.updateUI();
   }
 

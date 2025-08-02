@@ -589,7 +589,7 @@ body {
 /* サポートカード効果確認エリア */
 .support-drop-zone {
   position: fixed;
-  top: 10%;
+  bottom: 60%;
   left: 50%;
   transform: translateX(-50%);
   width: 200px;
