@@ -52,6 +52,8 @@ class HololiveBattleEngine {
       back1: null,
       back2: null,
       back3: null,
+      back4: null,
+      back5: null,
       archive: [],
       hand: [],
       
@@ -159,11 +161,13 @@ class HololiveBattleEngine {
     // コントロールパネルの初期化
     this.setupControlPanel();
     
-    // カードエリアのイベントリスナー設定
-    this.setupCardAreaListeners();
-    
     // 手札エリアの初期化
     this.setupHandArea();
+    
+    // カードエリアのイベントリスナー設定（少し遅延）
+    setTimeout(() => {
+      this.setupCardAreaListeners();
+    }, 100);
   }
 
   setupControlPanel() {
@@ -256,12 +260,34 @@ class HololiveBattleEngine {
   }
 
   setupCardAreaListeners() {
+    console.log('setupCardAreaListeners 開始');
+    
     const cardAreas = document.querySelectorAll('.card-area');
+    console.log('card-area数:', cardAreas.length);
+    
     cardAreas.forEach(area => {
       area.addEventListener('click', (e) => this.handleCardAreaClick(e));
       area.addEventListener('dragover', (e) => this.handleDragOver(e));
+      area.addEventListener('dragenter', (e) => this.handleDragEnter(e));
+      area.addEventListener('dragleave', (e) => this.handleDragLeave(e));
       area.addEventListener('drop', (e) => this.handleDrop(e));
     });
+    
+    // バックスロットにもリスナーを追加
+    const backSlots = document.querySelectorAll('.back-slot');
+    console.log('back-slot数:', backSlots.length);
+    
+    backSlots.forEach((slot, index) => {
+      console.log(`back-slot[${index}]:`, slot);
+      slot.addEventListener('click', (e) => this.handleCardAreaClick(e));
+      slot.addEventListener('dragover', (e) => this.handleDragOver(e));
+      slot.addEventListener('dragenter', (e) => this.handleDragEnter(e));
+      slot.addEventListener('dragleave', (e) => this.handleDragLeave(e));
+      slot.addEventListener('drop', (e) => this.handleDrop(e));
+    });
+    
+    // サポートカード効果エリアを作成
+    this.createSupportDropZone();
   }
 
   setupHandArea() {
@@ -824,6 +850,12 @@ class HololiveBattleEngine {
         
         cardElement.title = card.name || 'カード';
         cardElement.setAttribute('data-card-id', card.id || index);
+        cardElement.setAttribute('data-card-index', index);
+        
+        // ドラッグ機能を追加
+        cardElement.draggable = true;
+        cardElement.addEventListener('dragstart', (e) => this.handleHandCardDragStart(e, card, index));
+        cardElement.addEventListener('dragend', (e) => this.handleHandCardDragEnd(e));
         
         // クリックイベント
         cardElement.addEventListener('click', () => this.handleHandCardClick(card, index));
@@ -840,7 +872,7 @@ class HololiveBattleEngine {
   updateCardAreas() {
     // 各カードエリアの状態を更新
     const areas = ['life', 'front1', 'front2', 'oshi', 'holo', 'deck', 
-                   'yell-deck', 'backs', 'archive'];
+                   'yell-deck', 'archive']; // 'backs'を除外
     
     // プレイヤーエリアの更新
     areas.forEach(areaId => {
@@ -852,6 +884,9 @@ class HololiveBattleEngine {
       }
     });
 
+    // バックエリアは特別処理（.back-slot要素を保持）
+    this.updateBackSlots(1);
+
     // 対戦相手エリアの更新
     areas.forEach(areaId => {
       const area = document.querySelector(`.battle-opponent .${areaId}`);
@@ -859,6 +894,63 @@ class HololiveBattleEngine {
         area.innerHTML = '';
         const opponent = this.players[2];
         this.displayCardsInArea(area, opponent, areaId);
+      }
+    });
+    
+    // 対戦相手のバックエリアも特別処理
+    this.updateBackSlots(2);
+  }
+
+  // バックスロットエリアの更新（.back-slot要素を保持）
+  updateBackSlots(playerId) {
+    const sectionClass = playerId === 1 ? '.battle-player' : '.battle-opponent';
+    const backSlots = document.querySelectorAll(`${sectionClass} .back-slot`);
+    const player = this.players[playerId];
+    const backPositions = ['back1', 'back2', 'back3', 'back4', 'back5'];
+    
+    // センター①があるかどうかで最大使用スロット数を決定
+    const maxSlots = player.center1 ? 4 : 5;
+    
+    backSlots.forEach((slot, index) => {
+      // 既存のカード要素をクリア（スロット自体は保持）
+      const existingCards = slot.querySelectorAll('.card');
+      existingCards.forEach(card => card.remove());
+      
+      // 使用不可スロットの処理
+      if (index >= maxSlots) {
+        slot.classList.add('disabled');
+        slot.classList.remove('has-card');
+        slot.style.opacity = '0.3';
+        slot.style.pointerEvents = 'none';
+        slot.textContent = '使用不可';
+        return;
+      } else {
+        slot.classList.remove('disabled');
+        slot.style.opacity = '1';
+        slot.style.pointerEvents = 'auto';
+      }
+      
+      // 対応するバックポジションにカードがある場合は表示
+      const card = player[backPositions[index]];
+      if (card) {
+        const cardElement = this.createCardElement(card, 'single', 0, 'backs'); // 'backs'を渡す
+        // バックスロット内でのサイズ調整
+        cardElement.style.width = '100%';
+        cardElement.style.height = '100%';
+        cardElement.style.position = 'absolute';
+        cardElement.style.top = '0';
+        cardElement.style.left = '0';
+        
+        slot.appendChild(cardElement);
+        slot.classList.add('has-card');
+        slot.style.position = 'relative'; // 子要素の絶対配置のため
+      } else {
+        slot.classList.remove('has-card');
+        slot.style.position = 'static';
+        // 空のスロットには元のテキストを表示
+        if (slot.children.length === 0) {
+          slot.textContent = `バック${index + 1}`;
+        }
       }
     });
   }
@@ -895,12 +987,6 @@ class HololiveBattleEngine {
       case 'yell-deck':
         cards = player.yellDeck.slice(0, 3); // 上3枚のみ表示
         displayType = 'stack';
-        break;
-      case 'backs':
-        if (player.back1) cards.push(player.back1);
-        if (player.back2) cards.push(player.back2);
-        if (player.back3) cards.push(player.back3);
-        displayType = 'spread';
         break;
       case 'archive':
         cards = player.archive.slice(0, 3); // 上3枚のみ表示
@@ -999,7 +1085,7 @@ class HololiveBattleEngine {
       case 'holo': return player.holoPower.length;
       case 'deck': return player.deck.length;
       case 'yell-deck': return player.yellDeck.length;
-      case 'backs': return (player.back1 ? 1 : 0) + (player.back2 ? 1 : 0) + (player.back3 ? 1 : 0);
+      case 'backs': return (player.back1 ? 1 : 0) + (player.back2 ? 1 : 0) + (player.back3 ? 1 : 0) + (player.back4 ? 1 : 0) + (player.back5 ? 1 : 0);
       case 'archive': return player.archive.length;
       default: return 0;
     }
@@ -1428,9 +1514,8 @@ class HololiveBattleEngine {
     this.debutPlacementState = {
       playerId: playerId,
       debutCards: [...debutCards],
-      selectedCards: [],
       centerPlaced: false,
-      backPositions: ['back1', 'back2', 'back3'],
+      backPositions: ['back1', 'back2', 'back3', 'back4', 'back5'],
       usedBackPositions: []
     };
     
@@ -1440,388 +1525,131 @@ class HololiveBattleEngine {
       '📌 配置ルール:\n' +
       '• センター2に1枚必須\n' +
       '• バックに好きなだけ配置可能\n\n' +
-      '手札のDebutホロメンをクリックして配置してください'
+      '手札のDebutホロメンをドラッグ&ドロップで配置してください'
     );
     
-    this.showDebutPlacementModal();
+    // 手札を更新してドラッグ&ドロップでの配置を促進
+    this.updateHandDisplay();
+    
+    // 完了確認のためのボタンを表示
+    this.showDebutPlacementControls();
   }
 
-  showDebutPlacementModal() {
-    // 既存のモーダルを削除
-    const existingModal = document.getElementById('debut-placement-modal');
-    if (existingModal) {
-      existingModal.remove();
+  showDebutPlacementControls() {
+    // 既存のコントロールを削除
+    const existingControls = document.getElementById('debut-placement-controls');
+    if (existingControls) {
+      existingControls.remove();
     }
     
-    const modal = document.createElement('div');
-    modal.id = 'debut-placement-modal';
-    modal.className = 'debut-modal';
-    modal.innerHTML = this.createDebutPlacementModalHTML();
+    // Debut配置用のコントロールパネルを作成
+    const controls = document.createElement('div');
+    controls.id = 'debut-placement-controls';
+    controls.style.cssText = `
+      position: fixed;
+      top: 50%;
+      left: 20px;
+      transform: translateY(-50%);
+      background: rgba(0, 0, 0, 0.9);
+      color: white;
+      padding: 20px;
+      border-radius: 10px;
+      z-index: 1000;
+      backdrop-filter: blur(10px);
+      min-width: 250px;
+    `;
     
-    document.body.appendChild(modal);
-    this.addDebutPlacementStyles();
-    this.setupDebutPlacementEvents();
-    this.updateDebutPlacementDisplay();
-  }
-
-  createDebutPlacementModalHTML() {
-    return `
-      <div class="debut-modal-content">
-        <div class="debut-modal-header">
-          <h2>🎭 Debutホロメン配置</h2>
-          <div class="debut-progress">
-            <span id="center-status">センター2: 未配置</span>
-            <span id="back-status">バック: 0/3</span>
-          </div>
-        </div>
-        
-        <div class="debut-modal-body">
-          <div class="debut-cards-section">
-            <h3>手札のDebutホロメン</h3>
-            <div id="debut-cards-list" class="debut-cards-list">
-              <!-- Debutカードがここに表示される -->
-            </div>
-          </div>
-          
-          <div class="placement-area">
-            <h3>配置エリア</h3>
-            <div class="stage-layout">
-              <div class="center-stage">
-                <div class="stage-position" id="center2-slot" data-position="center2">
-                  <span class="position-label">センター2</span>
-                  <div class="card-slot">必須</div>
-                </div>
-              </div>
-              
-              <div class="back-stage">
-                <div class="stage-position" id="back1-slot" data-position="back1">
-                  <span class="position-label">バック1</span>
-                  <div class="card-slot">任意</div>
-                </div>
-                <div class="stage-position" id="back2-slot" data-position="back2">
-                  <span class="position-label">バック2</span>
-                  <div class="card-slot">任意</div>
-                </div>
-                <div class="stage-position" id="back3-slot" data-position="back3">
-                  <span class="position-label">バック3</span>
-                  <div class="card-slot">任意</div>
-                </div>
-              </div>
-            </div>
-          </div>
-        </div>
-        
-        <div class="debut-modal-footer">
-          <button id="confirm-debut-placement" class="debut-button debut-button-primary" disabled>
-            配置完了
-          </button>
-          <button id="auto-debut-placement" class="debut-button debut-button-secondary">
-            自動配置
-          </button>
-        </div>
+    controls.innerHTML = `
+      <h3>🎭 Debut配置</h3>
+      <div id="debut-status">
+        <div>センター2: <span id="center2-status">未配置</span></div>
+        <div>バック: <span id="back-count">0</span>/3</div>
       </div>
-    `;
-  }
-
-  addDebutPlacementStyles() {
-    if (document.getElementById('debut-placement-styles')) return;
-
-    const style = document.createElement('style');
-    style.id = 'debut-placement-styles';
-    style.textContent = `
-      .debut-modal {
-        position: fixed;
-        top: 0;
-        left: 0;
+      <button id="auto-debut-button" style="
         width: 100%;
-        height: 100%;
-        background: rgba(0, 0, 0, 0.8);
-        display: flex;
-        align-items: center;
-        justify-content: center;
-        z-index: 10000;
-      }
-
-      .debut-modal-content {
-        background: white;
-        border-radius: 15px;
-        width: 90%;
-        max-width: 1000px;
-        max-height: 85%;
-        overflow: hidden;
-        box-shadow: 0 20px 60px rgba(0, 0, 0, 0.5);
-      }
-
-      .debut-modal-header {
-        display: flex;
-        justify-content: space-between;
-        align-items: center;
-        padding: 20px;
-        background: linear-gradient(135deg, #ff6b6b 0%, #feca57 100%);
+        padding: 10px;
+        margin: 10px 0;
+        background: #4CAF50;
         color: white;
-      }
-
-      .debut-modal-header h2 {
-        margin: 0;
-        font-size: 1.5em;
-      }
-
-      .debut-progress {
-        font-size: 0.9em;
-        opacity: 0.9;
-      }
-
-      .debut-modal-body {
-        display: grid;
-        grid-template-columns: 1fr 1fr;
-        gap: 20px;
-        padding: 20px;
-        max-height: 50vh;
-        overflow-y: auto;
-      }
-
-      .debut-cards-list {
-        display: flex;
-        flex-wrap: wrap;
-        gap: 10px;
-        max-height: 300px;
-        overflow-y: auto;
-        padding: 10px;
-        border: 2px dashed #ddd;
-        border-radius: 10px;
-      }
-
-      .debut-card-item {
-        padding: 10px;
-        border: 2px solid #e0e0e0;
-        border-radius: 8px;
-        cursor: pointer;
-        transition: all 0.3s ease;
-        background: #f9f9f9;
-        min-width: 100px;
-        text-align: center;
-      }
-
-      .debut-card-item:hover {
-        border-color: #ff6b6b;
-        background: #ffe0e0;
-        transform: scale(1.05);
-      }
-
-      .debut-card-item.selected {
-        border-color: #ff6b6b;
-        background: #ffebeb;
-        box-shadow: 0 2px 10px rgba(255, 107, 107, 0.3);
-      }
-
-      .stage-layout {
-        display: flex;
-        flex-direction: column;
-        gap: 20px;
-      }
-
-      .center-stage, .back-stage {
-        display: flex;
-        gap: 10px;
-        justify-content: center;
-      }
-
-      .stage-position {
-        text-align: center;
-      }
-
-      .position-label {
-        display: block;
-        font-size: 0.8em;
-        color: #666;
-        margin-bottom: 5px;
-      }
-
-      .card-slot {
-        width: 100px;
-        height: 140px;
-        border: 2px dashed #ddd;
-        border-radius: 8px;
-        display: flex;
-        align-items: center;
-        justify-content: center;
-        font-size: 0.8em;
-        color: #999;
-        transition: all 0.3s ease;
-      }
-
-      .card-slot.can-drop {
-        border-color: #ff6b6b;
-        background: #ffe0e0;
-      }
-
-      .card-slot.filled {
-        border-color: #4ecdc4;
-        background: #e0f7fa;
-        color: #333;
-      }
-
-      .debut-modal-footer {
-        display: flex;
-        gap: 10px;
-        padding: 20px;
-        border-top: 1px solid #eee;
-      }
-
-      .debut-button {
-        flex: 1;
-        padding: 12px 20px;
         border: none;
-        border-radius: 8px;
-        font-size: 1em;
+        border-radius: 5px;
         cursor: pointer;
-        transition: all 0.3s ease;
-      }
-
-      .debut-button-primary {
-        background: #ff6b6b;
+      ">自動配置</button>
+      <button id="complete-debut-button" style="
+        width: 100%;
+        padding: 10px;
+        background: #2196F3;
         color: white;
-      }
-
-      .debut-button-primary:enabled:hover {
-        background: #ff5252;
-        transform: translateY(-1px);
-      }
-
-      .debut-button-primary:disabled {
-        background: #ccc;
-        cursor: not-allowed;
-      }
-
-      .debut-button-secondary {
-        background: #f0f0f0;
-        color: #333;
-        border: 1px solid #ccc;
-      }
-
-      .debut-button-secondary:hover {
-        background: #e0e0e0;
-      }
+        border: none;
+        border-radius: 5px;
+        cursor: pointer;
+      " disabled>配置完了</button>
     `;
-
-    document.head.appendChild(style);
-  }
-
-  setupDebutPlacementEvents() {
-    // 自動配置ボタン
-    document.getElementById('auto-debut-placement').addEventListener('click', () => {
+    
+    document.body.appendChild(controls);
+    
+    // イベントリスナーを設定
+    document.getElementById('auto-debut-button').addEventListener('click', () => {
       this.executeAutoDebutPlacement();
     });
-
-    // 配置完了ボタン
-    document.getElementById('confirm-debut-placement').addEventListener('click', () => {
-      this.confirmDebutPlacement();
-    });
-  }
-
-  updateDebutPlacementDisplay() {
-    const debutCardsList = document.getElementById('debut-cards-list');
-    const state = this.debutPlacementState;
     
-    // Debutカードリストを更新
-    debutCardsList.innerHTML = '';
-    state.debutCards.forEach(card => {
-      const cardElement = document.createElement('div');
-      cardElement.className = 'debut-card-item';
-      cardElement.innerHTML = `
-        <div class="card-name">${card.name}</div>
-        <div class="card-hp">HP: ${card.hp || '?'}</div>
-      `;
-      
-      cardElement.addEventListener('click', () => {
-        this.selectDebutCard(card);
-      });
-      
-      debutCardsList.appendChild(cardElement);
+    document.getElementById('complete-debut-button').addEventListener('click', () => {
+      this.completeDebutPlacement();
     });
     
-    // 進捗状況を更新
-    const centerStatus = document.getElementById('center-status');
-    const backStatus = document.getElementById('back-status');
-    
-    centerStatus.textContent = state.centerPlaced ? 'センター2: 配置済み' : 'センター2: 未配置';
-    backStatus.textContent = `バック: ${state.usedBackPositions.length}/3`;
-    
-    // 配置完了ボタンの状態を更新
-    const confirmButton = document.getElementById('confirm-debut-placement');
-    confirmButton.disabled = !state.centerPlaced;
+    // 初期状態を更新
+    this.updateDebutPlacementStatus();
   }
 
-  selectDebutCard(card) {
+  updateDebutPlacementStatus() {
     const state = this.debutPlacementState;
+    if (!state) return;
     
-    if (!state.centerPlaced) {
-      // センター2に配置
-      this.placeCardInPosition(card, 'center2');
-    } else {
-      // バックに配置
-      const availableBack = state.backPositions.find(pos => !state.usedBackPositions.includes(pos));
-      if (availableBack) {
-        this.placeCardInPosition(card, availableBack);
-      } else {
-        alert('バックステージが満員です（最大3枚）');
-      }
-    }
-  }
-
-  placeCardInPosition(card, position) {
-    const state = this.debutPlacementState;
-    const player = this.players[state.playerId];
+    const center2Status = document.getElementById('center2-status');
+    const backCount = document.getElementById('back-count');
+    const completeButton = document.getElementById('complete-debut-button');
     
-    // カードを配置
-    player[position] = card;
-    
-    // 手札から削除
-    const handIndex = player.hand.findIndex(handCard => handCard.id === card.id);
-    player.hand.splice(handIndex, 1);
-    
-    // 状態を更新
-    const cardIndex = state.debutCards.findIndex(debutCard => debutCard.id === card.id);
-    state.debutCards.splice(cardIndex, 1);
-    
-    if (position === 'center2') {
-      state.centerPlaced = true;
-    } else {
-      state.usedBackPositions.push(position);
+    if (center2Status) {
+      center2Status.textContent = state.centerPlaced ? '配置済み' : '未配置';
+      center2Status.style.color = state.centerPlaced ? '#4CAF50' : '#f44336';
     }
     
-    // スロット表示を更新
-    const slot = document.getElementById(`${position}-slot`).querySelector('.card-slot');
-    slot.textContent = card.name;
-    slot.classList.add('filled');
+    if (backCount) {
+      backCount.textContent = state.usedBackPositions.length;
+    }
     
-    // 表示を更新
-    this.updateDebutPlacementDisplay();
-    this.updateUI();
-    
-    console.log(`${card.name}を${position}に配置`);
+    if (completeButton) {
+      completeButton.disabled = !state.centerPlaced;
+      completeButton.style.background = state.centerPlaced ? '#2196F3' : '#666';
+    }
   }
 
   executeAutoDebutPlacement() {
     const state = this.debutPlacementState;
+    if (!state) return;
     
-    // モーダルを閉じる
-    document.getElementById('debut-placement-modal').remove();
+    // コントロールを削除
+    const controls = document.getElementById('debut-placement-controls');
+    if (controls) {
+      controls.remove();
+    }
     
     // 自動配置を実行
     this.autoDebutPlacement(state.playerId);
   }
 
-  confirmDebutPlacement() {
+  completeDebutPlacement() {
     const state = this.debutPlacementState;
-    
-    if (!state.centerPlaced) {
+    if (!state || !state.centerPlaced) {
       alert('センター2への配置は必須です');
       return;
     }
     
-    // モーダルを閉じる
-    document.getElementById('debut-placement-modal').remove();
+    // コントロールを削除
+    const controls = document.getElementById('debut-placement-controls');
+    if (controls) {
+      controls.remove();
+    }
     
     const placedCount = 1 + state.usedBackPositions.length;
     alert(`Debut配置完了！\n${placedCount}枚のDebutホロメンを配置しました`);
@@ -1849,8 +1677,10 @@ class HololiveBattleEngine {
       card.card_type && card.card_type.includes('ホロメン') && card.bloom_level === 'Debut'
     );
     
-    let backPositions = ['back1', 'back2', 'back3'];
-    remainingDebuts.slice(0, 3).forEach((card, index) => {
+    let backPositions = ['back1', 'back2', 'back3', 'back4', 'back5'];
+    const maxSlots = player.center1 ? 4 : 5; // センター①の存在で制限
+    
+    remainingDebuts.slice(0, maxSlots).forEach((card, index) => {
       player[backPositions[index]] = card;
       const handIndex = player.hand.findIndex(handCard => handCard.id === card.id);
       player.hand.splice(handIndex, 1);
@@ -1925,8 +1755,10 @@ class HololiveBattleEngine {
       card.card_type && card.card_type.includes('ホロメン') && card.bloom_level === 'Debut'
     );
     
-    let backPositions = ['back1', 'back2', 'back3'];
-    remainingDebuts.slice(0, 3).forEach((card, index) => {
+    let backPositions = ['back1', 'back2', 'back3', 'back4', 'back5'];
+    const maxSlots = player.center1 ? 4 : 5; // センター①の存在で制限
+    
+    remainingDebuts.slice(0, maxSlots).forEach((card, index) => {
       player[backPositions[index]] = card;
       const handIndex = player.hand.findIndex(handCard => handCard.id === card.id);
       player.hand.splice(handIndex, 1);
@@ -1954,6 +1786,348 @@ class HololiveBattleEngine {
     console.log(`ターン${this.gameState.turnCount}開始 - プレイヤー${this.gameState.currentPlayer}のターン`);
     this.gameState.currentPhase = 0; // リセットステップから開始
     this.updateUI();
+  }
+
+  // ドラッグ&ドロップ関連の関数
+  handleHandCardDragStart(e, card, index) {
+    console.log('ドラッグ開始:', card.name);
+    
+    // ドラッグ中のカードデータを保存
+    this.draggedCard = {
+      card: card,
+      index: index,
+      source: 'hand'
+    };
+    
+    // ドラッグエフェクトを追加
+    e.target.classList.add('dragging');
+    
+    // サポートカードの場合は専用エリアを表示
+    if (this.isSupportCard(card)) {
+      this.showSupportDropZone();
+    }
+    
+    // 有効なドロップゾーンをハイライト
+    this.highlightValidDropZones(card);
+    
+    e.dataTransfer.effectAllowed = 'move';
+    e.dataTransfer.setData('text/plain', JSON.stringify({
+      cardId: card.id,
+      cardIndex: index,
+      source: 'hand'
+    }));
+  }
+
+  handleHandCardDragEnd(e) {
+    console.log('ドラッグ終了');
+    
+    // ドラッグエフェクトを削除
+    e.target.classList.remove('dragging');
+    
+    // サポートエリアを非表示
+    this.hideSupportDropZone();
+    
+    // ハイライトを削除
+    this.clearDropZoneHighlights();
+    
+    // ドラッグ状態をクリア
+    this.draggedCard = null;
+  }
+
+  handleDragOver(e) {
+    e.preventDefault();
+    e.dataTransfer.dropEffect = 'move';
+  }
+
+  handleDragEnter(e) {
+    e.preventDefault();
+    if (this.draggedCard && this.isValidDropTarget(e.target, this.draggedCard.card)) {
+      e.target.classList.add('drop-zone-hover');
+    }
+  }
+
+  handleDragLeave(e) {
+    e.target.classList.remove('drop-zone-hover');
+  }
+
+  handleDrop(e) {
+    e.preventDefault();
+    e.target.classList.remove('drop-zone-hover');
+    
+    if (!this.draggedCard) {
+      console.log('ドラッグデータが見つかりません');
+      return;
+    }
+    
+    const card = this.draggedCard.card;
+    const dropZone = this.getDropZoneInfo(e.target);
+    
+    console.log('ドロップ先:', dropZone);
+    
+    if (this.isValidDropTarget(e.target, card)) {
+      this.placeCardFromHand(card, this.draggedCard.index, dropZone);
+    } else {
+      console.log('無効なドロップ先です');
+    }
+  }
+
+  // カードタイプ判定
+  isSupportCard(card) {
+    const isSupport = card.card_type && card.card_type.includes('サポート');
+    console.log(`isSupportCard判定: ${card.name} = ${isSupport} (${card.card_type})`);
+    return isSupport;
+  }
+
+  isHolomenCard(card) {
+    const isHolomen = card.card_type && card.card_type.includes('ホロメン');
+    console.log(`isHolomenCard判定: ${card.name} = ${isHolomen} (${card.card_type})`);
+    return isHolomen;
+  }
+
+  // 有効なドロップゾーンをハイライト
+  highlightValidDropZones(card) {
+    console.log('ハイライト開始:', card.name, 'カードタイプ:', card.card_type);
+    
+    if (this.isSupportCard(card)) {
+      // サポートカードは効果エリアのみ
+      console.log('サポートカード検出');
+      return;
+    }
+    
+    if (this.isHolomenCard(card)) {
+      console.log('ホロメンカード検出');
+      
+      // センター②をチェック（空の場合のみ）
+      const center2 = document.querySelector('.battle-player .front2');
+      if (center2 && !this.players[1].center2) {
+        center2.classList.add('drop-zone-active');
+        console.log('センター②をハイライト');
+      }
+      
+      // バックスロットをチェック（デバッグ強化）
+      console.log('全体のバックスロット:', document.querySelectorAll('.back-slot').length);
+      console.log('プレイヤーエリアのバックスロット:', document.querySelectorAll('.battle-player .back-slot').length);
+      
+      const backSlots = document.querySelectorAll('.battle-player .back-slot');
+      console.log('バックスロット数:', backSlots.length);
+      
+      backSlots.forEach((slot, index) => {
+        console.log(`バックスロット${index}:`, slot);
+        const canPlace = this.canPlaceCardInBackSlot(card, index);
+        console.log(`バックスロット${index}: 配置可能=${canPlace}`);
+        if (canPlace) {
+          slot.classList.add('drop-zone-active');
+          console.log(`バックスロット${index}をハイライト`);
+        }
+      });
+    }
+  }
+
+  // ドロップゾーンハイライトをクリア
+  clearDropZoneHighlights() {
+    const highlighted = document.querySelectorAll('.drop-zone-active');
+    highlighted.forEach(element => {
+      element.classList.remove('drop-zone-active');
+    });
+  }
+
+  // ドロップ先の有効性チェック
+  isValidDropTarget(target, card) {
+    if (this.isSupportCard(card)) {
+      return target.classList.contains('support-drop-zone');
+    }
+    
+    if (!this.isHolomenCard(card)) {
+      return false;
+    }
+    
+    const dropZone = this.getDropZoneInfo(target);
+    
+    switch (dropZone.type) {
+      case 'center2':
+        return !this.players[1].center2; // 空の場合のみ
+      case 'back':
+        return this.canPlaceCardInBackSlot(card, dropZone.index);
+      default:
+        return false;
+    }
+  }
+
+  // バックスロットへの配置可能性チェック
+  canPlaceCardInBackSlot(card, slotIndex) {
+    const player = this.players[1];
+    const backPositions = ['back1', 'back2', 'back3', 'back4', 'back5'];
+    
+    // センター①があるかどうかで最大使用スロット数を決定
+    const maxSlots = player.center1 ? 4 : 5;
+    
+    // スロットインデックスが使用可能範囲内かチェック
+    if (slotIndex >= maxSlots) {
+      console.log(`スロット${slotIndex}は使用不可（center1=${!!player.center1}, maxSlots=${maxSlots}）`);
+      return false;
+    }
+    
+    const currentCard = player[backPositions[slotIndex]];
+    
+    console.log(`バック配置チェック: ${card.name}, bloom_level: ${card.bloom_level}, slotIndex: ${slotIndex}, currentCard:`, currentCard);
+    
+    // Debut, Spotは空のスロットにのみ配置可能
+    if (card.bloom_level === 'Debut' || card.bloom_level === 'Spot') {
+      const canPlace = !currentCard;
+      console.log(`Debut/Spot配置チェック: ${canPlace}`);
+      return canPlace;
+    }
+    
+    // 1stは Debut/1st/1stBuzz の上に配置可能
+    if (card.bloom_level === '1st') {
+      if (!currentCard) return false;
+      return ['Debut', '1st', '1stBuzz'].includes(currentCard.bloom_level);
+    }
+    
+    // 2ndは 1st/1stBuzz/2nd の上に配置可能
+    if (card.bloom_level === '2nd') {
+      if (!currentCard) return false;
+      return ['1st', '1stBuzz', '2nd'].includes(currentCard.bloom_level);
+    }
+    
+    return false;
+  }
+
+  // ドロップ先情報を取得
+  getDropZoneInfo(target) {
+    console.log('getDropZoneInfo - target:', target, 'classList:', target.classList);
+    
+    if (target.classList.contains('front2')) {
+      return { type: 'center2' };
+    }
+    
+    if (target.classList.contains('back-slot')) {
+      const slotIndex = parseInt(target.getAttribute('data-slot')) || 0;
+      console.log('バックスロット検出:', slotIndex);
+      return { type: 'back', index: slotIndex };
+    }
+    
+    // .backs コンテナがクリックされた場合、最初の空きスロットを探す
+    if (target.classList.contains('backs')) {
+      console.log('backsコンテナ検出 - 子スロットを検索');
+      const backSlots = target.querySelectorAll('.back-slot');
+      console.log('子バックスロット数:', backSlots.length);
+      
+      // 最初の空きスロットを見つける
+      for (let i = 0; i < backSlots.length; i++) {
+        const slotIndex = parseInt(backSlots[i].getAttribute('data-slot')) || i;
+        const player = this.players[1];
+        const backPositions = ['back1', 'back2', 'back3'];
+        if (!player[backPositions[slotIndex]]) {
+          console.log('空きスロット発見:', slotIndex);
+          return { type: 'back', index: slotIndex };
+        }
+      }
+    }
+    
+    if (target.classList.contains('support-drop-zone')) {
+      return { type: 'support' };
+    }
+    
+    return { type: 'unknown' };
+  }
+
+  // 手札からカードを配置
+  placeCardFromHand(card, handIndex, dropZone) {
+    const player = this.players[1];
+    
+    console.log(`カード配置試行: ${card.name}, dropZone:`, dropZone);
+    
+    if (dropZone.type === 'support') {
+      this.useSupportCard(card, handIndex);
+      return;
+    }
+    
+    switch (dropZone.type) {
+      case 'center2':
+        player.center2 = card;
+        console.log(`${card.name}をセンター②に配置`);
+        
+        // Debut配置中の場合、状態を更新
+        if (this.debutPlacementState && !this.debutPlacementState.centerPlaced) {
+          this.debutPlacementState.centerPlaced = true;
+          this.updateDebutPlacementStatus();
+        }
+        break;
+        
+      case 'back':
+        const backPositions = ['back1', 'back2', 'back3', 'back4', 'back5'];
+        const position = backPositions[dropZone.index];
+        player[position] = card;
+        console.log(`${card.name}をバック${dropZone.index + 1}(${position})に配置`);
+        
+        // Debut配置中の場合、状態を更新
+        if (this.debutPlacementState && !this.debutPlacementState.usedBackPositions.includes(position)) {
+          this.debutPlacementState.usedBackPositions.push(position);
+          this.updateDebutPlacementStatus();
+        }
+        break;
+    }
+    
+    // 手札から削除
+    player.hand.splice(handIndex, 1);
+    
+    // UI更新
+    this.updateHandDisplay();
+    this.updateUI();
+  }
+
+  // サポートカード使用
+  useSupportCard(card, handIndex) {
+    const useCard = confirm(`「${card.name}」の効果を使用しますか？`);
+    
+    if (useCard) {
+      console.log(`${card.name}の効果を使用`);
+      
+      // 手札から削除
+      this.players[1].hand.splice(handIndex, 1);
+      
+      // アーカイブに移動（実際のゲームルールに応じて）
+      this.players[1].archive.push(card);
+      
+      // TODO: 実際のカード効果処理を実装
+      alert(`${card.name}の効果を発動しました！`);
+      
+      // UI更新
+      this.updateHandDisplay();
+      this.updateUI();
+    }
+  }
+
+  // サポートドロップゾーン作成
+  createSupportDropZone() {
+    const supportZone = document.createElement('div');
+    supportZone.className = 'support-drop-zone';
+    supportZone.textContent = 'サポートカード効果使用';
+    supportZone.id = 'support-drop-zone';
+    
+    // ドロップイベントを追加
+    supportZone.addEventListener('dragover', (e) => this.handleDragOver(e));
+    supportZone.addEventListener('dragenter', (e) => this.handleDragEnter(e));
+    supportZone.addEventListener('dragleave', (e) => this.handleDragLeave(e));
+    supportZone.addEventListener('drop', (e) => this.handleDrop(e));
+    
+    document.body.appendChild(supportZone);
+  }
+
+  // サポートドロップゾーン表示/非表示
+  showSupportDropZone() {
+    const supportZone = document.getElementById('support-drop-zone');
+    if (supportZone) {
+      supportZone.classList.add('active');
+    }
+  }
+
+  hideSupportDropZone() {
+    const supportZone = document.getElementById('support-drop-zone');
+    if (supportZone) {
+      supportZone.classList.remove('active');
+    }
   }
 }
 

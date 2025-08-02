@@ -56,26 +56,12 @@ body {
   box-sizing: border-box;
 }
 
-/* 対戦相手エリア */
-.battle-opponent {
-  display: grid;
-  grid-template-columns: 120px 100px 100px 100px 100px 120px;
-  grid-template-rows: 80px 100px 100px;
-  gap: 10px;
-  margin-bottom: 20px;
-  background: rgba(255, 255, 255, 0.1);
-  padding: 15px;
-  border-radius: 15px;
-  backdrop-filter: blur(10px);
-  transform: rotateX(180deg);
-}
-
 /* プレイヤーエリア */
 .battle-player {
   display: grid;
-  grid-template-columns: 130px 110px 110px 110px 130px 110px;
+  grid-template-columns: 130px 120px 120px 120px 130px 120px;
   grid-template-rows: 140px 140px 140px;
-  gap: 10px;
+  gap: 15px;
   background: rgba(255, 255, 255, 0.2);
   padding: 15px;
   border-radius: 15px;
@@ -86,23 +72,9 @@ body {
 /* 対戦相手エリア */
 .battle-opponent {
   display: grid;
-  grid-template-columns: 130px 110px 110px 110px 130px 110px;
+  grid-template-columns: 130px 120px 120px 120px 130px 120px;
   grid-template-rows: 140px 140px 140px;
-  gap: 10px;
-  margin-bottom: 20px;
-  background: rgba(255, 255, 255, 0.1);
-  padding: 15px;
-  border-radius: 15px;
-  backdrop-filter: blur(10px);
-  transform: rotateX(180deg);
-}
-
-/* 対戦相手エリア */
-.battle-opponent {
-  display: grid;
-  grid-template-columns: 100px 100px 100px 100px 100px 100px;
-  grid-template-rows: 90px 90px 90px;
-  gap: 10px;
+  gap: 15px;
   margin-bottom: 20px;
   background: rgba(255, 255, 255, 0.1);
   padding: 15px;
@@ -159,16 +131,58 @@ body {
 .front1 {
   grid-column: 2;
   grid-row: 1;
+  transform: translateX(40px);
+}
+
+.front1:hover {
+  background: rgba(255, 255, 255, 0.15);
+  border-color: rgba(255, 255, 255, 0.6);
+  transform: translateX(40px) translateY(-2px);
+  box-shadow: 0 4px 15px rgba(0, 0, 0, 0.2);
+}
+
+.front1.drop-zone-hover {
+  border: 3px solid #4CAF50 !important;
+  background: rgba(76, 175, 80, 0.2) !important;
+  transform: translateX(40px) scale(1.02);
 }
 
 .front2 {
   grid-column: 3;
   grid-row: 1;
+  transform: translateX(80px);
+}
+
+.front2:hover {
+  background: rgba(255, 255, 255, 0.15);
+  border-color: rgba(255, 255, 255, 0.6);
+  transform: translateX(80px) translateY(-2px);
+  box-shadow: 0 4px 15px rgba(0, 0, 0, 0.2);
+}
+
+.front2.drop-zone-hover {
+  border: 3px solid #4CAF50 !important;
+  background: rgba(76, 175, 80, 0.2) !important;
+  transform: translateX(80px) scale(1.02);
 }
 
 .oshi {
   grid-column: 4;
   grid-row: 1;
+  transform: translateX(120px);
+}
+
+.oshi:hover {
+  background: rgba(255, 255, 255, 0.15);
+  border-color: rgba(255, 255, 255, 0.6);
+  transform: translateX(120px) translateY(-2px);
+  box-shadow: 0 4px 15px rgba(0, 0, 0, 0.2);
+}
+
+.oshi.drop-zone-hover {
+  border: 3px solid #4CAF50 !important;
+  background: rgba(76, 175, 80, 0.2) !important;
+  transform: translateX(120px) scale(1.02);
 }
 
 .holo {
@@ -199,8 +213,53 @@ body {
   grid-column: 2 / 6;
   grid-row: 3;
   display: grid;
-  grid-template-columns: 1fr 1fr 1fr 1fr;
-  gap: 5px;
+  grid-template-columns: repeat(5, 1fr);
+  gap: 8px;
+  margin-bottom: 60px;
+  margin-top: -80px;
+}
+
+.back-slot {
+  width: 100px;
+  height: 140px;
+  border-radius: 8px;
+  background: rgba(255, 255, 255, 0.1);
+  border: 2px dashed #ccc;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 10px;
+  color: #666;
+  transition: all 0.3s ease;
+  cursor: pointer;
+  position: relative;
+  overflow: hidden;
+}
+
+.back-slot:hover {
+  border-color: #4CAF50;
+  background: rgba(76, 175, 80, 0.1);
+}
+
+.back-slot.has-card {
+  border: 2px solid #4CAF50;
+  background: transparent;
+}
+
+.back-slot.disabled {
+  border: 2px dashed #999;
+  background: rgba(100, 100, 100, 0.1);
+  color: #999;
+  cursor: not-allowed;
+}
+
+.back-slot .card {
+  width: 100%;
+  height: 100%;
+  border-radius: 6px;
+  position: absolute;
+  top: 0;
+  left: 0;
 }
 
 .archive {
@@ -308,7 +367,7 @@ body {
 /* 手札エリア */
 .hand-area {
   position: fixed;
-  bottom: 20px;
+  bottom: 10px;
   left: 50%;
   transform: translateX(-50%);
   display: flex;
@@ -316,9 +375,9 @@ body {
   z-index: 100;
   max-width: 90vw;
   overflow-x: auto;
-  padding: 10px;
-  background: rgba(0, 0, 0, 0.7);
-  border-radius: 15px;
+  padding: 8px;
+  background: rgba(0, 0, 0, 0.8);
+  border-radius: 12px;
   backdrop-filter: blur(10px);
 }
 
@@ -328,6 +387,28 @@ body {
   border-radius: 6px;
   background: white;
   border: 1px solid #ddd;
+  cursor: grab;
+  transition: all 0.3s ease;
+  background-size: cover;
+  background-position: center;
+  background-repeat: no-repeat;
+  flex-shrink: 0;
+  position: relative;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.3);
+}
+
+.hand-card[draggable="true"] {
+  cursor: grab;
+}
+
+.hand-card:active {
+  cursor: grabbing;
+}
+
+.hand-card.dragging {
+  opacity: 0.5;
+  transform: rotate(5deg);
+}
 
 /* 先行・後攻選択モーダル */
 .turn-order-modal {
@@ -477,109 +558,65 @@ body {
   background: #da190b;
 }
 
-/* Debut配置モーダル */
-.debut-placement-modal,
-.back-placement-modal {
-  position: fixed;
-  top: 0;
-  left: 0;
-  width: 100%;
-  height: 100%;
-  background: rgba(0, 0, 0, 0.8);
-  display: flex;
-  justify-content: center;
-  align-items: center;
-  z-index: 10000;
-}
-
-.debut-placement-modal .modal-content,
-.back-placement-modal .modal-content {
-  background: white;
-  padding: 30px;
-  border-radius: 15px;
-  text-align: center;
-  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.5);
-  max-width: 600px;
-  max-height: 80vh;
-  overflow-y: auto;
-  position: relative;
-  top: -5%;
-}
-
-.debut-cards {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 15px;
-  justify-content: center;
-  margin: 20px 0;
-}
-
-.debut-card {
-  width: 90px;
-  height: 126px;
-  border: 2px solid #ddd;
-  border-radius: 8px;
-  cursor: pointer;
-  transition: transform 0.2s, border-color 0.2s;
-  background: white;
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  padding: 5px;
-}
-
-.debut-card:hover {
-  transform: scale(1.05);
-  border-color: #4CAF50;
-}
-
-.debut-card img {
-  width: 70px;
-  height: 98px;
-  object-fit: cover;
-  border-radius: 4px;
-}
-
-.debut-card p {
-  margin: 5px 0 0 0;
-  font-size: 10px;
-  text-align: center;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-  width: 100%;
-}
-
-.back-placement-buttons {
-  margin-top: 20px;
-}
-
-.back-placement-buttons button {
-  padding: 12px 24px;
-  font-size: 16px;
-  border: none;
-  border-radius: 8px;
-  cursor: pointer;
-  background: #2196F3;
-  color: white;
-  transition: background 0.3s;
-}
-
-.back-placement-buttons button:hover {
-  background: #1976D2;
-}
-  cursor: pointer;
-  transition: all 0.3s ease;
-  background-size: cover;
-  background-position: center;
-  background-repeat: no-repeat;
-  flex-shrink: 0;
-}
-
 .hand-card:hover {
   transform: translateY(-20px) scale(1.2);
   z-index: 200;
   box-shadow: 0 8px 25px rgba(0, 0, 0, 0.5);
+}
+
+/* ドロップゾーン */
+.drop-zone-active {
+  border: 3px dashed #4CAF50 !important;
+  background: rgba(76, 175, 80, 0.1) !important;
+  animation: dropZonePulse 1.5s infinite;
+}
+
+.drop-zone-hover {
+  border: 3px solid #4CAF50 !important;
+  background: rgba(76, 175, 80, 0.2) !important;
+  transform: scale(1.02);
+}
+
+@keyframes dropZonePulse {
+  0%, 100% { 
+    box-shadow: 0 0 5px rgba(76, 175, 80, 0.5);
+  }
+  50% { 
+    box-shadow: 0 0 20px rgba(76, 175, 80, 0.8);
+  }
+}
+
+/* サポートカード効果確認エリア */
+.support-drop-zone {
+  position: fixed;
+  top: 10%;
+  left: 50%;
+  transform: translateX(-50%);
+  width: 200px;
+  height: 80px;
+  border: 2px dashed #ff9800;
+  border-radius: 10px;
+  background: rgba(255, 152, 0, 0.1);
+  display: none;
+  align-items: center;
+  justify-content: center;
+  font-weight: bold;
+  color: #ff9800;
+  z-index: 1000;
+}
+
+.support-drop-zone.active {
+  display: flex;
+  animation: supportZonePulse 1.5s infinite;
+}
+
+@keyframes supportZonePulse {
+  0%, 100% { 
+    box-shadow: 0 0 5px rgba(255, 152, 0, 0.5);
+  }
+  50% { 
+    box-shadow: 0 0 20px rgba(255, 152, 0, 0.8);
+  }
 }
 
 /* コントロールパネル */
