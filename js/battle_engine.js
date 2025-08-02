@@ -2705,6 +2705,12 @@ class HololiveBattleEngine {
 
   // サポートドロップゾーン作成
   createSupportDropZone() {
+    // 既存の要素があれば削除
+    const existingZone = document.getElementById('support-drop-zone');
+    if (existingZone) {
+      existingZone.remove();
+    }
+    
     const supportZone = document.createElement('div');
     supportZone.className = 'support-drop-zone';
     supportZone.textContent = 'サポートカード効果使用';
@@ -2716,7 +2722,13 @@ class HololiveBattleEngine {
     supportZone.addEventListener('dragleave', (e) => this.handleDragLeave(e));
     supportZone.addEventListener('drop', (e) => this.handleDrop(e));
     
-    document.body.appendChild(supportZone);
+    // プレイヤーエリア内に配置
+    const playerArea = document.querySelector('.battle-player');
+    if (playerArea) {
+      playerArea.appendChild(supportZone);
+    } else {
+      document.body.appendChild(supportZone);
+    }
   }
 
   // サポートドロップゾーン表示/非表示
@@ -2947,8 +2959,8 @@ class HololiveBattleEngine {
       
       // エールカードをライフカードのように重ねて配置
       yellElement.style.position = 'absolute';
-      yellElement.style.width = '100px'; // バックサイズに統一
-      yellElement.style.height = '140px'; // 統一サイズ
+      yellElement.style.width = '120px'; // 他のカードと同じサイズに統一
+      yellElement.style.height = '168px'; // 他のカードと同じサイズに統一
       
       // センターとバックで異なる重なり方（ホロメンカードから少しずらす）
       if (areaId === 'front1' || areaId === 'front2') {
@@ -3032,8 +3044,8 @@ class HololiveBattleEngine {
       
       // エールカードをライフカードのように重ねて配置
       yellElement.style.position = 'absolute';
-      yellElement.style.width = '90px';
-      yellElement.style.height = '126px';
+      yellElement.style.width = '120px'; // 他のカードと同じサイズに統一
+      yellElement.style.height = '168px'; // 他のカードと同じサイズに統一
       
       // センターとバックで異なる重なり方（ホロメンカードから少しずらす）
       if (areaId === 'front1' || areaId === 'front2') {

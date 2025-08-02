@@ -68,7 +68,7 @@ body {
   border-radius: 15px;
   backdrop-filter: blur(10px);
   box-shadow: 0 8px 32px rgba(31, 38, 135, 0.37);
-  position: relative; /* 手札エリアの基準点とするため */
+  position: relative; /* 手札エリアとサポートドロップゾーンの基準点とするため */
   margin-bottom: 180px; /* 手札エリアのスペースを確保 */
 }
 
@@ -139,20 +139,20 @@ body {
   height: 168px;
   grid-column: 2;
   grid-row: 1;
-  transform: translateX(50px);
+  transform: translateX(70px);
 }
 
 .front1:hover {
   background: rgba(255, 255, 255, 0.15);
   border-color: rgba(255, 255, 255, 0.6);
-  transform: translateX(50px) translateY(-2px);
+  transform: translateX(70px) translateY(-2px);
   box-shadow: 0 4px 15px rgba(0, 0, 0, 0.2);
 }
 
 .front1.drop-zone-hover {
   border: 3px solid #4CAF50 !important;
   background: rgba(76, 175, 80, 0.2) !important;
-  transform: translateX(50px) scale(1.02);
+  transform: translateX(70px) scale(1.02);
 }
 
 .front2 {
@@ -160,20 +160,20 @@ body {
   height: 168px;
   grid-column: 3;
   grid-row: 1;
-  transform: translateX(100px);
+  transform: translateX(120px);
 }
 
 .front2:hover {
   background: rgba(255, 255, 255, 0.15);
   border-color: rgba(255, 255, 255, 0.6);
-  transform: translateX(100px) translateY(-2px);
+  transform: translateX(120px) translateY(-2px);
   box-shadow: 0 4px 15px rgba(0, 0, 0, 0.2);
 }
 
 .front2.drop-zone-hover {
   border: 3px solid #4CAF50 !important;
   background: rgba(76, 175, 80, 0.2) !important;
-  transform: translateX(100px) scale(1.02);
+  transform: translateX(120px) scale(1.02);
 }
 
 .oshi {
@@ -181,20 +181,20 @@ body {
   height: 168px;
   grid-column: 4;
   grid-row: 1;
-  transform: translateX(150px);
+  transform: translateX(180px);
 }
 
 .oshi:hover {
   background: rgba(255, 255, 255, 0.15);
   border-color: rgba(255, 255, 255, 0.6);
-  transform: translateX(150px) translateY(-2px);
+  transform: translateX(180px) translateY(-2px);
   box-shadow: 0 4px 15px rgba(0, 0, 0, 0.2);
 }
 
 .oshi.drop-zone-hover {
   border: 3px solid #4CAF50 !important;
   background: rgba(76, 175, 80, 0.2) !important;
-  transform: translateX(150px) scale(1.02);
+  transform: translateX(180px) scale(1.02);
 }
 
 .holo {
@@ -428,7 +428,7 @@ body {
 .hand-area {
   position: absolute;
   bottom: -310px;
-  left: 30%;
+  left: 650px;
   transform: translateX(-50%);
   display: flex;
   gap: 5px;
@@ -495,7 +495,7 @@ body {
   border-radius: 15px;
   text-align: center;
   box-shadow: 0 10px 30px rgba(0, 0, 0, 0.5);
-  min-width: 400px;
+  min-width: 720px; /* マリガンモーダルと同じ幅に統一 */
   animation: slideDown 0.3s ease-out;
 }
 
@@ -565,27 +565,13 @@ body {
 }
 
 /* マリガンモーダル */
-.mulligan-modal {
-  position: fixed;
-  top: 0;
-  left: 0;
-  width: 100%;
-  height: 100%;
-  background: rgba(0, 0, 0, 0.8);
-  display: flex;
-  justify-content: center;
-  align-items: flex-start;
-  z-index: 10000;
-  padding-top: 10vh;
-}
-
-.mulligan-modal .modal-content {
+.game-modal .game-modal-content {
   background: white;
   padding: 30px;
   border-radius: 15px;
   text-align: center;
   box-shadow: 0 10px 30px rgba(0, 0, 0, 0.5);
-  min-width: 400px;
+  min-width: 720px; /* 7枚のカード用 */
   animation: slideDown 0.3s ease-out;
 }
 
@@ -646,14 +632,15 @@ body {
 
 /* サポートカード効果確認エリア */
 .support-drop-zone {
-  position: fixed;
-  bottom: 60%;
-  left: 50%;
-  transform: translateX(-50%);
-  width: 200px;
-  height: 80px;
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  width: 100%;
+  height: 100%;
   border: 2px dashed #ff9800;
-  border-radius: 10px;
+  border-radius: 15px; /* プレイヤーエリアと同じ */
   background: rgba(255, 152, 0, 0.1);
   display: none;
   align-items: center;
@@ -661,6 +648,7 @@ body {
   font-weight: bold;
   color: #ff9800;
   z-index: 1000;
+  font-size: 18px; /* テキストサイズも調整 */
 }
 
 .support-drop-zone.active {
