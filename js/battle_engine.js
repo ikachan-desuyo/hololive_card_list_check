@@ -679,118 +679,13 @@ class HololiveBattleEngine {
   }
 
   executeResetStep(playerId) {
-    console.log(`=== executeResetStep ===`);
-    console.log(`プレイヤー${playerId}のリセットステップを実行`);
-    console.log(`現在のcurrentPlayer: ${this.gameState.currentPlayer}`);
-    console.log(`現在のcurrentPhase: ${this.gameState.currentPhase}`);
-    console.log(`ターン数: ${this.gameState.turnCount}`);
-    console.log(`======================`);
-    
-    // 統合ログを記録
-    if (window.infoPanelManager) {
-      const playerName = playerId === 1 ? 'プレイヤー' : '対戦相手';
-      window.infoPanelManager.logStepProgress(this.gameState.turnCount, 'リセットステップ', playerName, 'カードをリセット');
-    }
-    
-    // フェーズハイライトを明示的に更新
-    this.updatePhaseHighlight();
-    
-    const player = this.players[playerId];
-    
-    // センター1のホロメンカードを横向きにしてバックに移動
-    if (player.center1) {
-      const center1Card = player.center1;
-      center1Card.isResting = true; // 横向き状態をマーク
-      
-      // 空いているバックスロットを探す
-      const backPositions = ['back1', 'back2', 'back3', 'back4', 'back5'];
-      for (let pos of backPositions) {
-        if (!player[pos]) {
-          player[pos] = center1Card;
-          player.center1 = null;
-          console.log(`${center1Card.name}をセンター1からバック(${pos})に移動（横向き）`);
-          break;
-        }
-      }
-    }
-    
-    // センター1が空の場合：バックの横向きホロメンカードをチェック
-    if (!player.center1) {
-      const backPositions = ['back1', 'back2', 'back3', 'back4', 'back5'];
-      let hasRestingCard = false;
-      
-      // 横向きのホロメンカードがあるかチェック
-      backPositions.forEach(pos => {
-        if (player[pos] && player[pos].isResting) {
-          hasRestingCard = true;
-        }
-      });
-      
-      if (hasRestingCard) {
-        // 横向きカードがある場合は縦に戻す
-        backPositions.forEach(pos => {
-          if (player[pos] && player[pos].isResting) {
-            player[pos].isResting = false;
-            console.log(`${player[pos].name}を縦向きに戻しました`);
-          }
-        });
-      } else {
-        // 横向きカードがない場合は特に処理なし
-        console.log('横向きのホロメンカードがないため、特に処理を行いません');
-      }
-    } else {
-      // センター1にカードがある場合は通常通りバックの横向きカードを縦に戻す
-      const backPositions = ['back1', 'back2', 'back3', 'back4', 'back5'];
-      backPositions.forEach(pos => {
-        if (player[pos] && player[pos].isResting) {
-          player[pos].isResting = false;
-          console.log(`${player[pos].name}を縦向きに戻しました`);
-        }
-      });
-    }
-    
-    // UI更新
-    this.updateUI();
-    
-    // リセットステップは自動で完了し、次のステップへ移行
-    console.log('リセットステップ完了 - 自動でドローステップに進みます');
-    setTimeout(() => {
-      this.nextPhase();
-    }, 2000); // プレイヤーがフェーズを確認できるよう2秒に延長
+    // PhaseControllerに委譲
+    return this.phaseController.executeResetStep(playerId);
   }
 
   executeDrawStep(playerId) {
-    console.log(`=== executeDrawStep ===`);
-    console.log(`プレイヤー${playerId}の手札ステップを実行`);
-    console.log(`現在のcurrentPlayer: ${this.gameState.currentPlayer}`);
-    console.log(`ターン数: ${this.gameState.turnCount}`);
-    console.log(`======================`);
-    
-    // 統合ログを記録
-    if (window.infoPanelManager) {
-      const playerName = playerId === 1 ? 'プレイヤー' : '対戦相手';
-      window.infoPanelManager.logStepProgress(this.gameState.turnCount, '手札ステップ', playerName, 'カードをドロー');
-    }
-    
-    // デッキからカードを1枚引く
-    const drawnCard = this.drawCard(playerId);
-    if (drawnCard) {
-      console.log(`プレイヤー${playerId}がカードを1枚引きました:`, drawnCard.name);
-    } else {
-      console.log(`プレイヤー${playerId}のデッキが空です`);
-      // デッキ切れの処理
-      this.checkVictoryConditions();
-      return;
-    }
-    
-    // UI更新
-    this.updateUI();
-    
-    // ドローステップは自動で完了し、次のステップへ移行（プレイヤー・CPU共通）
-    console.log('ドローステップ完了 - 自動でエールステップに進みます');
-    setTimeout(() => {
-      this.nextPhase();
-    }, 2000); // プレイヤーがフェーズを確認できるよう2秒に延長
+    // PhaseControllerに委譲
+    return this.phaseController.executeDrawStep(playerId);
   }
 
   executeYellStep(playerId) {
