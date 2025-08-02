@@ -475,18 +475,6 @@ document.addEventListener('DOMContentLoaded', () => {
   const initCPU = () => {
     if (window.battleEngine) {
       cpuLogic = new HololiveCPULogic(window.battleEngine);
-      
-      // CPUターンの自動実行
-      // CPUの自動実行を無効化（battle_engine.js内で自動実行される）
-      const originalEndTurn = window.battleEngine.endTurn.bind(window.battleEngine);
-      window.battleEngine.endTurn = function() {
-        originalEndTurn();
-        
-        // CPUのターンは battle_engine.js の各ステップで自動管理されるため
-        // ここでは追加の自動実行は行わない
-        console.log('ターン終了処理完了 - CPU自動実行はbattle_engine.jsで管理');
-      };
-      
       console.log('CPUロジック初期化完了');
     } else {
       setTimeout(initCPU, 100);

@@ -27,6 +27,7 @@ class HololiveBattleEngine {
     this.cardDatabase = null;
     this.stageData = null;
     this.modalUI = new ModalUI(); // モーダルUI追加
+    this.phaseInProgress = false; // フェーズ進行制御フラグ
     
     this.phaseNames = [
       '準備ステップ', // -1
@@ -39,6 +40,9 @@ class HololiveBattleEngine {
     ];
 
     this.initializeGame();
+    
+    // CPUロジックの初期化
+    this.cpuLogic = new HololiveCPULogic(this);
   }
 
   createPlayerState() {
@@ -185,6 +189,7 @@ class HololiveBattleEngine {
       <button class="control-button" id="select-opponent-deck">🤖 相手デッキ選択</button>
       <button class="control-button" id="start-game" disabled>ゲーム開始</button>
       <button class="control-button" id="next-phase" disabled>次のフェーズ</button>
+      <button class="control-button" id="to-performance" disabled>パフォーマンスステップへ</button>
       <button class="control-button" id="end-turn" disabled>ターン終了</button>
       <button class="control-button" id="shuffle-deck">デッキシャッフル</button>
       <button class="control-button" id="reset-game">ゲームリセット</button>
@@ -197,7 +202,8 @@ class HololiveBattleEngine {
     document.getElementById('select-opponent-deck').addEventListener('click', () => this.showDeckSelection(2));
     document.getElementById('start-game').addEventListener('click', () => this.startGame());
     document.getElementById('next-phase').addEventListener('click', () => this.nextPhase());
-    document.getElementById('end-turn').addEventListener('click', () => this.endTurn());
+    document.getElementById('to-performance').addEventListener('click', () => this.nextPhase());
+    document.getElementById('end-turn').addEventListener('click', () => this.nextPhase());
     document.getElementById('shuffle-deck').addEventListener('click', () => this.shuffleDeck(1));
     document.getElementById('reset-game').addEventListener('click', () => this.resetGame());
     
@@ -603,6 +609,14 @@ class HololiveBattleEngine {
     
     if (!this.gameState.gameStarted || this.gameState.gameEnded) return;
     
+    // 既にフェーズ進行中の場合は実行を避ける
+    if (this.phaseInProgress) {
+      console.log('フェーズ進行中のため、次のフェーズ呼び出しをスキップします');
+      return;
+    }
+    
+    this.phaseInProgress = true;
+    
     // 次のフェーズへ移行
     this.gameState.currentPhase++;
     
@@ -611,6 +625,7 @@ class HololiveBattleEngine {
     // エンドステップ（フェーズ5）の次はターン終了
     if (this.gameState.currentPhase > 5) {
       console.log(`フェーズ5を超えたためターン終了`);
+      this.phaseInProgress = false;
       this.endTurn();
       return;
     }
@@ -618,6 +633,11 @@ class HololiveBattleEngine {
     // UI更新（フェーズ情報を先に更新）
     this.updateTurnInfo();
     this.updateUI();
+    
+    // フェーズ進行フラグをリセット（非同期処理完了後）
+    setTimeout(() => {
+      this.phaseInProgress = false;
+    }, 100);
     
     // 現在のフェーズの処理を実行
     this.executePhase();
@@ -721,16 +741,11 @@ class HololiveBattleEngine {
     // UI更新
     this.updateUI();
     
-    // プレイヤー1の場合は手動操作を待つ、CPUの場合は自動進行
-    if (playerId === 1) {
-      // プレイヤーの場合は手動操作を待つ
-      console.log('プレイヤーのリセットステップ完了 - 手動で手札ステップに進んでください');
-    } else {
-      // CPUの場合は自動進行
-      setTimeout(() => {
-        this.nextPhase();
-      }, 1500);
-    }
+    // リセットステップは自動で完了し、次のステップへ移行
+    console.log('リセットステップ完了 - 自動で手札ステップに進みます');
+    setTimeout(() => {
+      this.nextPhase();
+    }, 1500);
   }
 
   executeDrawStep(playerId) {
@@ -754,16 +769,11 @@ class HololiveBattleEngine {
     // UI更新
     this.updateUI();
     
-    // プレイヤー1の場合は手動操作を待つ、CPUの場合は自動進行
-    if (playerId === 1) {
-      // プレイヤーの場合は手動操作を待つ
-      console.log('プレイヤーの手札ステップ完了 - 手動でエールステップに進んでください');
-    } else {
-      // CPUの場合は自動進行
-      setTimeout(() => {
-        this.nextPhase();
-      }, 1000);
-    }
+    // 手札ステップは自動で完了し、次のステップへ移行
+    console.log('手札ステップ完了 - 自動でエールステップに進みます');
+    setTimeout(() => {
+      this.nextPhase();
+    }, 1000);
   }
 
   executeYellStep(playerId) {
@@ -861,16 +871,11 @@ class HololiveBattleEngine {
     this.players[playerId].canPlaySupport = true;
     this.players[playerId].usedLimitedThisTurn = [];
     
-    // プレイヤー1の場合は手動でターン終了、CPUの場合は自動進行
-    if (playerId === 1) {
-      // プレイヤーの場合は手動操作を待つ
-      console.log('プレイヤーのエンドステップ完了 - 手動でターン終了してください');
-    } else {
-      // CPUの場合は自動でターン終了
-      setTimeout(() => {
-        this.endTurn();
-      }, 1000);
-    }
+    // エンドステップは自動で完了し、相手のターンに移行
+    console.log('エンドステップ完了 - 自動で相手のリセットステップに移行します');
+    setTimeout(() => {
+      this.endTurn();
+    }, 1000);
   }
 
   endTurn() {
@@ -891,17 +896,10 @@ class HololiveBattleEngine {
     console.log(`ターン終了 - プレイヤー${this.gameState.currentPlayer}のターン開始`);
     
     // 新しいターンのリセットステップ開始
-    // プレイヤー1の場合は手動操作を待つ、CPUの場合は自動実行
-    if (this.gameState.currentPlayer === 1) {
-      // プレイヤー1の場合は手動操作を待つ
-      console.log('プレイヤーのターンです - 手動でリセットステップを開始してください');
-      alert('あなたのターンです！\n「次のフェーズ」ボタンでリセットステップを開始してください。');
-    } else {
-      // CPUの場合は自動実行
-      setTimeout(() => {
-        this.executeResetStep(this.gameState.currentPlayer);
-      }, 1000);
-    }
+    // 両プレイヤーとも自動でリセットステップを開始
+    setTimeout(() => {
+      this.executeResetStep(this.gameState.currentPlayer);
+    }, 1000);
   }
 
   checkVictoryConditions() {
@@ -1037,6 +1035,9 @@ class HololiveBattleEngine {
     
     // フェーズハイライトの更新
     this.updatePhaseHighlight();
+    
+    // ボタンの表示制御
+    this.updatePhaseButtons();
     
     // Debut配置状態の更新（配置フェーズ中の場合）
     if (document.getElementById('debut-placement-controls')) {
@@ -1392,6 +1393,41 @@ class HololiveBattleEngine {
     
     if (targetArea) {
       targetArea.classList.add('phase-highlight');
+    }
+  }
+
+  updatePhaseButtons() {
+    const nextPhaseBtn = document.getElementById('next-phase');
+    const toPerformanceBtn = document.getElementById('to-performance');
+    const endTurnBtn = document.getElementById('end-turn');
+    
+    if (!nextPhaseBtn || !toPerformanceBtn || !endTurnBtn) return;
+    
+    // すべてのボタンを非表示かつ無効化
+    nextPhaseBtn.style.display = 'none';
+    nextPhaseBtn.disabled = true;
+    toPerformanceBtn.style.display = 'none';
+    toPerformanceBtn.disabled = true;
+    endTurnBtn.style.display = 'none';
+    endTurnBtn.disabled = true;
+    
+    // プレイヤー1のターンでゲームが開始されている場合のみボタンを表示・有効化
+    if (this.gameState.currentPlayer === 1 && this.gameState.gameStarted && !this.gameState.gameEnded) {
+      switch (this.gameState.currentPhase) {
+        case 3: // メインステップ
+          toPerformanceBtn.style.display = 'block';
+          toPerformanceBtn.disabled = false;
+          toPerformanceBtn.textContent = 'パフォーマンスステップへ';
+          break;
+        case 4: // パフォーマンスステップ
+          endTurnBtn.style.display = 'block';
+          endTurnBtn.disabled = false;
+          endTurnBtn.textContent = 'ターン終了';
+          break;
+        default:
+          // その他のステップでは自動進行のため、ボタンは表示しない
+          break;
+      }
     }
   }
 
@@ -2775,6 +2811,14 @@ class HololiveBattleEngine {
       }
     });
     console.log('=============================');
+    
+    // エールステップの場合は自動で次のステップに進む
+    if (this.gameState.currentPhase === 2 && this.gameState.currentPlayer === playerId) {
+      console.log('エール配置完了 - 自動でメインステップに進みます');
+      setTimeout(() => {
+        this.nextPhase();
+      }, 1500);
+    }
   }
 
   // エール対象選択UI表示
@@ -2894,12 +2938,24 @@ class HololiveBattleEngine {
     
     if (playerId === 1) {
       // プレイヤーの場合は手動操作を待つ（自動進行しない）
-      alert('メインステップです。\nカードをプレイできます。\n「次のフェーズ」ボタンでパフォーマンスステップに進んでください。');
+      console.log('メインステップです。カードをプレイした後、「パフォーマンスステップへ」ボタンを押してください。');
       // 手動操作を待つため、ここでは自動進行しない
     } else {
-      // CPUの場合は自動進行
-      setTimeout(() => {
-        this.nextPhase();
+      // CPUの場合は自動進行（CPU AIロジックを呼び出し）
+      console.log('CPU用メインステップ処理を開始します');
+      setTimeout(async () => {
+        try {
+          if (this.cpuLogic) {
+            console.log('CPUメインフェーズ実行中...');
+            await this.cpuLogic.cpuMainPhase();
+            console.log('CPUメインフェーズ完了');
+          }
+          console.log('CPUメインステップからパフォーマンスステップへ移行');
+          this.nextPhase();
+        } catch (error) {
+          console.error('CPUメインステップでエラー:', error);
+          this.nextPhase(); // エラーでも進行は続ける
+        }
       }, 2000);
     }
   }
@@ -2910,12 +2966,24 @@ class HololiveBattleEngine {
     
     if (playerId === 1) {
       // プレイヤーの場合は手動操作を待つ（自動進行しない）
-      alert('パフォーマンスステップです。\n攻撃やスキルを使用できます。\n「ターン終了」ボタンでエンドステップに進んでください。');
+      console.log('パフォーマンスステップです。攻撃やスキルを使用した後、「ターン終了」ボタンを押してください。');
       // 手動操作を待つため、ここでは自動進行しない
     } else {
-      // CPUの場合は自動進行
-      setTimeout(() => {
-        this.nextPhase();
+      // CPUの場合は自動進行（CPU AIロジックを呼び出し）
+      console.log('CPU用パフォーマンスステップ処理を開始します');
+      setTimeout(async () => {
+        try {
+          if (this.cpuLogic) {
+            console.log('CPUパフォーマンスフェーズ実行中...');
+            await this.cpuLogic.cpuPerformancePhase();
+            console.log('CPUパフォーマンスフェーズ完了');
+          }
+          console.log('CPUパフォーマンスステップからエンドステップへ移行');
+          this.nextPhase();
+        } catch (error) {
+          console.error('CPUパフォーマンスステップでエラー:', error);
+          this.nextPhase(); // エラーでも進行は続ける
+        }
       }, 2000);
     }
   }
