@@ -832,6 +832,27 @@ body {
   color: #f44336;
 }
 
+.log-entry.step {
+  background: rgba(33, 150, 243, 0.2);
+  color: #2196F3;
+  border-left: 3px solid #2196F3;
+  font-weight: bold;
+}
+
+.log-entry.turn {
+  background: rgba(255, 193, 7, 0.2);
+  color: #FFC107;
+  border-left: 3px solid #FFC107;
+  font-weight: bold;
+  font-size: 1em;
+}
+
+.log-entry.phase {
+  background: rgba(156, 39, 176, 0.2);
+  color: #9C27B0;
+  border-left: 3px solid #9C27B0;
+}
+
 .log-entry .timestamp {
   font-size: 0.7em;
   color: #999;

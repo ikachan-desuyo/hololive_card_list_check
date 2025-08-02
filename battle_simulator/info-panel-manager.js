@@ -316,6 +316,39 @@ class InfoPanelManager {
   }
 
   /**
+   * ステップ遷移ログを追加
+   * @param {string} playerName - プレイヤー名（'プレイヤー' or '対戦相手'）
+   * @param {string} fromStep - 移行前のステップ名
+   * @param {string} toStep - 移行後のステップ名
+   * @param {number} turn - ターン数
+   */
+  logStepTransition(playerName, fromStep, toStep, turn) {
+    const message = `【ターン${turn}】${playerName}: ${fromStep} → ${toStep}`;
+    this.addLogEntry('step', message);
+  }
+
+  /**
+   * ターン開始ログを追加
+   * @param {string} playerName - プレイヤー名
+   * @param {number} turn - ターン数
+   */
+  logTurnStart(playerName, turn) {
+    const message = `【ターン${turn}開始】${playerName}のターン`;
+    this.addLogEntry('turn', message);
+  }
+
+  /**
+   * フェーズ開始ログを追加
+   * @param {string} playerName - プレイヤー名
+   * @param {string} stepName - ステップ名
+   * @param {number} turn - ターン数
+   */
+  logPhaseStart(playerName, stepName, turn) {
+    const message = `【ターン${turn}】${stepName}: ${playerName}開始`;
+    this.addLogEntry('phase', message);
+  }
+
+  /**
    * カードアクションのログ
    * @param {string} player - プレイヤー識別子
    * @param {string} action - アクション（'ドロー', 'プレイ', 'バトル'など）
@@ -348,6 +381,28 @@ class InfoPanelManager {
   logPhaseChange(phase, player) {
     const playerName = player === 'player' ? 'あなた' : '相手';
     this.logSystem(`${playerName}の${phase}が開始されました`);
+  }
+
+  /**
+   * プレイヤーのアクション待ちログ
+   * @param {string} stepName - ステップ名
+   * @param {string} instruction - 操作指示
+   */
+  logPlayerActionWait(stepName, instruction) {
+    const message = `${stepName}: ${instruction}`;
+    this.addLogEntry('system', message);
+  }
+
+  /**
+   * 統合ステップログ（ターン情報 + ステップ + 操作内容）
+   * @param {number} turn - ターン数
+   * @param {string} stepName - ステップ名
+   * @param {string} playerName - プレイヤー名
+   * @param {string} action - 操作内容
+   */
+  logStepProgress(turn, stepName, playerName, action) {
+    const message = `【ターン${turn}】${stepName} (${playerName}) - ${action}`;
+    this.addLogEntry('step', message);
   }
 
   /**
