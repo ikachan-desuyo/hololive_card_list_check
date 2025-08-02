@@ -826,6 +826,11 @@ class HololiveBattleEngine {
     
     // フェーズハイライトの更新
     this.updatePhaseHighlight();
+    
+    // Debut配置状態の更新（配置フェーズ中の場合）
+    if (document.getElementById('debut-placement-controls')) {
+      this.updateDebutPlacementStatus();
+    }
   }
 
   updateHandDisplay() {
@@ -933,7 +938,7 @@ class HololiveBattleEngine {
       // 対応するバックポジションにカードがある場合は表示
       const card = player[backPositions[index]];
       if (card) {
-        const cardElement = this.createCardElement(card, 'single', 0, 'backs'); // 'backs'を渡す
+        const cardElement = this.createCardElement(card, 'single', index, 'backs'); // 正しいインデックスを渡す
         // バックスロット内でのサイズ調整
         cardElement.style.width = '100%';
         cardElement.style.height = '100%';
@@ -1037,6 +1042,17 @@ class HololiveBattleEngine {
           </div>
         `;
       }
+    }
+    
+    // 配置済みカードのドラッグ機能を追加（センター、バックのホロメンカードのみ）
+    if (shouldShowFaceUp && this.isHolomenCard(card) && (areaId === 'front1' || areaId === 'front2' || areaId === 'backs')) {
+      cardElement.draggable = true;
+      cardElement.setAttribute('data-card-id', card.id);
+      cardElement.setAttribute('data-area-id', areaId);
+      cardElement.setAttribute('data-area-index', index);
+      
+      cardElement.addEventListener('dragstart', (e) => this.handlePlacedCardDragStart(e, card, areaId, index));
+      cardElement.addEventListener('dragend', (e) => this.handlePlacedCardDragEnd(e));
     }
     
     // 表示タイプによる位置調整
@@ -1602,25 +1618,40 @@ class HololiveBattleEngine {
   }
 
   updateDebutPlacementStatus() {
-    const state = this.debutPlacementState;
-    if (!state) return;
-    
+    const player = this.players[1];
     const center2Status = document.getElementById('center2-status');
     const backCount = document.getElementById('back-count');
     const completeButton = document.getElementById('complete-debut-button');
     
+    // 実際のゲーム状態を確認
+    const hasValidCenter2 = player.center2 && 
+                           this.isHolomenCard(player.center2) && 
+                           player.center2.bloom_level === 'Debut';
+    
+    const backPositions = ['back1', 'back2', 'back3', 'back4', 'back5'];
+    const placedBackCards = backPositions.filter(pos => player[pos]).length;
+    
     if (center2Status) {
-      center2Status.textContent = state.centerPlaced ? '配置済み' : '未配置';
-      center2Status.style.color = state.centerPlaced ? '#4CAF50' : '#f44336';
+      center2Status.textContent = hasValidCenter2 ? '配置済み' : '未配置';
+      center2Status.style.color = hasValidCenter2 ? '#4CAF50' : '#f44336';
     }
     
     if (backCount) {
-      backCount.textContent = state.usedBackPositions.length;
+      backCount.textContent = placedBackCards;
     }
     
     if (completeButton) {
-      completeButton.disabled = !state.centerPlaced;
-      completeButton.style.background = state.centerPlaced ? '#2196F3' : '#666';
+      if (hasValidCenter2) {
+        completeButton.disabled = false;
+        completeButton.style.background = '#4CAF50';
+        completeButton.style.cursor = 'pointer';
+        completeButton.textContent = '配置完了';
+      } else {
+        completeButton.disabled = true;
+        completeButton.style.background = '#999';
+        completeButton.style.cursor = 'not-allowed';
+        completeButton.textContent = '配置完了（センター２への配置が必要）';
+      }
     }
   }
 
@@ -1639,11 +1670,32 @@ class HololiveBattleEngine {
   }
 
   completeDebutPlacement() {
-    const state = this.debutPlacementState;
-    if (!state || !state.centerPlaced) {
-      alert('センター2への配置は必須です');
+    const player = this.players[1]; // プレイヤーのデータを取得
+    
+    // センター２に配置されているかチェック
+    if (!player.center2) {
+      alert('エラー: センター２にDebutホロメンの配置が必要です。\n必ずセンター２にDebutカードを配置してください。');
       return;
     }
+    
+    // センター２のカードがDebutかチェック
+    if (player.center2.bloom_level !== 'Debut') {
+      alert('エラー: センター２にはDebutレベルのホロメンを配置してください。');
+      return;
+    }
+    
+    // ホロメンカードかチェック
+    if (!this.isHolomenCard(player.center2)) {
+      alert('エラー: センター２にはホロメンカードを配置してください。');
+      return;
+    }
+    
+    console.log('Debut配置バリデーション完了');
+    console.log('センター２:', player.center2.name);
+    
+    // バックエリアの配置数をカウント
+    const backPositions = ['back1', 'back2', 'back3', 'back4', 'back5'];
+    const placedBackCards = backPositions.filter(pos => player[pos]).length;
     
     // コントロールを削除
     const controls = document.getElementById('debut-placement-controls');
@@ -1651,11 +1703,11 @@ class HololiveBattleEngine {
       controls.remove();
     }
     
-    const placedCount = 1 + state.usedBackPositions.length;
-    alert(`Debut配置完了！\n${placedCount}枚のDebutホロメンを配置しました`);
+    const totalPlaced = 1 + placedBackCards; // センター２ + バック
+    alert(`Debut配置完了！\nセンター２: ${player.center2.name}\nバックエリア: ${placedBackCards}枚\n合計: ${totalPlaced}枚のDebutホロメンを配置しました`);
     
     // 次のプレイヤーまたは次のフェーズへ
-    this.proceedToNextDebutPlayer(state.playerId);
+    this.proceedToNextDebutPlayer(1);
   }
 
   autoDebutPlacement(playerId) {
@@ -1790,7 +1842,7 @@ class HololiveBattleEngine {
 
   // ドラッグ&ドロップ関連の関数
   handleHandCardDragStart(e, card, index) {
-    console.log('ドラッグ開始:', card.name);
+    console.log('手札からドラッグ開始:', card.name);
     
     // ドラッグ中のカードデータを保存
     this.draggedCard = {
@@ -1816,6 +1868,47 @@ class HololiveBattleEngine {
       cardIndex: index,
       source: 'hand'
     }));
+  }
+
+  // 配置済みカードのドラッグ開始処理
+  handlePlacedCardDragStart(e, card, areaId, index) {
+    console.log('配置済みカードからドラッグ開始:', card.name, 'エリア:', areaId, 'インデックス:', index);
+    
+    // ドラッグ中のカードデータを保存
+    this.draggedCard = {
+      card: card,
+      areaId: areaId,
+      index: index,
+      source: 'placed'
+    };
+    
+    // ドラッグエフェクトを追加
+    e.target.classList.add('dragging');
+    
+    // 有効なドロップゾーンをハイライト（交換可能な場所）
+    this.highlightValidSwapZones(card, areaId, index);
+    
+    e.dataTransfer.effectAllowed = 'move';
+    e.dataTransfer.setData('text/plain', JSON.stringify({
+      cardId: card.id,
+      areaId: areaId,
+      index: index,
+      source: 'placed'
+    }));
+  }
+
+  // 配置済みカードのドラッグ終了処理
+  handlePlacedCardDragEnd(e) {
+    console.log('配置済みカードのドラッグ終了');
+    
+    // ドラッグエフェクトを削除
+    e.target.classList.remove('dragging');
+    
+    // ハイライトを削除
+    this.clearDropZoneHighlights();
+    
+    // ドラッグ状態をクリア
+    this.draggedCard = null;
   }
 
   handleHandCardDragEnd(e) {
@@ -1854,21 +1947,38 @@ class HololiveBattleEngine {
     e.preventDefault();
     e.target.classList.remove('drop-zone-hover');
     
-    if (!this.draggedCard) {
+    const droppedData = this.draggedCard || this.draggedPlacedCard;
+    if (!droppedData) {
       console.log('ドラッグデータが見つかりません');
       return;
     }
     
-    const card = this.draggedCard.card;
+    const card = droppedData.card;
     const dropZone = this.getDropZoneInfo(e.target);
     
     console.log('ドロップ先:', dropZone);
+    console.log('ドラッグ元:', droppedData.source);
     
-    if (this.isValidDropTarget(e.target, card)) {
-      this.placeCardFromHand(card, this.draggedCard.index, dropZone);
-    } else {
-      console.log('無効なドロップ先です');
+    if (droppedData.source === 'hand') {
+      // 手札からの配置
+      if (this.isValidDropTarget(e.target, card)) {
+        this.placeCardFromHand(card, droppedData.index, dropZone);
+      } else {
+        console.log('無効なドロップ先です');
+      }
+    } else if (droppedData.source === 'placed') {
+      // 配置済みカードの移動・交換
+      if (this.isValidSwapTarget(e.target, card)) {
+        this.swapCards(droppedData, dropZone);
+      } else {
+        console.log('無効な交換先です');
+      }
     }
+    
+    // ドラッグ状態をクリア
+    this.clearHighlights();
+    this.draggedCard = null;
+    this.draggedPlacedCard = null;
   }
 
   // カードタイプ判定
@@ -1923,11 +2033,55 @@ class HololiveBattleEngine {
     }
   }
 
+  // 交換可能なゾーンをハイライト
+  highlightValidSwapZones(card, currentAreaId, currentIndex) {
+    console.log('交換可能ゾーンのハイライト開始:', card.name, '現在位置:', currentAreaId, currentIndex);
+    
+    if (!this.isHolomenCard(card)) {
+      return;
+    }
+    
+    // センター1をハイライト（空または交換可能）
+    const center1 = document.querySelector('.battle-player .front1');
+    if (center1 && (currentAreaId !== 'front1')) {
+      center1.classList.add('drop-zone-active');
+      console.log('センター1をハイライト（交換可能）');
+    }
+    
+    // センター2をハイライト（空または交換可能）
+    const center2 = document.querySelector('.battle-player .front2');
+    if (center2 && (currentAreaId !== 'front2')) {
+      center2.classList.add('drop-zone-active');
+      console.log('センター2をハイライト（交換可能）');
+    }
+    
+    // バックスロットをハイライト（現在位置以外）
+    const backSlots = document.querySelectorAll('.battle-player .back-slot');
+    backSlots.forEach((slot, index) => {
+      // 現在のバックスロット位置でない場合、または異なるエリアからの場合
+      if (currentAreaId !== 'backs' || currentIndex !== index) {
+        const canPlace = this.canPlaceCardInBackSlot(card, index);
+        if (canPlace) {
+          slot.classList.add('drop-zone-active');
+          console.log(`バックスロット${index}をハイライト（交換可能）`);
+        }
+      }
+    });
+  }
+
   // ドロップゾーンハイライトをクリア
   clearDropZoneHighlights() {
     const highlighted = document.querySelectorAll('.drop-zone-active');
     highlighted.forEach(element => {
       element.classList.remove('drop-zone-active');
+    });
+  }
+
+  // ハイライトをクリア（エイリアス）
+  clearHighlights() {
+    this.clearDropZoneHighlights();
+    document.querySelectorAll('.drop-zone-hover').forEach(element => {
+      element.classList.remove('drop-zone-hover');
     });
   }
 
@@ -1950,6 +2104,116 @@ class HololiveBattleEngine {
         return this.canPlaceCardInBackSlot(card, dropZone.index);
       default:
         return false;
+    }
+  }
+
+  // 交換先の有効性チェック
+  isValidSwapTarget(target, card) {
+    if (!this.isHolomenCard(card)) {
+      return false;
+    }
+    
+    const dropZone = this.getDropZoneInfo(target);
+    
+    switch (dropZone.type) {
+      case 'center1':
+      case 'center2':
+        return true; // センターエリアは常に交換可能
+      case 'back':
+        return this.canPlaceCardInBackSlot(card, dropZone.index);
+      default:
+        return false;
+    }
+  }
+
+  // カード交換処理
+  swapCards(draggedCardData, dropZone) {
+    console.log('カード交換開始');
+    console.log('ドラッグ元:', { areaId: draggedCardData.areaId, index: draggedCardData.index, card: draggedCardData.card.name });
+    console.log('ドロップ先:', dropZone);
+    
+    const player = this.players[1];
+    const sourceCard = draggedCardData.card;
+    
+    // ドロップ先のカードを取得
+    let targetCard = null;
+    switch (dropZone.type) {
+      case 'center1':
+        targetCard = player.center1;
+        break;
+      case 'center2':
+        targetCard = player.center2;
+        break;
+      case 'back':
+        const backPositions = ['back1', 'back2', 'back3', 'back4', 'back5'];
+        targetCard = player[backPositions[dropZone.index]];
+        console.log(`ドロップ先 back${dropZone.index + 1} のカード:`, targetCard ? targetCard.name : 'なし');
+        break;
+    }
+    
+    console.log(`元の位置から削除: ${draggedCardData.areaId}[${draggedCardData.index}]`);
+    // 元の位置からカードを削除
+    this.removeCardFromPosition(player, draggedCardData.areaId, draggedCardData.index);
+    
+    console.log(`ドロップ先に配置: ${dropZone.type}[${dropZone.index}]`);
+    // ドロップ先にカードを配置
+    this.placeCardAtPosition(player, sourceCard, dropZone);
+    
+    // 元の位置にターゲットカードを配置（カードが存在する場合）
+    if (targetCard) {
+      const sourceZone = {
+        type: this.getZoneTypeFromAreaId(draggedCardData.areaId),
+        index: draggedCardData.index
+      };
+      console.log(`交換先に配置: ${sourceZone.type}[${sourceZone.index}]`);
+      this.placeCardAtPosition(player, targetCard, sourceZone);
+      console.log(`カード交換完了: ${sourceCard.name} ⇔ ${targetCard.name}`);
+    } else {
+      console.log(`カード移動完了: ${sourceCard.name} → ${dropZone.type}[${dropZone.index}]`);
+    }
+    
+    this.updateUI();
+  }
+
+  // 位置からカードを削除
+  removeCardFromPosition(player, areaId, index) {
+    switch (areaId) {
+      case 'front1':
+        player.center1 = null;
+        break;
+      case 'front2':
+        player.center2 = null;
+        break;
+      case 'backs':
+        const backPositions = ['back1', 'back2', 'back3', 'back4', 'back5'];
+        player[backPositions[index]] = null;
+        break;
+    }
+  }
+
+  // 指定位置にカードを配置
+  placeCardAtPosition(player, card, zone) {
+    switch (zone.type) {
+      case 'center1':
+        player.center1 = card;
+        break;
+      case 'center2':
+        player.center2 = card;
+        break;
+      case 'back':
+        const backPositions = ['back1', 'back2', 'back3', 'back4', 'back5'];
+        player[backPositions[zone.index]] = card;
+        break;
+    }
+  }
+
+  // エリアIDからゾーンタイプを取得
+  getZoneTypeFromAreaId(areaId) {
+    switch (areaId) {
+      case 'front1': return 'center1';
+      case 'front2': return 'center2';
+      case 'backs': return 'back';
+      default: return areaId;
     }
   }
 
@@ -1997,6 +2261,26 @@ class HololiveBattleEngine {
   getDropZoneInfo(target) {
     console.log('getDropZoneInfo - target:', target, 'classList:', target.classList);
     
+    // 既存のカードの場合
+    if (target.classList.contains('card') && target.classList.contains('face-up')) {
+      console.log('配置済みカードを検出');
+      const areaId = target.dataset.areaId;
+      const areaIndex = parseInt(target.dataset.areaIndex) || 0;
+      
+      console.log('カードエリア情報:', { areaId, areaIndex });
+      
+      switch (areaId) {
+        case 'front1':
+          return { type: 'center1', index: 0, element: target };
+        case 'front2':
+          return { type: 'center2', index: 0, element: target };
+        case 'backs':
+          return { type: 'back', index: areaIndex, element: target };
+        default:
+          return { type: 'unknown' };
+      }
+    }
+    
     if (target.classList.contains('front2')) {
       return { type: 'center2' };
     }
@@ -2017,12 +2301,20 @@ class HololiveBattleEngine {
       for (let i = 0; i < backSlots.length; i++) {
         const slotIndex = parseInt(backSlots[i].getAttribute('data-slot')) || i;
         const player = this.players[1];
-        const backPositions = ['back1', 'back2', 'back3'];
+        const backPositions = ['back1', 'back2', 'back3', 'back4', 'back5'];
         if (!player[backPositions[slotIndex]]) {
           console.log('空きスロット発見:', slotIndex);
           return { type: 'back', index: slotIndex };
         }
       }
+    }
+    
+    // バックスロット内のカード要素に直接ドロップした場合
+    if (target.closest('.back-slot')) {
+      const backSlot = target.closest('.back-slot');
+      const slotIndex = parseInt(backSlot.getAttribute('data-slot')) || 0;
+      console.log('バックスロット内要素検出:', slotIndex);
+      return { type: 'back', index: slotIndex };
     }
     
     if (target.classList.contains('support-drop-zone')) {
