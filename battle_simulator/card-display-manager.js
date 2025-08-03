@@ -267,10 +267,11 @@ class CardDisplayManager {
         cardElement.style.zIndex = `${20 - cardIndex}`; // 上のカードほど前面に（動的計算）
         break;
       case 'holo':
-        // ホロパワーの展開表示
+        // ホロパワーの展開表示（CSSのrotate(90deg)を維持）
         cardElement.style.position = 'relative';
         cardElement.style.display = 'inline-block';
         cardElement.style.margin = '2px';
+        // transform: rotate(90deg) はCSSで設定済みなので、ここでは上書きしない
         break;
       default:
         // その他（センター、推し、バック）は単体表示

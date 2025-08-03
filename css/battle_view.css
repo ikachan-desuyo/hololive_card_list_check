@@ -146,6 +146,13 @@ body {
   /* 注意: z-indexはJavaScript(card-display-manager.js)で動的設定されます */
 }
 
+/* ライフカードのホバー効果（回転を維持） */
+.life .card:hover {
+  transform: rotate(90deg) scale(1.05);
+  z-index: 20; /* ホバー時はさらに前面に */
+  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.5);
+}
+
 .front1 {
   width: 120px;
   height: 168px;
@@ -215,6 +222,14 @@ body {
   writing-mode: horizontal-tb;
   transform: rotate(90deg);
   font-size: 10px;
+}
+
+/* ホロパワーエリアのホバー効果（回転を維持） */
+.holo:hover {
+  background: rgba(255, 255, 255, 0.15);
+  border-color: rgba(255, 255, 255, 0.6);
+  transform: rotate(90deg) translateX(-2px);
+  box-shadow: 0 4px 15px rgba(0, 0, 0, 0.2);
 }
 
 .deck {
@@ -316,9 +331,21 @@ body {
 }
 
 .card:hover {
-  transform: scale(1.05);
+  /* transform は個別のコンテキストで定義（ライフ、ホロパワー、横向きカードなど） */
   z-index: 20; /* ホバー時はさらに前面に */
   box-shadow: 0 4px 20px rgba(0, 0, 0, 0.5);
+}
+
+/* 通常のカード（センター、バック、推し、手札など）のホバー効果 */
+.front1 .card:hover,
+.front2 .card:hover,
+.oshi .card:hover,
+.back-slot .card:hover,
+.archive .card:hover,
+.deck .card:hover,
+.yell-deck .card:hover,
+.hand-card:hover {
+  transform: scale(1.05);
 }
 
 .card.face-down {
@@ -341,6 +368,8 @@ body {
 
 .card.resting:hover {
   transform: rotate(90deg) scale(1.05);
+  z-index: 20; /* ホバー時はさらに前面に */
+  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.5);
 }
 
 /* エールカード表示 */
@@ -379,6 +408,13 @@ body {
   transform: rotate(90deg);
   margin: 2px 0;
   /* 注意: position/display/marginはJavaScript(card-display-manager.js)で動的設定されます */
+}
+
+/* ホロパワーカードのホバー効果（回転を維持） */
+.holo .card:hover {
+  transform: rotate(90deg) scale(1.05);
+  z-index: 20; /* ホバー時はさらに前面に */
+  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.5);
 }
 
 /* デッキとアーカイブのスタック表示はJavaScriptで制御 */
