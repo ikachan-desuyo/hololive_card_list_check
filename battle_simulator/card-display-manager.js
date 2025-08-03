@@ -12,7 +12,14 @@ class CardDisplayManager {
     
     // プレイヤーとCPUの両方のエリアを更新
     [1, 2].forEach(playerId => {
-      const player = this.battleEngine.players[playerId];
+      // State Managerから状態を取得
+      const playerState = this.battleEngine.stateManager.getStateByPath(`players.${playerId}`);
+      if (!playerState || !playerState.cards) {
+        console.warn(`updateCardAreas: プレイヤー${playerId}の状態が見つかりません`);
+        return;
+      }
+      
+      const player = playerState.cards;
       const sectionClass = playerId === 1 ? '.battle-player' : '.battle-opponent';
       
       // 各エリアのデータと要素を取得
@@ -37,7 +44,7 @@ class CardDisplayManager {
           const playerType = playerId === 1 ? 'player' : 'cpu';
           this.updateBackSlots(playerType);
         } else {
-          this.displayCardsInArea(area, areaInfo.data, areaInfo.id, player, areaInfo.isMultiple);
+          this.displayCardsInArea(area, areaInfo.data, areaInfo.id, playerState, areaInfo.isMultiple);
         }
       });
     });
@@ -49,8 +56,12 @@ class CardDisplayManager {
   /**
    * 特定エリアにカードを表示
    */
-  displayCardsInArea(area, cards, areaId, player, isMultiple = false) {
+  displayCardsInArea(area, cards, areaId, playerState, isMultiple = false) {
     if (!area) return;
+    
+    // プレイヤーIDの特定（エリアのクラス名から判定）
+    const isPlayerArea = area.closest('.battle-player') !== null;
+    const playerId = isPlayerArea ? 1 : 2;
     
     // エリアをクリア（カウンターは残す）
     const counters = area.querySelectorAll('.card-counter');
@@ -75,8 +86,10 @@ class CardDisplayManager {
         break;
       case 'center':
         if (cards) {
-          // console.log(`🎨 センターポジションにカード表示: ${cards.name}`);
+          console.log(`🎨 センターポジションにカード表示: ${cards.name}`, cards);
           cardsToDisplay = [cards];
+        } else {
+          console.log('🎨 センターポジションにカードなし');
         }
         displayType = 'single';
         break;
@@ -106,7 +119,6 @@ class CardDisplayManager {
     cardsToDisplay.forEach((card, index) => {
       if (card) {
         // プレイヤー1のカードのみドラッグ可能
-        const playerId = this.battleEngine.players[1] === player ? 1 : 2;
         const isPlayerCard = (playerId === 1);
         const cardElement = this.createCardElement(card, areaId, index, isPlayerCard);
         area.appendChild(cardElement);
@@ -120,7 +132,7 @@ class CardDisplayManager {
     });
     
     // カードカウンターの追加
-    const totalCount = this.getCardCount(player, areaId);
+    const totalCount = this.getCardCount(playerState, areaId);
     if (totalCount > 1) {
       this.updateCardCounter(area, totalCount);
     }
@@ -233,6 +245,16 @@ class CardDisplayManager {
       cardElement.setAttribute('data-area-id', areaId);
       cardElement.setAttribute('data-area-index', cardIndex);
       
+      console.log(`[DEBUG] ドラッグ要素設定: ${card.name} in ${areaId}`, { 
+        card, 
+        areaId, 
+        cardIndex, 
+        shouldShowFaceUp, 
+        isPlayerCard,
+        isHolomenCard: this.battleEngine.isHolomenCard(card),
+        draggable: cardElement.draggable
+      });
+      
       // バックスロットの場合は、スロットインデックスも設定
       if (areaId === 'backs') {
         cardElement.setAttribute('data-slot-index', cardIndex);
@@ -243,6 +265,19 @@ class CardDisplayManager {
       }
       if (this.battleEngine.handlePlacedCardDragEnd) {
         cardElement.addEventListener('dragend', (e) => this.battleEngine.handlePlacedCardDragEnd(e));
+      }
+    } else {
+      // ドラッグが設定されなかった理由をログ出力
+      if (card && (areaId === 'collab' || areaId === 'center' || areaId === 'backs')) {
+        console.log(`[DEBUG] ドラッグ設定されず: ${card.name} in ${areaId}`, {
+          shouldShowFaceUp,
+          isPlayerCard,
+          isHolomenCard: this.battleEngine.isHolomenCard ? this.battleEngine.isHolomenCard(card) : 'メソッドなし',
+          reason: !shouldShowFaceUp ? 'shouldShowFaceUp=false' :
+                  !isPlayerCard ? 'isPlayerCard=false' :
+                  !this.battleEngine.isHolomenCard ? 'isHolomenCardメソッドなし' :
+                  !this.battleEngine.isHolomenCard(card) ? 'ホロメンカードではない' : '不明'
+        });
       }
     }
     
@@ -300,8 +335,17 @@ class CardDisplayManager {
     const backSlots = document.querySelectorAll(`${sectionClass} .back-slot`);
     if (!backSlots.length) return;
     
-    const player = this.battleEngine.players[playerId];
+    // State Managerから状態を取得
+    const playerState = this.battleEngine.stateManager.getStateByPath(`players.${playerId}`);
+    if (!playerState || !playerState.cards) {
+      console.warn(`updateBackSlots: プレイヤー${playerId}の状態が見つかりません`, playerState);
+      return;
+    }
+    
+    const player = playerState.cards;
     const backPositions = ['back1', 'back2', 'back3', 'back4', 'back5'];
+    
+    console.log(`updateBackSlots: プレイヤー${playerId}の状態`, { player, collab: player.collab });
     
     // センター①があるかどうかで最大使用スロット数を決定
     const maxSlots = player.collab ? 4 : 5;
@@ -332,7 +376,7 @@ class CardDisplayManager {
       // 対応するバックポジションにカードがある場合は表示
       const card = player[backPositions[index]];
       if (card) {
-        // console.log(`🎨 バックスロット${index + 1}にカード表示: ${card.name}`);
+        console.log(`🎨 バックスロット${index + 1}にカード表示: ${card.name}`);
         const isPlayerCard = (playerId === 1); // プレイヤー1のカードのみドラッグ可能
         const cardElement = this.createCardElement(card, 'backs', index, isPlayerCard);
         // バックスロット内でのサイズ調整
@@ -648,16 +692,19 @@ class CardDisplayManager {
    * カード数を取得
    */
   getCardCount(player, areaId) {
+    // State Managerからの構造に対応
+    const cards = player.cards || player;
+    
     switch (areaId) {
-      case 'life': return player.life.length;
-      case 'collab': return player.collab ? 1 : 0;
-      case 'center': return player.center ? 1 : 0;
-      case 'oshi': return player.oshi ? 1 : 0;
-      case 'holo': return player.holoPower.length;
-      case 'deck': return player.deck.length;
-      case 'yell-deck': return player.yellDeck.length;
-      case 'backs': return (player.back1 ? 1 : 0) + (player.back2 ? 1 : 0) + (player.back3 ? 1 : 0) + (player.back4 ? 1 : 0) + (player.back5 ? 1 : 0);
-      case 'archive': return player.archive.length;
+      case 'life': return cards.life?.length || 0;
+      case 'collab': return cards.collab ? 1 : 0;
+      case 'center': return cards.center ? 1 : 0;
+      case 'oshi': return cards.oshi ? 1 : 0;
+      case 'holo': return cards.holoPower?.length || 0;
+      case 'deck': return cards.deck?.length || 0;
+      case 'yell-deck': return cards.yellDeck?.length || 0;
+      case 'backs': return (cards.back1 ? 1 : 0) + (cards.back2 ? 1 : 0) + (cards.back3 ? 1 : 0) + (cards.back4 ? 1 : 0) + (cards.back5 ? 1 : 0);
+      case 'archive': return cards.archive?.length || 0;
       default: return 0;
     }
   }

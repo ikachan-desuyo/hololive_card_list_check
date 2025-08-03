@@ -558,6 +558,27 @@ class DeckSelectionUI {
     player.yellDeck = [...deck.yell];
     player.oshi = deck.oshi;
 
+    // State Managerの状態も同期
+    if (this.battleEngine.stateManager) {
+      this.battleEngine.stateManager.updateState('UPDATE_PLAYER_CARDS', {
+        player: this.playerId,
+        area: 'deck',
+        cards: [...deck.holomen, ...deck.support]
+      });
+      
+      this.battleEngine.stateManager.updateState('UPDATE_PLAYER_CARDS', {
+        player: this.playerId,
+        area: 'yellDeck',
+        cards: [...deck.yell]
+      });
+      
+      this.battleEngine.stateManager.updateState('UPDATE_PLAYER_CARDS', {
+        player: this.playerId,
+        area: 'oshi',
+        cards: deck.oshi
+      });
+    }
+
     // デッキをシャッフル
     this.battleEngine.shuffleDeck(this.playerId);
 

@@ -26,7 +26,8 @@ class HololiveStateManager {
         ended: false,
         winner: null,
         turnOrderDecided: false,
-        mulliganPhase: false
+        mulliganPhase: false,
+        debutPlacementPhase: false
       },
       
       // ターン・フェーズ状態
@@ -104,7 +105,8 @@ class HololiveStateManager {
       gameState: {
         usedLimitedThisTurn: [], // LIMITEDカード制限のみ残す
         restHolomem: [],
-        collabMovedThisTurn: false // このターンにコラボ移動を実行したか
+        collabMovedThisTurn: false, // このターンにコラボ移動を実行したか
+        batonTouchUsedThisTurn: false // このターンにバトンタッチを実行したか
         // ブルーム・プレイ状態などはカード自体に付与
       },
       
@@ -249,6 +251,14 @@ class HololiveStateManager {
         newState.game.mulliganPhase = false;
         break;
         
+      case 'DEBUT_PLACEMENT_START':
+        newState.game.debutPlacementPhase = true;
+        break;
+        
+      case 'DEBUT_PLACEMENT_END':
+        newState.game.debutPlacementPhase = false;
+        break;
+        
       case 'SET_MULLIGAN_COUNT':
         if (payload.counts) {
           newState.mulligan.count = { ...payload.counts };
@@ -316,9 +326,13 @@ class HololiveStateManager {
             const sourceCard = player.cards[payload.sourcePosition];
             const targetCard = player.cards[payload.targetPosition];
             
+            console.log(`[SWAP_CARDS] 交換前 - ${payload.sourcePosition}: ${sourceCard ? sourceCard.name : 'null'}, ${payload.targetPosition}: ${targetCard ? targetCard.name : 'null'}`);
+            
             // 位置を交換
             player.cards[payload.sourcePosition] = targetCard;
             player.cards[payload.targetPosition] = sourceCard;
+            
+            console.log(`[SWAP_CARDS] 交換後 - ${payload.sourcePosition}: ${player.cards[payload.sourcePosition] ? player.cards[payload.sourcePosition].name : 'null'}, ${payload.targetPosition}: ${player.cards[payload.targetPosition] ? player.cards[payload.targetPosition].name : 'null'}`);
           }
         }
         break;
@@ -635,10 +649,18 @@ class HololiveStateManager {
     // Debut配置フェーズの特別処理
     if (isDebutPhase) {
       if (targetPosition.startsWith('back') || targetPosition === 'center') {
-        return {
-          valid: true,
-          reason: 'Debut配置フェーズで配置可能'
-        };
+        // Debutレベルのホロメンカードのみ配置可能
+        if (card.card_type?.includes('ホロメン') && card.bloom_level === 'Debut') {
+          return {
+            valid: true,
+            reason: 'Debut配置フェーズで配置可能'
+          };
+        } else {
+          return {
+            valid: false,
+            reason: 'Debut配置フェーズではDebutレベルのホロメンカードのみ配置可能'
+          };
+        }
       } else {
         return {
           valid: false,
@@ -675,7 +697,7 @@ class HololiveStateManager {
 
   // コラボポジション配置のチェック
   checkCollabPlacement(card, player) {
-    // バックのホロメンカードのみがコラボに移動可能
+    // ホロメンカードのみがコラボに移動可能
     if (!card.card_type?.includes('ホロメン')) {
       return {
         valid: false,
@@ -779,23 +801,91 @@ class HololiveStateManager {
     const currentPhase = currentState.turn.currentPhase;
     const isDebutPhase = currentState.game.debutPlacementPhase;
     
-    // Debut配置フェーズでは交換可能
+    // デバッグログ追加
+    console.log(`[checkSwapValidity] currentPhase: ${currentPhase}, isDebutPhase: ${isDebutPhase}`);
+    console.log(`[checkSwapValidity] 移動: ${sourcePosition} → ${targetPosition}`);
+    
+    // Debut配置フェーズでは自由に移動可能（ブルーム以外）
     if (isDebutPhase) {
-      return {
-        valid: true,
-        reason: 'Debut配置フェーズで交換可能'
-      };
+      console.log('[checkSwapValidity] Debut配置フェーズ中の移動チェック');
+      // 手札、センター、バック間の移動は自由
+      if ((sourcePosition === 'hand' || sourcePosition === 'center' || sourcePosition.startsWith('back')) &&
+          (targetPosition === 'hand' || targetPosition === 'center' || targetPosition.startsWith('back'))) {
+        
+        // 手札への移動は常に許可
+        if (targetPosition === 'hand') {
+          console.log('[checkSwapValidity] Debut配置フェーズで手札への移動許可');
+          return {
+            valid: true,
+            reason: 'Debut配置フェーズで手札への移動可能'
+          };
+        }
+        
+        // Debutレベルのホロメンカードの配置先制限のみチェック（手札以外）
+        if (targetPosition !== 'hand' && sourceCard.card_type?.includes('ホロメン')) {
+          if (sourceCard.bloom_level !== 'Debut') {
+            console.log('[checkSwapValidity] Debutレベル以外のホロメンカードの配置拒否');
+            return {
+              valid: false,
+              reason: 'Debut配置フェーズではDebutレベルのホロメンカードのみ配置可能'
+            };
+          }
+        }
+        
+        console.log('[checkSwapValidity] Debut配置フェーズで移動許可');
+        return {
+          valid: true,
+          reason: 'Debut配置フェーズで移動可能'
+        };
+      } else {
+        console.log('[checkSwapValidity] Debut配置フェーズの移動範囲外');
+        return {
+          valid: false,
+          reason: 'Debut配置フェーズでは手札・センター・バック間のみ移動可能'
+        };
+      }
     }
 
     // ゲーム中の交換制限
+    console.log('[checkSwapValidity] Debut配置フェーズ以外での処理');
     if (currentPhase !== 3) { // メインフェーズ以外では交換不可
+      console.log('[checkSwapValidity] メインフェーズ以外での交換拒否');
       return {
         valid: false,
         reason: 'メインフェーズでのみカード交換が可能です'
       };
     }
 
-    // ホロメンカード同士の交換チェック
+    // メインフェーズでのカード移動制限
+    if (currentPhase === 3) {
+      // コラボへの移動制限: バックからのみ可能
+      if (targetPosition === 'collab') {
+        if (!sourcePosition.startsWith('back')) {
+          return {
+            valid: false,
+            reason: 'コラボに移動できるのはバックのカードからのみです'
+          };
+        }
+        return this.checkCollabMoveFromBack(sourceCard, player);
+      }
+      
+      // センターからバックへの移動: バトンタッチ
+      if (sourcePosition === 'center' && targetPosition.startsWith('back')) {
+        return this.checkBatonTouch(sourceCard, targetCard, targetPosition, player);
+      }
+      
+      // バックからセンターへの移動: 通常の交換
+      if (sourcePosition.startsWith('back') && targetPosition === 'center') {
+        return this.checkBackToCenterSwap(sourceCard, targetCard, player);
+      }
+      
+      // バック同士の移動: 通常の交換
+      if (sourcePosition.startsWith('back') && targetPosition.startsWith('back')) {
+        return this.checkBackToBackSwap(sourceCard, targetCard, sourcePosition, targetPosition, player);
+      }
+    }
+
+    // ホロメンカード同士の交換チェック（従来のロジック）
     if (sourceCard.card_type?.includes('ホロメン')) {
       // 移動先にカードがある場合の交換ルール
       if (targetCard) {
@@ -1148,6 +1238,12 @@ class HololiveStateManager {
     
     this.updateState('UPDATE_PLAYER_GAME_STATE', {
       player: playerId,
+      property: 'batonTouchUsedThisTurn',
+      value: false
+    });
+    
+    this.updateState('UPDATE_PLAYER_GAME_STATE', {
+      player: playerId,
       property: 'usedLimitedThisTurn',
       value: []
     });
@@ -1223,6 +1319,428 @@ class HololiveStateManager {
         }
       }
     });
+  }
+
+  // =========================================
+  // Debut配置フェーズ管理メソッド
+  // =========================================
+
+  /**
+   * Debut配置フェーズを開始
+   */
+  startDebutPlacementPhase() {
+    this.updateState('DEBUT_PLACEMENT_START', {});
+    console.log('Debut配置フェーズを開始しました');
+  }
+
+  /**
+   * Debut配置フェーズを終了
+   */
+  endDebutPlacementPhase() {
+    this.updateState('DEBUT_PLACEMENT_END', {});
+    console.log('Debut配置フェーズを終了しました');
+  }
+
+  /**
+   * Debut配置が完了しているかチェック
+   * @param {number} playerId - プレイヤーID
+   * @returns {Object} チェック結果
+   */
+  checkDebutPlacementComplete(playerId) {
+    const player = this.state.players[playerId];
+    if (!player) {
+      return {
+        complete: false,
+        reason: '無効なプレイヤーです'
+      };
+    }
+
+    // センターに最低1枚のDebutカードが必要
+    if (!player.cards.center || !player.cards.center.card_type?.includes('ホロメン')) {
+      return {
+        complete: false,
+        reason: 'センターにDebutホロメンカードを配置してください'
+      };
+    }
+
+    return {
+      complete: true,
+      reason: 'Debut配置完了'
+    };
+  }
+
+  // =========================================
+  // メインフェーズカード移動ルール
+  // =========================================
+
+  /**
+   * バックからコラボへの移動チェック
+   * @param {Object} card - 移動するカード
+   * @param {Object} player - プレイヤー状態
+   * @returns {Object} チェック結果
+   */
+  checkCollabMoveFromBack(card, player) {
+    // ホロメンカードのみがコラボに移動可能
+    if (!card.card_type?.includes('ホロメン')) {
+      return {
+        valid: false,
+        reason: 'ホロメンカードのみコラボに移動できます'
+      };
+    }
+
+    // このターンに既にコラボ移動を実行したかチェック
+    if (player.gameState.collabMovedThisTurn) {
+      return {
+        valid: false,
+        reason: '1ターンに1度のみコラボ移動可能です'
+      };
+    }
+
+    // お休み状態のカードかチェック
+    const cardState = this.getCardState(card);
+    if (cardState.resting) {
+      return {
+        valid: false,
+        reason: 'お休み状態のホロメンはコラボに移動できません'
+      };
+    }
+
+    // コラボポジションが既に使用されているかチェック
+    if (player.cards.collab) {
+      return {
+        valid: false,
+        reason: 'コラボポジションには既にカードが配置されています'
+      };
+    }
+
+    return {
+      valid: true,
+      reason: 'コラボ移動可能'
+    };
+  }
+
+  /**
+   * バトンタッチチェック（センターからバックへの移動）
+   * @param {Object} sourceCard - センターのカード
+   * @param {Object} targetCard - バックのカード（必須）
+   * @param {string} targetPosition - バックのポジション
+   * @param {Object} player - プレイヤー状態
+   * @returns {Object} チェック結果
+   */
+  checkBatonTouch(sourceCard, targetCard, targetPosition, player) {
+    // バックに対象カードが存在することが必須
+    if (!targetCard) {
+      return {
+        valid: false,
+        reason: 'バトンタッチは空のスロットには使用できません'
+      };
+    }
+
+    // 対象がホロメンカードであることを確認
+    if (!targetCard.card_type?.includes('ホロメン')) {
+      return {
+        valid: false,
+        reason: 'バトンタッチはホロメン同士でのみ可能です'
+      };
+    }
+
+    // このターンに既にバトンタッチを実行したかチェック
+    if (player.gameState.batonTouchUsedThisTurn) {
+      return {
+        valid: false,
+        reason: '1ターンに1度のみバトンタッチ可能です'
+      };
+    }
+
+    // センターカードのbaton_touch情報を取得
+    const batonTouchInfo = sourceCard.baton_touch;
+    if (!batonTouchInfo || batonTouchInfo.length === 0) {
+      return {
+        valid: false,
+        reason: 'このカードはバトンタッチ能力を持っていません'
+      };
+    }
+
+    // 必要なアーカイブ配置コストをチェック
+    const requiredCosts = this.calculateBatonTouchCost(batonTouchInfo);
+    const availableYellCards = this.getAvailableYellCardsForBatonTouch(player);
+    
+    const costCheck = this.checkBatonTouchCost(requiredCosts, availableYellCards);
+    if (!costCheck.valid) {
+      return costCheck;
+    }
+
+    return {
+      valid: true,
+      reason: 'バトンタッチ可能',
+      requiredCosts,
+      availableYellCards
+    };
+  }
+
+  /**
+   * バックからセンターへの交換チェック
+   * @param {Object} sourceCard - バックのカード
+   * @param {Object} targetCard - センターのカード
+   * @param {Object} player - プレイヤー状態
+   * @returns {Object} チェック結果
+   */
+  checkBackToCenterSwap(sourceCard, targetCard, player) {
+    // ホロメンカード同士の交換であることを確認
+    if (!sourceCard.card_type?.includes('ホロメン') || !targetCard.card_type?.includes('ホロメン')) {
+      return {
+        valid: false,
+        reason: 'ホロメン同士でのみ位置交換が可能です'
+      };
+    }
+
+    // お休み状態のカードはセンターに移動できない
+    const sourceCardState = this.getCardState(sourceCard);
+    if (sourceCardState.resting) {
+      return {
+        valid: false,
+        reason: 'お休み状態のホロメンはセンターに移動できません'
+      };
+    }
+
+    return {
+      valid: true,
+      reason: '位置交換可能'
+    };
+  }
+
+  /**
+   * バック同士の交換チェック
+   * @param {Object} sourceCard - 移動元のカード
+   * @param {Object} targetCard - 移動先のカード（null可）
+   * @param {string} sourcePosition - 移動元ポジション
+   * @param {string} targetPosition - 移動先ポジション
+   * @param {Object} player - プレイヤー状態
+   * @returns {Object} チェック結果
+   */
+  checkBackToBackSwap(sourceCard, targetCard, sourcePosition, targetPosition, player) {
+    // ホロメンカードのみ移動可能
+    if (!sourceCard.card_type?.includes('ホロメン')) {
+      return {
+        valid: false,
+        reason: 'ホロメンカードのみ移動可能です'
+      };
+    }
+
+    // 移動先にカードがある場合はホロメン同士である必要がある
+    if (targetCard && !targetCard.card_type?.includes('ホロメン')) {
+      return {
+        valid: false,
+        reason: 'ホロメン同士でのみ位置交換が可能です'
+      };
+    }
+
+    // ブルーム制限チェック
+    if (!this.checkBloomCompatibility(sourceCard, targetPosition, player)) {
+      return {
+        valid: false,
+        reason: 'ブルームレベル制限により移動できません'
+      };
+    }
+
+    return {
+      valid: true,
+      reason: '移動可能'
+    };
+  }
+
+  /**
+   * バトンタッチのコスト計算
+   * @param {Array} batonTouchInfo - baton_touch配列
+   * @returns {Object} 必要コスト
+   */
+  calculateBatonTouchCost(batonTouchInfo) {
+    const costs = {
+      white: 0,
+      green: 0,
+      red: 0,
+      blue: 0,
+      yellow: 0,
+      purple: 0,
+      colorless: 0
+    };
+
+    batonTouchInfo.forEach(cost => {
+      const colorKey = cost.toLowerCase();
+      if (colorKey === '無色') {
+        costs.colorless++;
+      } else if (costs.hasOwnProperty(colorKey)) {
+        costs[colorKey]++;
+      }
+    });
+
+    return costs;
+  }
+
+  /**
+   * バトンタッチに使用可能なエールカードを取得
+   * @param {Object} player - プレイヤー状態
+   * @returns {Array} 使用可能なエールカード
+   */
+  getAvailableYellCardsForBatonTouch(player) {
+    const availableCards = [];
+    
+    // 場に出ているホロメンのエールカードのみを取得
+    const holomemPositions = ['center', 'collab', 'back1', 'back2', 'back3', 'back4', 'back5'];
+    holomemPositions.forEach(position => {
+      const holomem = player.cards[position];
+      if (holomem && holomem.yellCards && Array.isArray(holomem.yellCards)) {
+        holomem.yellCards.forEach((yellCard, index) => {
+          availableCards.push({
+            card: yellCard,
+            source: 'holomem',
+            sourcePosition: position,
+            sourceIndex: index,
+            color: this.getYellCardColor(yellCard)
+          });
+        });
+      }
+    });
+
+    return availableCards;
+  }
+
+  /**
+   * エールカードの色を取得
+   * @param {Object} yellCard - エールカード
+   * @returns {string} カラー
+   */
+  getYellCardColor(yellCard) {
+    // エールカードの色情報を取得（実装に応じて調整）
+    if (yellCard.color) {
+      return yellCard.color.toLowerCase();
+    }
+    // フォールバック: カード名やIDから推測
+    const cardName = yellCard.name || '';
+    if (cardName.includes('白') || cardName.includes('White')) return 'white';
+    if (cardName.includes('緑') || cardName.includes('Green')) return 'green';
+    if (cardName.includes('赤') || cardName.includes('Red')) return 'red';
+    if (cardName.includes('青') || cardName.includes('Blue')) return 'blue';
+    if (cardName.includes('黄') || cardName.includes('Yellow')) return 'yellow';
+    if (cardName.includes('紫') || cardName.includes('Purple')) return 'purple';
+    
+    return 'colorless'; // デフォルトは無色
+  }
+
+  /**
+   * バトンタッチコストをチェック
+   * @param {Object} requiredCosts - 必要コスト
+   * @param {Array} availableCards - 使用可能カード
+   * @returns {Object} チェック結果
+   */
+  checkBatonTouchCost(requiredCosts, availableCards) {
+    const availableCosts = {
+      white: 0,
+      green: 0,
+      red: 0,
+      blue: 0,
+      yellow: 0,
+      purple: 0,
+      colorless: 0
+    };
+
+    // 使用可能なカードをカウント
+    availableCards.forEach(cardInfo => {
+      availableCosts[cardInfo.color]++;
+    });
+
+    // 各色のコストをチェック
+    for (const [color, required] of Object.entries(requiredCosts)) {
+      if (required > 0) {
+        if (color === 'colorless') {
+          // 無色コストは任意の色で支払い可能
+          const totalAvailable = Object.values(availableCosts).reduce((sum, count) => sum + count, 0);
+          if (totalAvailable < required) {
+            return {
+              valid: false,
+              reason: `バトンタッチに必要なエール${required}枚が不足しています`
+            };
+          }
+        } else {
+          // 特定色のコストチェック
+          if (availableCosts[color] < required) {
+            return {
+              valid: false,
+              reason: `バトンタッチに必要な${color}エール${required}枚が不足しています`
+            };
+          }
+        }
+      }
+    }
+
+    return {
+      valid: true,
+      reason: 'バトンタッチコスト満足'
+    };
+  }
+
+  /**
+   * バトンタッチ実行
+   * @param {Object} sourceCard - センターのカード
+   * @param {Object} targetCard - バックのカード
+   * @param {string} targetPosition - バックのポジション
+   * @param {number} playerId - プレイヤーID
+   * @param {Array} usedYellCards - 使用するエールカード
+   * @returns {boolean} 実行成功フラグ
+   */
+  executeBatonTouch(sourceCard, targetCard, targetPosition, playerId, usedYellCards) {
+    try {
+      // バトンタッチフラグを設定
+      this.updateState('UPDATE_PLAYER_GAME_STATE', {
+        player: playerId,
+        property: 'batonTouchUsedThisTurn',
+        value: true
+      });
+
+      // 使用したエールカードをアーカイブに移動
+      usedYellCards.forEach(cardInfo => {
+        this.moveYellCardToArchive(cardInfo, playerId);
+      });
+
+      // カードの位置を交換
+      this.updateState('SWAP_CARDS', {
+        player: playerId,
+        sourcePosition: 'center',
+        targetPosition: targetPosition
+      });
+
+      console.log(`バトンタッチ実行: ${sourceCard.name} ⇔ ${targetCard.name}`);
+      return true;
+    } catch (error) {
+      console.error('バトンタッチ実行エラー:', error);
+      return false;
+    }
+  }
+
+  /**
+   * エールカードをアーカイブに移動
+   * @param {Object} cardInfo - カード情報
+   * @param {number} playerId - プレイヤーID
+   */
+  moveYellCardToArchive(cardInfo, playerId) {
+    const player = this.state.players[playerId];
+    if (!player) return;
+
+    if (cardInfo.source === 'holomem') {
+      // ホロメンからエールカードを削除
+      const holomem = player.cards[cardInfo.sourcePosition];
+      if (holomem && holomem.yellCards && Array.isArray(holomem.yellCards)) {
+        if (cardInfo.sourceIndex >= 0 && cardInfo.sourceIndex < holomem.yellCards.length) {
+          const removedCard = holomem.yellCards.splice(cardInfo.sourceIndex, 1)[0];
+          // アーカイブに追加
+          if (!player.cards.archive) {
+            player.cards.archive = [];
+          }
+          player.cards.archive.push(removedCard);
+          console.log(`エールカード削除: ${holomem.name}から${removedCard.name}をアーカイブに移動`);
+        }
+      }
+    }
   }
 }
 

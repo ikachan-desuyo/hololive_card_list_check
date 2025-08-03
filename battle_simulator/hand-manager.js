@@ -510,14 +510,12 @@ class HandManager {
       player[targetPosition] = updatedSourceCard;
     }
     
-    // UI更新（交換したエリアのみ更新）
+    // UI更新（State Managerとの同期を確実にする）
+    this.battleEngine.updateUI();
+    
+    // 追加の遅延更新でState Manager状態を確実に反映
     setTimeout(() => {
-      // 手札表示を更新
-      this.updateHandDisplay();
-      // バックスロットのみ更新（全エリア更新は避ける）
-      this.battleEngine.cardDisplayManager.updateBackSlots(playerId === 1 ? 'player' : 'cpu');
-      // フェーズハイライトのみ更新
-      this.battleEngine.updatePhaseHighlight(playerId, this.battleEngine.stateManager.getState().turn.currentPhase);
+      this.battleEngine.updateUI();
     }, 50);
     
     console.log(`✅ カード交換完了: ${sourceCard.name} → ${targetPosition}`);

@@ -732,64 +732,80 @@ class HololiveBattleEngine {
     try {
       console.log('ゲームリセット開始...');
       
-      // ゲーム状態のリセット
-      this.gameState = {
-        currentPlayer: 1,
-        currentPhase: -1,  // -1: 準備ステップから開始
-        turnCount: 1,
-        gameStarted: false,
-        gameEnded: false,
-        winner: null,
-        preparationPhase: true,  // 準備ステップフラグ
-        mulliganPhase: false,
-        debutPlacementPhase: false,
-        mulliganCount: { 1: 0, 2: 0 },
-        mulliganCompleted: { 1: false, 2: false },
-        debutPlacementCompleted: { 1: false, 2: false },
-        firstPlayer: null, // 先行・後攻をリセット
-        turnOrderDecided: false // 先行・後攻決定状態をリセット
-      };
-      
-      // プレイヤー状態のリセット
-      this.players[1] = this.createPlayerState();
-      this.players[2] = this.createPlayerState();
+      // State Managerを使用してゲーム状態をリセット
+      if (this.stateManager) {
+        this.stateManager.updateState('RESET_GAME', {});
+        console.log('State Manager経由でゲーム状態をリセット');
+        
+        // リセット後の状態確認
+        const newState = this.stateManager.getState();
+        console.log('リセット後の状態:', newState);
+      } else {
+        // フォールバック: 直接リセット（古い方式）
+        this.gameState = {
+          currentPlayer: 1,
+          currentPhase: -1,  // -1: 準備ステップから開始
+          turnCount: 1,
+          gameStarted: false,
+          gameEnded: false,
+          winner: null,
+          preparationPhase: true,  // 準備ステップフラグ
+          mulliganPhase: false,
+          debutPlacementPhase: false,
+          mulliganCount: { 1: 0, 2: 0 },
+          mulliganCompleted: { 1: false, 2: false },
+          debutPlacementCompleted: { 1: false, 2: false },
+          firstPlayer: null, // 先行・後攻をリセット
+          turnOrderDecided: false // 先行・後攻決定状態をリセット
+        };
+        
+        // プレイヤー状態のリセット
+        this.players[1] = this.createPlayerState();
+        this.players[2] = this.createPlayerState();
+      }
       
       // UI要素の完全クリア
       this.clearAllUIElements();
       
-      // 各マネージャーの状態リセット
-      if (this.turnManager) {
-        // Turn Managerの参照を更新
-        this.turnManager.gameState = this.gameState;
-        this.turnManager.players = this.players;
-        console.log('Turn Manager状態をリセット');
+      // State Managerを使用している場合は、マネージャー間の状態同期は不要
+      // （State Managerが状態を一元管理するため）
+      if (!this.stateManager) {
+        // 各マネージャーの状態リセット（フォールバック）
+        if (this.turnManager) {
+          // Turn Managerの参照を更新
+          this.turnManager.gameState = this.gameState;
+          this.turnManager.players = this.players;
+          console.log('Turn Manager状態をリセット');
+        }
+        
+        if (this.handManager) {
+          // Hand Managerの参照を更新
+          this.handManager.gameState = this.gameState;
+          this.handManager.players = this.players;
+          console.log('Hand Manager状態をリセット');
+        }
+        
+        if (this.cardDisplayManager) {
+          // Card Display Managerの参照を更新
+          this.cardDisplayManager.gameState = this.gameState;
+          this.cardDisplayManager.players = this.players;
+          console.log('Card Display Manager状態をリセット');
+        }
       }
       
-      if (this.handManager) {
-        // Hand Managerの参照を更新
-        this.handManager.gameState = this.gameState;
-        this.handManager.players = this.players;
-        console.log('Hand Manager状態をリセット');
-      }
-      
-      if (this.cardDisplayManager) {
-        // Card Display Managerの参照を更新
-        this.cardDisplayManager.gameState = this.gameState;
-        this.cardDisplayManager.players = this.players;
-        console.log('Card Display Manager状態をリセット');
-      }
-      
-      if (this.setupManager) {
-        // Setup Managerの参照を更新
-        this.setupManager.gameState = this.gameState;
-        this.setupManager.players = this.players;
-        console.log('Setup Manager状態をリセット');
-      }
-      
-      if (this.phaseController) {
-        // Phase Controllerの参照を更新
-        this.phaseController.gameState = this.gameState;
-        console.log('Phase Controller状態をリセット');
+      if (!this.stateManager) {
+        // Setup Managerの参照を更新（フォールバック）
+        if (this.setupManager) {
+          this.setupManager.gameState = this.gameState;
+          this.setupManager.players = this.players;
+          console.log('Setup Manager状態をリセット');
+        }
+        
+        if (this.phaseController) {
+          // Phase Controllerの参照を更新
+          this.phaseController.gameState = this.gameState;
+          console.log('Phase Controller状態をリセット');
+        }
       }
       
       if (this.infoPanelManager) {
@@ -805,9 +821,27 @@ class HololiveBattleEngine {
       this.updateUI();
       this.updateGameStatus();
       
+      // 手札の明示的な更新
+      if (this.handManager) {
+        this.handManager.updateHandDisplay();
+      }
+      
       // コントロールボタンの状態更新
-      document.getElementById('start-game').disabled = false;
-      document.getElementById('start-game').style.background = '#2196f3';
+      if (this.stateManager) {
+        // State Manager経由でボタン状態を更新
+        this.stateManager.updateState('UI_BUTTON_STATE', {
+          buttons: {
+            startGame: true,
+            nextPhase: false,
+            endTurn: false,
+            resetGame: true
+          }
+        });
+      } else {
+        // フォールバック: 直接ボタン状態を更新
+        document.getElementById('start-game').disabled = false;
+        document.getElementById('start-game').style.background = '#2196f3';
+      }
       document.getElementById('next-phase').disabled = true;
       document.getElementById('end-turn').disabled = true;
       
@@ -1408,6 +1442,12 @@ class HololiveBattleEngine {
   startDebutPlacementPhase() {
     this.gameState.mulliganPhase = false;
     this.gameState.debutPlacementPhase = true;  // 追加: Debut配置フェーズフラグを設定
+    
+    // State Managerの状態も更新
+    if (this.stateManager) {
+      this.stateManager.startDebutPlacementPhase();
+    }
+    
     console.log('Debut配置フェーズ開始');
     
     alert(
@@ -1934,6 +1974,11 @@ class HololiveBattleEngine {
     this.gameState.gameStarted = true;
     this.gameState.debutPlacementPhase = false;  // 追加: Debut配置フェーズ終了
     
+    // State Managerの状態も更新
+    if (this.stateManager) {
+      this.stateManager.endDebutPlacementPhase();
+    }
+    
     alert('ゲーム開始！');
     
     // 最初のターンを開始（リセットステップから）
@@ -2286,6 +2331,24 @@ class HololiveBattleEngine {
     console.log('最終確認 - sourceCard.name:', sourceCard.name);
     console.log('最終確認 - targetCard:', targetCard);
     console.log('最終確認 - targetPosition:', targetPosition);
+    
+    // State Manager経由でのチェック（新ルール対応）
+    if (this.stateManager) {
+      const swapCheck = this.stateManager.checkSwapValidity(
+        sourceCard, sourcePosition, targetCard, targetPosition, 1
+      );
+      
+      if (!swapCheck.valid) {
+        alert(`⚠️ 移動不可\n\n${swapCheck.reason}`);
+        console.log('State Managerにより移動が拒否されました:', swapCheck.reason);
+        return false;
+      }
+      
+      // バトンタッチの場合は特別処理
+      if (sourcePosition === 'center' && targetPosition.startsWith('back') && targetCard) {
+        return this.handleBatonTouch(sourceCard, targetCard, targetPosition);
+      }
+    }
     
     // HandManagerのswapCardsメソッドを呼び出し
     return this.handManager.swapCards(sourceCard, sourcePosition, targetCard, targetPosition, 1);
@@ -2750,6 +2813,119 @@ class HololiveBattleEngine {
    * @returns {string} フェーズ名
    */
   // getPhaseNameByIndex は PhaseController に移譲
+
+  /**
+   * バトンタッチの処理
+   * @param {Object} sourceCard - センターのカード
+   * @param {Object} targetCard - バックのカード
+   * @param {string} targetPosition - バックのポジション
+   * @returns {boolean} 実行成功フラグ
+   */
+  handleBatonTouch(sourceCard, targetCard, targetPosition) {
+    if (!this.stateManager) {
+      console.error('State Managerが見つかりません');
+      return false;
+    }
+
+    try {
+      // バトンタッチの詳細チェック
+      const batonCheck = this.stateManager.checkBatonTouch(
+        sourceCard, targetCard, targetPosition, this.stateManager.getStateByPath('players.1')
+      );
+
+      if (!batonCheck.valid) {
+        alert(`⚠️ バトンタッチ不可\n\n${batonCheck.reason}`);
+        return false;
+      }
+
+      // エールカード選択UI表示
+      this.showBatonTouchYellSelection(sourceCard, targetCard, targetPosition, batonCheck);
+      return true;
+    } catch (error) {
+      console.error('バトンタッチ処理エラー:', error);
+      return false;
+    }
+  }
+
+  /**
+   * バトンタッチ用のエールカード選択UIを表示
+   * @param {Object} sourceCard - センターのカード
+   * @param {Object} targetCard - バックのカード
+   * @param {string} targetPosition - バックのポジション
+   * @param {Object} batonCheck - バトンタッチチェック結果
+   */
+  showBatonTouchYellSelection(sourceCard, targetCard, targetPosition, batonCheck) {
+    // シンプルな確認ダイアログ（後でより高度なUIに置き換え可能）
+    const requiredCosts = batonCheck.requiredCosts;
+    const totalRequired = Object.values(requiredCosts).reduce((sum, count) => sum + count, 0);
+    
+    const costText = Object.entries(requiredCosts)
+      .filter(([color, count]) => count > 0)
+      .map(([color, count]) => `${color}:${count}`)
+      .join(', ');
+
+    const message = `バトンタッチを実行しますか？\n\n` +
+                   `${sourceCard.name} ⇔ ${targetCard.name}\n\n` +
+                   `必要コスト: ${costText || 'なし'}\n` +
+                   `アーカイブ予定: ${totalRequired}枚のエール`;
+
+    if (confirm(message)) {
+      // 使用可能なエールカードから必要分を自動選択
+      const selectedCards = this.autoSelectYellCards(batonCheck.availableYellCards, requiredCosts);
+      
+      if (selectedCards.length >= totalRequired) {
+        // バトンタッチ実行
+        const success = this.stateManager.executeBatonTouch(
+          sourceCard, targetCard, targetPosition, 1, selectedCards
+        );
+        
+        if (success) {
+          // UI更新
+          this.updateUI();
+          this.infoPanelManager?.addLogEntry('action', 
+            `バトンタッチ: ${sourceCard.name} ⇔ ${targetCard.name} (エール${selectedCards.length}枚使用)`
+          );
+        }
+      } else {
+        alert('エールカードが不足しています');
+      }
+    }
+  }
+
+  /**
+   * エールカードの自動選択
+   * @param {Array} availableCards - 使用可能なカード
+   * @param {Object} requiredCosts - 必要コスト
+   * @returns {Array} 選択されたカード
+   */
+  autoSelectYellCards(availableCards, requiredCosts) {
+    const selected = [];
+    const remaining = { ...requiredCosts };
+    
+    // 特定色のコストを優先的に選択
+    for (const [color, required] of Object.entries(remaining)) {
+      if (required > 0 && color !== 'colorless') {
+        const matchingCards = availableCards.filter(cardInfo => 
+          cardInfo.color === color && !selected.includes(cardInfo)
+        );
+        
+        for (let i = 0; i < Math.min(required, matchingCards.length); i++) {
+          selected.push(matchingCards[i]);
+          remaining[color]--;
+        }
+      }
+    }
+    
+    // 無色コストを任意の色で補填
+    const totalColorlessNeeded = Object.values(remaining).reduce((sum, count) => sum + count, 0);
+    const unselectedCards = availableCards.filter(cardInfo => !selected.includes(cardInfo));
+    
+    for (let i = 0; i < Math.min(totalColorlessNeeded, unselectedCards.length); i++) {
+      selected.push(unselectedCards[i]);
+    }
+    
+    return selected;
+  }
 }
 
 // グローバルインスタンス
