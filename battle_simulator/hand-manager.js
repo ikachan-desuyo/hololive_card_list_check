@@ -98,17 +98,11 @@ class HandManager {
         
         handArea.appendChild(cardElement);
       });
-      
-      console.log(`手札表示更新完了: ${player.hand.length}枚`);
-    } else {
-      console.log('手札が空です');
     }
   }
 
   // 手札カードのクリック処理
   handleHandCardClick(card, index) {
-    console.log('手札のカードがクリックされました:', card.name);
-    
     // メインステップでのみカードをプレイ可能
     if (this.battleEngine.gameState.currentPhase === 3) {
       this.battleEngine.playCard(card, index);
@@ -119,8 +113,6 @@ class HandManager {
 
   // 手札からのドラッグ開始処理
   handleHandCardDragStart(e, card, index) {
-    console.log('手札からドラッグ開始:', card.name);
-    
     // ドラッグ中のカードデータを保存
     this.battleEngine.draggedCard = {
       card: card,
@@ -133,10 +125,7 @@ class HandManager {
     
     // サポートカードの場合は専用エリアを表示
     if (this.battleEngine.isSupportCard(card)) {
-      console.log('サポートカード判定: true - showSupportDropZone()を呼び出します');
       this.battleEngine.showSupportDropZone();
-    } else {
-      console.log('サポートカード判定: false - 通常のドロップゾーンのみ');
     }
     
     // 有効なドロップゾーンをハイライト
@@ -152,8 +141,6 @@ class HandManager {
 
   // 手札からのドラッグ終了処理
   handleHandCardDragEnd(e) {
-    console.log('ドラッグ終了');
-    
     // ドラッグエフェクトを削除
     e.target.classList.remove('dragging');
     
@@ -211,7 +198,6 @@ class HandManager {
     const availableSlots = this.findAvailableSlots(player);
     
     if (availableSlots.length === 0) {
-      console.log('配置可能なスロットがありません');
       return;
     }
 
@@ -245,7 +231,6 @@ class HandManager {
     
     // 手札から除去
     player.hand.splice(handIndex, 1);
-    console.log(`${cardCopy.name}を${targetSlot}に配置しました`);
     
     this.battleEngine.updateUI();
   }
@@ -261,25 +246,19 @@ class HandManager {
     if (!player.collab) {
       player.collab = cardCopy;
       player.hand.splice(handIndex, 1);
-      console.log(`${cardCopy.name}をセンター①に配置しました`);
     } else if (!player.center) {
       player.center = cardCopy;
       player.hand.splice(handIndex, 1);
-      console.log(`${cardCopy.name}をセンター②に配置しました`);
     } else if (!player.back1) {
       player.back1 = cardCopy;
       player.hand.splice(handIndex, 1);
-      console.log(`${cardCopy.name}をバック①に配置しました`);
     } else if (!player.back2) {
       player.back2 = cardCopy;
       player.hand.splice(handIndex, 1);
-      console.log(`${cardCopy.name}をバック②に配置しました`);
     } else if (!player.back3) {
       player.back3 = cardCopy;
       player.hand.splice(handIndex, 1);
-      console.log(`${cardCopy.name}をバック③に配置しました`);
     } else {
-      console.log('ステージが満員です');
       return;
     }
     
@@ -364,16 +343,12 @@ class HandManager {
       cardCopy.isResting = card.isResting;
     }
     
-    console.log(`カードコピー作成: ${cardCopy.name} (元のエール数: ${card.yellCards ? card.yellCards.length : 0})`);
-    
     return cardCopy;
   }
 
   // サポートカード判定
   isSupportCard(card) {
-    const isSupport = card.card_type && card.card_type.includes('サポート');
-    console.log(`isSupportCard判定: ${card.name} = ${isSupport} (${card.card_type})`);
-    return isSupport;
+    return card.card_type && card.card_type.includes('サポート');
   }
 
   // サポートカード効果使用
@@ -381,8 +356,6 @@ class HandManager {
     const useCard = confirm(`「${card.name}」の効果を使用しますか？`);
     
     if (useCard) {
-      console.log(`${card.name}の効果を使用`);
-      
       // 手札から削除
       this.battleEngine.players[1].hand.splice(handIndex, 1);
       
@@ -407,41 +380,12 @@ class HandManager {
    * @param {number} playerId - プレイヤーID
    */
   swapCards(sourceCard, sourcePosition, targetCard, targetPosition, playerId = 1) {
-    // console.log('=== HAND MANAGER: カード交換処理開始 ===');
-    // 引数チェック（デバッグ用）
-    // console.log('引数 sourceCard:', sourceCard);
-    // console.log('引数 sourcePosition:', sourcePosition);
-    // console.log('引数 targetCard:', targetCard);
-    // console.log('引数 targetPosition:', targetPosition);
-    // console.log('引数 playerId:', playerId);
-    
     // 引数の検証
-    if (!sourceCard) {
-      console.error('HAND MANAGER: sourceCard が null/undefined です');
-      alert('⚠️ エラー: 移動元カードが見つかりません');
+    if (!sourceCard || !sourceCard.name || !sourcePosition || !targetPosition) {
+      console.error('HAND MANAGER: カード交換に必要な引数が不足しています');
+      alert('⚠️ エラー: カード交換に必要な情報が不足しています');
       return false;
     }
-    
-    if (!sourceCard.name) {
-      console.error('HAND MANAGER: sourceCard にname プロパティがありません:', sourceCard);
-      alert('⚠️ エラー: 移動元カードの名前が見つかりません');
-      return false;
-    }
-    
-    if (!sourcePosition) {
-      console.error('HAND MANAGER: sourcePosition が null/undefined です');
-      alert('⚠️ エラー: 移動元位置が見つかりません');
-      return false;
-    }
-    
-    if (!targetPosition) {
-      console.error('HAND MANAGER: targetPosition が null/undefined です');
-      alert('⚠️ エラー: 移動先位置が見つかりません');
-      return false;
-    }
-    
-    console.log(`移動元: ${sourcePosition} - ${sourceCard.name}`);
-    console.log(`移動先: ${targetPosition} - ${targetCard ? targetCard.name : '空'}`);
     
     // Placement Controllerで新しいルールをチェック
     const placementCheck = this.battleEngine.placementController.canSwapCards(
@@ -449,7 +393,6 @@ class HandManager {
     );
     
     if (!placementCheck.valid) {
-      console.log(`配置ルール拒否: ${placementCheck.reason}`);
       alert(`⚠️ カード交換不可\n\n${placementCheck.reason}`);
       return false;
     }
@@ -460,12 +403,9 @@ class HandManager {
     );
     
     if (!swapCheck.valid) {
-      console.log(`交換拒否: ${swapCheck.reason}`);
       alert(`⚠️ カード交換不可\n\n${swapCheck.reason}`);
       return false;
     }
-    
-    console.log(`交換許可: ${swapCheck.reason}`);
     
     // 特別なケースの処理
     const isBloom = targetCard && this.battleEngine.placementController.isBloomMove(sourceCard, targetCard);
@@ -474,22 +414,49 @@ class HandManager {
     // 実際の交換処理
     const player = this.battleEngine.players[playerId];
     
-    console.log(`カード交換: ${sourcePosition} → ${targetPosition}`);
-    
-    // State Managerで一括交換（プロキシシステムを使用せずに状態管理を統一）
-    this.battleEngine.stateManager.updateState('SWAP_CARDS', {
-      player: playerId,
-      sourcePosition: sourcePosition,
-      targetPosition: targetPosition
-    });
-
-    // 特別な処理の実行
+    // ブルームの場合は重ね置き処理を実行
     if (isBloom) {
-      // ブルーム実行の記録（カード状態ベース）
-      const updatedSourceCard = this.battleEngine.stateManager.recordBloom(sourceCard, targetCard, playerId);
-      // 更新されたカードで状態を再設定
-      player[targetPosition] = updatedSourceCard;
-      console.log(`ブルーム実行: ${sourceCard.name} → ${targetCard.name}`);
+      // 手札からカードを削除（手札からのブルームの場合のみ）
+      if (sourcePosition === 'hand') {
+        // より精密な検索：IDと名前の両方を確認し、完全一致するものを探す
+        let handIndex = -1;
+        for (let i = 0; i < player.hand.length; i++) {
+          const handCard = player.hand[i];
+          // IDが一致する場合を優先、IDがない場合は名前とbloom_levelで判定
+          if (sourceCard.id && handCard.id === sourceCard.id) {
+            handIndex = i;
+            break;
+          } else if (!sourceCard.id && handCard.name === sourceCard.name && 
+                     handCard.bloom_level === sourceCard.bloom_level) {
+            handIndex = i;
+            break;
+          }
+        }
+        
+        if (handIndex !== -1) {
+          const removedCard = player.hand.splice(handIndex, 1)[0];
+          console.log(`swapCards: 手札から削除: ${removedCard.name} (${removedCard.bloom_level}) インデックス: ${handIndex}`);
+        } else {
+          console.warn(`swapCards: 手札で対象カードが見つかりません:`, sourceCard);
+        }
+      }
+      
+      // PLACE_CARDで重ね置き実行
+      const placeResult = this.battleEngine.stateManager.updateState('PLACE_CARD', {
+        player: playerId,
+        card: sourceCard,
+        position: targetPosition
+      });
+
+      // ブルーム履歴の記録のみ（重ね置きはPLACE_CARDで実行済み）
+      this.battleEngine.stateManager.addBloomHistory(playerId, targetPosition);
+    } else {
+      // 通常の交換処理
+      this.battleEngine.stateManager.updateState('SWAP_CARDS', {
+        player: playerId,
+        sourcePosition: sourcePosition,
+        targetPosition: targetPosition
+      });
     }
 
     if (isCollabMove) {
@@ -497,7 +464,6 @@ class HandManager {
       const updatedSourceCard = this.battleEngine.stateManager.recordCollabMove(sourceCard, playerId);
       // 更新されたカードで状態を再設定
       player[targetPosition] = updatedSourceCard;
-      console.log(`コラボ移動実行: ${sourceCard.name}`);
       
       // ホロパワーカード配置を強制実行
       this.placeHoloPowerFromDeck(playerId);
@@ -517,8 +483,6 @@ class HandManager {
     setTimeout(() => {
       this.battleEngine.updateUI();
     }, 50);
-    
-    console.log(`✅ カード交換完了: ${sourceCard.name} → ${targetPosition}`);
     
     return true;
   }
@@ -611,8 +575,6 @@ class HandManager {
   placeCardFromHandWithSwap(card, handIndex, dropZone) {
     const player = this.battleEngine.players[1];
     
-    console.log(`手札からの配置試行: ${card.name}, dropZone:`, dropZone);
-    
     if (dropZone.type === 'support') {
       this.useSupportCard(card, handIndex);
       return;
@@ -633,46 +595,136 @@ class HandManager {
         targetCard = player[targetPosition];
         break;
       default:
-        console.log('未対応のドロップ先です');
         return;
     }
     
-    // ドロップ先にカードがある場合は交換処理
+    // ドロップ先にカードがある場合は交換処理またはブルーム処理
     if (targetCard) {
-      console.log(`位置交換モード: ${card.name} → ${targetPosition} (${targetCard.name}と交換)`);
+      // ブルーム判定: 同名カードかつレベル進化の場合
+      const isBloom = this.battleEngine.stateManager.isBloom(card, targetCard);
       
-      // State Managerで交換可能性をチェック
-      const swapCheck = this.battleEngine.stateManager.checkSwapValidity(
-        card, 'hand', targetCard, targetPosition, 1
-      );
-      
-      if (!swapCheck.valid) {
-        console.log(`交換拒否: ${swapCheck.reason}`);
-        alert(`⚠️ カード交換不可\n\n${swapCheck.reason}`);
+      if (isBloom) {
+        // ブルーム可能性をチェック
+        const bloomCheck = this.battleEngine.stateManager.canBloom(card, targetCard, 1);
+        
+        if (!bloomCheck.valid) {
+          alert(`⚠️ ブルーム不可\n\n${bloomCheck.reason}`);
+          return;
+        }
+        
+        // ブルーム確認画面
+        const confirmBloom = confirm(
+          `🌸 ブルーム確認\n\n` +
+          `${targetCard.name} (${targetCard.bloom_level})\n` +
+          `↓ ブルーム ↓\n` +
+          `${card.name} (${card.bloom_level})\n\n` +
+          `ブルームを実行しますか？`
+        );
+        
+        if (!confirmBloom) {
+          return;
+        }
+        
+        // ブルーム実行: PLACE_CARDアクションでスタック
+        const cardCopy = JSON.parse(JSON.stringify(card));
+        cardCopy.yells = cardCopy.yells || [];
+        
+        // 既存カードのエール情報を新しいカードに引き継ぎ
+        if (targetCard && targetCard.yellCards && Array.isArray(targetCard.yellCards)) {
+          cardCopy.yellCards = [...targetCard.yellCards];
+          console.log(`エール引継ぎ: ${targetCard.yellCards.length}枚のエールを新しいカードに引き継ぎました`);
+        }
+        
+        // その他の重要な状態情報も引き継ぎ
+        if (targetCard && targetCard.cardState) {
+          // 既存の状態情報を基に新しい状態を作成
+          cardCopy.cardState = {
+            ...targetCard.cardState,
+            bloomedThisTurn: true,  // ブルームフラグを設定
+            playedTurn: targetCard.cardState.playedTurn || 1  // 元の配置ターンを保持
+          };
+        }
+        
+        // ブルーム後のカード情報をログ出力
+        console.log(`ブルーム実行: ${targetCard.name} (${targetCard.bloom_level}) → ${cardCopy.name} (${cardCopy.bloom_level})`);
+        console.log(`新しいカード画像URL: ${cardCopy.image_url}`);
+        console.log(`カードコピー詳細:`, cardCopy);
+        
+        // State Managerでブルーム実行（カード重ね）
+        const result = this.battleEngine.stateManager.updateState('PLACE_CARD', {
+          card: cardCopy,
+          source: 'hand',
+          position: targetPosition,
+          player: 1,
+          action: 'bloom'
+        });
+        
+        // Battle Engineとの同期を確実にする
+        if (result && result.success) {
+          // 手札からカードを削除（正確なインデックスを使用）
+          if (handIndex !== undefined && handIndex >= 0 && handIndex < player.hand.length) {
+            // 元の手札インデックスを使用して正確に削除
+            const removedCard = player.hand.splice(handIndex, 1)[0];
+            console.log(`手札から削除: ${removedCard.name} (インデックス: ${handIndex})`);
+          } else {
+            console.warn(`手札インデックスが無効: ${handIndex}`);
+          }
+          
+          console.log(`ブルーム成功: ${card.name} → ${targetPosition}`);
+          
+          // State Managerの状態更新が完了してからUI更新を実行
+          const waitForBloomCompletion = () => {
+            if (this.battleEngine.stateManager.bloomCompleted) {
+              this.battleEngine.stateManager.bloomCompleted = false; // フラグをリセット
+              this.updateHandDisplay();
+              this.battleEngine.updateUI();
+              console.log(`ブルーム後のUI更新完了: ${card.name}`);
+            } else {
+              // ブルーム完了を待つ
+              setTimeout(waitForBloomCompletion, 10);
+            }
+          };
+          
+          setTimeout(waitForBloomCompletion, 30);
+          
+          return;
+          
+        } else {
+          console.error('ブルーム処理が失敗しました:', result);
+          alert('⚠️ ブルーム処理でエラーが発生しました');
+          return;
+        }
+        
+      } else if (targetCard) {
+        // ホロライブTCGでは基本的にブルーム以外の自由な交換は許可されない
+        alert(`⚠️ カード交換不可\n\nブルーム以外での交換はできません。\n\n- 同名カードでレベルが進化する場合のみブルーム可能\n- 空いている位置への配置は可能`);
         return;
       }
-      
-      // 交換実行: 手札のカードをステージに、ステージのカードを手札に
-      const cardCopy = this.createCardCopy(card);
-      player[targetPosition] = cardCopy;
-      player.hand[handIndex] = targetCard;
-      
-      console.log(`✅ 手札↔ステージ交換完了: ${card.name} ⇔ ${targetCard.name}`);
-      
     } else {
       // 通常の配置処理（空の場所に配置）
-      console.log(`通常配置モード: ${card.name} → ${targetPosition}`);
-      
       const cardCopy = this.createCardCopy(card);
-      player[targetPosition] = cardCopy;
+      
+      // カードに状態情報を追加
+      const cardWithState = this.battleEngine.stateManager.addCardState(cardCopy, {
+        playedTurn: this.battleEngine.gameState.turnCount || 1,
+        playedByPlayer: 1,
+        bloomedThisTurn: false,
+        resting: false,
+        damage: 0,
+        yellCards: cardCopy.yellCards || []  // 既存のエール情報を保持
+      });
+      
+      player[targetPosition] = cardWithState;
       player.hand.splice(handIndex, 1);
       
-      console.log(`✅ 通常配置完了: ${card.name} → ${targetPosition}`);
+      console.log(`通常配置: ${card.name} → ${targetPosition}`);
     }
     
-    // UI更新
-    this.updateHandDisplay();
-    this.battleEngine.updateUI();
+    // UI更新（ブルーム処理が成功した場合は遅延更新が既に実行されるためスキップ）
+    if (!targetCard || !this.battleEngine.stateManager.isBloom(card, targetCard)) {
+      this.updateHandDisplay();
+      this.battleEngine.updateUI();
+    }
   }
 }
 

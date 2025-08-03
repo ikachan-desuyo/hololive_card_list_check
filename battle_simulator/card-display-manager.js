@@ -9,17 +9,20 @@ class CardDisplayManager {
    * 全カードエリアの表示を更新
    */
   updateCardAreas() {
+    console.log(`🔄 [Card Display] updateCardAreas開始`);
     
     // プレイヤーとCPUの両方のエリアを更新
     [1, 2].forEach(playerId => {
-      // State Managerから状態を取得
-      const playerState = this.battleEngine.stateManager.getStateByPath(`players.${playerId}`);
-      if (!playerState || !playerState.cards) {
+      console.log(`🔄 [Card Display] プレイヤー${playerId}の更新開始`);
+      // Battle Engineから直接プレイヤーデータを取得
+      const player = this.battleEngine.players[playerId];
+      if (!player) {
         console.warn(`updateCardAreas: プレイヤー${playerId}の状態が見つかりません`);
         return;
       }
       
-      const player = playerState.cards;
+      console.log(`🔄 [Card Display] プレイヤー${playerId}データ:`, player);
+      
       const sectionClass = playerId === 1 ? '.battle-player' : '.battle-opponent';
       
       // 各エリアのデータと要素を取得
@@ -44,7 +47,7 @@ class CardDisplayManager {
           const playerType = playerId === 1 ? 'player' : 'cpu';
           this.updateBackSlots(playerType);
         } else {
-          this.displayCardsInArea(area, areaInfo.data, areaInfo.id, playerState, areaInfo.isMultiple);
+          this.displayCardsInArea(area, areaInfo.data, areaInfo.id, playerId, areaInfo.isMultiple);
         }
       });
     });
@@ -56,12 +59,12 @@ class CardDisplayManager {
   /**
    * 特定エリアにカードを表示
    */
-  displayCardsInArea(area, cards, areaId, playerState, isMultiple = false) {
+  displayCardsInArea(area, cards, areaId, playerId, isMultiple = false) {
     if (!area) return;
     
     // プレイヤーIDの特定（エリアのクラス名から判定）
     const isPlayerArea = area.closest('.battle-player') !== null;
-    const playerId = isPlayerArea ? 1 : 2;
+    const actualPlayerId = isPlayerArea ? 1 : 2;
     
     // エリアをクリア（カウンターは残す）
     const counters = area.querySelectorAll('.card-counter');
@@ -87,6 +90,11 @@ class CardDisplayManager {
       case 'center':
         if (cards) {
           console.log(`🎨 センターポジションにカード表示: ${cards.name}`, cards);
+          console.log(`🎨 センター画像URL: ${cards.image_url}`);
+          console.log(`🎨 センターカード状態:`, cards.cardState);
+          if (!cards.cardState) {
+            console.warn(`⚠️ センターカードに状態情報がありません:`, cards);
+          }
           cardsToDisplay = [cards];
         } else {
           console.log('🎨 センターポジションにカードなし');
@@ -119,7 +127,7 @@ class CardDisplayManager {
     cardsToDisplay.forEach((card, index) => {
       if (card) {
         // プレイヤー1のカードのみドラッグ可能
-        const isPlayerCard = (playerId === 1);
+        const isPlayerCard = (actualPlayerId === 1);
         const cardElement = this.createCardElement(card, areaId, index, isPlayerCard);
         area.appendChild(cardElement);
         
@@ -132,7 +140,8 @@ class CardDisplayManager {
     });
     
     // カードカウンターの追加
-    const totalCount = this.getCardCount(playerState, areaId);
+    const player = this.battleEngine.players[actualPlayerId];
+    const totalCount = this.getCardCount(player, areaId);
     if (totalCount > 1) {
       this.updateCardCounter(area, totalCount);
     }
@@ -200,13 +209,17 @@ class CardDisplayManager {
       cardElement.classList.remove('face-down');
       cardElement.classList.add('face-up');
       
+      console.log(`🎨 [Card Element] 表向きカード作成: ${card.name}, 画像URL: ${card.image_url}`);
+      
       // カード画像の設定
       if (card.image_url) {
         cardElement.style.backgroundImage = `url(${card.image_url})`;
         cardElement.style.backgroundSize = 'cover';
         cardElement.style.backgroundPosition = 'center';
         cardElement.style.backgroundRepeat = 'no-repeat';
+        console.log(`🎨 [Card Element] 画像設定完了: ${card.image_url}`);
       } else {
+        console.log(`⚠️ [Card Element] 画像URLなし: ${card.name}`);
         // 画像がない場合はカード内容を表示
         cardElement.innerHTML = `
           <div class="card-content">
@@ -231,7 +244,11 @@ class CardDisplayManager {
     // カードクリック処理の追加
     if (areaId !== 'deck' && areaId !== 'yell-deck') {
       cardElement.addEventListener('click', (e) => {
-        this.battleEngine.showCardModal(card);
+        if (typeof this.battleEngine.showCardModal === 'function') {
+          this.battleEngine.showCardModal(card);
+        } else {
+          console.log('カード情報:', card);
+        }
         e.stopPropagation();
       });
     }
@@ -377,6 +394,16 @@ class CardDisplayManager {
       const card = player[backPositions[index]];
       if (card) {
         console.log(`🎨 バックスロット${index + 1}にカード表示: ${card.name}`);
+        console.log(`🎨 バック画像URL: ${card.image_url}`);
+        console.log(`🎨 バックカード状態:`, card.cardState);
+        console.log(`🎨 カードレベル: ${card.bloom_level || 'レベル不明'}`);
+        console.log(`🎨 エール枚数: ${card.yellCards?.length || 0}枚`);
+        if (card.cardState?.bloomedThisTurn) {
+          console.log(`🌸 このターンにブルームしたカード: ${card.name}`);
+        }
+        if (!card.cardState) {
+          console.warn(`⚠️ バックカード${index + 1}に状態情報がありません:`, card);
+        }
         const isPlayerCard = (playerId === 1); // プレイヤー1のカードのみドラッグ可能
         const cardElement = this.createCardElement(card, 'backs', index, isPlayerCard);
         // バックスロット内でのサイズ調整

@@ -6,7 +6,7 @@
 class HololiveBattleEngine {
   constructor() {
     // 状態管理の初期化（最優先）
-    this.stateManager = new HololiveStateManager();
+    this.stateManager = new HololiveStateManager(this);
     
     // 互換性のための状態オブジェクト（State Managerから動的に取得）
     this.gameState = this.createGameStateProxy();
@@ -30,14 +30,23 @@ class HololiveBattleEngine {
     
     // ターン管理の初期化
     this.turnManager = new HololiveTurnManager(this);
-
-    this.initializeGame();
     
     // CPUロジックの初期化
     this.cpuLogic = new HololiveCPULogic(this);
     
     // 手札管理の初期化
-    this.handManager = new HandManager(this);
+    try {
+      if (typeof HandManager === 'undefined') {
+        throw new Error('HandManager クラスが読み込まれていません');
+      }
+      this.handManager = new HandManager(this);
+      console.log('✅ HandManager初期化成功');
+    } catch (error) {
+      console.error('❌ HandManager初期化エラー:', error);
+      throw error;
+    }
+
+    this.initializeGame();
     
     // カード表示管理の初期化
     this.cardDisplayManager = new CardDisplayManager(this);
@@ -274,16 +283,55 @@ class HololiveBattleEngine {
    * プレイヤーのカード状態を更新
    */
   updatePlayerCards(playerId, area, cards) {
+    // カードに状態情報が不足している場合は追加
+    if (cards && !Array.isArray(cards)) {
+      // 単一カードの場合
+      if (cards && typeof cards === 'object' && !cards.cardState) {
+        cards = this.stateManager.addCardState(cards, {
+          playedTurn: this.gameState.turnCount || 1,
+          playedByPlayer: playerId,
+          bloomedThisTurn: false,
+          resting: false,
+          damage: 0
+        });
+      }
+    } else if (Array.isArray(cards)) {
+      // 配列の場合（手札等）
+      cards = cards.map(card => {
+        if (card && typeof card === 'object' && !card.cardState) {
+          return this.stateManager.addCardState(card, {
+            playedTurn: this.gameState.turnCount || 1,
+            playedByPlayer: playerId,
+            bloomedThisTurn: false,
+            resting: false,
+            damage: 0
+          });
+        }
+        return card;
+      });
+    }
+    
     // エールカード情報を保持（cards配列から取得）
     if (cards && cards.length > 0 && cards[0] && cards[0].yellCards) {
       console.log(`📤 [State Manager送信] ${area}: ${cards[0].name} (エール${cards[0].yellCards.length}枚)`);
     }
     
-    this.stateManager.updateState('UPDATE_PLAYER_CARDS', {
-      player: playerId,
-      area: area,
-      cards: cards
-    });
+    // 状態遷移中の場合は少し待ってから実行
+    if (this.stateManager.transitionInProgress) {
+      setTimeout(() => {
+        this.stateManager.updateState('UPDATE_PLAYER_CARDS', {
+          player: playerId,
+          area: area,
+          cards: cards
+        });
+      }, 20);  // 少し長めの遅延に変更
+    } else {
+      this.stateManager.updateState('UPDATE_PLAYER_CARDS', {
+        player: playerId,
+        area: area,
+        cards: cards
+      });
+    }
   }
 
   /**
@@ -1986,7 +2034,15 @@ class HololiveBattleEngine {
   }
 
   startTurn() {
-    console.log(`ターン${this.gameState.turnCount}開始 - プレイヤー${this.gameState.currentPlayer}のターン`);
+    // プレイヤー別ターン回数を増加（ターン開始時）
+    const currentPlayerTurnCount = this.stateManager.getStateByPath(`turn.playerTurnCount.${this.gameState.currentPlayer}`) || 0;
+    this.stateManager.updateState('PLAYER_TURN_CHANGE', {
+      player: this.gameState.currentPlayer,
+      turnCount: currentPlayerTurnCount + 1
+    });
+    
+    const playerTurnCount = currentPlayerTurnCount + 1;
+    console.log(`プレイヤー${this.gameState.currentPlayer}のターン${playerTurnCount}開始 (全体ターン${this.gameState.turnCount})`);
     this.gameState.currentPhase = 0; // リセットステップから開始
     this.updateTurnInfo(); // ターン情報を更新
     this.updateUI();
@@ -2242,7 +2298,8 @@ class HololiveBattleEngine {
     
     switch (dropZone.type) {
       case 'center':
-        return !this.players[1].center; // 空の場合のみ
+        // センターは空の場合も、カードがある場合（ブルーム/交換）も有効
+        return true;
       case 'back':
         return this.canPlaceCardInBackSlot(card, dropZone.index);
       default:

@@ -30,16 +30,51 @@ class HololiveTurnManager {
     this.gameState.currentPlayer = this.gameState.currentPlayer === 1 ? 2 : 1;
     this.gameState.currentPhase = 0;
     
+    // 前のプレイヤーのブルームフラグをリセット
+    const previousPlayer = this.gameState.currentPlayer === 1 ? 2 : 1;
+    this.engine.stateManager.updateState('RESET_BLOOM_FLAGS', {
+      player: previousPlayer
+    });
+    
+    // プレイヤー別ターン数を更新（新しいプレイヤーのターン開始時に増加）
+    const newPlayer = this.gameState.currentPlayer;
+    const currentPlayerTurnCount = this.engine.stateManager.getStateByPath(`turn.playerTurnCount.${newPlayer}`) || 0;
+    const newPlayerTurnCount = currentPlayerTurnCount + 1;
+    
+    // State Managerを通じてプレイヤー別ターン数を更新
+    this.engine.stateManager.updateState('UPDATE_PLAYER_TURN', {
+      player: newPlayer,
+      turnCount: newPlayerTurnCount
+    });
+    
+    console.log(`プレイヤー${newPlayer}のターン回数を更新: ${currentPlayerTurnCount} → ${newPlayerTurnCount}`);
+    
+    // 全体ターン数の更新（プレイヤー1に戻った時のみ）
     if (this.gameState.currentPlayer === 1) {
-      this.gameState.turnCount++;
+      // プレイヤー1に戻った時は常に全体ターン数を増加
+      // ただし、ゲーム最初のプレイヤー1のターンは除外
+      const player1TurnCount = newPlayerTurnCount; // 上で更新済み
+      if (player1TurnCount > 1) {
+        // プレイヤー1が既に2回以上ターンを実行している場合のみ増加（初回を除く）
+        this.gameState.turnCount++;
+        console.log(`全体ターン数を増加: ${this.gameState.turnCount} (プレイヤー1の${player1TurnCount}回目のターン)`);
+      } else {
+        console.log(`最初のサイクル: 全体ターン数維持 ${this.gameState.turnCount} (プレイヤー1の${player1TurnCount}回目のターン)`);
+      }
     }
     
     console.log(`新しいターン - プレイヤー${this.gameState.currentPlayer}, ターン数: ${this.gameState.turnCount}`);
     
-    // ターン開始をログに記録
-    if (window.infoPanelManager) {
-      window.infoPanelManager.logTurnStart(this.gameState.currentPlayer, this.gameState.turnCount);
-    }
+    // プレイヤー別ターン回数を取得してログに含める（プレイヤー切り替え後の状態）
+    setTimeout(() => {
+      const playerTurnCount = this.engine.stateManager.getStateByPath(`turn.playerTurnCount.${this.gameState.currentPlayer}`) || 0;
+      console.log(`プレイヤー${this.gameState.currentPlayer}のターン回数: ${playerTurnCount} (ターン開始前)`);
+      
+      // ターン開始をログに記録（プレイヤー別ターン回数を表示）
+      if (window.infoPanelManager) {
+        window.infoPanelManager.logTurnStart(`プレイヤー${this.gameState.currentPlayer}(${playerTurnCount + 1}回目)`, this.gameState.turnCount);
+      }
+    }, 100);
     
     this.engine.updateTurnInfo();
     this.engine.updateUI();
@@ -85,17 +120,20 @@ class HololiveTurnManager {
     
     const playerName = this.gameState.currentPlayer === 1 ? 'プレイヤー' : '対戦相手';
     
+    // プレイヤー別ターン回数を取得
+    const playerTurnCount = this.engine.stateManager.getStateByPath(`turn.playerTurnCount.${this.gameState.currentPlayer}`) || 0;
+    
     // PhaseControllerが初期化されているかチェック
     const phaseName = this.engine.phaseController 
       ? this.engine.phaseController.phaseNames[this.gameState.currentPhase + 1] 
       : '準備中'; // フォールバック
     
-    turnInfo.textContent = `${playerName}のターン - ${phaseName} (ターン${this.gameState.turnCount})`;
+    turnInfo.textContent = `${playerName}のターン${playerTurnCount} - ${phaseName} (全体ターン${this.gameState.turnCount})`;
     
     // 情報パネルも更新
     if (window.updateGameStep) {
       const currentPlayer = this.gameState.currentPlayer === 1 ? 'player' : 'opponent';
-      window.updateGameStep(phaseName, `${playerName}のターン`, this.gameState.turnCount, currentPlayer);
+      window.updateGameStep(phaseName, `${playerName}のターン${playerTurnCount}`, this.gameState.turnCount, currentPlayer);
     }
   }
 
@@ -462,7 +500,7 @@ class HololiveTurnManager {
   resetTurnState() {
     this.gameState.currentPlayer = 1;
     this.gameState.currentPhase = -1;
-    this.gameState.turnCount = 1;
+    this.gameState.turnCount = 0; // 初期値は0、ゲーム開始時に1になる
     this.gameState.turnOrderDecided = false;
   }
 }

@@ -4,15 +4,13 @@
  */
 
 class HololiveStateManager {
-  constructor() {
+  constructor(battleEngine = null) {
+    this.battleEngine = battleEngine;
     this.state = this.createInitialState();
     this.listeners = new Map(); // イベントリスナー管理
     this.stateHistory = []; // 状態履歴（デバッグ用）
     this.maxHistorySize = 50;
     this.transitionInProgress = false; // 状態遷移中フラグ
-    
-    console.log('State Manager初期化完了');
-    this.logStateChange('INIT', 'State Manager initialized');
   }
 
   /**
@@ -34,8 +32,9 @@ class HololiveStateManager {
       turn: {
         currentPlayer: 1,
         currentPhase: -1, // -1: 準備, 0-5: リセット〜エンド
-        turnCount: 1,
-        firstPlayer: null
+        turnCount: 0, // ゲーム開始前は0、最初のターン開始時に1になる
+        firstPlayer: null,
+        playerTurnCount: { 1: 0, 2: 0 } // 各プレイヤーのターン回数
       },
       
       // マリガン状態
@@ -151,16 +150,30 @@ class HololiveStateManager {
    * @param {Object} payload - 更新データ
    */
   updateState(actionType, payload) {
-    if (this.transitionInProgress) {
+    // UPDATE_PLAYER_CARDSは状態遷移中でも安全に実行可能
+    if (this.transitionInProgress && actionType !== 'UPDATE_PLAYER_CARDS') {
       console.warn(`状態遷移中のため更新をスキップ: ${actionType}`);
-      return false;
+      return { success: false, reason: 'transition_in_progress' };
     }
 
-    this.transitionInProgress = true;
+    // UPDATE_PLAYER_CARDSの場合は遷移フラグを設定しない
+    if (actionType !== 'UPDATE_PLAYER_CARDS') {
+      this.transitionInProgress = true;
+    }
     
     try {
       const oldState = this.deepClone(this.state);
-      const newState = this.applyStateUpdate(oldState, actionType, payload);
+      const result = this.applyStateUpdate(oldState, actionType, payload);
+      
+      // applyStateUpdateの戻り値を確認
+      if (result && typeof result === 'object' && result.success !== undefined) {
+        if (actionType !== 'UPDATE_PLAYER_CARDS') {
+          this.transitionInProgress = false;
+        }
+        return result;
+      }
+      
+      const newState = result;
       
       // 状態の妥当性チェック
       if (this.validateState(newState)) {
@@ -175,16 +188,23 @@ class HololiveStateManager {
         this.notifyListeners(actionType, payload, oldState, newState);
         
         this.logStateChange(actionType, payload);
-        return true;
+        
+        if (actionType !== 'UPDATE_PLAYER_CARDS') {
+          this.transitionInProgress = false;
+        }
+        return { success: true };
       } else {
         console.error(`状態の妥当性チェックに失敗: ${actionType}`, payload);
-        return false;
+        return { success: false, reason: 'validation_failed' };
       }
     } catch (error) {
       console.error(`状態更新中にエラーが発生: ${actionType}`, error);
-      return false;
+      return { success: false, reason: 'error', error: error.message };
     } finally {
-      this.transitionInProgress = false;
+      // UPDATE_PLAYER_CARDSの場合はフラグをクリアしない
+      if (actionType !== 'UPDATE_PLAYER_CARDS') {
+        this.transitionInProgress = false;
+      }
     }
   }
 
@@ -199,6 +219,9 @@ class HololiveStateManager {
         newState.game.started = true;
         newState.ui.buttonsEnabled.startGame = false;
         newState.ui.buttonsEnabled.nextPhase = true;
+        
+        // ゲーム開始時：全体ターン数のみ1に設定（プレイヤーターン回数は最初のターン開始時に設定）
+        newState.turn.turnCount = 1; // 最初のターンなので1
         break;
         
       case 'GAME_STOP':
@@ -219,14 +242,43 @@ class HololiveStateManager {
         break;
         
       case 'PLAYER_CHANGE':
+        const oldPlayer = newState.turn.currentPlayer;
         newState.turn.currentPlayer = payload.player;
-        if (payload.player === 1) {
-          newState.turn.turnCount++;
-        }
+        
+        // プレイヤー別ターン回数の自動増加は無効化（turn-manager.jsで手動管理）
+        // 従来の全体ターンカウントも無効化（turn-manager.jsで管理）
         break;
         
       case 'TURN_COUNT_CHANGE':
         newState.turn.turnCount = payload.count;
+        break;
+        
+      case 'PLAYER_TURN_CHANGE':
+        // プレイヤー別ターン数を手動で設定
+        if (payload.player && payload.turnCount !== undefined) {
+          newState.turn.playerTurnCount[payload.player] = payload.turnCount;
+        }
+        break;
+        
+      case 'UPDATE_PLAYER_TURN':
+        // プレイヤー別ターン数を更新
+        if (payload.player && payload.turnCount !== undefined) {
+          newState.turn.playerTurnCount[payload.player] = payload.turnCount;
+        }
+        break;
+        
+      case 'RESET_BLOOM_FLAGS':
+        // プレイヤーの全カードのブルームフラグをリセット
+        if (payload.player && newState.players[payload.player]) {
+          const player = newState.players[payload.player];
+          const positions = ['center', 'collab', 'back1', 'back2', 'back3', 'back4', 'back5'];
+          
+          positions.forEach(position => {
+            if (player[position]?.cardState) {
+              player[position].cardState.bloomedThisTurn = false;
+            }
+          });
+        }
         break;
         
       case 'SET_WINNER':
@@ -326,15 +378,160 @@ class HololiveStateManager {
             const sourceCard = player.cards[payload.sourcePosition];
             const targetCard = player.cards[payload.targetPosition];
             
-            console.log(`[SWAP_CARDS] 交換前 - ${payload.sourcePosition}: ${sourceCard ? sourceCard.name : 'null'}, ${payload.targetPosition}: ${targetCard ? targetCard.name : 'null'}`);
-            
             // 位置を交換
             player.cards[payload.sourcePosition] = targetCard;
             player.cards[payload.targetPosition] = sourceCard;
-            
-            console.log(`[SWAP_CARDS] 交換後 - ${payload.sourcePosition}: ${player.cards[payload.sourcePosition] ? player.cards[payload.sourcePosition].name : 'null'}, ${payload.targetPosition}: ${player.cards[payload.targetPosition] ? player.cards[payload.targetPosition].name : 'null'}`);
           }
         }
+        break;
+        
+      case 'PLACE_CARD':
+        // カード配置（ブルームの場合は重ね置き）
+        if (payload.player && payload.card && payload.position) {
+          const player = newState.players[payload.player];
+          if (player) {
+            // Battle Engineの最新データも確認
+            const battleEnginePlayer = this.battleEngine?.players?.[payload.player];
+            
+            // ブルーム配置の場合（バックポジション且つ既存カードがある）
+            if (payload.position.startsWith('back')) {
+              // Battle Engineデータを優先して確認
+              const existingCard = battleEnginePlayer?.[payload.position] || player[payload.position];
+              if (existingCard) {
+                // ブルーム: 新しいカードを上に重ね、下のカードをstackedCardsに移動
+                console.log(`[PLACE_CARD/BACK] ブルーム処理開始: ${existingCard.name} → ${payload.card.name}`);
+                console.log(`[PLACE_CARD/BACK] 新しいカード画像URL: ${payload.card.image_url}`);
+                
+                const newCard = this.addCardState(payload.card, {
+                  bloomedThisTurn: true,
+                  playedTurn: newState.turn.turnCount,
+                  bloomedFromCard: existingCard,
+                  // 既存カードから状態を引き継ぎ
+                  resting: existingCard.cardState?.resting || false,
+                  damage: existingCard.cardState?.damage || 0,
+                  yellCards: existingCard.yellCards || existingCard.cardState?.yellCards || [],
+                  supportCards: existingCard.cardState?.supportCards || [],
+                  stackedCards: [
+                    ...(existingCard.cardState?.stackedCards || []),
+                    existingCard
+                  ]
+                });
+                
+                // エール引き継ぎを確実にする追加処理
+                if (existingCard.yellCards && existingCard.yellCards.length > 0) {
+                  newCard.yellCards = [...existingCard.yellCards];
+                  console.log(`[PLACE_CARD/BACK] エール引継ぎ: ${existingCard.yellCards.length}枚`);
+                }
+                
+                // 新しいカードの情報を確認
+                console.log(`[PLACE_CARD/BACK] 配置完了: ${newCard.name}, 画像URL: ${newCard.image_url}`);
+                
+                player[payload.position] = newCard; // 直接プロパティアクセス
+                
+                // ブルーム完了フラグを設定
+                this.bloomCompleted = true;
+              } else {
+                // 通常配置
+                const newCard = this.addCardState(payload.card, {
+                  playedTurn: newState.turn.turnCount,
+                  playedByPlayer: payload.player
+                });
+                player[payload.position] = newCard; // 直接プロパティアクセス
+              }
+            } else if (payload.position === 'center') {
+              // センターポジションの場合
+              const existingCard = battleEnginePlayer?.center || player.center;
+              if (existingCard) {
+                // ブルーム: 新しいカードを上に重ね、下のカードをstackedCardsに移動
+                console.log(`[PLACE_CARD/CENTER] ブルーム処理開始: ${existingCard.name} → ${payload.card.name}`);
+                console.log(`[PLACE_CARD/CENTER] 新しいカード画像URL: ${payload.card.image_url}`);
+                
+                const newCard = this.addCardState(payload.card, {
+                  bloomedThisTurn: true,
+                  playedTurn: newState.turn.turnCount,
+                  bloomedFromCard: existingCard,
+                  // 既存カードから状態を引き継ぎ
+                  resting: existingCard.cardState?.resting || false,
+                  damage: existingCard.cardState?.damage || 0,
+                  yellCards: existingCard.yellCards || existingCard.cardState?.yellCards || [],
+                  supportCards: existingCard.cardState?.supportCards || [],
+                  stackedCards: [
+                    ...(existingCard.cardState?.stackedCards || []),
+                    existingCard
+                  ]
+                });
+                
+                // エール引き継ぎを確実にする追加処理
+                if (existingCard.yellCards && existingCard.yellCards.length > 0) {
+                  newCard.yellCards = [...existingCard.yellCards];
+                  console.log(`[PLACE_CARD/CENTER] エール引継ぎ: ${existingCard.yellCards.length}枚`);
+                }
+                
+                // 新しいカードの情報を確認
+                console.log(`[PLACE_CARD/CENTER] 配置完了: ${newCard.name}, 画像URL: ${newCard.image_url}`);
+                
+                player.center = newCard; // 直接プロパティアクセス
+                
+                // ブルーム完了フラグを設定
+                this.bloomCompleted = true;
+              } else {
+                // 通常配置
+                const newCard = this.addCardState(payload.card, {
+                  playedTurn: newState.turn.turnCount,
+                  playedByPlayer: payload.player
+                });
+                player.center = newCard; // 直接プロパティアクセス
+              }
+            } else {
+              // その他のポジション（コラボなど）
+              player.cards[payload.position] = payload.card;
+            }
+            
+            // 手札から配置した場合は手札から削除
+            if (player.cards.hand) {
+              const handIndex = player.cards.hand.findIndex(handCard => 
+                handCard.id === payload.card.id || handCard.name === payload.card.name
+              );
+              if (handIndex !== -1) {
+                player.cards.hand.splice(handIndex, 1);
+              }
+            }
+            
+            // Battle Engineのプレイヤーデータと同期
+            if (this.battleEngine?.players?.[payload.player]) {
+              
+              // Battle Engineプレイヤーデータを直接更新（確実な同期）
+              try {
+                // 新しいカードデータをディープコピーして設定
+                const updatedCard = JSON.parse(JSON.stringify(player[payload.position]));
+                
+                // エール情報を確実に引き継ぎ
+                if (updatedCard.yellCards && Array.isArray(updatedCard.yellCards)) {
+                  console.log(`[Battle Engine同期] エール情報引継ぎ: ${updatedCard.yellCards.length}枚`);
+                }
+                
+                // 同期するカード情報をログ出力
+                console.log(`[Battle Engine同期] カード名: ${updatedCard.name}, 画像URL: ${updatedCard.image_url}`);
+                console.log(`[Battle Engine同期] ポジション: ${payload.position}, プレイヤー: ${payload.player}`);
+                
+                this.battleEngine.players[payload.player][payload.position] = updatedCard;
+                
+                // UI更新は呼び出し元で適切なタイミングで行う
+                console.log(`[Battle Engine同期] 同期完了、UI更新は呼び出し元で実行`);
+                
+                // 成功を返す
+                return { success: true, card: updatedCard };
+                
+              } catch (error) {
+                console.error(`[PLACE_CARD] Battle Engine同期エラー:`, error);
+                // フォールバック：直接代入
+                this.battleEngine.players[payload.player][payload.position] = player[payload.position];
+                return { success: false, error: error.message };
+              }
+            }
+          }
+        }
+        return { success: true };
         break;
 
       case 'ADD_BLOOM_HISTORY':
@@ -524,12 +721,26 @@ class HololiveStateManager {
         resting: false,              // お休み状態か
         playedTurn: null,            // プレイされたターン
         bloomedFromCard: null,       // ブルーム元のカード（ブルームの場合）
+        damage: 0,                   // 受けているダメージ
+        yellCards: [],               // 付いているエールカード
+        supportCards: [],            // 付いているサポートカード
+        stackedCards: [],            // 重なっているホロメンカード
         uniqueId: null               // 一意識別子（同名カード識別用）
       };
     }
     
+    // 既存のエール情報を保持（カードの直接プロパティとcardState両方チェック）
+    if (cardWithState.yellCards && !cardWithState.cardState.yellCards.length) {
+      cardWithState.cardState.yellCards = [...cardWithState.yellCards];
+    }
+    
     // 状態情報を更新
     Object.assign(cardWithState.cardState, stateInfo);
+    
+    // エール情報をカードの直接プロパティにも設定（UI表示用）
+    if (cardWithState.cardState.yellCards && cardWithState.cardState.yellCards.length > 0) {
+      cardWithState.yellCards = [...cardWithState.cardState.yellCards];
+    }
     
     // 一意識別子がない場合は生成
     if (!cardWithState.cardState.uniqueId) {
@@ -553,6 +764,10 @@ class HololiveStateManager {
         resting: false,
         playedTurn: null,
         bloomedFromCard: null,
+        damage: 0,
+        yellCards: [],
+        supportCards: [],
+        stackedCards: [],
         uniqueId: null
       };
     }
@@ -626,6 +841,10 @@ class HololiveStateManager {
   checkDropValidity(card, targetPosition, playerId = 1) {
     const currentState = this.getState();
     
+    // デバッグ用: 現在の状態を表示
+    const playerTurnCount = currentState.turn.playerTurnCount[playerId] || 0;
+    console.log(`[checkDropValidity] ターン: ${currentState.turn.turnCount}, プレイヤー${playerId}ターン回数: ${playerTurnCount}, フェーズ: ${currentState.turn.currentPhase}, 現在プレイヤー: ${currentState.turn.currentPlayer}`);
+    
     // 基本的なバリデーション
     if (!card || !targetPosition) {
       return {
@@ -633,6 +852,9 @@ class HololiveStateManager {
         reason: 'カードまたはドロップ先が指定されていません'
       };
     }
+
+    // ドラッグソースの確認（ブルーム制限用）
+    const dragSource = currentState.ui.dragState.dragSource;
 
     // プレイヤーの存在確認
     if (!currentState.players[playerId]) {
@@ -670,9 +892,57 @@ class HololiveStateManager {
     }
 
     // その他のフェーズでの制限
+    const player = currentState.players[playerId];
+    
+    // ブルーム配置の制限チェック（メインステップでのみ可能）
+    if ((targetPosition.startsWith('back') || targetPosition === 'center') && currentPhase === 3) {
+      const targetCard = targetPosition === 'center' 
+        ? player.center 
+        : player[targetPosition];
+        
+      console.log(`[checkDropValidity] ブルーム対象確認: targetCard = ${targetCard ? targetCard.name : 'なし'}`);
+        
+      if (targetCard && this.checkBloomCompatibility(card, targetCard).valid) {
+        console.log(`[checkDropValidity] ブルーム互換性確認OK: ${card.name} → ${targetCard.name}`);
+        
+        // ブルーム操作の場合の制限チェック
+        
+        // 1. 手札からのみ可能チェック
+        if (!dragSource || dragSource !== 'hand') {
+          console.log(`[checkDropValidity] 手札制限により拒否: dragSource = ${dragSource}`);
+          return {
+            valid: false,
+            reason: 'ブルームは手札からのみ可能です'
+          };
+        }
+        
+        // 2. ターン制限チェック
+        console.log(`[checkDropValidity] canBloomチェック実行中...`);
+        const canBloomResult = this.canBloom(card, targetCard, playerId);
+        if (!canBloomResult.valid) {
+          console.log(`[checkDropValidity] canBloomにより拒否: ${canBloomResult.reason}`);
+          return canBloomResult;
+        }
+        console.log(`[checkDropValidity] canBloomチェック通過`);
+      }
+    }
+    
+    // メインステップ以外でのブルーム試行を拒否
+    if ((targetPosition.startsWith('back') || targetPosition === 'center') && currentPhase !== 3) {
+      const targetCard = targetPosition === 'center' 
+        ? player.cards.center 
+        : player.cards.back_positions[targetPosition];
+        
+      if (targetCard && this.checkBloomCompatibility(card, targetCard).valid) {
+        console.log(`[checkDropValidity] フェーズ制限により拒否: 現在フェーズ${currentPhase}, ブルームはメインステップ(3)でのみ可能`);
+        return {
+          valid: false,
+          reason: 'ブルームはメインステップでのみ可能です'
+        };
+      }
+    }
+    
     if (currentPhase === 3) { // メインステップ
-      const player = currentState.players[playerId];
-      
       // コラボポジションの制限チェック
       if (targetPosition === 'collab') {
         return this.checkCollabPlacement(card, player);
@@ -686,6 +956,11 @@ class HololiveStateManager {
       // ブルーム配置の制限チェック（バックスロット）
       if (targetPosition.startsWith('back')) {
         return this.checkBloomPlacement(card, targetPosition, player);
+      }
+      
+      // ブルーム配置の制限チェック（センターポジション）
+      if (targetPosition === 'center') {
+        return this.checkBloomPlacement(card, 'center', player);
       }
     }
 
@@ -735,9 +1010,17 @@ class HololiveStateManager {
     };
   }
 
-  // ブルーム配置のチェック
+  // ブルーム配置のチェック（公式ルールver1.40準拠）
   checkBloomPlacement(card, targetPosition, player) {
-    const targetCard = player.cards[targetPosition];
+    // ターゲットカードの取得（ポジションに応じて適切にアクセス）
+    let targetCard;
+    if (targetPosition === 'center') {
+      targetCard = player.cards.center;
+    } else if (targetPosition.startsWith('back')) {
+      targetCard = player.cards.back_positions[targetPosition];
+    } else {
+      targetCard = player.cards[targetPosition];
+    }
     
     if (!targetCard) {
       return {
@@ -746,17 +1029,28 @@ class HololiveStateManager {
       };
     }
 
-    // 既にブルームしているカードは再度ブルームできない（カード状態ベース）
-    const targetCardState = this.getCardState(targetCard);
-    if (targetCardState.bloomedThisTurn) {
-      return {
-        valid: false,
-        reason: 'このターンに既にブルームしたカードです'
-      };
+    // ブルームは手札からのみ可能
+    // この関数が呼ばれる時点で、ドラッグ元が手札であることを確認する必要がある
+    // ※ 実際のドラッグ元チェックは checkDropValidity で実装
+
+    // 基本的な互換性チェック
+    const compatibilityResult = this.checkBloomCompatibility(card, targetCard, 1);
+    if (!compatibilityResult.valid) {
+      return compatibilityResult;
     }
 
-    // ブルームレベルの互換性チェック
-    return this.checkBloomCompatibility(card, targetCard);
+    // より詳細なブルーム可能性チェック
+    const canBloomResult = this.canBloom(card, targetCard, 1);
+    if (!canBloomResult.valid) {
+      return canBloomResult;
+    }
+
+    return {
+      valid: true,
+      reason: 'ブルーム配置可能',
+      willStayResting: canBloomResult.willStayResting,
+      isBloom: true // ブルームであることを明示
+    };
   }
 
   /**
@@ -896,22 +1190,11 @@ class HololiveStateManager {
           };
         }
         
-        // ブルーム制限チェック
-        if (!this.checkBloomCompatibility(sourceCard, targetPosition, player) ||
-            !this.checkBloomCompatibility(targetCard, sourcePosition, player)) {
-          return {
-            valid: false,
-            reason: 'ブルームレベル制限により交換できません'
-          };
-        }
+        // ホロメンカード同士の基本的な配置チェック（ブルームではない通常の移動）
+        // 実際のブルームは別途 checkBloomPlacement で処理される
       } else {
-        // 空の位置への移動
-        if (!this.checkBloomCompatibility(sourceCard, targetPosition, player)) {
-          return {
-            valid: false,
-            reason: 'このブルームレベルはその位置に配置できません'
-          };
-        }
+        // 空の位置への移動は基本的に許可（ブルーム以外）
+        // ブルーム判定は drag&drop 時に別途実行される
       }
     }
 
@@ -935,47 +1218,73 @@ class HololiveStateManager {
   }
 
   /**
-   * ブルーム互換性チェック
+   * ブルーム互換性チェック（公式ルールver1.40準拠）
    * @param {Object} card - チェックするカード
-   * @param {string} position - 配置先ポジション
-   * @param {Object} player - プレイヤー状態
-   * @returns {boolean} 配置可能かどうか
+   * @param {Object} targetCard - ブルーム対象のカード
+   * @param {number} playerId - プレイヤーID
+   * @returns {Object} チェック結果
    */
-  checkBloomCompatibility(card, position, player) {
-    if (!card.card_type?.includes('ホロメン')) {
-      return true; // ホロメン以外は制限なし
+  checkBloomCompatibility(card, targetCard, playerId) {
+    if (!card.card_type?.includes('ホロメン') || !targetCard.card_type?.includes('ホロメン')) {
+      return {
+        valid: false,
+        reason: 'ブルームはホロメン同士でのみ可能です'
+      };
     }
 
-    const bloomLevel = card.bloom_level;
+    // 1. 同名カード要件チェック
+    if (card.name !== targetCard.name) {
+      return {
+        valid: false,
+        reason: 'ブルームは同名のホロメンカード同士でのみ可能です'
+      };
+    }
+
+    // 2. Spotホロメンのブルーム禁止
+    if (card.bloom_level === 'Spot' || targetCard.bloom_level === 'Spot') {
+      return {
+        valid: false,
+        reason: 'Spotホロメンはブルームできません'
+      };
+    }
+
+    // 3. ブルームレベル制限チェック（公式ルール準拠）
+    const sourceLevel = card.bloom_level;
+    const targetLevel = targetCard.bloom_level;
     
-    // センターエリア（collab, center）は制限なし
-    if (position === 'collab' || position === 'center') {
-      return true;
+    // 正しいブルーム可能組み合わせ
+    const validBloomCombinations = {
+      'Debut': ['1st', '1stBuzz'],                  // Debut → 1st, 1stBuzz のみ
+      '1st': ['1st', '1stBuzz', '2nd'],             // 1st → 1st, 1stBuzz, 2nd
+      '1stBuzz': ['1st', '1stBuzz', '2nd'],         // 1stBuzz → 1st, 1stBuzz, 2nd
+      '2nd': ['2nd']                                // 2nd → 2nd のみ
+    };
+    
+    if (!validBloomCombinations[targetLevel] || !validBloomCombinations[targetLevel].includes(sourceLevel)) {
+      return {
+        valid: false,
+        reason: `${targetLevel} → ${sourceLevel}へのブルームはできません`
+      };
+    }
+    
+    console.log(`[checkBloomCompatibility] ブルーム可能: ${targetLevel} → ${sourceLevel}`);
+
+    // 4. HP・ダメージ制限チェック
+    const targetCardState = this.getCardState(targetCard);
+    const currentDamage = targetCardState.damage || 0;
+    const bloomCardHP = card.hp || 0;
+    
+    if (bloomCardHP <= currentDamage) {
+      return {
+        valid: false,
+        reason: 'Bloom先のHPがダメージ量以下のためブルームできません'
+      };
     }
 
-    // バックスロットの場合
-    if (position.startsWith('back')) {
-      const currentCard = player.cards[position];
-      
-      // Debut, Spotは空のスロットにのみ配置可能
-      if (bloomLevel === 'Debut' || bloomLevel === 'Spot') {
-        return !currentCard;
-      }
-      
-      // 1stは Debut/1st/1stBuzz の上に配置可能
-      if (bloomLevel === '1st') {
-        if (!currentCard) return false;
-        return ['Debut', '1st', '1stBuzz'].includes(currentCard.bloom_level);
-      }
-      
-      // 2ndは 1st/1stBuzz/2nd の上に配置可能
-      if (bloomLevel === '2nd') {
-        if (!currentCard) return false;
-        return ['1st', '1stBuzz', '2nd'].includes(currentCard.bloom_level);
-      }
-    }
-
-    return true;
+    return {
+      valid: true,
+      reason: 'ブルーム可能'
+    };
   }
 
   /**
@@ -1054,35 +1363,132 @@ class HololiveStateManager {
   // =========================================
 
   /**
-   * カードがブルーム可能かチェック
+   * カードがブルームかどうかを判定（新ブルームルール準拠）
+   * @param {Object} card - ブルームしようとするカード（手札から）
+   * @param {Object} targetCard - ブルーム対象のカード（場のカード）
+   * @returns {boolean} ブルームかどうか
+   */
+  isBloom(card, targetCard) {
+    // 基本チェック: カードが存在するか
+    if (!card || !targetCard) {
+      return false;
+    }
+    
+    // 同名チェック
+    if (card.name !== targetCard.name) {
+      return false;
+    }
+    
+    // 新しいブルームルールでレベル組み合わせチェック
+    const sourceLevel = card.bloom_level;      // 手札のカード
+    const targetLevel = targetCard.bloom_level; // 場のカード
+    
+    // 正しいブルーム可能組み合わせ
+    const validBloomCombinations = {
+      'Debut': ['1st', '1stBuzz'],                  // Debut → 1st, 1stBuzz のみ
+      '1st': ['1st', '1stBuzz', '2nd'],             // 1st → 1st, 1stBuzz, 2nd
+      '1stBuzz': ['1st', '1stBuzz', '2nd'],         // 1stBuzz → 1st, 1stBuzz, 2nd
+      '2nd': ['2nd']                                // 2nd → 2nd のみ
+    };
+    
+    return validBloomCombinations[targetLevel]?.includes(sourceLevel) || false;
+  }
+
+  /**
+   * ブルームレベルを数値に変換
+   * @param {string} bloomLevel - ブルームレベル文字列
+   * @returns {number} レベル数値
+   */
+  getBloomLevel(bloomLevel) {
+    switch (bloomLevel) {
+      case 'Debut':
+        return 0;
+      case '1st':
+        return 1;
+      case '2nd':
+        return 2;
+      default:
+        return -1; // 無効なレベル
+    }
+  }
+
+  /**
+   * カードがブルーム可能かチェック（公式ルールver1.40準拠）
    * @param {Object} card - ブルームしようとするカード
    * @param {Object} targetCard - ブルーム対象のカード
    * @param {number} playerId - プレイヤーID
    * @returns {Object} チェック結果
    */
   canBloom(card, targetCard, playerId) {
-    const cardState = this.getCardState(card);
+    const gameState = this.getState();
+    const currentTurn = gameState.turn.turnCount;
+    const playerTurnCount = gameState.turn.playerTurnCount[playerId] || 0;
+    
+    console.log(`[canBloom] ターン制限チェック: プレイヤー${playerId}のターン回数${playerTurnCount}, 全体ターン${currentTurn}`);
+    
+    // 1. 基本的な互換性チェック
+    const compatibilityCheck = this.checkBloomCompatibility(card, targetCard, playerId);
+    if (!compatibilityCheck.valid) {
+      console.log(`[canBloom] 互換性チェック失敗: ${compatibilityCheck.reason}`);
+      return compatibilityCheck;
+    }
+
+    // 2. 初回ターン制限チェック（各プレイヤーの最初のターン）
+    if (playerTurnCount <= 1) {
+      console.log(`[canBloom] ターン制限により拒否: プレイヤー${playerId}のターン回数${playerTurnCount} <= 1`);
+      return {
+        valid: false,
+        reason: `プレイヤー${playerId}の最初のターンではブルームできません`
+      };
+    }
+
+    console.log(`[canBloom] ターン制限チェック通過: プレイヤー${playerId}のターン回数${playerTurnCount} > 1`);
+
+    // 3. カード別ブルーム回数制限チェック（同一カードに対して1ターンに1回のみ）
     const targetCardState = this.getCardState(targetCard);
-
-    // 1. 同ターンに既にブルームしたカードかチェック
-    if (cardState.bloomedThisTurn) {
+    
+    if (targetCardState?.bloomedThisTurn) {
+      console.log(`[canBloom] カード別ブルーム制限により拒否: 対象カードは今ターンに既にブルーム済み`);
       return {
         valid: false,
-        reason: 'このカードは既に今ターンでブルームしています'
+        reason: `このカードは今ターンに既にブルームしています`
       };
     }
 
-    // 2. プレイしたばかりのDebutカードかチェック
-    if (targetCardState.justPlayed) {
+    // 4. カード状態チェック
+    const cardState = this.getCardState(card);
+    // targetCardStateは上で既に取得済み
+
+    // 4. 同ターンに既にブルームしたホロメンかチェック
+    if (targetCardState.bloomedThisTurn) {
       return {
         valid: false,
-        reason: 'プレイしたばかりのDebutカードにはブルームできません（次ターンから可能）'
+        reason: 'このホロメンは既に今ターンでブルームしています'
       };
     }
 
-    // 3. お休み状態の確認（お休みでもブルーム可能、ただし状態は維持）
+    // 5. ステージに出たターンのブルーム禁止
+    console.log(`[canBloom] ステージ出場ターンチェック: targetCard.playedTurn=${targetCardState.playedTurn}, currentTurn=${currentTurn}`);
+    // playedTurnがnullの場合は、古いカードとして扱い、ブルーム可能とする
+    if (targetCardState.justPlayed || (targetCardState.playedTurn !== null && targetCardState.playedTurn === currentTurn)) {
+      console.log(`[canBloom] ステージに出たターンのブルーム禁止: justPlayed=${targetCardState.justPlayed}, playedTurn=${targetCardState.playedTurn}`);
+      return {
+        valid: false,
+        reason: 'ステージに出たターンではブルームできません'
+      };
+    }
+
+    // 6. ブルーム不可能力チェック
+    if (targetCard.abilities?.includes('ブルーム不可') || targetCard.bloom_level === 'Spot') {
+      return {
+        valid: false,
+        reason: 'このホロメンはブルーム不可能力を持っています'
+      };
+    }
+
+    // 7. お休み状態の確認（お休みでもブルーム可能、ただし状態は維持）
     if (targetCardState.resting) {
-      console.log('お休み状態のカードにブルームします（お休み状態は維持されます）');
+      console.log('お休み状態のホロメンにブルームします（お休み状態は維持されます）');
     }
 
     return {
@@ -1093,7 +1499,7 @@ class HololiveStateManager {
   }
 
   /**
-   * ブルーム実行後の状態更新
+   * ブルーム実行後の状態更新（公式ルールver1.40準拠）
    * @param {Object} card - ブルームしたカード
    * @param {Object} targetCard - ブルーム対象のカード  
    * @param {number} playerId - プレイヤーID
@@ -1103,13 +1509,30 @@ class HololiveStateManager {
     const currentTurn = this.state.turn.turnCount;
     const targetCardState = this.getCardState(targetCard);
     
-    // ブルームしたカードに状態を付与
+    // ブルームしたカードに状態を付与し、全ての要素を引き継ぐ
     const updatedCard = this.addCardState(card, {
       bloomedThisTurn: true,
       playedTurn: currentTurn,
       bloomedFromCard: targetCard,
-      resting: targetCardState.resting // ブルーム元の休み状態を継承
+      // 引き継がれる状態
+      resting: targetCardState.resting,           // お休み状態
+      damage: targetCardState.damage || 0,        // ダメージマーカー
+      // 引き継がれる要素
+      yellCards: targetCard.cardState?.yellCards || [],      // エールカード
+      supportCards: targetCard.cardState?.supportCards || [], // サポートカード
+      stackedCards: [                             // 重なっているホロメン
+        ...(targetCard.cardState?.stackedCards || []),
+        targetCard // ブルーム元を重なったカードに追加
+      ]
     });
+    
+    // ブルーム履歴を記録
+    const targetCardUpdatedState = this.addCardState(targetCard, {
+      bloomedThisTurn: true // ブルーム対象のホロメンもブルーム済みマーク
+    });
+    
+    console.log(`ブルーム実行: ${card.name}(${card.bloom_level}) → ${targetCard.name}(${targetCard.bloom_level})`);
+    console.log(`引き継ぎ要素: エール${updatedCard.cardState?.yellCards?.length || 0}枚, サポート${updatedCard.cardState?.supportCards?.length || 0}枚, 重なったカード${updatedCard.cardState?.stackedCards?.length || 0}枚`);
     
     return updatedCard;
   }
@@ -1205,6 +1628,78 @@ class HololiveStateManager {
       valid: true,
       reason: '移動可能'
     };
+  }
+
+  /**
+   * カードにダメージを与える
+   * @param {Object} card - ダメージを受けるカード
+   * @param {number} damage - ダメージ量
+   * @returns {Object} ダメージ後のカード
+   */
+  addDamageToCard(card, damage) {
+    if (!card || damage <= 0) return card;
+    
+    const currentState = this.getCardState(card);
+    const newDamage = (currentState.damage || 0) + damage;
+    
+    return this.addCardState(card, {
+      damage: newDamage
+    });
+  }
+
+  /**
+   * カードのダメージを回復する
+   * @param {Object} card - 回復するカード
+   * @param {number} healAmount - 回復量（省略で全回復）
+   * @returns {Object} 回復後のカード
+   */
+  healCardDamage(card, healAmount = null) {
+    if (!card) return card;
+    
+    const currentState = this.getCardState(card);
+    const currentDamage = currentState.damage || 0;
+    
+    const newDamage = healAmount === null 
+      ? 0 
+      : Math.max(0, currentDamage - healAmount);
+    
+    return this.addCardState(card, {
+      damage: newDamage
+    });
+  }
+
+  /**
+   * エールカードをホロメンに付ける
+   * @param {Object} holomem - ホロメンカード
+   * @param {Object} yellCard - エールカード
+   * @returns {Object} 更新されたホロメンカード
+   */
+  attachYellCard(holomem, yellCard) {
+    if (!holomem || !yellCard) return holomem;
+    
+    const currentState = this.getCardState(holomem);
+    const newYellCards = [...(currentState.yellCards || []), yellCard];
+    
+    return this.addCardState(holomem, {
+      yellCards: newYellCards
+    });
+  }
+
+  /**
+   * サポートカードをホロメンに付ける
+   * @param {Object} holomem - ホロメンカード
+   * @param {Object} supportCard - サポートカード
+   * @returns {Object} 更新されたホロメンカード
+   */
+  attachSupportCard(holomem, supportCard) {
+    if (!holomem || !supportCard) return holomem;
+    
+    const currentState = this.getCardState(holomem);
+    const newSupportCards = [...(currentState.supportCards || []), supportCard];
+    
+    return this.addCardState(holomem, {
+      supportCards: newSupportCards
+    });
   }
 
   /**
@@ -1535,13 +2030,8 @@ class HololiveStateManager {
       };
     }
 
-    // ブルーム制限チェック
-    if (!this.checkBloomCompatibility(sourceCard, targetPosition, player)) {
-      return {
-        valid: false,
-        reason: 'ブルームレベル制限により移動できません'
-      };
-    }
+    // バック同士の移動は基本的に許可（ブルーム判定は別途実行）
+    // 実際のブルーム処理は drag&drop 時に checkBloomPlacement で処理
 
     return {
       valid: true,

@@ -29,3 +29,6 @@ coverage/
 
 # Ignore local data
 *.local
+
+#input_file
+input_file/
