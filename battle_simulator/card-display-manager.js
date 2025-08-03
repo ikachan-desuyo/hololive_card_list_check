@@ -462,7 +462,7 @@ class CardDisplayManager {
       if (areaId === 'collab' || areaId === 'center') {
         // センター配置：ホロメンカードの下に、右部分が少しはみ出るように配置
         // 上下は同じ高さ、左右は右にずらして重ねる
-        const offsetX = -80 + (index * 25); // 右にもっと大きくはみ出し
+        const offsetX = -100 + (index * 25); // 右にもっと大きくはみ出し
         const offsetY = 0; // 上下は同じ高さ
         yellElement.style.transform = `translate(${offsetX}px, ${offsetY}px) scale(1)`;
         yellElement.style.zIndex = `${5 - index}`; // 通常時は後ろに、ホバー時はCSSで250に
@@ -574,7 +574,7 @@ class CardDisplayManager {
       if (areaId === 'collab' || areaId === 'center') {
         // センター配置：ホロメンカードの下に、右部分が少しはみ出るように配置
         // 上下は同じ高さ、左右は右にずらして重ねる
-        const offsetX = -80 + (index * 25); // 右にもっと大きくはみ出し
+        const offsetX = -100 + (index * 25); // 右にもっと大きくはみ出し
         const offsetY = 0; // 上下は同じ高さ
         yellElement.style.transform = `translate(${offsetX}px, ${offsetY}px) scale(1)`;
         yellElement.style.zIndex = `${5 - index}`; // 通常時は後ろに、ホバー時はCSSで250に
