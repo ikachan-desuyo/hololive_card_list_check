@@ -36,6 +36,9 @@ class HololiveBattleEngine {
     
     // ゲームセットアップ管理の初期化
     this.setupManager = new HololiveGameSetupManager(this);
+    
+    // ターン管理の初期化
+    this.turnManager = new HololiveTurnManager(this);
 
     this.initializeGame();
     
@@ -47,6 +50,12 @@ class HololiveBattleEngine {
     
     // カード表示管理の初期化
     this.cardDisplayManager = new CardDisplayManager(this);
+    
+    // 情報パネル管理の初期化
+    if (!window.infoPanelManager) {
+      window.infoPanelManager = new InfoPanelManager();
+    }
+    this.infoPanelManager = window.infoPanelManager;
   }
 
   createPlayerState() {
@@ -304,38 +313,8 @@ class HololiveBattleEngine {
   // setupHandArea メソッドを削除（HandManagerに移動）
 
   updateTurnInfo() {
-    let turnInfo = document.querySelector('.turn-info');
-    if (!turnInfo) {
-      turnInfo = document.createElement('div');
-      turnInfo.className = 'turn-info';
-      document.body.appendChild(turnInfo);
-    }
-    
-    // 準備ステップの場合は特別な表示
-    if (this.gameState.currentPhase === -1) {
-      turnInfo.textContent = '準備ステップ - ゲーム開始準備中';
-      
-      // 情報パネルも更新
-      if (window.updateGameStep) {
-        window.updateGameStep('準備ステップ', 'ゲーム開始準備中', 0, 'system');
-      }
-      return;
-    }
-    
-    const playerName = this.gameState.currentPlayer === 1 ? 'プレイヤー' : '対戦相手';
-    
-    // PhaseControllerが初期化されているかチェック
-    const phaseName = this.phaseController 
-      ? this.phaseController.phaseNames[this.gameState.currentPhase + 1] 
-      : '準備中'; // フォールバック
-    
-    turnInfo.textContent = `${playerName}のターン - ${phaseName} (ターン${this.gameState.turnCount})`;
-    
-    // 情報パネルも更新
-    if (window.updateGameStep) {
-      const currentPlayer = this.gameState.currentPlayer === 1 ? 'player' : 'opponent';
-      window.updateGameStep(phaseName, `${playerName}のターン`, this.gameState.turnCount, currentPlayer);
-    }
+    // Turn Managerに委譲
+    return this.turnManager.updateTurnInfo();
   }
 
   showDeckSelection(playerId = 1) {
@@ -453,42 +432,8 @@ class HololiveBattleEngine {
   }
 
   endTurn() {
-    console.log(`=== ターン終了処理開始 ===`);
-    console.log(`現在のプレイヤー: ${this.gameState.currentPlayer} → 切り替え後: ${this.gameState.currentPlayer === 1 ? 2 : 1}`);
-    
-    // ターン終了
-    this.gameState.currentPlayer = this.gameState.currentPlayer === 1 ? 2 : 1;
-    this.gameState.currentPhase = 0;
-    
-    if (this.gameState.currentPlayer === 1) {
-      this.gameState.turnCount++;
-    }
-    
-    console.log(`新しいターン - プレイヤー${this.gameState.currentPlayer}, ターン数: ${this.gameState.turnCount}`);
-    
-    // ターン開始をログに記録
-    if (window.infoPanelManager) {
-      window.infoPanelManager.logTurnStart(this.gameState.currentPlayer, this.gameState.turnCount);
-    }
-    
-    this.updateTurnInfo();
-    this.updateUI();
-    
-    // フェーズハイライトを更新（重要！）
-    this.updatePhaseHighlight();
-    
-    // 勝利条件の確認
-    this.checkVictoryConditions();
-    
-    console.log(`ターン終了 - プレイヤー${this.gameState.currentPlayer}のターン開始`);
-    console.log(`=== ターン終了処理完了 ===`);
-    
-    // 新しいターンのリセットステップ開始
-    // 両プレイヤーとも自動でリセットステップを開始
-    setTimeout(() => {
-      console.log(`プレイヤー${this.gameState.currentPlayer}のリセットステップ開始`);
-      this.executeResetStep(this.gameState.currentPlayer);
-    }, 1000);
+    // Turn Managerに委譲
+    return this.turnManager.endTurn();
   }
 
   checkVictoryConditions() {
@@ -535,37 +480,168 @@ class HololiveBattleEngine {
   }
 
   resetGame() {
-    // ゲーム状態のリセット
-    this.gameState = {
-      currentPlayer: 1,
-      currentPhase: 0,
-      turnCount: 1,
-      gameStarted: false,
-      gameEnded: false,
-      winner: null,
-      mulliganPhase: false,
-      mulliganCount: { 1: 0, 2: 0 },
-      mulliganCompleted: { 1: false, 2: false },
-      debutPlacementCompleted: { 1: false, 2: false }
-    };
+    try {
+      console.log('ゲームリセット開始...');
+      
+      // ゲーム状態のリセット
+      this.gameState = {
+        currentPlayer: 1,
+        currentPhase: 0,
+        turnCount: 1,
+        gameStarted: false,
+        gameEnded: false,
+        winner: null,
+        mulliganPhase: false,
+        mulliganCount: { 1: 0, 2: 0 },
+        mulliganCompleted: { 1: false, 2: false },
+        debutPlacementCompleted: { 1: false, 2: false },
+        firstPlayer: null, // 先行・後攻をリセット
+        turnOrderDecided: false // 先行・後攻決定状態をリセット
+      };
+      
+      // プレイヤー状態のリセット
+      this.players[1] = this.createPlayerState();
+      this.players[2] = this.createPlayerState();
+      
+      // UI要素の完全クリア
+      this.clearAllUIElements();
+      
+      // 各マネージャーの状態リセット
+      if (this.turnManager) {
+        // Turn Managerの参照を更新
+        this.turnManager.gameState = this.gameState;
+        this.turnManager.players = this.players;
+        console.log('Turn Manager状態をリセット');
+      }
+      
+      if (this.handManager) {
+        // Hand Managerの参照を更新
+        this.handManager.gameState = this.gameState;
+        this.handManager.players = this.players;
+        console.log('Hand Manager状態をリセット');
+      }
+      
+      if (this.cardDisplayManager) {
+        // Card Display Managerの参照を更新
+        this.cardDisplayManager.gameState = this.gameState;
+        this.cardDisplayManager.players = this.players;
+        console.log('Card Display Manager状態をリセット');
+      }
+      
+      if (this.setupManager) {
+        // Setup Managerの参照を更新
+        this.setupManager.gameState = this.gameState;
+        this.setupManager.players = this.players;
+        console.log('Setup Manager状態をリセット');
+      }
+      
+      if (this.phaseController) {
+        // Phase Controllerの参照を更新
+        this.phaseController.gameState = this.gameState;
+        console.log('Phase Controller状態をリセット');
+      }
+      
+      if (this.infoPanelManager) {
+        // Info Panel Managerの状態リセット
+        this.infoPanelManager.updateStepInfo('ゲーム開始準備', '準備フェーズ', 0);
+        this.infoPanelManager.clearCardDetail();
+        this.infoPanelManager.addLogEntry('system', 'ゲームがリセットされました');
+        console.log('Info Panel Manager状態をリセット');
+      }
+      
+      // UIの更新
+      this.updateTurnInfo();
+      this.updateUI();
+      this.updateGameStatus();
+      
+      // コントロールボタンの状態更新
+      document.getElementById('start-game').disabled = false;
+      document.getElementById('start-game').style.background = '#2196f3';
+      document.getElementById('next-phase').disabled = true;
+      document.getElementById('end-turn').disabled = true;
+      
+      console.log('ゲームをリセットしました');
+      alert('ゲームがリセットされました。\n新しいバトルを開始できます。');
+      
+    } catch (error) {
+      console.error('ゲームリセット中にエラーが発生:', error);
+      alert('ゲームリセット中にエラーが発生しました。ページをリロードしてください。');
+    }
+  }
+  
+  // UI要素の完全クリア用メソッド
+  clearAllUIElements() {
+    // カード表示エリアのクリア
+    const cardAreas = [
+      'player1-center1', 'player1-center2', 'player1-oshi',
+      'player1-back1', 'player1-back2', 'player1-back3', 'player1-back4', 'player1-back5',
+      'player2-center1', 'player2-center2', 'player2-oshi',
+      'player2-back1', 'player2-back2', 'player2-back3', 'player2-back4', 'player2-back5'
+    ];
     
-    // プレイヤー状態のリセット
-    this.players[1] = this.createPlayerState();
-    this.players[2] = this.createPlayerState();
+    cardAreas.forEach(areaId => {
+      const area = document.getElementById(areaId);
+      if (area) {
+        area.innerHTML = '';
+        area.classList.remove('occupied', 'selected', 'highlighted');
+      }
+    });
     
-    // UIの更新
-    this.updateTurnInfo();
-    this.updateUI();
-    this.updateGameStatus();
+    // 手札エリアのクリア
+    const handAreas = ['player1-hand', 'player2-hand'];
+    handAreas.forEach(areaId => {
+      const area = document.getElementById(areaId);
+      if (area) {
+        area.innerHTML = '';
+      }
+    });
     
-    // コントロールボタンの状態更新
-    document.getElementById('start-game').disabled = false;
-    document.getElementById('start-game').style.background = '#2196f3';
-    document.getElementById('next-phase').disabled = true;
-    document.getElementById('end-turn').disabled = true;
+    // ライフエリアのクリア
+    const lifeAreas = ['player1-life', 'player2-life'];
+    lifeAreas.forEach(areaId => {
+      const area = document.getElementById(areaId);
+      if (area) {
+        area.innerHTML = '';
+      }
+    });
     
-    console.log('ゲームをリセットしました');
-    alert('ゲームがリセットされました。\n新しいバトルを開始できます。');
+    // アーカイブエリアのクリア
+    const archiveAreas = ['player1-archive', 'player2-archive'];
+    archiveAreas.forEach(areaId => {
+      const area = document.getElementById(areaId);
+      if (area) {
+        area.innerHTML = '';
+      }
+    });
+    
+    // ゲーム状態表示のクリア
+    const statusElement = document.getElementById('game-status');
+    if (statusElement) {
+      statusElement.textContent = 'ゲーム準備中';
+    }
+    
+    // カードカウンターのクリア
+    const allCounters = document.querySelectorAll('.card-counter');
+    allCounters.forEach(counter => {
+      counter.remove();
+    });
+    
+    // デッキ情報表示のクリア（レガシーコントロールパネル内）
+    const deckStatusElements = ['deck-status', 'opponent-deck-status'];
+    deckStatusElements.forEach(statusId => {
+      const element = document.getElementById(statusId);
+      if (element) {
+        element.innerHTML = '';
+      }
+    });
+    
+    // レガシーのready-status要素をクリア
+    const readyStatusElement = document.getElementById('ready-status');
+    if (readyStatusElement) {
+      readyStatusElement.textContent = '準備: 未完了';
+    }
+    
+    console.log('UI要素をクリアしました（Info Panelは保持）');
   }
 
   handleCardAreaClick(event) {
@@ -883,45 +959,13 @@ class HololiveBattleEngine {
 
   // マリガン処理開始
   startMulliganPhase() {
-    // 先行・後攻が決定されているか確認
-    if (!this.gameState.firstPlayer) {
-      console.error('先行・後攻が決定されていません');
-      return;
-    }
-    
-    this.gameState.mulliganPhase = true;
-    console.log('マリガンフェーズ開始');
-    
-    // 先行プレイヤーから順番にマリガンチェック
-    this.checkMulligan(this.gameState.firstPlayer);
+    // Turn Managerに委譲
+    return this.turnManager.startMulliganPhase();
   }
 
   checkMulligan(playerId) {
-    // プレイヤーの存在確認
-    if (!playerId || !this.players[playerId]) {
-      console.error(`無効なプレイヤーID: ${playerId}`);
-      return;
-    }
-    
-    const player = this.players[playerId];
-    
-    // 手札の存在確認
-    if (!player.hand || !Array.isArray(player.hand)) {
-      console.error(`プレイヤー${playerId}の手札が無効です:`, player.hand);
-      return;
-    }
-    
-    const hasDebut = player.hand.some(card => 
-      card.card_type && card.card_type.includes('ホロメン') && card.bloom_level === 'Debut'
-    );
-    
-    if (!hasDebut) {
-      // Debutがない場合は強制マリガン
-      this.showMulliganUI(playerId, true);
-    } else {
-      // Debutがある場合は選択可能
-      this.showMulliganUI(playerId, false);
-    }
+    // Turn & Mulligan Managerに委譲
+    return this.turnMulliganManager.checkMulligan(playerId);
   }
 
   showMulliganUI(playerId, isForced) {

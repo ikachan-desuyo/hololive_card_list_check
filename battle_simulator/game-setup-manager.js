@@ -184,6 +184,12 @@ class HololiveGameSetupManager {
   executeGameSetup() {
     console.log('ゲームセットアップ実行');
     
+    // デバッグ：ゲーム状態確認
+    console.log('=== ゲーム状態確認 ===');
+    console.log('gameStarted:', this.gameState.gameStarted);
+    console.log('firstPlayer:', this.gameState.firstPlayer);
+    console.log('turnOrderDecided:', this.gameState.turnOrderDecided);
+    
     // 0. 先行・後攻の決定
     this.decideTurnOrder();
     
@@ -363,25 +369,44 @@ class HololiveGameSetupManager {
    * 先行・後攻の決定
    */
   decideTurnOrder() {
+    console.log('=== decideTurnOrder 開始 ===');
+    console.log('turnOrderDecided:', this.gameState.turnOrderDecided);
+    
     if (this.gameState.turnOrderDecided) {
+      console.log('先行・後攻は既に決定済みです');
       return;
     }
 
     // ランダムで先行・後攻を決定
     const randomFirstPlayer = Math.random() < 0.5 ? 1 : 2;
+    console.log('ランダム先行プレイヤー:', randomFirstPlayer);
     
     // ポップアップで選択
     this.showTurnOrderPopup(randomFirstPlayer);
+    
+    console.log('=== decideTurnOrder 完了 ===');
   }
 
   /**
    * 先行・後攻選択のポップアップを表示
    */
   showTurnOrderPopup(suggestedPlayer) {
+    console.log('=== showTurnOrderPopup 開始 ===');
+    console.log('推奨プレイヤー:', suggestedPlayer);
+    console.log('modalUI:', this.modalUI);
+    
     // モーダルUIで選択
-    this.modalUI.showTurnOrderModal(0.5, suggestedPlayer, (playerId, isManual) => {
-      this.setFirstPlayer(playerId, isManual);
-    });
+    if (this.modalUI && this.modalUI.showTurnOrderModal) {
+      console.log('モーダルUI呼び出し開始');
+      this.modalUI.showTurnOrderModal(0.5, suggestedPlayer, (playerId, isManual) => {
+        console.log('モーダルコールバック実行:', playerId, isManual);
+        this.setFirstPlayer(playerId, isManual);
+      });
+    } else {
+      console.error('モーダルUIまたはshowTurnOrderModalが利用できません');
+    }
+    
+    console.log('=== showTurnOrderPopup 完了 ===');
   }
 
   /**
