@@ -1,0 +1,549 @@
+/**
+ * Placement Controller
+ * フェーズや状態に応じたカード配置制御を管理
+ */
+
+class HololivePlacementController {
+  constructor(battleEngine) {
+    this.engine = battleEngine;
+    this.gameState = battleEngine.gameState;
+    this.players = battleEngine.players;
+    
+    // 配置ルール定義
+    this.placementRules = this.initializePlacementRules();
+    
+    console.log('Placement Controller初期化完了');
+  }
+
+  /**
+   * 配置ルールの初期化
+   */
+  initializePlacementRules() {
+    return {
+      // 準備ステップ（フェーズ -1）
+      PREPARATION: {
+        phase: -1,
+        name: '準備ステップ',
+        description: 'ゲーム開始準備中',
+        allowedPlacements: {
+          collab: { allowed: false, reason: '準備ステップでは配置不可' },
+          center: { allowed: false, reason: '準備ステップでは配置不可' },
+          back1: { allowed: false, reason: '準備ステップでは配置不可' },
+          back2: { allowed: false, reason: '準備ステップでは配置不可' },
+          back3: { allowed: false, reason: '準備ステップでは配置不可' },
+          back4: { allowed: false, reason: '準備ステップでは配置不可' },
+          back5: { allowed: false, reason: '準備ステップでは配置不可' },
+          support: { allowed: false, reason: '準備ステップでは配置不可' }
+        }
+      },
+
+      // Debut配置フェーズ（特別フェーズ）
+      DEBUT_PLACEMENT: {
+        phase: 'debut',
+        name: 'Debut配置フェーズ',
+        description: 'Debutホロメンの初期配置',
+        allowedPlacements: {
+          collab: { 
+            allowed: false, 
+            reason: 'Debut配置フェーズではコラボに配置不可'
+          },
+          center: { 
+            allowed: true, 
+            conditions: [
+              { type: 'cardType', value: 'ホロメン', message: 'ホロメンカードのみ配置可能' },
+              { type: 'bloomLevel', value: 'Debut', message: 'Debutレベルのみ配置可能' },
+              { type: 'maxCount', value: 1, message: 'センターには1枚まで' },
+              { type: 'required', value: true, message: 'センターへの配置は必須' }
+            ]
+          },
+          back1: { 
+            allowed: true, 
+            conditions: [
+              { type: 'cardType', value: 'ホロメン', message: 'ホロメンカードのみ配置可能' },
+              { type: 'bloomLevel', value: 'Debut', message: 'Debutレベルのみ配置可能' },
+              { type: 'maxCount', value: 1, message: 'バック①には1枚まで' }
+            ]
+          },
+          back2: { 
+            allowed: true, 
+            conditions: [
+              { type: 'cardType', value: 'ホロメン', message: 'ホロメンカードのみ配置可能' },
+              { type: 'bloomLevel', value: 'Debut', message: 'Debutレベルのみ配置可能' },
+              { type: 'maxCount', value: 1, message: 'バック②には1枚まで' }
+            ]
+          },
+          back3: { 
+            allowed: true, 
+            conditions: [
+              { type: 'cardType', value: 'ホロメン', message: 'ホロメンカードのみ配置可能' },
+              { type: 'bloomLevel', value: 'Debut', message: 'Debutレベルのみ配置可能' },
+              { type: 'maxCount', value: 1, message: 'バック③には1枚まで' }
+            ]
+          },
+          back4: { 
+            allowed: true, 
+            conditions: [
+              { type: 'cardType', value: 'ホロメン', message: 'ホロメンカードのみ配置可能' },
+              { type: 'bloomLevel', value: 'Debut', message: 'Debutレベルのみ配置可能' },
+              { type: 'maxCount', value: 1, message: 'バック④には1枚まで' }
+            ]
+          },
+          back5: { 
+            allowed: true, 
+            conditions: [
+              { type: 'cardType', value: 'ホロメン', message: 'ホロメンカードのみ配置可能' },
+              { type: 'bloomLevel', value: 'Debut', message: 'Debutレベルのみ配置可能' },
+              { type: 'maxCount', value: 1, message: 'バック⑤には1枚まで' }
+            ]
+          },
+          support: { 
+            allowed: false, 
+            reason: 'Debut配置フェーズではサポート使用不可'
+          }
+        }
+      },
+
+      // リセットステップ（フェーズ 0）
+      RESET_STEP: {
+        phase: 0,
+        name: 'リセットステップ',
+        description: 'お休みホロメンをアクティブ化、コラボホロメンをお休み化',
+        allowedPlacements: {
+          center: { allowed: false, reason: 'リセットステップでは配置不可' },
+          collab: { allowed: false, reason: 'リセットステップでは配置不可' },
+          back1: { allowed: false, reason: 'リセットステップでは配置不可' },
+          back2: { allowed: false, reason: 'リセットステップでは配置不可' },
+          back3: { allowed: false, reason: 'リセットステップでは配置不可' },
+          back4: { allowed: false, reason: 'リセットステップでは配置不可' },
+          back5: { allowed: false, reason: 'リセットステップでは配置不可' },
+          support: { allowed: false, reason: 'リセットステップでは配置不可' }
+        }
+      },
+
+      // 手札ステップ（フェーズ 1）
+      HAND_STEP: {
+        phase: 1,
+        name: '手札ステップ',
+        description: 'デッキからカード1枚ドロー',
+        allowedPlacements: {
+          center: { allowed: false, reason: '手札ステップでは配置不可' },
+          collab: { allowed: false, reason: '手札ステップでは配置不可' },
+          back1: { allowed: false, reason: '手札ステップでは配置不可' },
+          back2: { allowed: false, reason: '手札ステップでは配置不可' },
+          back3: { allowed: false, reason: '手札ステップでは配置不可' },
+          back4: { allowed: false, reason: '手札ステップでは配置不可' },
+          back5: { allowed: false, reason: '手札ステップでは配置不可' },
+          support: { allowed: false, reason: '手札ステップでは配置不可' }
+        }
+      },
+
+      // エールステップ（フェーズ 2）
+      YELL_STEP: {
+        phase: 2,
+        name: 'エールステップ',
+        description: 'エールデッキから1枚をステージのホロメンに送る',
+        allowedPlacements: {
+          center: { 
+            allowed: true, 
+            conditions: [
+              { type: 'targetType', value: 'yell', message: 'エールカードのみ配置可能' },
+              { type: 'targetHolomen', value: true, message: 'センターホロメンが配置されている必要があります' }
+            ]
+          },
+          collab: { 
+            allowed: true, 
+            conditions: [
+              { type: 'targetType', value: 'yell', message: 'エールカードのみ配置可能' },
+              { type: 'targetHolomen', value: true, message: 'コラボホロメンが配置されている必要があります' }
+            ]
+          },
+          back1: { 
+            allowed: true, 
+            conditions: [
+              { type: 'targetType', value: 'yell', message: 'エールカードのみ配置可能' },
+              { type: 'targetHolomen', value: true, message: 'バックホロメンが配置されている必要があります' }
+            ]
+          },
+          back2: { 
+            allowed: true, 
+            conditions: [
+              { type: 'targetType', value: 'yell', message: 'エールカードのみ配置可能' },
+              { type: 'targetHolomen', value: true, message: 'バックホロメンが配置されている必要があります' }
+            ]
+          },
+          back3: { 
+            allowed: true, 
+            conditions: [
+              { type: 'targetType', value: 'yell', message: 'エールカードのみ配置可能' },
+              { type: 'targetHolomen', value: true, message: 'バックホロメンが配置されている必要があります' }
+            ]
+          },
+          back4: { 
+            allowed: true, 
+            conditions: [
+              { type: 'targetType', value: 'yell', message: 'エールカードのみ配置可能' },
+              { type: 'targetHolomen', value: true, message: 'バックホロメンが配置されている必要があります' }
+            ]
+          },
+          back5: { 
+            allowed: true, 
+            conditions: [
+              { type: 'targetType', value: 'yell', message: 'エールカードのみ配置可能' },
+              { type: 'targetHolomen', value: true, message: 'バックホロメンが配置されている必要があります' }
+            ]
+          },
+          support: { allowed: false, reason: 'エールステップではサポート使用不可' }
+        }
+      },
+
+      // メインステップ（フェーズ 3）
+      MAIN_STEP: {
+        phase: 3,
+        name: 'メインステップ',
+        description: 'ホロメン配置・サポート使用・コラボ',
+        allowedPlacements: {
+          center: { 
+            allowed: true, 
+            conditions: [
+              { type: 'cardType', value: 'ホロメン', message: 'ホロメンカードのみ配置可能' },
+              { type: 'maxCount', value: 1, message: 'センターポジションには1枚まで' }
+            ]
+          },
+          collab: { 
+            allowed: true, 
+            conditions: [
+              { type: 'cardType', value: 'ホロメン', message: 'ホロメンカードのみ配置可能' },
+              { type: 'maxCount', value: 1, message: 'コラボポジションには1枚まで' }
+            ]
+          },
+          back1: { 
+            allowed: true, 
+            conditions: [
+              { type: 'cardType', value: 'ホロメン', message: 'ホロメンカードのみ配置可能' },
+              { type: 'maxCount', value: 1, message: 'バックポジションには1枚まで' }
+            ]
+          },
+          back2: { 
+            allowed: true, 
+            conditions: [
+              { type: 'cardType', value: 'ホロメン', message: 'ホロメンカードのみ配置可能' },
+              { type: 'maxCount', value: 1, message: 'バックポジションには1枚まで' }
+            ]
+          },
+          back3: { 
+            allowed: true, 
+            conditions: [
+              { type: 'cardType', value: 'ホロメン', message: 'ホロメンカードのみ配置可能' },
+              { type: 'maxCount', value: 1, message: 'バックポジションには1枚まで' }
+            ]
+          },
+          back4: { 
+            allowed: true, 
+            conditions: [
+              { type: 'cardType', value: 'ホロメン', message: 'ホロメンカードのみ配置可能' },
+              { type: 'maxCount', value: 1, message: 'バックポジションには1枚まで' }
+            ]
+          },
+          back5: { 
+            allowed: true, 
+            conditions: [
+              { type: 'cardType', value: 'ホロメン', message: 'ホロメンカードのみ配置可能' },
+              { type: 'maxCount', value: 1, message: 'バックポジションには1枚まで' }
+            ]
+          },
+          support: { 
+            allowed: true, 
+            conditions: [
+              { type: 'cardType', value: 'サポート', message: 'サポートカードのみ使用可能' },
+              { type: 'oncePerTurn', value: true, message: '1ターンに1枚まで使用可能' }
+            ]
+          }
+        }
+      },
+
+      // パフォーマンスステップ（フェーズ 4）
+      PERFORMANCE_STEP: {
+        phase: 4,
+        name: 'パフォーマンスステップ',
+        description: 'センター・コラボホロメンのアーツ使用',
+        allowedPlacements: {
+          center: { allowed: false, reason: 'パフォーマンスステップでは配置不可' },
+          collab: { allowed: false, reason: 'パフォーマンスステップでは配置不可' },
+          back1: { allowed: false, reason: 'パフォーマンスステップでは配置不可' },
+          back2: { allowed: false, reason: 'パフォーマンスステップでは配置不可' },
+          back3: { allowed: false, reason: 'パフォーマンスステップでは配置不可' },
+          back4: { allowed: false, reason: 'パフォーマンスステップでは配置不可' },
+          back5: { allowed: false, reason: 'パフォーマンスステップでは配置不可' },
+          support: { allowed: false, reason: 'パフォーマンスステップでは配置不可' }
+        }
+      },
+
+      // エンドステップ（フェーズ 5）
+      END_STEP: {
+        phase: 5,
+        name: 'エンドステップ',
+        description: 'ターン終了、相手にターンを渡す',
+        allowedPlacements: {
+          center: { allowed: false, reason: 'エンドステップでは配置不可' },
+          collab: { allowed: false, reason: 'エンドステップでは配置不可' },
+          back1: { allowed: false, reason: 'エンドステップでは配置不可' },
+          back2: { allowed: false, reason: 'エンドステップでは配置不可' },
+          back3: { allowed: false, reason: 'エンドステップでは配置不可' },
+          back4: { allowed: false, reason: 'エンドステップでは配置不可' },
+          back5: { allowed: false, reason: 'エンドステップでは配置不可' },
+          support: { allowed: false, reason: 'エンドステップでは配置不可' }
+        }
+      }
+    };
+  }
+
+  /**
+   * 現在のフェーズに基づく配置ルールを取得
+   */
+  getCurrentPlacementRules() {
+    const currentPhase = this.gameState.currentPhase;
+    
+    // Debut配置フェーズのチェック（最優先）
+    if (this.gameState.debutPlacementPhase) {
+      return this.placementRules.DEBUT_PLACEMENT;
+    }
+    
+    // 通常フェーズのマッピング（公式ルールに基づく）
+    const phaseMap = {
+      '-1': 'PREPARATION',
+      '0': 'RESET_STEP',
+      '1': 'HAND_STEP',      // 変更: DRAW_STEP → HAND_STEP
+      '2': 'YELL_STEP',
+      '3': 'MAIN_STEP',
+      '4': 'PERFORMANCE_STEP',
+      '5': 'END_STEP'        // 追加: エンドステップ
+    };
+    
+    const ruleKey = phaseMap[currentPhase.toString()];
+    return this.placementRules[ruleKey] || this.placementRules.PREPARATION;
+  }
+
+  /**
+   * 特定の位置への配置が可能かチェック
+   */
+  canPlaceCard(card, position, playerId = 1) {
+    const rules = this.getCurrentPlacementRules();
+    
+    // ポジション名を正規化
+    const normalizedPosition = this.normalizePositionId(position);
+    const positionRule = rules.allowedPlacements[normalizedPosition];
+    
+    if (!positionRule) {
+      return {
+        allowed: false,
+        reason: '無効な配置位置です'
+      };
+    }
+    
+    if (!positionRule.allowed) {
+      return {
+        allowed: false,
+        reason: positionRule.reason
+      };
+    }
+    
+    // 条件チェック
+    if (positionRule.conditions) {
+      for (const condition of positionRule.conditions) {
+        const check = this.checkCondition(card, normalizedPosition, condition, playerId);
+        if (!check.valid) {
+          return {
+            allowed: false,
+            reason: check.message
+          };
+        }
+      }
+    }
+    
+    return {
+      allowed: true,
+      reason: '配置可能'
+    };
+  }
+
+  /**
+   * 条件のチェック
+   */
+  checkCondition(card, position, condition, playerId) {
+    const player = this.players[playerId];
+    
+    switch (condition.type) {
+      case 'cardType':
+        return {
+          valid: card.card_type && card.card_type.includes(condition.value),
+          message: condition.message
+        };
+        
+      case 'bloomLevel':
+        return {
+          valid: card.bloom_level === condition.value,
+          message: condition.message
+        };
+        
+      case 'maxCount':
+        const currentCard = player[position];
+        return {
+          valid: currentCard === null || currentCard === undefined,
+          message: condition.message
+        };
+        
+      case 'required':
+        // 必須条件（配置完了時にチェック）
+        return {
+          valid: true,
+          message: condition.message
+        };
+        
+      case 'targetType':
+        return {
+          valid: condition.value === 'yell' ? card.card_type === 'エール' : true,
+          message: condition.message
+        };
+        
+      case 'targetHolomen':
+        const hasHolomen = player[position] && player[position].card_type && 
+                          player[position].card_type.includes('ホロメン');
+        return {
+          valid: hasHolomen,
+          message: condition.message
+        };
+        
+      case 'oncePerTurn':
+        // サポートカードの1ターン1回制限
+        return {
+          valid: player.canPlaySupport !== false,
+          message: condition.message
+        };
+        
+      default:
+        return {
+          valid: true,
+          message: '不明な条件'
+        };
+    }
+  }
+
+  /**
+   * 配置可能な位置のリストを取得
+   */
+  getValidDropZones(card, playerId = 1) {
+    const validZones = [];
+    const rules = this.getCurrentPlacementRules();
+    
+    for (const [position, rule] of Object.entries(rules.allowedPlacements)) {
+      const result = this.canPlaceCard(card, position, playerId);
+      if (result.allowed) {
+        validZones.push({
+          position,
+          element: document.getElementById(`${position}-${playerId}`) || 
+                  document.querySelector(`[data-position="${position}"]`)
+        });
+      }
+    }
+    
+    return validZones;
+  }
+
+  /**
+   * 配置制限の説明を取得
+   */
+  getPlacementDescription() {
+    const rules = this.getCurrentPlacementRules();
+    return {
+      phase: rules.name,
+      description: rules.description,
+      restrictions: this.formatRestrictions(rules.allowedPlacements)
+    };
+  }
+
+  /**
+   * 制限をフォーマット
+   */
+  formatRestrictions(placements) {
+    const restrictions = [];
+    
+    for (const [position, rule] of Object.entries(placements)) {
+      if (rule.allowed && rule.conditions) {
+        const conditionTexts = rule.conditions.map(c => c.message);
+        restrictions.push(`${this.getPositionName(position)}: ${conditionTexts.join(', ')}`);
+      } else if (!rule.allowed) {
+        restrictions.push(`${this.getPositionName(position)}: ${rule.reason}`);
+      }
+    }
+    
+    return restrictions;
+  }
+
+  /**
+   * 位置名を取得
+   */
+  getPositionName(position) {
+    const names = {
+      collab: 'コラボ',      // 変更: center1 → collab
+      center: 'センター',    // 変更: center2 → center
+      back1: 'バック①',
+      back2: 'バック②',
+      back3: 'バック③',
+      back4: 'バック④',
+      back5: 'バック⑤',
+      support: 'サポート'
+    };
+    return names[position] || position;
+  }
+
+  /**
+   * ポジションIDの正規化（公式ルールに基づく）
+   * 古いポジション名を新しい名前にマッピング
+   */
+  normalizePositionId(positionId) {
+    // オブジェクト形式 {type: 'back', index: 0} の場合
+    if (typeof positionId === 'object' && positionId.type) {
+      if (positionId.type === 'back' && positionId.index !== undefined) {
+        return `back${positionId.index + 1}`; // index 0 → back1
+      }
+      return positionId.type;
+    }
+    
+    // 文字列形式のマッピング
+    const positionMap = {
+      'center1': 'collab',     // センター①→コラボ
+      'center2': 'center',     // センター②→センター
+      'front1': 'collab',      // front1→コラボ
+      'front2': 'center',      // front2→センター
+      'center': 'center',      // センター（そのまま）
+      'collab': 'collab',      // コラボ（そのまま）
+      'back1': 'back1',        // バック①
+      'back2': 'back2',        // バック②
+      'back3': 'back3',        // バック③
+      'back4': 'back4',        // バック④
+      'back5': 'back5',        // バック⑤
+      'support': 'support'     // サポート
+    };
+    
+    return positionMap[positionId] || positionId;
+  }
+
+  /**
+   * フェーズ変更時の制御更新
+   */
+  updatePlacementControls() {
+    const description = this.getPlacementDescription();
+    
+    // UI更新イベントを発火
+    if (window.dispatchEvent) {
+      window.dispatchEvent(new CustomEvent('placementRulesUpdated', {
+        detail: description
+      }));
+    }
+    
+    console.log(`配置制御更新: ${description.phase} - ${description.description}`);
+  }
+}
+
+// グローバルスコープに公開
+window.HololivePlacementController = HololivePlacementController;

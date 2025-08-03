@@ -5,24 +5,12 @@
 
 class HololiveBattleEngine {
   constructor() {
-    this.gameState = {
-      currentPlayer: 1, // 1: プレイヤー, 2: 対戦相手
-      currentPhase: -1, // -1: 準備ステップ, 0-5: リセット〜エンド
-      turnCount: 1,
-      gameStarted: false,
-      gameEnded: false,
-      winner: null,
-      firstPlayer: null, // 先行プレイヤー (1 or 2)
-      turnOrderDecided: false,
-      mulliganPhase: false, // マリガン中かどうか
-      mulliganCount: { 1: 0, 2: 0 }, // 各プレイヤーのマリガン回数
-      mulliganCompleted: { 1: false, 2: false } // 各プレイヤーのマリガン完了状態
-    };
-
-    this.players = {
-      1: this.createPlayerState(),
-      2: this.createPlayerState()
-    };
+    // 状態管理の初期化（最優先）
+    this.stateManager = new HololiveStateManager();
+    
+    // 互換性のための状態オブジェクト（State Managerから動的に取得）
+    this.gameState = this.createGameStateProxy();
+    this.players = this.createPlayersProxy();
 
     this.cardDatabase = null;
     this.stageData = null;
@@ -33,6 +21,9 @@ class HololiveBattleEngine {
 
     // フェーズ管理コントローラーの初期化（早期初期化）
     this.phaseController = new PhaseController(this);
+    
+    // 配置制御管理の初期化
+    this.placementController = new HololivePlacementController(this);
     
     // ゲームセットアップ管理の初期化
     this.setupManager = new HololiveGameSetupManager(this);
@@ -56,6 +47,268 @@ class HololiveBattleEngine {
       window.infoPanelManager = new InfoPanelManager();
     }
     this.infoPanelManager = window.infoPanelManager;
+  }
+
+  /**
+   * 互換性のためのgameStateプロキシオブジェクトを作成
+   * 既存コードがthis.gameState.currentPlayerのようにアクセスできるようにする
+   */
+  createGameStateProxy() {
+    const self = this;
+    return {
+      get currentPlayer() { return self.stateManager.getStateByPath('turn.currentPlayer'); },
+      set currentPlayer(value) { self.stateManager.updateState('PLAYER_CHANGE', { player: value }); },
+      
+      get currentPhase() { return self.stateManager.getStateByPath('turn.currentPhase'); },
+      set currentPhase(value) { self.stateManager.updateState('PHASE_CHANGE', { phase: value }); },
+      
+      get turnCount() { return self.stateManager.getStateByPath('turn.turnCount'); },
+      set turnCount(value) { self.stateManager.updateState('TURN_COUNT_CHANGE', { count: value }); },
+      
+      get gameStarted() { return self.stateManager.getStateByPath('game.started'); },
+      set gameStarted(value) { 
+        if (value) {
+          self.stateManager.updateState('GAME_START', {});
+        } else {
+          self.stateManager.updateState('GAME_STOP', {});
+        }
+      },
+      
+      get gameEnded() { return self.stateManager.getStateByPath('game.ended'); },
+      set gameEnded(value) { 
+        if (value) {
+          self.stateManager.updateState('GAME_END', { winner: self.stateManager.getStateByPath('game.winner') });
+        }
+      },
+      
+      get winner() { return self.stateManager.getStateByPath('game.winner'); },
+      set winner(value) { self.stateManager.updateState('SET_WINNER', { winner: value }); },
+      
+      get firstPlayer() { return self.stateManager.getStateByPath('turn.firstPlayer'); },
+      set firstPlayer(value) { self.stateManager.updateState('SET_FIRST_PLAYER', { player: value }); },
+      
+      get turnOrderDecided() { return self.stateManager.getStateByPath('game.turnOrderDecided'); },
+      set turnOrderDecided(value) { 
+        if (!value) {
+          self.stateManager.updateState('RESET_TURN_ORDER', {});
+        }
+      },
+      
+      get mulliganPhase() { return self.stateManager.getStateByPath('game.mulliganPhase'); },
+      set mulliganPhase(value) { 
+        if (value) {
+          self.stateManager.updateState('MULLIGAN_START', {});
+        } else {
+          self.stateManager.updateState('MULLIGAN_END', {});
+        }
+      },
+      
+      get mulliganCount() { return self.stateManager.getStateByPath('mulligan.count'); },
+      set mulliganCount(value) { self.stateManager.updateState('SET_MULLIGAN_COUNT', { counts: value }); },
+      
+      get mulliganCompleted() { return self.stateManager.getStateByPath('mulligan.completed'); },
+      set mulliganCompleted(value) { self.stateManager.updateState('SET_MULLIGAN_COMPLETED', { completed: value }); }
+    };
+  }
+
+  /**
+   * 互換性のためのplayersプロキシオブジェクトを作成
+   * 既存コードがthis.players[1].deckのようにアクセスできるようにする
+   */
+  createPlayersProxy() {
+    const self = this;
+    return {
+      1: this.createPlayerProxy(1),
+      2: this.createPlayerProxy(2)
+    };
+  }
+
+  /**
+   * 配列プロパティ用のプロキシを作成（State Manager連携）
+   */
+  createArrayProxy(playerId, area, path) {
+    const self = this;
+    return {
+      get() {
+        const arrayRef = self.stateManager.getStateByPath(path) || [];
+        return new Proxy(arrayRef, {
+          set(target, property, value) {
+            if (property === 'length' || !isNaN(property)) {
+              const newArray = [...arrayRef];
+              if (property === 'length') {
+                newArray.length = value;
+              } else {
+                newArray[property] = value;
+              }
+              self.updatePlayerCards(playerId, area, newArray);
+            }
+            return true;
+          },
+          get(target, property) {
+            if (property === 'push') {
+              return (...items) => {
+                const newArray = [...arrayRef, ...items];
+                self.updatePlayerCards(playerId, area, newArray);
+                return newArray.length;
+              };
+            }
+            if (property === 'pop') {
+              return () => {
+                if (arrayRef.length === 0) return undefined;
+                const newArray = [...arrayRef];
+                const result = newArray.pop();
+                self.updatePlayerCards(playerId, area, newArray);
+                return result;
+              };
+            }
+            if (property === 'splice') {
+              return (...args) => {
+                const newArray = [...arrayRef];
+                const result = newArray.splice(...args);
+                self.updatePlayerCards(playerId, area, newArray);
+                return result;
+              };
+            }
+            if (property === 'unshift') {
+              return (...items) => {
+                const newArray = [...items, ...arrayRef];
+                self.updatePlayerCards(playerId, area, newArray);
+                return newArray.length;
+              };
+            }
+            if (property === 'shift') {
+              return () => {
+                if (arrayRef.length === 0) return undefined;
+                const newArray = [...arrayRef];
+                const result = newArray.shift();
+                self.updatePlayerCards(playerId, area, newArray);
+                return result;
+              };
+            }
+            return target[property];
+          }
+        });
+      },
+      set(value) {
+        self.updatePlayerCards(playerId, area, value);
+      }
+    };
+  }
+
+  /**
+   * 個別プレイヤーのプロキシを作成
+   */
+  createPlayerProxy(playerId) {
+    const self = this;
+    const handProxy = this.createArrayProxy(playerId, 'hand', `players.${playerId}.cards.hand`);
+    const deckProxy = this.createArrayProxy(playerId, 'deck', `players.${playerId}.cards.deck`);
+    const lifeProxy = this.createArrayProxy(playerId, 'life', `players.${playerId}.cards.life`);
+    const holoPowerProxy = this.createArrayProxy(playerId, 'holoPower', `players.${playerId}.cards.holoPower`);
+    const archiveProxy = this.createArrayProxy(playerId, 'archive', `players.${playerId}.cards.archive`);
+    const yellDeckProxy = this.createArrayProxy(playerId, 'yellDeck', `players.${playerId}.cards.yellDeck`);
+    
+    return {
+      // カードエリアの直接アクセス（既存コード互換性）
+      get life() { return lifeProxy.get(); },
+      set life(value) { lifeProxy.set(value); },
+      
+      get center1() { return self.stateManager.getStateByPath(`players.${playerId}.cards.center1`); },
+      set center1(value) { self.updatePlayerCards(playerId, 'center1', value); },
+      
+      get center2() { return self.stateManager.getStateByPath(`players.${playerId}.cards.center2`); },
+      set center2(value) { self.updatePlayerCards(playerId, 'center2', value); },
+      
+      get oshi() { return self.stateManager.getStateByPath(`players.${playerId}.cards.oshi`); },
+      set oshi(value) { self.updatePlayerCards(playerId, 'oshi', value); },
+      
+      get holoPower() { return holoPowerProxy.get(); },
+      set holoPower(value) { holoPowerProxy.set(value); },
+      
+      get deck() { return deckProxy.get(); },
+      set deck(value) { deckProxy.set(value); },
+      
+      get yellDeck() { return yellDeckProxy.get(); },
+      set yellDeck(value) { yellDeckProxy.set(value); },
+      
+      get back1() { return self.stateManager.getStateByPath(`players.${playerId}.cards.back1`); },
+      set back1(value) { self.updatePlayerCards(playerId, 'back1', value); },
+      
+      get back2() { return self.stateManager.getStateByPath(`players.${playerId}.cards.back2`); },
+      set back2(value) { self.updatePlayerCards(playerId, 'back2', value); },
+      
+      get back3() { return self.stateManager.getStateByPath(`players.${playerId}.cards.back3`); },
+      set back3(value) { self.updatePlayerCards(playerId, 'back3', value); },
+      
+      get back4() { return self.stateManager.getStateByPath(`players.${playerId}.cards.back4`); },
+      set back4(value) { self.updatePlayerCards(playerId, 'back4', value); },
+      
+      get back5() { return self.stateManager.getStateByPath(`players.${playerId}.cards.back5`); },
+      set back5(value) { self.updatePlayerCards(playerId, 'back5', value); },
+      
+      get archive() { return archiveProxy.get(); },
+      set archive(value) { archiveProxy.set(value); },
+      
+      get hand() { return handProxy.get(); },
+      set hand(value) { handProxy.set(value); },
+      
+      // ゲーム状態
+      get canPlaySupport() { return self.stateManager.getStateByPath(`players.${playerId}.gameState.canPlaySupport`); },
+      set canPlaySupport(value) { self.updatePlayerGameState(playerId, 'canPlaySupport', value); },
+      
+      get usedLimitedThisTurn() { return self.stateManager.getStateByPath(`players.${playerId}.gameState.usedLimitedThisTurn`) || []; },
+      set usedLimitedThisTurn(value) { self.updatePlayerGameState(playerId, 'usedLimitedThisTurn', value); },
+      
+      get restHolomem() { return self.stateManager.getStateByPath(`players.${playerId}.gameState.restHolomem`) || []; },
+      set restHolomem(value) { self.updatePlayerGameState(playerId, 'restHolomem', value); },
+      
+      // デッキ情報
+      get oshiCard() { return self.stateManager.getStateByPath(`players.${playerId}.deck.oshiCard`); },
+      set oshiCard(value) { self.updatePlayerDeck(playerId, 'oshiCard', value); },
+      
+      get mainDeck() { return self.stateManager.getStateByPath(`players.${playerId}.deck.mainDeck`) || []; },
+      set mainDeck(value) { self.updatePlayerDeck(playerId, 'mainDeck', value); },
+      
+      get yellCards() { return self.stateManager.getStateByPath(`players.${playerId}.deck.yellCards`) || []; },
+      set yellCards(value) { self.updatePlayerDeck(playerId, 'yellCards', value); }
+    };
+  }
+
+  /**
+   * プレイヤーのカード状態を更新
+   */
+  updatePlayerCards(playerId, area, cards) {
+    // エールカード情報を保持（cards配列から取得）
+    if (cards && cards.length > 0 && cards[0] && cards[0].yellCards) {
+      console.log(`📤 [State Manager送信] ${area}: ${cards[0].name} (エール${cards[0].yellCards.length}枚)`);
+    }
+    
+    this.stateManager.updateState('UPDATE_PLAYER_CARDS', {
+      player: playerId,
+      area: area,
+      cards: cards
+    });
+  }
+
+  /**
+   * プレイヤーのゲーム状態を更新
+   */
+  updatePlayerGameState(playerId, property, value) {
+    this.stateManager.updateState('UPDATE_PLAYER_GAME_STATE', {
+      player: playerId,
+      property: property,
+      value: value
+    });
+  }
+
+  /**
+   * プレイヤーのデッキ情報を更新
+   */
+  updatePlayerDeck(playerId, property, value) {
+    this.stateManager.updateState('UPDATE_PLAYER_DECK', {
+      player: playerId,
+      property: property,
+      value: value
+    });
   }
 
   createPlayerState() {
@@ -486,12 +739,14 @@ class HololiveBattleEngine {
       // ゲーム状態のリセット
       this.gameState = {
         currentPlayer: 1,
-        currentPhase: 0,
+        currentPhase: -1,  // -1: 準備ステップから開始
         turnCount: 1,
         gameStarted: false,
         gameEnded: false,
         winner: null,
+        preparationPhase: true,  // 準備ステップフラグ
         mulliganPhase: false,
+        debutPlacementPhase: false,
         mulliganCount: { 1: 0, 2: 0 },
         mulliganCompleted: { 1: false, 2: false },
         debutPlacementCompleted: { 1: false, 2: false },
@@ -692,6 +947,15 @@ class HololiveBattleEngine {
   }
 
   updateUI() {
+    // エール更新中は一時的に更新を抑制（ただし手札とフェーズハイライトは更新）
+    if (this.isUpdatingYellCard) {
+      // 手札の更新
+      this.handManager.updateHandDisplay();
+      // フェーズハイライトの更新
+      this.updatePhaseHighlight();
+      return; // カードエリア更新はスキップ
+    }
+    
     // 手札の更新
     this.handManager.updateHandDisplay();
     
@@ -716,6 +980,11 @@ class HololiveBattleEngine {
   }
 
   updateCardAreas() {
+    // エール更新中は一時的に更新を抑制
+    if (this.isUpdatingYellCard) {
+      return; // サイレントにスキップ
+    }
+    
     // カード表示管理機能をCardDisplayManagerに委譲
     this.cardDisplayManager.updateCardAreas();
   }
@@ -766,8 +1035,123 @@ class HololiveBattleEngine {
   }
 
   updatePhaseHighlight() {
-    // フェーズハイライト機能をCardDisplayManagerに委譲
-    this.cardDisplayManager.updatePhaseHighlight();
+    console.log(`=== updatePhaseHighlight 呼び出し ===`);
+    console.log(`プレイヤー: ${this.gameState.currentPlayer}, フェーズ: ${this.gameState.currentPhase}`);
+    
+    // すべてのハイライトを削除
+    const existingHighlights = document.querySelectorAll('.phase-highlight');
+    console.log(`既存のハイライト数: ${existingHighlights.length}`);
+    existingHighlights.forEach(element => {
+      element.classList.remove('phase-highlight');
+    });
+
+    const currentPlayer = this.gameState.currentPlayer;
+    const currentPhase = this.gameState.currentPhase;
+    
+    console.log(`フェーズハイライト更新: プレイヤー${currentPlayer}, フェーズ${currentPhase}`);
+    
+    // 現在のプレイヤーのエリアをハイライト
+    this.highlightPhaseArea(currentPlayer, currentPhase);
+    
+    // 更新後のハイライト確認
+    const newHighlights = document.querySelectorAll('.phase-highlight');
+    console.log(`新しいハイライト数: ${newHighlights.length}`);
+    newHighlights.forEach((element, index) => {
+      console.log(`ハイライト${index}: ${element.className}`);
+    });
+    console.log(`=== updatePhaseHighlight 完了 ===`);
+  }
+
+  // 指定プレイヤーのフェーズエリアをハイライト
+  highlightPhaseArea(playerId, phase) {
+    console.log(`=== highlightPhaseArea ===`);
+    console.log(`プレイヤー${playerId}, フェーズ${phase}`);
+    
+    const playerArea = playerId === 1 ? '.battle-player' : '.battle-opponent';
+    console.log(`対象エリア: ${playerArea}`);
+    
+    // フェーズに応じてハイライトを適用
+    switch (phase) {
+      case 0: // リセットステップ
+        console.log('リセットステップ - プレイヤーエリア全体をハイライト');
+        const battleArea = document.querySelector(playerArea);
+        if (battleArea) {
+          battleArea.classList.add('phase-highlight');
+          console.log('✅ リセットステップハイライト適用完了');
+        } else {
+          console.log('❌ プレイヤーエリアが見つかりません');
+        }
+        break;
+      case 1: // ドローステップ
+        console.log('ドローステップ - デッキエリアをハイライト');
+        const deckArea = document.querySelector(`${playerArea} .deck`);
+        if (deckArea) {
+          deckArea.classList.add('phase-highlight');
+          console.log('✅ ドローステップハイライト適用完了');
+        } else {
+          console.log('❌ デッキエリアが見つかりません');
+        }
+        break;
+      case 2: // エールステップ
+        console.log('エールステップ - エールデッキをハイライト');
+        const yellDeck = document.querySelector(`${playerArea} .yell-deck`);
+        if (yellDeck) {
+          yellDeck.classList.add('phase-highlight');
+          console.log('✅ エールステップハイライト適用完了');
+        } else {
+          console.log('❌ エールデッキが見つかりません');
+        }
+        break;
+      case 3: // メインステップ
+        if (playerId === 1) {
+          console.log('メインステップ（プレイヤー） - 手札エリアをハイライト');
+          const handArea = document.querySelector('.hand-area');
+          if (handArea) {
+            handArea.classList.add('phase-highlight');
+            console.log('✅ プレイヤーメインステップハイライト適用完了');
+          } else {
+            console.log('❌ 手札エリアが見つかりません');
+          }
+        } else {
+          console.log('メインステップ（CPU） - プレイヤーエリア全体をハイライト');
+          const battleArea = document.querySelector(playerArea);
+          if (battleArea) {
+            battleArea.classList.add('phase-highlight');
+            console.log('✅ CPUメインステップハイライト適用完了');
+          } else {
+            console.log('❌ CPUプレイヤーエリアが見つかりません');
+          }
+        }
+        break;
+      case 4: // パフォーマンスステップ
+        console.log('パフォーマンスステップ - フロントエリアをハイライト');
+        const front1 = document.querySelector(`${playerArea} .front1`);
+        const front2 = document.querySelector(`${playerArea} .front2`);
+        let highlightCount = 0;
+        if (front1) {
+          front1.classList.add('phase-highlight');
+          highlightCount++;
+        }
+        if (front2) {
+          front2.classList.add('phase-highlight');
+          highlightCount++;
+        }
+        console.log(`✅ パフォーマンスステップハイライト適用完了 (${highlightCount}箇所)`);
+        break;
+      case 5: // エンドステップ
+        console.log('エンドステップ - プレイヤーエリア全体をハイライト');
+        const endBattleArea = document.querySelector(playerArea);
+        if (endBattleArea) {
+          endBattleArea.classList.add('phase-highlight');
+          console.log('✅ エンドステップハイライト適用完了');
+        } else {
+          console.log('❌ エンドステップ用プレイヤーエリアが見つかりません');
+        }
+        break;
+      default:
+        console.log(`⚠️ 未対応のフェーズ: ${phase}`);
+    }
+    console.log(`=== highlightPhaseArea 完了 ===`);
   }
 
   updatePhaseButtons() {
@@ -1107,12 +1491,13 @@ class HololiveBattleEngine {
   // Debut配置フェーズ開始
   startDebutPlacementPhase() {
     this.gameState.mulliganPhase = false;
+    this.gameState.debutPlacementPhase = true;  // 追加: Debut配置フェーズフラグを設定
     console.log('Debut配置フェーズ開始');
     
     alert(
       'マリガン完了！\n\n' +
       'Debutホロメンの配置を行います\n' +
-      '・センター2に1枚必須\n' +
+      '・センターに1枚必須\n' +
       '・バックに好きなだけ配置可能'
     );
     
@@ -1121,10 +1506,30 @@ class HololiveBattleEngine {
   }
 
   showDebutPlacementUI(playerId) {
+    console.log(`=== showDebutPlacementUI 開始 - プレイヤー${playerId} ===`);
     const player = this.players[playerId];
+    
+    console.log(`プレイヤー${playerId}の手札:`, player.hand);
+    console.log(`手札枚数: ${player.hand.length}`);
+    
+    // 手札の各カードを詳細チェック
+    player.hand.forEach((card, index) => {
+      if (card) {
+        console.log(`手札[${index}]:`, {
+          name: card.name,
+          card_type: card.card_type,
+          bloom_level: card.bloom_level,
+          isHolomen: card.card_type && card.card_type.includes('ホロメン'),
+          isDebut: card.bloom_level === 'Debut'
+        });
+      }
+    });
+    
     const debutCards = player.hand.filter(card => 
       card.card_type && card.card_type.includes('ホロメン') && card.bloom_level === 'Debut'
     );
+    
+    console.log(`デビューカード検出結果: ${debutCards.length}枚`, debutCards);
     
     if (debutCards.length === 0) {
       console.error(`プレイヤー${playerId}にDebutホロメンがありません`);
@@ -1200,7 +1605,7 @@ class HololiveBattleEngine {
     controls.innerHTML = `
       <h3>🎭 Debut配置</h3>
       <div id="debut-status">
-        <div>センター2: <span id="center2-status">未配置</span></div>
+        <div>センター: <span id="center-status">未配置</span></div>
         <div>バック: <span id="back-count">0</span>/3</div>
       </div>
       <button id="auto-debut-button" style="
@@ -1241,29 +1646,34 @@ class HololiveBattleEngine {
 
   updateDebutPlacementStatus() {
     const player = this.players[1];
-    const center2Status = document.getElementById('center2-status');
+    const centerStatus = document.getElementById('center-status');
     const backCount = document.getElementById('back-count');
     const completeButton = document.getElementById('complete-debut-button');
+    const autoButton = document.getElementById('auto-debut-button');
     
-    // 実際のゲーム状態を確認
-    const hasValidCenter2 = player.center2 && 
-                           this.isHolomenCard(player.center2) && 
-                           player.center2.bloom_level === 'Debut';
+    // 実際のゲーム状態を確認（center2 → center）
+    const hasValidCenter = player.center2 && 
+                          this.isHolomenCard(player.center2) && 
+                          player.center2.bloom_level === 'Debut';
     
     const backPositions = ['back1', 'back2', 'back3', 'back4', 'back5'];
     const placedBackCards = backPositions.filter(pos => player[pos]).length;
     
-    if (center2Status) {
-      center2Status.textContent = hasValidCenter2 ? '配置済み' : '未配置';
-      center2Status.style.color = hasValidCenter2 ? '#4CAF50' : '#f44336';
+    // センターに既にカードが配置されているかチェック（Debutかどうかは問わない）
+    const hasAnyCenterCard = player.center2 !== null;
+    
+    if (centerStatus) {
+      centerStatus.textContent = hasValidCenter ? '配置済み' : '未配置';
+      centerStatus.style.color = hasValidCenter ? '#4CAF50' : '#f44336';
     }
     
     if (backCount) {
       backCount.textContent = placedBackCards;
     }
     
+    // 配置完了ボタンの制御
     if (completeButton) {
-      if (hasValidCenter2) {
+      if (hasValidCenter) {
         completeButton.disabled = false;
         completeButton.style.background = '#4CAF50';
         completeButton.style.cursor = 'pointer';
@@ -1272,14 +1682,49 @@ class HololiveBattleEngine {
         completeButton.disabled = true;
         completeButton.style.background = '#999';
         completeButton.style.cursor = 'not-allowed';
-        completeButton.textContent = '配置完了（センター２への配置が必要）';
+        completeButton.textContent = '配置完了（センターへの配置が必要）';
+      }
+    }
+    
+    // 自動配置ボタンの制御
+    if (autoButton) {
+      if (hasAnyCenterCard) {
+        // 既にセンターにカードが配置されている場合は自動配置を無効化
+        autoButton.disabled = true;
+        autoButton.style.background = '#999';
+        autoButton.style.cursor = 'not-allowed';
+        autoButton.textContent = '自動配置（センタークリア後に使用可能）';
+      } else {
+        // センターが空の場合は自動配置を有効化
+        autoButton.disabled = false;
+        autoButton.style.background = '#4CAF50';
+        autoButton.style.cursor = 'pointer';
+        autoButton.textContent = '自動配置';
       }
     }
   }
 
   executeAutoDebutPlacement() {
+    console.log('=== executeAutoDebutPlacement 開始 ===');
     const state = this.debutPlacementState;
-    if (!state) return;
+    console.log('debutPlacementState:', state);
+    
+    if (!state) {
+      console.error('debutPlacementStateが存在しません');
+      return;
+    }
+    
+    // 自動配置前にセンター2の状態をチェック
+    const player = this.players[state.playerId];
+    if (player.center2 !== null) {
+      alert('⚠️ 自動配置エラー\n\nセンター２に既にカードが配置されています。\n手動で移動するか、クリアしてから自動配置を使用してください。');
+      console.error('センター2に既にカードが配置されているため自動配置を実行できません');
+      return;
+    }
+    
+    // プレイヤーの現在状態をチェック
+    console.log(`プレイヤー${state.playerId}の手札:`, player.hand);
+    console.log(`手札枚数: ${player.hand.length}`);
     
     // コントロールを削除
     const controls = document.getElementById('debut-placement-controls');
@@ -1342,65 +1787,150 @@ class HololiveBattleEngine {
     }
     
     console.log('プレイヤーの手札:', player.hand);
+    console.log('既存の配置状態:');
+    console.log('- center1:', player.center1?.name || '空');
+    console.log('- center2:', player.center2?.name || '空');
+    console.log('- back1:', player.back1?.name || '空');
+    console.log('- back2:', player.back2?.name || '空');
+    console.log('- back3:', player.back3?.name || '空');
+    console.log('- back4:', player.back4?.name || '空');
+    console.log('- back5:', player.back5?.name || '空');
     
-    const debutCards = player.hand.filter(card => 
+    // 手札の各カードを詳細チェック
+    player.hand.forEach((card, index) => {
+      if (card) {
+        console.log(`手札[${index}]:`, {
+          name: card.name,
+          card_type: card.card_type,
+          bloom_level: card.bloom_level,
+          isHolomen: card.card_type && card.card_type.includes('ホロメン'),
+          isDebut: card.bloom_level === 'Debut'
+        });
+      }
+    });
+    
+    // 手札と既に配置済みのDebutカードを取得
+    const handDebutCards = player.hand.filter(card => 
       card && card.card_type && card.card_type.includes('ホロメン') && card.bloom_level === 'Debut'
     );
     
-    console.log('デビューカード:', debutCards);
+    // 既に配置済みのDebutカードを取得
+    const placedDebutCards = [];
+    const backPositions = ['back1', 'back2', 'back3', 'back4', 'back5'];
     
-    // デビューカードが存在するかチェック
-    if (!debutCards || debutCards.length === 0) {
-      console.error(`プレイヤー${playerId}の手札にデビューカードが見つかりません`);
+    // センター2からDebutカードを探す
+    if (player.center2 && player.center2.card_type && player.center2.card_type.includes('ホロメン') && player.center2.bloom_level === 'Debut') {
+      placedDebutCards.push({ card: player.center2, position: 'center2' });
+    }
+    
+    // バックからDebutカードを探す
+    backPositions.forEach(position => {
+      const card = player[position];
+      if (card && card.card_type && card.card_type.includes('ホロメン') && card.bloom_level === 'Debut') {
+        placedDebutCards.push({ card: card, position: position });
+      }
+    });
+    
+    console.log('手札のデビューカード:', handDebutCards);
+    console.log('配置済みのデビューカード:', placedDebutCards);
+    
+    // 利用可能なDebutカードの総数をチェック
+    const totalDebutCards = handDebutCards.length + placedDebutCards.length;
+    if (totalDebutCards === 0) {
+      console.warn(`プレイヤー${playerId}にDebutカードが見つかりません`);
+      this.proceedToNextDebutPlayer(playerId);
       return;
     }
     
-    // センター2に1枚配置（ディープコピー使用）
-    const centerCard = debutCards[0];
-    if (!centerCard || !centerCard.id) {
-      console.error('センターカードまたはIDが無効です:', centerCard);
-      return;
-    }
-
-    const centerCardCopy = this.createCardCopy(centerCard);
-    player.center2 = centerCardCopy;
-    const centerIndex = player.hand.findIndex(card => card && card.id === centerCard.id);
-    if (centerIndex === -1) {
-      console.error('手札からセンターカードが見つかりません:', centerCard);
-      return;
-    }
-    player.hand.splice(centerIndex, 1);
-    
-    console.log(`プレイヤー${playerId}が${centerCardCopy.name}をセンター2に配置`);
-    
-    // 残りのDebutをバックに配置
-    const remainingDebuts = player.hand.filter(card => 
-      card && card.card_type && card.card_type.includes('ホロメン') && card.bloom_level === 'Debut'
-    );
-    
-    let backPositions = ['back1', 'back2', 'back3', 'back4', 'back5'];
-    const maxSlots = player.center1 ? 4 : 5; // センター①の存在で制限
-    
-    remainingDebuts.slice(0, maxSlots).forEach((card, index) => {
-      if (!card || !card.id) {
-        console.error('バックカードまたはIDが無効です:', card);
-        return;
+    // センター2が空の場合、必ず配置する
+    if (!player.center2) {
+      let centerCard = null;
+      let sourcePosition = null;
+      
+      // 優先順位：手札 > バック配置済み
+      if (handDebutCards.length > 0) {
+        centerCard = handDebutCards[0];
+        sourcePosition = 'hand';
+      } else if (placedDebutCards.length > 0) {
+        const backPlaced = placedDebutCards.find(p => p.position.startsWith('back'));
+        if (backPlaced) {
+          centerCard = backPlaced.card;
+          sourcePosition = backPlaced.position;
+        }
       }
       
-      const cardCopy = this.createCardCopy(card);
-      player[backPositions[index]] = cardCopy;
-      const handIndex = player.hand.findIndex(handCard => handCard && handCard.id === card.id);
-      if (handIndex === -1) {
-        console.error('手札からバックカードが見つかりません:', card);
-        return;
+      if (centerCard) {
+        const centerCardCopy = this.createCardCopy(centerCard);
+        player.center2 = centerCardCopy;
+        
+        if (sourcePosition === 'hand') {
+          // 手札から移動
+          const handIndex = player.hand.findIndex(card => card && card.id === centerCard.id);
+          if (handIndex !== -1) {
+            player.hand.splice(handIndex, 1);
+          }
+        } else {
+          // バックから移動
+          player[sourcePosition] = null;
+        }
+        
+        console.log(`プレイヤー${playerId}が${centerCardCopy.name}を${sourcePosition}からセンター2に配置`);
       }
-      player.hand.splice(handIndex, 1);
-      console.log(`プレイヤー${playerId}が${cardCopy.name}を${backPositions[index]}に配置`);
-    });    // UIを更新
+    }
+    
+    // 残りのDebutをバックに配置（手札のみから）
+    const remainingHandDebuts = player.hand.filter(card => 
+      card && card.card_type && card.card_type.includes('ホロメン') && card.bloom_level === 'Debut'
+    );
+    
+    const maxSlots = player.center1 ? 4 : 5; // センター①の存在で制限
+    
+    // 空きバックスロットを探して配置
+    let placedCount = 0;
+    for (let i = 0; i < Math.min(maxSlots, backPositions.length) && placedCount < remainingHandDebuts.length; i++) {
+      const position = backPositions[i];
+      
+      // スロットが空の場合のみ配置
+      if (!player[position]) {
+        const card = remainingHandDebuts[placedCount];
+        if (!card || !card.id) {
+          console.error('バックカードまたはIDが無効です:', card);
+          continue;
+        }
+        
+        const cardCopy = this.createCardCopy(card);
+        player[position] = cardCopy;
+        const handIndex = player.hand.findIndex(handCard => handCard && handCard.id === card.id);
+        if (handIndex === -1) {
+          console.error('手札からバックカードが見つかりません:', card);
+          continue;
+        }
+        player.hand.splice(handIndex, 1);
+        console.log(`プレイヤー${playerId}が${cardCopy.name}を${position}に配置`);
+        placedCount++;
+      } else {
+        console.log(`${position}は既に配置済み:`, player[position].name);
+      }
+    }    
+    // UIを更新
     this.updateUI();
     this.updateHandDisplay();
     
-    alert(`${centerCard.name}をセンター2に配置\n残り${remainingDebuts.length}枚をバックに配置しました`);
+    const centerCardName = player.center2 ? player.center2.name : '（センター2既に配置済み）';
+    const backPlacedCount = placedCount;
+    
+    if (centerCardName !== '（センター2既に配置済み）' || backPlacedCount > 0) {
+      let message = '';
+      if (centerCardName !== '（センター2既に配置済み）') {
+        message += `${centerCardName}をセンター2に配置\n`;
+      }
+      if (backPlacedCount > 0) {
+        message += `${backPlacedCount}枚をバックに配置しました`;
+      }
+      alert(message.trim());
+    } else {
+      alert('既に配置されているため、新たな配置は行いませんでした');
+    }
     
     // 次のプレイヤーへ
     this.proceedToNextDebutPlayer(playerId);
@@ -1486,6 +2016,7 @@ class HololiveBattleEngine {
   finishGameSetup() {
     console.log('ゲームセットアップ完了');
     this.gameState.gameStarted = true;
+    this.gameState.debutPlacementPhase = false;  // 追加: Debut配置フェーズ終了
     
     alert('ゲーム開始！');
     
@@ -1589,6 +2120,22 @@ class HololiveBattleEngine {
     console.log('ドロップ先:', dropZone);
     console.log('ドラッグ元:', droppedData.source);
     
+    // 配置制御チェック
+    if (this.placementController && dropZone.type !== 'support') {
+      // バックスロットの場合は具体的なポジション名を作成
+      let positionName = dropZone.type;
+      if (dropZone.type === 'back' && dropZone.index !== undefined) {
+        positionName = `back${dropZone.index + 1}`; // index 0 → back1
+      }
+      
+      const placementCheck = this.placementController.canPlaceCard(card, positionName, 1);
+      if (!placementCheck.allowed) {
+        alert(`⚠️ 配置不可\n\n${placementCheck.reason}`);
+        console.log('配置制御により配置が拒否されました:', placementCheck.reason);
+        return;
+      }
+    }
+    
     if (droppedData.source === 'hand') {
       // 手札からの配置
       if (this.isValidDropTarget(e.target, card)) {
@@ -1619,7 +2166,13 @@ class HololiveBattleEngine {
   }
 
   isHolomenCard(card) {
-    const isHolomen = card.card_type && card.card_type.includes('ホロメン');
+    // nullチェックを追加
+    if (!card || !card.card_type) {
+      console.log(`isHolomenCard判定: ${card ? card.name || 'unnamed' : 'null'} = false (nullまたはcard_typeなし)`);
+      return false;
+    }
+    
+    const isHolomen = card.card_type.includes('ホロメン');
     console.log(`isHolomenCard判定: ${card.name} = ${isHolomen} (${card.card_type})`);
     return isHolomen;
   }
@@ -2086,48 +2639,70 @@ class HololiveBattleEngine {
 
   // エールカードをホロメンに添付
   attachYellCard(playerId, position, yellCard) {
+    console.log(`✅ [エール配置開始] プレイヤー${playerId}: ${yellCard.name} → ${position}`);
+    
+    // UI更新を一時停止（unknown表示を防ぐ）
+    this.isUpdatingYellCard = true;
+    
     const player = this.players[playerId];
     const holomen = player[position];
     
     if (!holomen) {
-      console.error(`位置${position}にホロメンが見つかりません`);
+      console.error(`❌ [エール配置エラー] プレイヤー${playerId}の${position}にホロメンが存在しません`);
+      this.isUpdatingYellCard = false;
       return;
     }
     
-    // ホロメンにエールカードリストがない場合は作成
+    // yellCardsプロパティを初期化（存在しない場合）
     if (!holomen.yellCards) {
       holomen.yellCards = [];
     }
     
     // エールカードを添付
     holomen.yellCards.push(yellCard);
-    console.log(`プレイヤー${playerId}: ${holomen.name}(${position})に${yellCard.name}を添付しました`);
-    console.log(`現在の${holomen.name}のエール数: ${holomen.yellCards.length}枚`);
     
-    // デバッグ：他のホロメンの状態も確認
-    console.log('=== 全ホロメンのエール状態 ===');
-    ['center1', 'center2', 'back1', 'back2', 'back3', 'back4', 'back5'].forEach(pos => {
-      if (player[pos]) {
-        const yellCount = player[pos].yellCards ? player[pos].yellCards.length : 0;
-        console.log(`${pos}: ${player[pos].name} - エール${yellCount}枚`);
-      }
-    });
-    console.log('=============================');
+    console.log(`✅ [エール配置完了] ${holomen.name}に${yellCard.name}を添付 (エール数: ${holomen.yellCards.length}枚)`);
     
-    // エールステップの場合：プレイヤー1・CPU共に自動進行
-    if (this.gameState.currentPhase === 2 && this.gameState.currentPlayer === playerId) {
-      if (playerId === 1) {
-        console.log('エール配置完了 - 自動でメインステップに進みます');
-        setTimeout(() => {
-          this.nextPhase();
-        }, 1500);
+    // State Managerに更新を送信
+    this.updatePlayerCards(playerId, position, [holomen]);
+    
+    // データ同期とUI更新
+    setTimeout(() => {
+      if (typeof window !== 'undefined' && this.stateManager && typeof this.stateManager.getState === 'function') {
+        try {
+          const state = this.stateManager.getState();
+          const statePlayer = state.players ? state.players[playerId] : null;
+          if (statePlayer && statePlayer.cards && statePlayer.cards[position]) {
+            // プレイヤーデータをState Managerと同期
+            if (statePlayer.cards[position][0] && statePlayer.cards[position][0].yellCards) {
+              this.players[playerId][position] = statePlayer.cards[position][0];
+              console.log(`🔄 [データ同期完了] ${position}をState Managerから同期`);
+              
+              // 同期完了後にUI更新を実行
+              setTimeout(() => {
+                this.isUpdatingYellCard = false;
+                this.updateUI();
+                this.updateCardAreas();
+                console.log(`🎨 [UI更新完了] エール表示を更新しました`);
+              }, 50);
+            }
+          }
+        } catch (error) {
+          console.error(`❌ [同期エラー] State Manager同期に失敗:`, error.message);
+          this.isUpdatingYellCard = false;
+        }
       } else {
-        console.log('CPUエール配置完了 - 自動でメインステップに進みます');
+        // State Manager利用不可の場合の代替処理
         setTimeout(() => {
-          this.nextPhase();
-        }, 1500);
+          this.isUpdatingYellCard = false;
+          this.updateUI();
+          this.updateCardAreas();
+          console.log(`🎨 [UI更新完了] 直接UI更新を実行しました`);
+        }, 100);
       }
-    }
+    }, 100);
+    
+    // 注意: UI更新はデータ同期完了後に自動実行されます
   }
 
   // エール対象選択UI表示
@@ -2201,8 +2776,19 @@ class HololiveBattleEngine {
         console.log(`選択されたターゲット: ${target.position} - ${target.card.name}`);
         console.log(`配置するエールカード: ${yellCard.name}`);
         
-        // 選択されたホロメンのみにエールを配置
-        this.attachYellCard(playerId, target.position, yellCard);
+        try {
+          console.log('attachYellCard呼び出し直前');
+          console.log('this.attachYellCard:', this.attachYellCard);
+          console.log('playerId:', playerId, 'target.position:', target.position, 'yellCard:', yellCard);
+          
+          // 選択されたホロメンのみにエールを配置
+          this.attachYellCard(playerId, target.position, yellCard);
+          
+          console.log('attachYellCard呼び出し後');
+        } catch (error) {
+          console.error(`エール配置でエラーが発生:`, error);
+          console.error(`エラーの詳細:`, error.stack);
+        }
         
         // モーダルを削除
         document.body.removeChild(modal);
@@ -2210,8 +2796,14 @@ class HololiveBattleEngine {
         // UI更新
         this.updateUI();
         
-        // エール配置完了（自動進行はattachYellCardメソッドで処理される）
+        // エール配置完了 - プレイヤーの場合は自動でメインステップに進む
         console.log('エールカード配置完了');
+        if (this.gameState.currentPhase === 2 && playerId === 1) {
+          console.log('エール配置完了 - 自動でメインステップに進みます');
+          setTimeout(() => {
+            this.nextPhase();
+          }, 1500);
+        }
       });
       
       button.addEventListener('mouseenter', () => {
@@ -2260,127 +2852,6 @@ class HololiveBattleEngine {
   addYellCardsToDisplay(cardElement, holomenCard, areaId) {
     // エールカード表示機能をCardDisplayManagerに委譲
     this.cardDisplayManager.addYellCardsToDisplay(cardElement, holomenCard, areaId);
-  }
-
-  // フェーズハイライト機能
-  updatePhaseHighlight() {
-    console.log(`=== updatePhaseHighlight 呼び出し ===`);
-    console.log(`プレイヤー: ${this.gameState.currentPlayer}, フェーズ: ${this.gameState.currentPhase}`);
-    
-    // すべてのハイライトを削除
-    const existingHighlights = document.querySelectorAll('.phase-highlight');
-    console.log(`既存のハイライト数: ${existingHighlights.length}`);
-    existingHighlights.forEach(element => {
-      element.classList.remove('phase-highlight');
-    });
-
-    const currentPlayer = this.gameState.currentPlayer;
-    const currentPhase = this.gameState.currentPhase;
-    
-    console.log(`フェーズハイライト更新: プレイヤー${currentPlayer}, フェーズ${currentPhase}`);
-    
-    // 現在のプレイヤーのエリアをハイライト
-    this.highlightPhaseArea(currentPlayer, currentPhase);
-    
-    // 更新後のハイライト確認
-    const newHighlights = document.querySelectorAll('.phase-highlight');
-    console.log(`新しいハイライト数: ${newHighlights.length}`);
-    newHighlights.forEach((element, index) => {
-      console.log(`ハイライト${index}: ${element.className}`);
-    });
-    console.log(`=== updatePhaseHighlight 完了 ===`);
-  }
-
-  // 指定プレイヤーのフェーズエリアをハイライト
-  highlightPhaseArea(playerId, phase) {
-    console.log(`=== highlightPhaseArea ===`);
-    console.log(`プレイヤー${playerId}, フェーズ${phase}`);
-    
-    const playerArea = playerId === 1 ? '.battle-player' : '.battle-opponent';
-    console.log(`対象エリア: ${playerArea}`);
-    
-    // フェーズに応じてハイライトを適用
-    switch (phase) {
-      case 0: // リセットステップ
-        console.log('リセットステップ - プレイヤーエリア全体をハイライト');
-        const battleArea = document.querySelector(playerArea);
-        if (battleArea) {
-          battleArea.classList.add('phase-highlight');
-          console.log('✅ リセットステップハイライト適用完了');
-        } else {
-          console.log('❌ プレイヤーエリアが見つかりません');
-        }
-        break;
-      case 1: // ドローステップ
-        console.log('ドローステップ - デッキエリアをハイライト');
-        const deckArea = document.querySelector(`${playerArea} .deck`);
-        if (deckArea) {
-          deckArea.classList.add('phase-highlight');
-          console.log('✅ ドローステップハイライト適用完了');
-        } else {
-          console.log('❌ デッキエリアが見つかりません');
-        }
-        break;
-      case 2: // エールステップ
-        console.log('エールステップ - エールデッキをハイライト');
-        const yellDeck = document.querySelector(`${playerArea} .yell-deck`);
-        if (yellDeck) {
-          yellDeck.classList.add('phase-highlight');
-          console.log('✅ エールステップハイライト適用完了');
-        } else {
-          console.log('❌ エールデッキが見つかりません');
-        }
-        break;
-      case 3: // メインステップ
-        if (playerId === 1) {
-          console.log('メインステップ（プレイヤー） - 手札エリアをハイライト');
-          const handArea = document.querySelector('.hand-area');
-          if (handArea) {
-            handArea.classList.add('phase-highlight');
-            console.log('✅ プレイヤーメインステップハイライト適用完了');
-          } else {
-            console.log('❌ 手札エリアが見つかりません');
-          }
-        } else {
-          console.log('メインステップ（CPU） - プレイヤーエリア全体をハイライト');
-          const battleArea = document.querySelector(playerArea);
-          if (battleArea) {
-            battleArea.classList.add('phase-highlight');
-            console.log('✅ CPUメインステップハイライト適用完了');
-          } else {
-            console.log('❌ CPUプレイヤーエリアが見つかりません');
-          }
-        }
-        break;
-      case 4: // パフォーマンスステップ
-        console.log('パフォーマンスステップ - フロントエリアをハイライト');
-        const front1 = document.querySelector(`${playerArea} .front1`);
-        const front2 = document.querySelector(`${playerArea} .front2`);
-        let highlightCount = 0;
-        if (front1) {
-          front1.classList.add('phase-highlight');
-          highlightCount++;
-        }
-        if (front2) {
-          front2.classList.add('phase-highlight');
-          highlightCount++;
-        }
-        console.log(`✅ パフォーマンスステップハイライト適用完了 (${highlightCount}箇所)`);
-        break;
-      case 5: // エンドステップ
-        console.log('エンドステップ - プレイヤーエリア全体をハイライト');
-        const endBattleArea = document.querySelector(playerArea);
-        if (endBattleArea) {
-          endBattleArea.classList.add('phase-highlight');
-          console.log('✅ エンドステップハイライト適用完了');
-        } else {
-          console.log('❌ エンドステップ用プレイヤーエリアが見つかりません');
-        }
-        break;
-      default:
-        console.log(`⚠️ 未対応のフェーズ: ${phase}`);
-    }
-    console.log(`=== highlightPhaseArea 完了 ===`);
   }
 
   /**

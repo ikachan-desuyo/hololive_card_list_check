@@ -105,10 +105,17 @@ class HololiveCPULogic {
 
   attachYellToHolomem(holomem, yellCard) {
     // ホロメンにエールを付ける処理
-    if (!holomem.attachedYells) {
-      holomem.attachedYells = [];
+    if (!holomem.yellCards) {
+      holomem.yellCards = [];
     }
-    holomem.attachedYells.push(yellCard);
+    holomem.yellCards.push(yellCard);
+    
+    console.log(`CPU: ${holomem.name}に${yellCard.name}を配置`);
+    console.log(`現在の${holomem.name}のエール数: ${holomem.yellCards.length}枚`);
+    
+    // UI更新
+    this.battleEngine.updateUI();
+    this.battleEngine.updateCardAreas();
   }
 
   async cpuMainPhase() {

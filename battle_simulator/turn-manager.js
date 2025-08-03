@@ -20,6 +20,12 @@ class HololiveTurnManager {
     console.log(`=== ターン終了処理開始 ===`);
     console.log(`現在のプレイヤー: ${this.gameState.currentPlayer} → 切り替え後: ${this.gameState.currentPlayer === 1 ? 2 : 1}`);
     
+    // エンドステップフラグをリセット（重複実行防止）
+    if (this.engine.phaseController) {
+      this.engine.phaseController.endStepInProgress = false;
+      console.log('🔄 エンドステップフラグをリセット');
+    }
+    
     // ターン終了
     this.gameState.currentPlayer = this.gameState.currentPlayer === 1 ? 2 : 1;
     this.gameState.currentPhase = 0;
@@ -121,6 +127,8 @@ class HololiveTurnManager {
    * マリガンチェック
    */
   checkMulligan(playerId) {
+    console.log(`🔍🔍🔍 checkMulligan開始 - プレイヤー${playerId}`);
+    
     // プレイヤーの存在確認
     if (!playerId || !this.players[playerId]) {
       console.error(`無効なプレイヤーID: ${playerId}`);
@@ -128,6 +136,7 @@ class HololiveTurnManager {
     }
     
     const player = this.players[playerId];
+    console.log(`🔍 プレイヤー${playerId}の手札確認:`, player.hand);
     
     // 手札の存在確認
     if (!player.hand || !Array.isArray(player.hand)) {
@@ -139,30 +148,80 @@ class HololiveTurnManager {
       card.card_type && card.card_type.includes('ホロメン') && card.bloom_level === 'Debut'
     );
     
+    console.log(`🔍 プレイヤー${playerId}のDebut有無: ${hasDebut}`);
+    
     if (!hasDebut) {
       // Debutがない場合は強制マリガン
+      console.log(`🔍 プレイヤー${playerId}: Debutなし、強制マリガンUI表示`);
       this.showMulliganUI(playerId, true);
     } else {
       // Debutがある場合は選択可能
+      console.log(`🔍 プレイヤー${playerId}: Debutあり、任意マリガンUI表示`);
       this.showMulliganUI(playerId, false);
     }
+    
+    console.log(`🔍 checkMulligan終了 - プレイヤー${playerId}`);
   }
 
   /**
    * マリガンUI表示
    */
   showMulliganUI(playerId, isForced) {
+    console.log(`🔍🔍🔍 showMulliganUI開始 - プレイヤー${playerId}, 強制: ${isForced}`);
+    
     const player = this.players[playerId];
     const mulliganCount = this.gameState.mulliganCount[playerId];
     
-    // モーダルUIでマリガン選択
-    this.modalUI.showMulliganModal(playerId, isForced, player.hand, mulliganCount, (doMulligan) => {
-      if (doMulligan) {
-        this.executeMulligan(playerId);
-      } else {
-        this.skipMulligan(playerId);
+    console.log(`🔍 プレイヤー${playerId}のマリガン回数: ${mulliganCount}`);
+    console.log(`🔍 modalUI存在確認:`, !!this.modalUI);
+    console.log(`🔍 showMulliganModal存在確認:`, !!this.modalUI?.showMulliganModal);
+    
+    // 既存のモーダルを確実に削除してから新しいモーダルを表示
+    const existingModal = document.getElementById('mulligan-modal');
+    if (existingModal) {
+      console.log(`🔍 既存のマリガンモーダルを削除中...`);
+      existingModal.remove();
+    }
+    
+    // 少し遅延を入れてからモーダルを表示（DOM更新を確実にする）
+    setTimeout(() => {
+      console.log(`🔍 プレイヤー${playerId}のマリガンモーダル表示開始`);
+      
+      // モーダルUIでマリガン選択
+      try {
+        this.modalUI.showMulliganModal(playerId, isForced, player.hand, mulliganCount, (doMulligan) => {
+          console.log(`🔍🔍🔍 マリガンモーダルコールバック呼び出し - プレイヤー${playerId}, マリガン実行: ${doMulligan}`);
+          console.log(`🔍 コールバック前の完了状態:`, this.gameState.mulliganCompleted);
+          
+          // 重複処理チェック
+          if (this.gameState.mulliganCompleted[playerId]) {
+            console.log(`🔍 ⚠️ 重複処理検出: プレイヤー${playerId}は既に完了済み - コールバック処理をスキップ`);
+            return;
+          }
+          
+          try {
+            if (doMulligan) {
+              console.log(`🔍 executeMulligan呼び出し開始 - プレイヤー${playerId}`);
+              this.executeMulligan(playerId);
+              console.log(`🔍 executeMulligan呼び出し完了 - プレイヤー${playerId}`);
+            } else {
+              console.log(`🔍 skipMulligan呼び出し開始 - プレイヤー${playerId}`);
+              this.skipMulligan(playerId);
+              console.log(`🔍 skipMulligan呼び出し完了 - プレイヤー${playerId}`);
+            }
+          } catch (error) {
+            console.error(`🔍 ❌ コールバック処理中にエラー:`, error);
+          }
+          
+          console.log(`🔍 コールバック後の完了状態:`, this.gameState.mulliganCompleted);
+        });
+        console.log(`🔍 showMulliganModal呼び出し成功 - プレイヤー${playerId}`);
+      } catch (error) {
+        console.error(`🔍 showMulliganModal呼び出しエラー:`, error);
       }
-    });
+      
+      console.log(`🔍 showMulliganUI終了 - プレイヤー${playerId}`);
+    }, 200); // 200ms遅延でDOM更新を確実にする
   }
 
   /**
@@ -216,10 +275,12 @@ class HololiveTurnManager {
       
       if (!hasDebut) {
         // まだDebutがないので、再度マリガンが必要
+        console.log(`🔍 プレイヤー${playerId}: Debutなし、強制マリガン継続`);
         this.checkMulligan(playerId);
       } else {
-        // Debutが見つかったので、任意でマリガンを選択可能
-        this.checkMulligan(playerId);
+        // Debutが見つかったので、マリガン完了として次のプレイヤーへ
+        console.log(`🔍 プレイヤー${playerId}: Debut発見、マリガン完了`);
+        this.proceedToNextMulliganPlayer(playerId);
       }
     }, 500);
   }
@@ -228,27 +289,78 @@ class HololiveTurnManager {
    * マリガンスキップ
    */
   skipMulligan(playerId) {
+    console.log(`🔍🔍🔍 skipMulligan開始 - プレイヤー${playerId}`);
+    console.log(`🔍 現在の完了状態:`, this.gameState.mulliganCompleted);
+    
+    // 既に完了している場合は重複処理を防ぐ
+    if (this.gameState.mulliganCompleted[playerId]) {
+      console.log(`🔍 ⚠️ プレイヤー${playerId}のマリガンは既に完了済み - 重複処理をスキップ`);
+      return;
+    }
+    
     console.log(`プレイヤー${playerId}がマリガンをスキップ`);
     
     // マリガンスキップメッセージ
     const playerName = playerId === 1 ? 'あなた' : '相手';
     alert(`${playerName}がマリガンをスキップしました`);
     
-    // 次のプレイヤーまたはDebut配置フェーズへ
-    setTimeout(() => {
-      this.proceedToNextMulliganPlayer(playerId);
-    }, 500);
+    // 次のプレイヤーまたはDebut配置フェーズへ（setTimeout削除）
+    this.proceedToNextMulliganPlayer(playerId);
   }
 
   /**
    * 次のマリガンプレイヤーへ進む
    */
   proceedToNextMulliganPlayer(currentPlayerId) {
-    // マリガン完了状態をマーク
-    this.gameState.mulliganCompleted[currentPlayerId] = true;
+    console.log(`🔍🔍🔍 proceedToNextMulliganPlayer開始 - プレイヤー${currentPlayerId}`);
+    console.log(`🔍 処理前の完了状態:`, this.gameState.mulliganCompleted);
+    
+    // 重複処理防止チェック
+    if (this.gameState.mulliganCompleted[currentPlayerId]) {
+      console.log(`🔍 ⚠️ プレイヤー${currentPlayerId}は既に完了済み - 重複処理をスキップ`);
+      // 既に完了している場合でも、次のプレイヤーの確認は実行
+    } else {
+      // マリガン完了状態をマーク（State Manager対応）
+      if (this.engine.stateManager) {
+        console.log(`🔍 State Manager使用してプレイヤー${currentPlayerId}を完了マーク`);
+        try {
+          this.engine.stateManager.updateState('MULLIGAN_COMPLETE', {
+            player: currentPlayerId,
+            count: this.gameState.mulliganCount[currentPlayerId] || 0
+          });
+          console.log(`🔍 State Manager更新成功 - プレイヤー${currentPlayerId}`);
+        } catch (error) {
+          console.error(`🔍 ❌ State Manager更新エラー:`, error);
+          // フォールバック処理
+          const newCompleted = { ...this.gameState.mulliganCompleted };
+          newCompleted[currentPlayerId] = true;
+          this.gameState.mulliganCompleted = newCompleted;
+          console.log(`🔍 フォールバック更新実行 - プレイヤー${currentPlayerId}`);
+        }
+      } else {
+        // フォールバック: 直接更新
+        console.log(`🔍 直接更新でプレイヤー${currentPlayerId}を完了マーク`);
+        const newCompleted = { ...this.gameState.mulliganCompleted };
+        newCompleted[currentPlayerId] = true;
+        this.gameState.mulliganCompleted = newCompleted;
+      }
+      
+      console.log(`🔍 プレイヤー${currentPlayerId}を完了にマーク`);
+    }
+    
+    console.log(`🔍 マーク後の完了状態:`, this.gameState.mulliganCompleted);
+    console.log(`🔍 mulliganCompleted[1]:`, this.gameState.mulliganCompleted[1]);
+    console.log(`🔍 mulliganCompleted[2]:`, this.gameState.mulliganCompleted[2]);
+    console.log(`🔍 mulliganCompleted の型:`, typeof this.gameState.mulliganCompleted);
+    console.log(`🔍 mulliganCompleted はArray?:`, Array.isArray(this.gameState.mulliganCompleted));
     
     // 両プレイヤーのマリガンが完了したかチェック
-    if (this.gameState.mulliganCompleted[1] && this.gameState.mulliganCompleted[2]) {
+    const player1Complete = this.gameState.mulliganCompleted[1];
+    const player2Complete = this.gameState.mulliganCompleted[2];
+    console.log(`🔍 プレイヤー1完了: ${player1Complete}, プレイヤー2完了: ${player2Complete}`);
+    
+    if (player1Complete && player2Complete) {
+      console.log(`🔍 ✅ 両プレイヤーのマリガンが完了 - Debut配置フェーズへ`);
       // 両プレイヤーのマリガンが完了
       this.engine.startDebutPlacementPhase();
       return;
@@ -256,17 +368,24 @@ class HololiveTurnManager {
     
     // 次のプレイヤーを決定
     const nextPlayerId = currentPlayerId === 1 ? 2 : 1;
+    console.log(`🔍 次のプレイヤー: ${nextPlayerId}`);
+    console.log(`🔍 次のプレイヤーの完了状態: ${this.gameState.mulliganCompleted[nextPlayerId]}`);
     
     // 次のプレイヤーがまだマリガンを完了していない場合
     if (!this.gameState.mulliganCompleted[nextPlayerId]) {
+      console.log(`🔍 プレイヤー${nextPlayerId}は未完了 - マリガン処理開始`);
+      
       if (nextPlayerId === 2) {
         // CPU のマリガン判定
+        console.log(`🔍 CPUマリガン判定開始 - プレイヤー${nextPlayerId}`);
         this.cpuMulliganDecision(nextPlayerId);
       } else {
         // プレイヤー1のマリガン
+        console.log(`🔍 プレイヤー1マリガンチェック開始 - プレイヤー${nextPlayerId}`);
         this.checkMulligan(nextPlayerId);
       }
     } else {
+      console.log(`🔍 プレイヤー${nextPlayerId}も既に完了済み - Debut配置フェーズへ`);
       // 次のプレイヤーが既に完了している場合、Debut配置フェーズへ
       this.engine.startDebutPlacementPhase();
     }
@@ -276,13 +395,25 @@ class HololiveTurnManager {
    * CPUマリガン判定
    */
   cpuMulliganDecision(playerId) {
+    console.log(`🔍🔍🔍 CPUマリガン判定開始 - プレイヤー${playerId}`);
+    console.log(`🔍 現在の完了状態:`, this.gameState.mulliganCompleted);
+    
+    // 既に完了している場合はスキップ
+    if (this.gameState.mulliganCompleted[playerId]) {
+      console.log(`🔍 ⚠️ プレイヤー${playerId}のマリガンは既に完了済み（CPU）- 重複処理をスキップ`);
+      return;
+    }
+    
     const player = this.players[playerId];
     const hasDebut = player.hand.some(card => 
       card.card_type && card.card_type.includes('ホロメン') && card.bloom_level === 'Debut'
     );
     
+    console.log(`🔍 CPU: プレイヤー${playerId}のDebut有無: ${hasDebut}`);
+    
     if (!hasDebut) {
       // Debutがない場合は強制マリガン
+      console.log('🔍 CPU: Debutがないので強制マリガンします');
       this.executeMulligan(playerId);
     } else {
       // 簡単なAI判定：手札が悪い場合マリガン
@@ -290,6 +421,8 @@ class HololiveTurnManager {
         (card.card_type && card.card_type.includes('ホロメン')) || 
         (card.card_type && card.card_type.includes('サポート'))
       ).length;
+      
+      console.log(`🔍 CPU: 良いカード枚数: ${goodCards}`);
       
       // 3枚未満の場合はマリガン
       if (goodCards < 3) {

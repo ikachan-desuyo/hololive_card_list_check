@@ -442,7 +442,7 @@ class ModalUI {
 
     const penaltyText = mulliganCount > 0 ? 
       `<div class="game-modal-highlight" style="background: #fff3e0; border-color: #ff9800;">
-        ⚠️ ${mulliganCount}回目のマリガンのため、手札が${mulliganCount}枚減ります
+        ⚠️ ${mulliganCount}回目のマリガンのため、手札が1枚減ります
       </div>` : '';
 
     const forcedText = isForced ? 

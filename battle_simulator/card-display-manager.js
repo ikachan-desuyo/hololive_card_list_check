@@ -9,7 +9,6 @@ class CardDisplayManager {
    * 全カードエリアの表示を更新
    */
   updateCardAreas() {
-    console.log('全カードエリアの表示を更新');
     
     // プレイヤーとCPUの両方のエリアを更新
     [1, 2].forEach(playerId => {
@@ -108,6 +107,7 @@ class CardDisplayManager {
         
         // エールカードがある場合は追加
         if (card.yellCards && card.yellCards.length > 0) {
+          console.log(`🎨 [エール表示] ${card.name}: ${card.yellCards.length}枚のエールカードを表示`);
           this.addYellCardsToArea(area, card, areaId, index);
         }
       }
@@ -392,9 +392,11 @@ class CardDisplayManager {
    * エールカードをエリアに追加
    */
   addYellCardsToArea(area, holomenCard, areaId, cardIndex) {
-    if (!holomenCard.yellCards || holomenCard.yellCards.length === 0) return;
+    if (!holomenCard.yellCards || holomenCard.yellCards.length === 0) {
+      return;
+    }
     
-    console.log(`エール表示更新: ${holomenCard.name}に${holomenCard.yellCards.length}枚のエール`);
+    console.log(`🎯 [エール描画] ${holomenCard.name} (${areaId}): ${holomenCard.yellCards.length}枚のエールカードを描画開始`);
     
     // 既存のエールカードコンテナを削除（重複防止）
     const existingYellContainer = area.querySelector(`.yell-cards[data-card-index="${cardIndex}"]`);

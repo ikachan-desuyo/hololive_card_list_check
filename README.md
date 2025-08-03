@@ -554,7 +554,36 @@ The creator assumes no responsibility for any damages arising from the use of th
 
 ---
 
-## 📞 Support
+## � トラブルシューティング / Troubleshooting
+
+### バトルシミュレーター / Battle Simulator
+
+#### エール配置時の一瞬の表示問題
+**問題**: エールカード配置時に一瞬カード画像が"unknown"になる
+**解決**: v4.5.2でUI更新タイミングを最適化し、State Manager同期完了後にUI更新を実行するよう修正済み
+
+#### エールカードが表示されない
+**症状**: エール配置が成功しているがカード上にエールが表示されない
+**原因**: State Managerとバトルエンジン間のデータ同期の問題
+**解決**: 自動的にデータ同期を実行し、エールカード情報を復元
+
+#### フェーズ進行の問題
+**症状**: エールステップで手動でフェーズを進めなければならない
+**解決**: v4.5.2でエール配置完了後の自動フェーズ進行を実装
+
+### 一般的な問題
+
+#### Service Workerキャッシュの問題
+**症状**: 更新が反映されない、古いバージョンが表示される
+**解決**: ブラウザのデベロッパーツール > Application > Storage > Clear storage
+
+#### モバイルでの表示問題
+**症状**: カードモーダルが正しく表示されない
+**解決**: v4.5.2でモバイル対応を強化、タッチ操作を最適化
+
+---
+
+## �📞 Support
 
 For questions or issues, please open an issue on GitHub.
 

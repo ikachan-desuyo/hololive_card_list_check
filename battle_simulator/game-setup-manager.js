@@ -113,7 +113,7 @@ class HololiveGameSetupManager {
     // ゲーム状態の初期化
     this.gameState.gameStarted = true;
     this.gameState.currentPlayer = 1;
-    this.gameState.currentPhase = 0;
+    this.gameState.currentPhase = -1; // 準備ステップから開始（マリガンフェーズ）
     this.gameState.turnCount = 1;
     
     // ゲーム開始ログ
@@ -284,6 +284,7 @@ class HololiveGameSetupManager {
       console.log('プレイヤー1のデッキが設定されていません。テストデッキを作成します。');
       const testCards1 = this.getTestCards();
       
+      // プロキシ経由で設定（State Managerに反映される）
       this.players[1].deck = [...testCards1.holomen, ...testCards1.support];
       this.players[1].yellDeck = [...testCards1.yell];
       this.players[1].oshi = testCards1.oshi;
@@ -295,6 +296,8 @@ class HololiveGameSetupManager {
     if (this.players[2].deck.length === 0) {
       console.log('プレイヤー2のデッキが設定されていません。テストデッキを作成します。');
       const testCards2 = this.getTestCards();
+      
+      // プロキシ経由で設定（State Managerに反映される）
       this.players[2].deck = [...testCards2.holomen, ...testCards2.support];
       this.players[2].yellDeck = [...testCards2.yell];
       this.players[2].oshi = testCards2.oshi;
@@ -346,11 +349,26 @@ class HololiveGameSetupManager {
    * 初期手札を配布
    */
   dealInitialHands() {
+    console.log('=== 初期手札配布開始 ===');
+    
+    // シャッフル後のデッキの状態を確認
+    const player1DeckTop = this.players[1].deck.slice(-7).map(c => c.name || c.card_id);
+    const player2DeckTop = this.players[2].deck.slice(-7).map(c => c.name || c.card_id);
+    console.log('プレイヤー1のデッキトップ7枚:', player1DeckTop);
+    console.log('プレイヤー2のデッキトップ7枚:', player2DeckTop);
+    
     // 初期手札を7枚配る
     for (let i = 0; i < 7; i++) {
       this.engine.drawCard(1);
       this.engine.drawCard(2);
     }
+    
+    // 配布後の手札を確認
+    const player1Hand = this.players[1].hand.map(c => c.name || c.card_id);
+    const player2Hand = this.players[2].hand.map(c => c.name || c.card_id);
+    console.log('プレイヤー1の手札:', player1Hand);
+    console.log('プレイヤー2の手札:', player2Hand);
+    console.log('=== 初期手札配布完了 ===');
   }
 
   /**
@@ -358,11 +376,21 @@ class HololiveGameSetupManager {
    */
   shuffleDeck(playerId) {
     const deck = this.players[playerId].deck;
-    for (let i = deck.length - 1; i > 0; i--) {
+    const shuffledDeck = [...deck]; // コピーを作成
+    
+    console.log(`プレイヤー${playerId}のデッキシャッフル前:`, shuffledDeck.slice(0, 5).map(c => c.name || c.card_id));
+    
+    // Fisher-Yates シャッフル
+    for (let i = shuffledDeck.length - 1; i > 0; i--) {
       const j = Math.floor(Math.random() * (i + 1));
-      [deck[i], deck[j]] = [deck[j], deck[i]];
+      [shuffledDeck[i], shuffledDeck[j]] = [shuffledDeck[j], shuffledDeck[i]];
     }
-    console.log(`プレイヤー${playerId}のデッキをシャッフルしました`);
+    
+    console.log(`プレイヤー${playerId}のデッキシャッフル後:`, shuffledDeck.slice(0, 5).map(c => c.name || c.card_id));
+    
+    // シャッフル結果をプロキシ経由で設定（State Managerに反映される）
+    this.players[playerId].deck = shuffledDeck;
+    console.log(`プレイヤー${playerId}のデッキをシャッフルしました（${shuffledDeck.length}枚）`);
   }
 
   /**

@@ -17,6 +17,7 @@ class PhaseController {
     ];
     
     this.phaseInProgress = false; // フェーズ進行制御フラグ
+    this.endStepInProgress = false; // エンドステップ重複実行防止フラグ
   }
   
   /**
@@ -335,8 +336,9 @@ class PhaseController {
         console.log(`CPU選択ターゲット: ${target.position} - ${target.card.name}`);
         this.battleEngine.attachYellCard(playerId, target.position, yellCard);
         
-        // UI更新
+        // UI更新（エール表示を反映）
         this.battleEngine.updateUI();
+        this.battleEngine.updateCardAreas();
         
         // 自動で次のステップへ移行
         setTimeout(() => {
@@ -458,6 +460,15 @@ class PhaseController {
   executeEndStep(playerId) {
     console.log(`プレイヤー${playerId}のエンドステップを実行`);
     
+    // 重複実行防止チェック
+    if (this.endStepInProgress) {
+      console.log(`⚠️ エンドステップ重複実行防止: プレイヤー${playerId}のエンドステップは既に進行中です`);
+      return;
+    }
+    
+    this.endStepInProgress = true;
+    console.log(`🔒 エンドステップ進行中フラグを設定: プレイヤー${playerId}`);
+    
     // 統合ログを記録
     if (window.infoPanelManager) {
       const playerName = playerId === 1 ? 'プレイヤー' : '対戦相手';
@@ -471,6 +482,8 @@ class PhaseController {
     // エンドステップは自動で完了し、相手のターンに移行（プレイヤー・CPU共通）
     console.log('エンドステップ完了 - 自動で相手のリセットステップに移行します');
     setTimeout(() => {
+      console.log(`🔓 エンドステップ進行中フラグをクリア: プレイヤー${playerId}`);
+      this.endStepInProgress = false;
       this.battleEngine.endTurn();
     }, 1000);
   }
