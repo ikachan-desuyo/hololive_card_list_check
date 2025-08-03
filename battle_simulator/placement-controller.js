@@ -484,8 +484,8 @@ class HololivePlacementController {
    */
   getPositionName(position) {
     const names = {
-      collab: 'コラボ',      // 変更: center1 → collab
-      center: 'センター',    // 変更: center2 → center
+      collab: 'コラボ',
+      center: 'センター',
       back1: 'バック①',
       back2: 'バック②',
       back3: 'バック③',
@@ -509,23 +509,8 @@ class HololivePlacementController {
       return positionId.type;
     }
     
-    // 文字列形式のマッピング
-    const positionMap = {
-      'center1': 'collab',     // センター①→コラボ
-      'center2': 'center',     // センター②→センター
-      'front1': 'collab',      // front1→コラボ
-      'front2': 'center',      // front2→センター
-      'center': 'center',      // センター（そのまま）
-      'collab': 'collab',      // コラボ（そのまま）
-      'back1': 'back1',        // バック①
-      'back2': 'back2',        // バック②
-      'back3': 'back3',        // バック③
-      'back4': 'back4',        // バック④
-      'back5': 'back5',        // バック⑤
-      'support': 'support'     // サポート
-    };
-    
-    return positionMap[positionId] || positionId;
+    // 基本的にはそのまま返す（必要に応じて拡張可能）
+    return positionId;
   }
 
   /**

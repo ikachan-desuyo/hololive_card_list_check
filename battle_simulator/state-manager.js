@@ -85,8 +85,8 @@ class HololiveStateManager {
       // カードエリア
       cards: {
         life: [],
-        center1: null,
-        center2: null,
+        collab: null,
+        center: null,
         oshi: null,
         holoPower: [],
         deck: [],

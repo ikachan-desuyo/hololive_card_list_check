@@ -6,13 +6,13 @@
       "max_cards": 6,
       "orientation": "vertical_stack"
     },
-    "center1": {
+    "collab": {
       "name": "センター①",
       "description": "メインのホロメンが立つステージ",
       "max_cards": 1,
       "type": "stage"
     },
-    "center2": {
+    "center": {
       "name": "センター②", 
       "description": "コラボホロメンが立つステージ",
       "max_cards": 1,

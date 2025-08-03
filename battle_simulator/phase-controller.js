@@ -163,25 +163,25 @@ class PhaseController {
     
     const player = this.battleEngine.players[playerId];
     
-    // センター1のホロメンカードを横向きにしてバックに移動
-    if (player.center1) {
-      const center1Card = player.center1;
-      center1Card.isResting = true; // 横向き状態をマーク
+    // コラボのホロメンカードを横向きにしてバックに移動
+    if (player.collab) {
+      const collabCard = player.collab
+      collabCard.isResting = true; // 横向き状態をマーク
       
       // 空いているバックスロットを探す
       const backPositions = ['back1', 'back2', 'back3', 'back4', 'back5'];
       for (let pos of backPositions) {
         if (!player[pos]) {
-          player[pos] = center1Card;
-          player.center1 = null;
-          console.log(`${center1Card.name}をセンター1からバック(${pos})に移動（横向き）`);
+          player[pos] = collabCard;
+          player.collab= null;
+          console.log(`${collabCard.name}をコラボからバック(${pos})に移動（横向き）`);
           break;
         }
       }
     }
     
-    // センター1が空の場合：バックの横向きホロメンカードをチェック
-    if (!player.center1) {
+    // コラボが空の場合：バックの横向きホロメンカードをチェック
+    if (!player.collab) {
       const backPositions = ['back1', 'back2', 'back3', 'back4', 'back5'];
       let hasRestingCard = false;
       
@@ -205,7 +205,7 @@ class PhaseController {
         console.log('横向きのホロメンカードがないため、特に処理を行いません');
       }
     } else {
-      // センター1にカードがある場合は通常通りバックの横向きカードを縦に戻す
+      // コラボにカードがある場合は通常通りバックの横向きカードを縦に戻す
       const backPositions = ['back1', 'back2', 'back3', 'back4', 'back5'];
       backPositions.forEach(pos => {
         if (player[pos] && player[pos].isResting) {
@@ -307,8 +307,8 @@ class PhaseController {
     const availableTargets = [];
     
     // センターのホロメンをチェック
-    if (player.center1) availableTargets.push({ position: 'center1', card: player.center1 });
-    if (player.center2) availableTargets.push({ position: 'center2', card: player.center2 });
+    if (player.collab) availableTargets.push({ position: 'collab', card: player.collab });
+    if (player.center) availableTargets.push({ position: 'center', card: player.center });
     
     // バックのホロメンをチェック
     const backPositions = ['back1', 'back2', 'back3', 'back4', 'back5'];

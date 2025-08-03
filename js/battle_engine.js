@@ -212,11 +212,11 @@ class HololiveBattleEngine {
       get life() { return lifeProxy.get(); },
       set life(value) { lifeProxy.set(value); },
       
-      get center1() { return self.stateManager.getStateByPath(`players.${playerId}.cards.center1`); },
-      set center1(value) { self.updatePlayerCards(playerId, 'center1', value); },
+      get collab() { return self.stateManager.getStateByPath(`players.${playerId}.cards.collab`); },
+      set collab(value) { self.updatePlayerCards(playerId, 'collab', value); },
       
-      get center2() { return self.stateManager.getStateByPath(`players.${playerId}.cards.center2`); },
-      set center2(value) { self.updatePlayerCards(playerId, 'center2', value); },
+      get center() { return self.stateManager.getStateByPath(`players.${playerId}.cards.center`); },
+      set center(value) { self.updatePlayerCards(playerId, 'center', value); },
       
       get oshi() { return self.stateManager.getStateByPath(`players.${playerId}.cards.oshi`); },
       set oshi(value) { self.updatePlayerCards(playerId, 'oshi', value); },
@@ -314,8 +314,8 @@ class HololiveBattleEngine {
   createPlayerState() {
     return {
       life: [],
-      center1: null,
-      center2: null,
+      collab: null,
+      center: null,
       oshi: null,
       holoPower: [],
       deck: [],
@@ -702,7 +702,7 @@ class HololiveBattleEngine {
       }
       
       // 条件2: 相手のステージに推しホロメン以外がいない
-      const hasStageHolomem = opponent.center1 || opponent.center2 || 
+      const hasStageHolomem = opponent.collab || opponent.center || 
                              opponent.back1 || opponent.back2 || opponent.back3;
       if (!hasStageHolomem) {
         this.endGame(playerId);
@@ -828,9 +828,9 @@ class HololiveBattleEngine {
   clearAllUIElements() {
     // カード表示エリアのクリア
     const cardAreas = [
-      'player1-center1', 'player1-center2', 'player1-oshi',
+      'player1-collab', 'player1-center', 'player1-oshi',
       'player1-back1', 'player1-back2', 'player1-back3', 'player1-back4', 'player1-back5',
-      'player2-center1', 'player2-center2', 'player2-oshi',
+      'player2-collab', 'player2-center', 'player2-oshi',
       'player2-back1', 'player2-back2', 'player2-back3', 'player2-back4', 'player2-back5'
     ];
     
@@ -1002,8 +1002,8 @@ class HololiveBattleEngine {
     let cards = null;
     switch (areaId) {
       case 'life': cards = player.life; break;
-      case 'front1': cards = player.center1; break;
-      case 'front2': cards = player.center2; break;
+      case 'collab': cards = player.collab; break;
+      case 'center': cards = player.center; break;
       case 'oshi': cards = player.oshi; break;
       case 'holo': cards = player.holoPower; break;
       case 'deck': cards = player.deck; break;
@@ -1125,15 +1125,15 @@ class HololiveBattleEngine {
         break;
       case 4: // パフォーマンスステップ
         console.log('パフォーマンスステップ - フロントエリアをハイライト');
-        const front1 = document.querySelector(`${playerArea} .front1`);
-        const front2 = document.querySelector(`${playerArea} .front2`);
+        const collab = document.querySelector(`${playerArea} .collab`);
+        const center = document.querySelector(`${playerArea} .center`);
         let highlightCount = 0;
-        if (front1) {
-          front1.classList.add('phase-highlight');
+        if (collab) {
+          collab.classList.add('phase-highlight');
           highlightCount++;
         }
-        if (front2) {
-          front2.classList.add('phase-highlight');
+        if (center) {
+          center.classList.add('phase-highlight');
           highlightCount++;
         }
         console.log(`✅ パフォーマンスステップハイライト適用完了 (${highlightCount}箇所)`);
@@ -1238,12 +1238,12 @@ class HololiveBattleEngine {
     const cardCopy = this.createCardCopy(card);
     
     // 空いているステージポジションを探す
-    if (!player.center1) {
-      player.center1 = cardCopy;
+    if (!player.collab) {
+      player.collab = cardCopy;
       player.hand.splice(handIndex, 1);
       console.log(`${cardCopy.name}をセンター①に配置しました`);
-    } else if (!player.center2) {
-      player.center2 = cardCopy;
+    } else if (!player.center) {
+      player.center = cardCopy;
       player.hand.splice(handIndex, 1);
       console.log(`${cardCopy.name}をセンター②に配置しました`);
     } else if (!player.back1) {
@@ -1566,7 +1566,7 @@ class HololiveBattleEngine {
       'あなたのDebut配置\n\n' +
       `Debutホロメン: ${debutCards.length}枚\n\n` +
       '📌 配置ルール:\n' +
-      '• センター2に1枚必須\n' +
+      '• センターに1枚必須\n' +
       '• バックに好きなだけ配置可能\n\n' +
       '手札のDebutホロメンをドラッグ&ドロップで配置してください'
     );
@@ -1651,16 +1651,16 @@ class HololiveBattleEngine {
     const completeButton = document.getElementById('complete-debut-button');
     const autoButton = document.getElementById('auto-debut-button');
     
-    // 実際のゲーム状態を確認（center2 → center）
-    const hasValidCenter = player.center2 && 
-                          this.isHolomenCard(player.center2) && 
-                          player.center2.bloom_level === 'Debut';
+    // 実際のゲーム状態を確認（center → center）
+    const hasValidCenter = player.center && 
+                          this.isHolomenCard(player.center) && 
+                          player.center.bloom_level === 'Debut';
     
     const backPositions = ['back1', 'back2', 'back3', 'back4', 'back5'];
     const placedBackCards = backPositions.filter(pos => player[pos]).length;
     
     // センターに既にカードが配置されているかチェック（Debutかどうかは問わない）
-    const hasAnyCenterCard = player.center2 !== null;
+    const hasAnyCenterCard = player.center !== null;
     
     if (centerStatus) {
       centerStatus.textContent = hasValidCenter ? '配置済み' : '未配置';
@@ -1714,11 +1714,11 @@ class HololiveBattleEngine {
       return;
     }
     
-    // 自動配置前にセンター2の状態をチェック
+    // 自動配置前にセンターの状態をチェック
     const player = this.players[state.playerId];
-    if (player.center2 !== null) {
+    if (player.center !== null) {
       alert('⚠️ 自動配置エラー\n\nセンター２に既にカードが配置されています。\n手動で移動するか、クリアしてから自動配置を使用してください。');
-      console.error('センター2に既にカードが配置されているため自動配置を実行できません');
+      console.error('センターに既にカードが配置されているため自動配置を実行できません');
       return;
     }
     
@@ -1740,25 +1740,25 @@ class HololiveBattleEngine {
     const player = this.players[1]; // プレイヤーのデータを取得
     
     // センター２に配置されているかチェック
-    if (!player.center2) {
+    if (!player.center) {
       alert('エラー: センター２にDebutホロメンの配置が必要です。\n必ずセンター２にDebutカードを配置してください。');
       return;
     }
     
     // センター２のカードがDebutかチェック
-    if (player.center2.bloom_level !== 'Debut') {
+    if (player.center.bloom_level !== 'Debut') {
       alert('エラー: センター２にはDebutレベルのホロメンを配置してください。');
       return;
     }
     
     // ホロメンカードかチェック
-    if (!this.isHolomenCard(player.center2)) {
+    if (!this.isHolomenCard(player.center)) {
       alert('エラー: センター２にはホロメンカードを配置してください。');
       return;
     }
     
     console.log('Debut配置バリデーション完了');
-    console.log('センター２:', player.center2.name);
+    console.log('センター２:', player.center.name);
     
     // バックエリアの配置数をカウント
     const backPositions = ['back1', 'back2', 'back3', 'back4', 'back5'];
@@ -1771,7 +1771,7 @@ class HololiveBattleEngine {
     }
     
     const totalPlaced = 1 + placedBackCards; // センター２ + バック
-    alert(`Debut配置完了！\nセンター２: ${player.center2.name}\nバックエリア: ${placedBackCards}枚\n合計: ${totalPlaced}枚のDebutホロメンを配置しました`);
+    alert(`Debut配置完了！\nセンター２: ${player.center.name}\nバックエリア: ${placedBackCards}枚\n合計: ${totalPlaced}枚のDebutホロメンを配置しました`);
     
     // 次のプレイヤーまたは次のフェーズへ
     this.proceedToNextDebutPlayer(1);
@@ -1788,8 +1788,8 @@ class HololiveBattleEngine {
     
     console.log('プレイヤーの手札:', player.hand);
     console.log('既存の配置状態:');
-    console.log('- center1:', player.center1?.name || '空');
-    console.log('- center2:', player.center2?.name || '空');
+    console.log('- collab:', player.collab?.name || '空');
+    console.log('- center:', player.center?.name || '空');
     console.log('- back1:', player.back1?.name || '空');
     console.log('- back2:', player.back2?.name || '空');
     console.log('- back3:', player.back3?.name || '空');
@@ -1818,9 +1818,9 @@ class HololiveBattleEngine {
     const placedDebutCards = [];
     const backPositions = ['back1', 'back2', 'back3', 'back4', 'back5'];
     
-    // センター2からDebutカードを探す
-    if (player.center2 && player.center2.card_type && player.center2.card_type.includes('ホロメン') && player.center2.bloom_level === 'Debut') {
-      placedDebutCards.push({ card: player.center2, position: 'center2' });
+    // センターからDebutカードを探す
+    if (player.center && player.center.card_type && player.center.card_type.includes('ホロメン') && player.center.bloom_level === 'Debut') {
+      placedDebutCards.push({ card: player.center, position: 'center' });
     }
     
     // バックからDebutカードを探す
@@ -1842,8 +1842,8 @@ class HololiveBattleEngine {
       return;
     }
     
-    // センター2が空の場合、必ず配置する
-    if (!player.center2) {
+    // センターが空の場合、必ず配置する
+    if (!player.center) {
       let centerCard = null;
       let sourcePosition = null;
       
@@ -1861,7 +1861,7 @@ class HololiveBattleEngine {
       
       if (centerCard) {
         const centerCardCopy = this.createCardCopy(centerCard);
-        player.center2 = centerCardCopy;
+        player.center = centerCardCopy;
         
         if (sourcePosition === 'hand') {
           // 手札から移動
@@ -1874,7 +1874,7 @@ class HololiveBattleEngine {
           player[sourcePosition] = null;
         }
         
-        console.log(`プレイヤー${playerId}が${centerCardCopy.name}を${sourcePosition}からセンター2に配置`);
+        console.log(`プレイヤー${playerId}が${centerCardCopy.name}を${sourcePosition}からセンターに配置`);
       }
     }
     
@@ -1883,7 +1883,7 @@ class HololiveBattleEngine {
       card && card.card_type && card.card_type.includes('ホロメン') && card.bloom_level === 'Debut'
     );
     
-    const maxSlots = player.center1 ? 4 : 5; // センター①の存在で制限
+    const maxSlots = player.collab ? 4 : 5; // センター①の存在で制限
     
     // 空きバックスロットを探して配置
     let placedCount = 0;
@@ -1916,13 +1916,13 @@ class HololiveBattleEngine {
     this.updateUI();
     this.updateHandDisplay();
     
-    const centerCardName = player.center2 ? player.center2.name : '（センター2既に配置済み）';
+    const centerCardName = player.center ? player.center.name : '（センター既に配置済み）';
     const backPlacedCount = placedCount;
     
-    if (centerCardName !== '（センター2既に配置済み）' || backPlacedCount > 0) {
+    if (centerCardName !== '（センター既に配置済み）' || backPlacedCount > 0) {
       let message = '';
-      if (centerCardName !== '（センター2既に配置済み）') {
-        message += `${centerCardName}をセンター2に配置\n`;
+      if (centerCardName !== '（センター既に配置済み）') {
+        message += `${centerCardName}をセンターに配置\n`;
       }
       if (backPlacedCount > 0) {
         message += `${backPlacedCount}枚をバックに配置しました`;
@@ -1981,14 +1981,14 @@ class HololiveBattleEngine {
       return;
     }
     
-    // センター2に1枚配置（ディープコピー使用）
+    // センターに1枚配置（ディープコピー使用）
     const centerCard = debutCards[0];
     const centerCardCopy = this.createCardCopy(centerCard);
-    player.center2 = centerCardCopy;
+    player.center = centerCardCopy;
     const centerIndex = player.hand.findIndex(card => card.id === centerCard.id);
     player.hand.splice(centerIndex, 1);
     
-    console.log(`CPU（プレイヤー${playerId}）が${centerCardCopy.name}をセンター2に配置`);
+    console.log(`CPU（プレイヤー${playerId}）が${centerCardCopy.name}をセンターに配置`);
     
     // 残りのDebutをバックに配置（簡単なAI）
     const remainingDebuts = player.hand.filter(card => 
@@ -1996,7 +1996,7 @@ class HololiveBattleEngine {
     );
     
     let backPositions = ['back1', 'back2', 'back3', 'back4', 'back5'];
-    const maxSlots = player.center1 ? 4 : 5; // センター①の存在で制限
+    const maxSlots = player.collab ? 4 : 5; // センター①の存在で制限
     
     remainingDebuts.slice(0, maxSlots).forEach((card, index) => {
       const cardCopy = this.createCardCopy(card);
@@ -2191,9 +2191,9 @@ class HololiveBattleEngine {
       console.log('ホロメンカード検出');
       
       // センター②をチェック（空の場合のみ）
-      const center2 = document.querySelector('.battle-player .front2');
-      if (center2 && !this.players[1].center2) {
-        center2.classList.add('drop-zone-active');
+      const center = document.querySelector('.battle-player .center');
+      if (center && !this.players[1].center) {
+        center.classList.add('drop-zone-active');
         console.log('センター②をハイライト');
       }
       
@@ -2224,18 +2224,18 @@ class HololiveBattleEngine {
       return;
     }
     
-    // センター1をハイライト（空または交換可能）
-    const center1 = document.querySelector('.battle-player .front1');
-    if (center1 && (currentAreaId !== 'front1')) {
-      center1.classList.add('drop-zone-active');
-      console.log('センター1をハイライト（交換可能）');
+    // コラボをハイライト（空または交換可能）
+    const collab = document.querySelector('.battle-player .collab');
+    if (collab && (currentAreaId !== 'collab')) {
+      collab.classList.add('drop-zone-active');
+      console.log('コラボをハイライト（交換可能）');
     }
     
-    // センター2をハイライト（空または交換可能）
-    const center2 = document.querySelector('.battle-player .front2');
-    if (center2 && (currentAreaId !== 'front2')) {
-      center2.classList.add('drop-zone-active');
-      console.log('センター2をハイライト（交換可能）');
+    // センターをハイライト（空または交換可能）
+    const center = document.querySelector('.battle-player .center');
+    if (center && (currentAreaId !== 'center')) {
+      center.classList.add('drop-zone-active');
+      console.log('センターをハイライト（交換可能）');
     }
     
     // バックスロットをハイライト（現在位置以外）
@@ -2281,8 +2281,8 @@ class HololiveBattleEngine {
     const dropZone = this.getDropZoneInfo(target);
     
     switch (dropZone.type) {
-      case 'center2':
-        return !this.players[1].center2; // 空の場合のみ
+      case 'center':
+        return !this.players[1].center; // 空の場合のみ
       case 'back':
         return this.canPlaceCardInBackSlot(card, dropZone.index);
       default:
@@ -2299,8 +2299,8 @@ class HololiveBattleEngine {
     const dropZone = this.getDropZoneInfo(target);
     
     switch (dropZone.type) {
-      case 'center1':
-      case 'center2':
+      case 'collab':
+      case 'center':
         return true; // センターエリアは常に交換可能
       case 'back':
         return this.canPlaceCardInBackSlot(card, dropZone.index);
@@ -2321,11 +2321,11 @@ class HololiveBattleEngine {
     // ドロップ先のカードを取得
     let targetCard = null;
     switch (dropZone.type) {
-      case 'center1':
-        targetCard = player.center1;
+      case 'collab':
+        targetCard = player.collab;
         break;
-      case 'center2':
-        targetCard = player.center2;
+      case 'center':
+        targetCard = player.center;
         break;
       case 'back':
         const backPositions = ['back1', 'back2', 'back3', 'back4', 'back5'];
@@ -2361,11 +2361,11 @@ class HololiveBattleEngine {
   // 位置からカードを削除
   removeCardFromPosition(player, areaId, index) {
     switch (areaId) {
-      case 'front1':
-        player.center1 = null;
+      case 'collab':
+        player.collab = null;
         break;
-      case 'front2':
-        player.center2 = null;
+      case 'center':
+        player.center = null;
         break;
       case 'backs':
         const backPositions = ['back1', 'back2', 'back3', 'back4', 'back5'];
@@ -2377,11 +2377,11 @@ class HololiveBattleEngine {
   // 指定位置にカードを配置
   placeCardAtPosition(player, card, zone) {
     switch (zone.type) {
-      case 'center1':
-        player.center1 = card;
+      case 'collab':
+        player.collab = card;
         break;
-      case 'center2':
-        player.center2 = card;
+      case 'center':
+        player.center = card;
         break;
       case 'back':
         const backPositions = ['back1', 'back2', 'back3', 'back4', 'back5'];
@@ -2393,8 +2393,8 @@ class HololiveBattleEngine {
   // エリアIDからゾーンタイプを取得
   getZoneTypeFromAreaId(areaId) {
     switch (areaId) {
-      case 'front1': return 'center1';
-      case 'front2': return 'center2';
+      case 'collab': return 'collab';
+      case 'center': return 'center';
       case 'backs': return 'back';
       default: return areaId;
     }
@@ -2406,11 +2406,11 @@ class HololiveBattleEngine {
     const backPositions = ['back1', 'back2', 'back3', 'back4', 'back5'];
     
     // センター①があるかどうかで最大使用スロット数を決定
-    const maxSlots = player.center1 ? 4 : 5;
+    const maxSlots = player.collab ? 4 : 5;
     
     // スロットインデックスが使用可能範囲内かチェック
     if (slotIndex >= maxSlots) {
-      console.log(`スロット${slotIndex}は使用不可（center1=${!!player.center1}, maxSlots=${maxSlots}）`);
+      console.log(`スロット${slotIndex}は使用不可（collab=${!!player.collab}, maxSlots=${maxSlots}）`);
       return false;
     }
     
@@ -2453,10 +2453,10 @@ class HololiveBattleEngine {
       console.log('カードエリア情報:', { areaId, areaIndex });
       
       switch (areaId) {
-        case 'front1':
-          return { type: 'center1', index: 0, element: target };
-        case 'front2':
-          return { type: 'center2', index: 0, element: target };
+        case 'collab':
+          return { type: 'collab', index: 0, element: target };
+        case 'center':
+          return { type: 'center', index: 0, element: target };
         case 'backs':
           return { type: 'back', index: areaIndex, element: target };
         default:
@@ -2464,8 +2464,8 @@ class HololiveBattleEngine {
       }
     }
     
-    if (target.classList.contains('front2')) {
-      return { type: 'center2' };
+    if (target.classList.contains('center')) {
+      return { type: 'center' };
     }
     
     if (target.classList.contains('back-slot')) {
@@ -2522,8 +2522,8 @@ class HololiveBattleEngine {
     const cardToPlace = this.isHolomenCard(card) ? this.createCardCopy(card) : card;
     
     switch (dropZone.type) {
-      case 'center2':
-        player.center2 = cardToPlace;
+      case 'center':
+        player.center = cardToPlace;
         console.log(`${cardToPlace.name}をセンター②に配置`);
         
         // Debut配置中の場合、状態を更新
@@ -2821,8 +2821,8 @@ class HololiveBattleEngine {
   // ポジション名を取得
   getPositionName(position) {
     const positionNames = {
-      'center1': 'センター①',
-      'center2': 'センター②',
+      'collab': 'センター①',
+      'center': 'センター②',
       'back1': 'バック①',
       'back2': 'バック②',
       'back3': 'バック③',

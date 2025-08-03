@@ -18,8 +18,8 @@ class CardDisplayManager {
       // 各エリアのデータと要素を取得
       const areas = [
         { id: 'life', data: player.life, isMultiple: true },
-        { id: 'front1', data: player.center1, isMultiple: false },
-        { id: 'front2', data: player.center2, isMultiple: false },
+        { id: 'collab', data: player.collab, isMultiple: false },
+        { id: 'center', data: player.center, isMultiple: false },
         { id: 'oshi', data: player.oshi, isMultiple: false },
         { id: 'holo', data: player.holoPower, isMultiple: true },
         { id: 'deck', data: player.deck, isMultiple: true },
@@ -66,11 +66,11 @@ class CardDisplayManager {
         cardsToDisplay = cards || [];
         displayType = 'vertical';
         break;
-      case 'front1':
+      case 'collab':
         if (cards) cardsToDisplay = [cards];
         displayType = 'single';
         break;
-      case 'front2':
+      case 'center':
         if (cards) cardsToDisplay = [cards];
         displayType = 'single';
         break;
@@ -216,7 +216,7 @@ class CardDisplayManager {
     // 配置済みカードのドラッグ機能を追加（プレイヤー1のセンター、バックのホロメンカードのみ）
     if (shouldShowFaceUp && card && isPlayerCard && 
         this.battleEngine.isHolomenCard && this.battleEngine.isHolomenCard(card) && 
-        (areaId === 'front1' || areaId === 'front2' || areaId === 'backs')) {
+        (areaId === 'collab' || areaId === 'center' || areaId === 'backs')) {
       cardElement.draggable = true;
       cardElement.setAttribute('data-card-id', card.id);
       cardElement.setAttribute('data-area-id', areaId);
@@ -293,7 +293,7 @@ class CardDisplayManager {
     const backPositions = ['back1', 'back2', 'back3', 'back4', 'back5'];
     
     // センター①があるかどうかで最大使用スロット数を決定
-    const maxSlots = player.center1 ? 4 : 5;
+    const maxSlots = player.collab ? 4 : 5;
     
     backSlots.forEach((slot, index) => {
       // 既存のカード要素をクリア（スロット自体は保持）
@@ -409,7 +409,7 @@ class CardDisplayManager {
     yellContainer.setAttribute('data-card-index', cardIndex);
     
     // センターかバックかで配置を変える
-    if (areaId === 'front1' || areaId === 'front2') {
+    if (areaId === 'collab' || areaId === 'center') {
       yellContainer.classList.add('center');
     } else {
       yellContainer.classList.add('back');
@@ -427,7 +427,31 @@ class CardDisplayManager {
     holomenCard.yellCards.forEach((yellCard, index) => {
       const yellElement = document.createElement('div');
       yellElement.className = 'yell-card';
-      yellElement.title = yellCard.name;
+      yellElement.title = yellCard.name || 'エールカード';
+      
+      // エールカード用のdata属性を設定（情報パネル表示用）
+      yellElement.setAttribute('data-card-id', yellCard.id || '');
+      yellElement.setAttribute('data-card-name', yellCard.name || 'エールカード');
+      yellElement.setAttribute('data-card-type', yellCard.card_type || 'エールカード');
+      yellElement.setAttribute('data-card-description', yellCard.description || '');
+      
+      if (yellCard.color && Array.isArray(yellCard.color)) {
+        yellElement.setAttribute('data-card-color', yellCard.color.join('・'));
+      } else if (yellCard.color) {
+        yellElement.setAttribute('data-card-color', yellCard.color);
+      }
+      
+      if (yellCard.level !== undefined) {
+        yellElement.setAttribute('data-card-level', yellCard.level);
+      }
+      
+      if (yellCard.hp !== undefined) {
+        yellElement.setAttribute('data-card-hp', yellCard.hp);
+      }
+      
+      if (yellCard.attack !== undefined) {
+        yellElement.setAttribute('data-card-attack', yellCard.attack);
+      }
       
       // エールカードをライフカードのように重ねて配置
       yellElement.style.position = 'absolute';
@@ -435,10 +459,10 @@ class CardDisplayManager {
       yellElement.style.height = '168px'; // 他のカードと同じサイズに統一
       
       // センターとバックで異なる重なり方（ホロメンカードから少しずらす）
-      if (areaId === 'front1' || areaId === 'front2') {
+      if (areaId === 'collab' || areaId === 'center') {
         // センター配置：ホロメンカードの下に、右部分が少しはみ出るように配置
         // 上下は同じ高さ、左右は右にずらして重ねる
-        const offsetX = 30 + (index * 12); // 右にもっと大きくはみ出し
+        const offsetX = -80 + (index * 25); // 右にもっと大きくはみ出し
         const offsetY = 0; // 上下は同じ高さ
         yellElement.style.transform = `translate(${offsetX}px, ${offsetY}px) scale(1)`;
         yellElement.style.zIndex = `${5 - index}`; // 通常時は後ろに、ホバー時はCSSで250に
@@ -484,6 +508,7 @@ class CardDisplayManager {
    * エールカードをカード表示に追加（旧関数・互換性のため残す）
    */
   addYellCardsToDisplay(cardElement, holomenCard, areaId) {
+    console.log(`🔍 [エールカード配置] areaId: "${areaId}", yellCards: ${holomenCard.yellCards?.length || 0}枚`);
     if (!holomenCard.yellCards || holomenCard.yellCards.length === 0) return;
     
     // 既存のエールカードコンテナを削除（重複防止）
@@ -496,7 +521,7 @@ class CardDisplayManager {
     yellContainer.className = 'yell-cards';
     
     // センターかバックかで配置を変える
-    if (areaId === 'front1' || areaId === 'front2') {
+    if (areaId === 'collab' || areaId === 'center') {
       yellContainer.classList.add('center');
     } else {
       yellContainer.classList.add('back');
@@ -514,7 +539,31 @@ class CardDisplayManager {
     holomenCard.yellCards.forEach((yellCard, index) => {
       const yellElement = document.createElement('div');
       yellElement.className = 'yell-card';
-      yellElement.title = yellCard.name;
+      yellElement.title = yellCard.name || 'エールカード';
+      
+      // エールカード用のdata属性を設定（情報パネル表示用）
+      yellElement.setAttribute('data-card-id', yellCard.id || '');
+      yellElement.setAttribute('data-card-name', yellCard.name || 'エールカード');
+      yellElement.setAttribute('data-card-type', yellCard.card_type || 'エールカード');
+      yellElement.setAttribute('data-card-description', yellCard.description || '');
+      
+      if (yellCard.color && Array.isArray(yellCard.color)) {
+        yellElement.setAttribute('data-card-color', yellCard.color.join('・'));
+      } else if (yellCard.color) {
+        yellElement.setAttribute('data-card-color', yellCard.color);
+      }
+      
+      if (yellCard.level !== undefined) {
+        yellElement.setAttribute('data-card-level', yellCard.level);
+      }
+      
+      if (yellCard.hp !== undefined) {
+        yellElement.setAttribute('data-card-hp', yellCard.hp);
+      }
+      
+      if (yellCard.attack !== undefined) {
+        yellElement.setAttribute('data-card-attack', yellCard.attack);
+      }
       
       // エールカードをライフカードのように重ねて配置
       yellElement.style.position = 'absolute';
@@ -522,10 +571,10 @@ class CardDisplayManager {
       yellElement.style.height = '168px'; // 他のカードと同じサイズに統一
       
       // センターとバックで異なる重なり方（ホロメンカードから少しずらす）
-      if (areaId === 'front1' || areaId === 'front2') {
+      if (areaId === 'collab' || areaId === 'center') {
         // センター配置：ホロメンカードの下に、右部分が少しはみ出るように配置
         // 上下は同じ高さ、左右は右にずらして重ねる
-        const offsetX = 30 + (index * 12); // 右にもっと大きくはみ出し
+        const offsetX = -80 + (index * 25); // 右にもっと大きくはみ出し
         const offsetY = 0; // 上下は同じ高さ
         yellElement.style.transform = `translate(${offsetX}px, ${offsetY}px) scale(1)`;
         yellElement.style.zIndex = `${5 - index}`; // 通常時は後ろに、ホバー時はCSSで250に
@@ -579,7 +628,7 @@ class CardDisplayManager {
     }
     
     // 表向きで表示すべきエリア
-    const faceUpAreas = ['front1', 'front2', 'backs', 'archive'];
+    const faceUpAreas = ['collab', 'center', 'backs', 'archive'];
     return faceUpAreas.includes(areaId);
   }
 
@@ -589,8 +638,8 @@ class CardDisplayManager {
   getCardCount(player, areaId) {
     switch (areaId) {
       case 'life': return player.life.length;
-      case 'front1': return player.center1 ? 1 : 0;
-      case 'front2': return player.center2 ? 1 : 0;
+      case 'collab': return player.collab ? 1 : 0;
+      case 'center': return player.center ? 1 : 0;
       case 'oshi': return player.oshi ? 1 : 0;
       case 'holo': return player.holoPower.length;
       case 'deck': return player.deck.length;

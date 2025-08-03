@@ -78,12 +78,12 @@ class HololiveCPULogic {
     const targets = [];
     
     // センターホロメンを最優先
-    if (cpu.center1) {
-      targets.push({ position: 'center1', card: cpu.center1, priority: 10 });
+    if (cpu.collab) {
+      targets.push({ position: 'collab', card: cpu.collab, priority: 10 });
     }
     
-    if (cpu.center2) {
-      targets.push({ position: 'center2', card: cpu.center2, priority: 8 });
+    if (cpu.center) {
+      targets.push({ position: 'center', card: cpu.center, priority: 8 });
     }
     
     // バックホロメンは低優先度
@@ -171,8 +171,8 @@ class HololiveCPULogic {
     const cpu = this.battleEngine.players[2];
     
     // センターポジションを優先
-    if (!cpu.center1) return 'center1';
-    if (!cpu.center2) return 'center2';
+    if (!cpu.collab) return 'collab';
+    if (!cpu.center) return 'center';
     
     // バックポジション
     if (!cpu.back1) return 'back1';
@@ -186,8 +186,8 @@ class HololiveCPULogic {
     let priority = 5;
     
     // センターポジションは高優先度
-    if (position === 'center1') priority += 5;
-    if (position === 'center2') priority += 3;
+    if (position === 'collab') priority += 5;
+    if (position === 'center') priority += 3;
     
     // カードの強さに応じて優先度調整
     if (card.hp && parseInt(card.hp) > 100) priority += 2;
@@ -307,18 +307,18 @@ class HololiveCPULogic {
     
     // アーツ使用の判定
     const attackTargets = this.getAttackTargets();
-    
-    if (cpu.center1 && this.canUseArts(cpu.center1)) {
+
+    if (cpu.collab && this.canUseArts(cpu.collab)) {
       const target = this.selectAttackTarget(attackTargets);
       if (target) {
-        await this.cpuUseArts(cpu.center1, target);
+        await this.cpuUseArts(cpu.collab, target);
       }
     }
     
-    if (cpu.center2 && this.canUseArts(cpu.center2)) {
+    if (cpu.center && this.canUseArts(cpu.center)) {
       const target = this.selectAttackTarget(attackTargets);
       if (target) {
-        await this.cpuUseArts(cpu.center2, target);
+        await this.cpuUseArts(cpu.center, target);
       }
     }
   }
@@ -328,8 +328,8 @@ class HololiveCPULogic {
     const targets = [];
     
     // プレイヤーのホロメンを攻撃対象として取得
-    if (player.center1) targets.push({ type: 'holomem', card: player.center1, position: 'center1' });
-    if (player.center2) targets.push({ type: 'holomem', card: player.center2, position: 'center2' });
+    if (player.collab) targets.push({ type: 'holomem', card: player.collab, position: 'collab' });
+    if (player.center) targets.push({ type: 'holomem', card: player.center, position: 'center' });
     if (player.back1) targets.push({ type: 'holomem', card: player.back1, position: 'back1' });
     if (player.back2) targets.push({ type: 'holomem', card: player.back2, position: 'back2' });
     if (player.back3) targets.push({ type: 'holomem', card: player.back3, position: 'back3' });
@@ -357,8 +357,8 @@ class HololiveCPULogic {
     if (targets.length === 0) return null;
     
     // 攻撃対象の優先順位
-    const priorityOrder = ['center1', 'center2', 'life', 'back1', 'back2', 'back3'];
-    
+    const priorityOrder = ['collab', 'center', 'life', 'back1', 'back2', 'back3'];
+
     for (const priority of priorityOrder) {
       const target = targets.find(t => t.position === priority);
       if (target) return target;
@@ -432,7 +432,7 @@ class HololiveCPULogic {
     const player = this.battleEngine.players[1];
     
     // ホロメンをステージから除去してアーカイブへ
-    ['center1', 'center2', 'back1', 'back2', 'back3'].forEach(pos => {
+    ['collab', 'center', 'back1', 'back2', 'back3'].forEach(pos => {
       if (player[pos] === holomem) {
         player[pos] = null;
         player.archive.push(holomem);
@@ -446,7 +446,7 @@ class HololiveCPULogic {
   findHolomenPosition(holomem) {
     const cpu = this.battleEngine.players[2];
     
-    const positions = ['center1', 'center2', 'back1', 'back2', 'back3'];
+    const positions = ['collab', 'center', 'back1', 'back2', 'back3'];
     return positions.find(pos => cpu[pos] === holomem);
   }
 
