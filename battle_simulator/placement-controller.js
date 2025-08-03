@@ -52,7 +52,6 @@ class HololivePlacementController {
             conditions: [
               { type: 'cardType', value: 'ホロメン', message: 'ホロメンカードのみ配置可能' },
               { type: 'bloomLevel', value: 'Debut', message: 'Debutレベルのみ配置可能' },
-              { type: 'maxCount', value: 1, message: 'センターには1枚まで' },
               { type: 'required', value: true, message: 'センターへの配置は必須' }
             ]
           },
@@ -60,40 +59,35 @@ class HololivePlacementController {
             allowed: true, 
             conditions: [
               { type: 'cardType', value: 'ホロメン', message: 'ホロメンカードのみ配置可能' },
-              { type: 'bloomLevel', value: 'Debut', message: 'Debutレベルのみ配置可能' },
-              { type: 'maxCount', value: 1, message: 'バック①には1枚まで' }
+              { type: 'bloomLevel', value: 'Debut', message: 'Debutレベルのみ配置可能' }
             ]
           },
           back2: { 
             allowed: true, 
             conditions: [
               { type: 'cardType', value: 'ホロメン', message: 'ホロメンカードのみ配置可能' },
-              { type: 'bloomLevel', value: 'Debut', message: 'Debutレベルのみ配置可能' },
-              { type: 'maxCount', value: 1, message: 'バック②には1枚まで' }
+              { type: 'bloomLevel', value: 'Debut', message: 'Debutレベルのみ配置可能' }
             ]
           },
           back3: { 
             allowed: true, 
             conditions: [
               { type: 'cardType', value: 'ホロメン', message: 'ホロメンカードのみ配置可能' },
-              { type: 'bloomLevel', value: 'Debut', message: 'Debutレベルのみ配置可能' },
-              { type: 'maxCount', value: 1, message: 'バック③には1枚まで' }
+              { type: 'bloomLevel', value: 'Debut', message: 'Debutレベルのみ配置可能' }
             ]
           },
           back4: { 
             allowed: true, 
             conditions: [
               { type: 'cardType', value: 'ホロメン', message: 'ホロメンカードのみ配置可能' },
-              { type: 'bloomLevel', value: 'Debut', message: 'Debutレベルのみ配置可能' },
-              { type: 'maxCount', value: 1, message: 'バック④には1枚まで' }
+              { type: 'bloomLevel', value: 'Debut', message: 'Debutレベルのみ配置可能' }
             ]
           },
           back5: { 
             allowed: true, 
             conditions: [
               { type: 'cardType', value: 'ホロメン', message: 'ホロメンカードのみ配置可能' },
-              { type: 'bloomLevel', value: 'Debut', message: 'Debutレベルのみ配置可能' },
-              { type: 'maxCount', value: 1, message: 'バック⑤には1枚まで' }
+              { type: 'bloomLevel', value: 'Debut', message: 'Debutレベルのみ配置可能' }
             ]
           },
           support: { 
@@ -205,50 +199,43 @@ class HololivePlacementController {
           center: { 
             allowed: true, 
             conditions: [
-              { type: 'cardType', value: 'ホロメン', message: 'ホロメンカードのみ配置可能' },
-              { type: 'maxCount', value: 1, message: 'センターポジションには1枚まで' }
+              { type: 'cardType', value: 'ホロメン', message: 'ホロメンカードのみ配置可能' }
             ]
           },
           collab: { 
             allowed: true, 
             conditions: [
-              { type: 'cardType', value: 'ホロメン', message: 'ホロメンカードのみ配置可能' },
-              { type: 'maxCount', value: 1, message: 'コラボポジションには1枚まで' }
+              { type: 'cardType', value: 'ホロメン', message: 'ホロメンカードのみ配置可能' }
             ]
           },
           back1: { 
             allowed: true, 
             conditions: [
-              { type: 'cardType', value: 'ホロメン', message: 'ホロメンカードのみ配置可能' },
-              { type: 'maxCount', value: 1, message: 'バックポジションには1枚まで' }
+              { type: 'cardType', value: 'ホロメン', message: 'ホロメンカードのみ配置可能' }
             ]
           },
           back2: { 
             allowed: true, 
             conditions: [
-              { type: 'cardType', value: 'ホロメン', message: 'ホロメンカードのみ配置可能' },
-              { type: 'maxCount', value: 1, message: 'バックポジションには1枚まで' }
+              { type: 'cardType', value: 'ホロメン', message: 'ホロメンカードのみ配置可能' }
             ]
           },
           back3: { 
             allowed: true, 
             conditions: [
-              { type: 'cardType', value: 'ホロメン', message: 'ホロメンカードのみ配置可能' },
-              { type: 'maxCount', value: 1, message: 'バックポジションには1枚まで' }
+              { type: 'cardType', value: 'ホロメン', message: 'ホロメンカードのみ配置可能' }
             ]
           },
           back4: { 
             allowed: true, 
             conditions: [
-              { type: 'cardType', value: 'ホロメン', message: 'ホロメンカードのみ配置可能' },
-              { type: 'maxCount', value: 1, message: 'バックポジションには1枚まで' }
+              { type: 'cardType', value: 'ホロメン', message: 'ホロメンカードのみ配置可能' }
             ]
           },
           back5: { 
             allowed: true, 
             conditions: [
-              { type: 'cardType', value: 'ホロメン', message: 'ホロメンカードのみ配置可能' },
-              { type: 'maxCount', value: 1, message: 'バックポジションには1枚まで' }
+              { type: 'cardType', value: 'ホロメン', message: 'ホロメンカードのみ配置可能' }
             ]
           },
           support: { 
@@ -386,10 +373,10 @@ class HololivePlacementController {
         };
         
       case 'maxCount':
-        const currentCard = player[position];
+        // 配置枚数制限を削除 - 常に許可
         return {
-          valid: currentCard === null || currentCard === undefined,
-          message: condition.message
+          valid: true,
+          message: '配置可能'
         };
         
       case 'required':
@@ -414,10 +401,10 @@ class HololivePlacementController {
         };
         
       case 'oncePerTurn':
-        // サポートカードの1ターン1回制限
+        // サポートカードの1ターン1回制限を削除（LIMITEDのみ別途チェック）
         return {
-          valid: player.canPlaySupport !== false,
-          message: condition.message
+          valid: true,
+          message: '配置可能'
         };
         
       default:
@@ -511,6 +498,91 @@ class HololivePlacementController {
     
     // 基本的にはそのまま返す（必要に応じて拡張可能）
     return positionId;
+  }
+
+  /**
+   * ドラッグ&ドロップでのカード交換が可能かチェック
+   * @param {Object} sourceCard - 移動元のカード
+   * @param {string} sourcePosition - 移動元のポジション
+   * @param {Object} targetCard - 移動先のカード（null可）
+   * @param {string} targetPosition - 移動先のポジション
+   * @param {number} playerId - プレイヤーID
+   * @returns {Object} チェック結果
+   */
+  canSwapCards(sourceCard, sourcePosition, targetCard, targetPosition, playerId = 1) {
+    const currentPhase = this.gameState.currentPhase;
+    const isDebutPhase = this.gameState.debutPlacementPhase;
+    
+    // 1. フェーズチェック（準備ステップのDebut配置時、メインステップ時のみ交換可能）
+    if (!isDebutPhase && currentPhase !== 3) {
+      return {
+        valid: false,
+        reason: 'カードの交換は準備ステップのDebut配置時、またはメインステップでのみ可能です'
+      };
+    }
+
+    // 2. ブルームのチェック
+    if (targetCard && this.isBloomMove(sourceCard, targetCard)) {
+      const stateManager = this.engine.stateManager;
+      const bloomCheck = stateManager.canBloom(sourceCard, targetCard, playerId);
+      if (!bloomCheck.valid) {
+        return bloomCheck;
+      }
+    }
+
+    // 3. コラボ移動のチェック
+    if (targetPosition === 'collab' && sourcePosition.startsWith('back')) {
+      const stateManager = this.engine.stateManager;
+      const collabCheck = stateManager.canMoveToCollab(sourceCard, playerId);
+      if (!collabCheck.valid) {
+        return collabCheck;
+      }
+    }
+
+    // 4. コラボからの移動チェック
+    if (sourcePosition === 'collab' && targetPosition !== 'collab') {
+      const stateManager = this.engine.stateManager;
+      const fromCollabCheck = stateManager.canMoveFromCollab(sourceCard, playerId);
+      if (!fromCollabCheck.valid) {
+        return fromCollabCheck;
+      }
+    }
+
+    return {
+      valid: true,
+      reason: '交換可能'
+    };
+  }
+
+  /**
+   * ブルーム移動かどうかを判定
+   * @param {Object} sourceCard - 移動元のカード
+   * @param {Object} targetCard - 移動先のカード
+   * @returns {boolean} ブルーム移動かどうか
+   */
+  isBloomMove(sourceCard, targetCard) {
+    // 両方ホロメンで、同じキャラクターの場合はブルーム
+    if (sourceCard.card_type?.includes('ホロメン') && 
+        targetCard.card_type?.includes('ホロメン')) {
+      
+      // カード名から基本キャラクター名を抽出して比較
+      const sourceName = this.extractCharacterName(sourceCard.name);
+      const targetName = this.extractCharacterName(targetCard.name);
+      
+      return sourceName === targetName;
+    }
+    return false;
+  }
+
+  /**
+   * カード名からキャラクター名を抽出
+   * @param {string} cardName - カード名
+   * @returns {string} キャラクター名
+   */
+  extractCharacterName(cardName) {
+    // 例: "紫咲シオン" -> "紫咲シオン", "雪花ラミィ" -> "雪花ラミィ"
+    // より複雑なパターンがある場合は、ここでロジックを拡張
+    return cardName.trim();
   }
 
   /**

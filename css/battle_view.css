@@ -402,17 +402,19 @@ body {
 }
 
 /* ホロパワーカード専用スタイル */
-.holo .card {
+.holo .card,
+.holo-power-card {
   width: 120px;  /* 統一サイズに変更 */
   height: 168px; /* 統一サイズに変更 */
-  transform: rotate(90deg);
+  transform: rotate(180deg);
   margin: 2px 0;
   /* 注意: position/display/marginはJavaScript(card-display-manager.js)で動的設定されます */
 }
 
 /* ホロパワーカードのホバー効果（回転を維持） */
-.holo .card:hover {
-  transform: rotate(90deg) scale(1.05);
+.holo .card:hover,
+.holo-power-card:hover {
+  transform: rotate(180deg) scale(1.05);
   z-index: 20; /* ホバー時はさらに前面に */
   box-shadow: 0 4px 20px rgba(0, 0, 0, 0.5);
 }

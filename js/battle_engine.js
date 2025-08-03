@@ -251,10 +251,7 @@ class HololiveBattleEngine {
       get hand() { return handProxy.get(); },
       set hand(value) { handProxy.set(value); },
       
-      // ゲーム状態
-      get canPlaySupport() { return self.stateManager.getStateByPath(`players.${playerId}.gameState.canPlaySupport`); },
-      set canPlaySupport(value) { self.updatePlayerGameState(playerId, 'canPlaySupport', value); },
-      
+      // ゲーム状態（LIMITEDカード制限のみ残す）
       get usedLimitedThisTurn() { return self.stateManager.getStateByPath(`players.${playerId}.gameState.usedLimitedThisTurn`) || []; },
       set usedLimitedThisTurn(value) { self.updatePlayerGameState(playerId, 'usedLimitedThisTurn', value); },
       
@@ -329,8 +326,7 @@ class HololiveBattleEngine {
       hand: [],
       
       // ゲーム状態
-      canPlaySupport: true,
-      usedLimitedThisTurn: [],
+      usedLimitedThisTurn: [], // LIMITEDカード制限のみ残す
       restHolomem: [], // お休み状態のホロメン
       
       // デッキ構築情報
@@ -1035,7 +1031,7 @@ class HololiveBattleEngine {
   }
 
   updatePhaseHighlight() {
-    console.log(`=== updatePhaseHighlight 呼び出し ===`);
+    // console.log(`=== updatePhaseHighlight 呼び出し ===`);
     console.log(`プレイヤー: ${this.gameState.currentPlayer}, フェーズ: ${this.gameState.currentPhase}`);
     
     // すべてのハイライトを削除
@@ -1059,7 +1055,7 @@ class HololiveBattleEngine {
     newHighlights.forEach((element, index) => {
       console.log(`ハイライト${index}: ${element.className}`);
     });
-    console.log(`=== updatePhaseHighlight 完了 ===`);
+    // console.log(`=== updatePhaseHighlight 完了 ===`);
   }
 
   // 指定プレイヤーのフェーズエリアをハイライト
@@ -1194,104 +1190,24 @@ class HololiveBattleEngine {
     this.handManager.handleHandCardClick(card, index);
   }
 
+  // カードプレイ処理（HandManagerに委任）
   playCard(card, handIndex) {
-    const player = this.players[this.gameState.currentPlayer];
-    
-    // カードプレイのログ
-    if (window.logCardEvent) {
-      const playerType = this.gameState.currentPlayer === 1 ? 'player' : 'opponent';
-      const cardName = card.name || '不明なカード';
-      window.logCardEvent(playerType, 'プレイ', cardName);
-    }
-    
-    if (card.card_type === 'ホロメン') {
-      this.playHolomenCard(card, handIndex);
-    } else if (card.card_type.includes('サポート')) {
-      this.playSupportCard(card, handIndex);
-    }
+    return this.handManager.playCard(card, handIndex);
   }
 
-  // カードオブジェクトのディープコピーを作成
-  createCardCopy(card) {
-    if (!card) return null;
-    
-    // カードオブジェクトのディープコピーを作成
-    const cardCopy = JSON.parse(JSON.stringify(card));
-    
-    // エールカードリストを独立したオブジェクトとして初期化
-    cardCopy.yellCards = [];
-    
-    // 回転状態などの状態情報を保持
-    if (card.isResting) {
-      cardCopy.isResting = card.isResting;
-    }
-    
-    console.log(`カードコピー作成: ${cardCopy.name} (元のエール数: ${card.yellCards ? card.yellCards.length : 0})`);
-    
-    return cardCopy;
-  }
-
+  // ホロメンカード配置処理（HandManagerに委任）
   playHolomenCard(card, handIndex) {
-    const player = this.players[this.gameState.currentPlayer];
-    
-    // カードのディープコピーを作成
-    const cardCopy = this.createCardCopy(card);
-    
-    // 空いているステージポジションを探す
-    if (!player.collab) {
-      player.collab = cardCopy;
-      player.hand.splice(handIndex, 1);
-      console.log(`${cardCopy.name}をセンター①に配置しました`);
-    } else if (!player.center) {
-      player.center = cardCopy;
-      player.hand.splice(handIndex, 1);
-      console.log(`${cardCopy.name}をセンター②に配置しました`);
-    } else if (!player.back1) {
-      player.back1 = cardCopy;
-      player.hand.splice(handIndex, 1);
-      console.log(`${cardCopy.name}をバック①に配置しました`);
-    } else if (!player.back2) {
-      player.back2 = cardCopy;
-      player.hand.splice(handIndex, 1);
-      console.log(`${cardCopy.name}をバック②に配置しました`);
-    } else if (!player.back3) {
-      player.back3 = cardCopy;
-      player.hand.splice(handIndex, 1);
-      console.log(`${cardCopy.name}をバック③に配置しました`);
-    } else {
-      console.log('ステージが満員です');
-      return;
-    }
-    
-    this.updateUI();
+    return this.handManager.playHolomenCard(card, handIndex);
   }
 
+  // サポートカード使用処理（HandManagerに委任）
   playSupportCard(card, handIndex) {
-    const player = this.players[this.gameState.currentPlayer];
-    
-    // サポートカードの使用制限チェック
-    if (!player.canPlaySupport) {
-      console.log('このターンにはサポートカードを使用できません');
-      return;
-    }
-    
-    // LIMITED制限チェック
-    if (card.card_type.includes('LIMITED')) {
-      if (player.usedLimitedThisTurn.length > 0) {
-        console.log('このターンには既にLIMITEDカードを使用しています');
-        return;
-      }
-      player.usedLimitedThisTurn.push(card.id);
-    }
-    
-    // サポート効果の実行（簡易版）
-    console.log(`${card.name}を使用しました`);
-    
-    // 手札から除去してアーカイブへ
-    player.hand.splice(handIndex, 1);
-    player.archive.push(card);
-    
-    this.updateUI();
+    return this.handManager.playSupportCard(card, handIndex);
+  }
+
+  // カードオブジェクトのディープコピーを作成（HandManagerに委任）
+  createCardCopy(card) {
+    return this.handManager.createCardCopy(card);
   }
 
   // 先行・後攻の決定
@@ -2146,7 +2062,8 @@ class HololiveBattleEngine {
     } else if (droppedData.source === 'placed') {
       // 配置済みカードの移動・交換
       if (this.isValidSwapTarget(e.target, card)) {
-        this.swapCards(droppedData, dropZone);
+        // swapCardsメソッドを正しい引数で呼び出し
+        this.performCardSwap(droppedData, dropZone);
       } else {
         console.log('無効な交換先です');
       }
@@ -2158,11 +2075,9 @@ class HololiveBattleEngine {
     this.draggedPlacedCard = null;
   }
 
-  // カードタイプ判定
+  // カードタイプ判定（HandManagerに委任）
   isSupportCard(card) {
-    const isSupport = card.card_type && card.card_type.includes('サポート');
-    console.log(`isSupportCard判定: ${card.name} = ${isSupport} (${card.card_type})`);
-    return isSupport;
+    return this.handManager.isSupportCard(card);
   }
 
   isHolomenCard(card) {
@@ -2309,53 +2224,71 @@ class HololiveBattleEngine {
     }
   }
 
-  // カード交換処理
-  swapCards(draggedCardData, dropZone) {
-    console.log('カード交換開始');
-    console.log('ドラッグ元:', { areaId: draggedCardData.areaId, index: draggedCardData.index, card: draggedCardData.card.name });
-    console.log('ドロップ先:', dropZone);
+  // カード交換の実行（ドラッグ&ドロップからの呼び出し用）
+  performCardSwap(draggedCardData, dropZone) {
+    // console.log('=== BATTLE ENGINE: performCardSwap 開始 ===');
+    console.log('draggedCardData:', draggedCardData);
+    console.log('dropZone:', dropZone);
+    
+    // データ構造の検証とカードの抽出
+    let sourceCard;
+    if (draggedCardData && draggedCardData.card) {
+      sourceCard = draggedCardData.card;
+    } else if (draggedCardData && !draggedCardData.card && draggedCardData.name) {
+      // draggedCardDataが直接カードオブジェクトの場合
+      sourceCard = draggedCardData;
+    } else {
+      console.error('sourceCard の抽出に失敗:', draggedCardData);
+      return false;
+    }
+    
+    console.log('抽出したsourceCard:', sourceCard);
+    console.log('sourceCard.name:', sourceCard ? sourceCard.name : 'なし');
+    
+    if (!sourceCard || !sourceCard.name) {
+      console.error('有効なsourceCard が見つかりません');
+      return false;
+    }
     
     const player = this.players[1];
-    const sourceCard = draggedCardData.card;
     
-    // ドロップ先のカードを取得
+    // 移動元のポジション名を構築
+    let sourcePosition;
+    if (draggedCardData.areaId === 'backs') {
+      sourcePosition = `back${draggedCardData.index + 1}`;
+    } else {
+      sourcePosition = draggedCardData.areaId;
+    }
+    
+    // 移動先のポジション名を構築
+    let targetPosition;
     let targetCard = null;
+    
     switch (dropZone.type) {
       case 'collab':
+        targetPosition = 'collab';
         targetCard = player.collab;
         break;
       case 'center':
+        targetPosition = 'center';
         targetCard = player.center;
         break;
       case 'back':
-        const backPositions = ['back1', 'back2', 'back3', 'back4', 'back5'];
-        targetCard = player[backPositions[dropZone.index]];
-        console.log(`ドロップ先 back${dropZone.index + 1} のカード:`, targetCard ? targetCard.name : 'なし');
+        targetPosition = `back${dropZone.index + 1}`;
+        targetCard = player[targetPosition];
+        console.log(`ドロップ先 ${targetPosition} のカード:`, targetCard ? targetCard.name : 'なし');
         break;
     }
     
-    console.log(`元の位置から削除: ${draggedCardData.areaId}[${draggedCardData.index}]`);
-    // 元の位置からカードを削除
-    this.removeCardFromPosition(player, draggedCardData.areaId, draggedCardData.index);
+    // console.log('=== BATTLE ENGINE: HandManagerのswapCardsを呼び出し ===');
+    console.log(`移動: ${sourcePosition} → ${targetPosition}`);
+    console.log('最終確認 - sourceCard:', sourceCard);
+    console.log('最終確認 - sourceCard.name:', sourceCard.name);
+    console.log('最終確認 - targetCard:', targetCard);
+    console.log('最終確認 - targetPosition:', targetPosition);
     
-    console.log(`ドロップ先に配置: ${dropZone.type}[${dropZone.index}]`);
-    // ドロップ先にカードを配置
-    this.placeCardAtPosition(player, sourceCard, dropZone);
-    
-    // 元の位置にターゲットカードを配置（カードが存在する場合）
-    if (targetCard) {
-      const sourceZone = {
-        type: this.getZoneTypeFromAreaId(draggedCardData.areaId),
-        index: draggedCardData.index
-      };
-      console.log(`交換先に配置: ${sourceZone.type}[${sourceZone.index}]`);
-      this.placeCardAtPosition(player, targetCard, sourceZone);
-      console.log(`カード交換完了: ${sourceCard.name} ⇔ ${targetCard.name}`);
-    } else {
-      console.log(`カード移動完了: ${sourceCard.name} → ${dropZone.type}[${dropZone.index}]`);
-    }
-    
-    this.updateUI();
+    // HandManagerのswapCardsメソッドを呼び出し
+    return this.handManager.swapCards(sourceCard, sourcePosition, targetCard, targetPosition, 1);
   }
 
   // 位置からカードを削除
@@ -2405,12 +2338,9 @@ class HololiveBattleEngine {
     const player = this.players[1];
     const backPositions = ['back1', 'back2', 'back3', 'back4', 'back5'];
     
-    // センター①があるかどうかで最大使用スロット数を決定
-    const maxSlots = player.collab ? 4 : 5;
-    
-    // スロットインデックスが使用可能範囲内かチェック
-    if (slotIndex >= maxSlots) {
-      console.log(`スロット${slotIndex}は使用不可（collab=${!!player.collab}, maxSlots=${maxSlots}）`);
+    // 配置枚数制限を削除 - すべてのスロットを使用可能に
+    if (slotIndex >= 5) {
+      console.log(`スロット${slotIndex}は範囲外（0-4のみ有効）`);
       return false;
     }
     
@@ -2468,6 +2398,16 @@ class HololiveBattleEngine {
       return { type: 'center' };
     }
     
+    if (target.classList.contains('collab')) {
+      console.log('コラボエリア検出');
+      return { type: 'collab' };
+    }
+    
+    if (target.classList.contains('holo')) {
+      console.log('ホロパワーエリア検出');
+      return { type: 'holo' };
+    }
+    
     if (target.classList.contains('back-slot')) {
       const slotIndex = parseInt(target.getAttribute('data-slot')) || 0;
       console.log('バックスロット検出:', slotIndex);
@@ -2507,74 +2447,24 @@ class HololiveBattleEngine {
     return { type: 'unknown' };
   }
 
-  // 手札からカードを配置
+  // 手札からカードを配置（交換対応版、HandManagerに委任）
   placeCardFromHand(card, handIndex, dropZone) {
-    const player = this.players[1];
-    
-    console.log(`カード配置試行: ${card.name}, dropZone:`, dropZone);
-    
-    if (dropZone.type === 'support') {
-      this.useSupportCard(card, handIndex);
-      return;
-    }
-    
-    // カードのディープコピーを作成（ホロメンカードの場合）
-    const cardToPlace = this.isHolomenCard(card) ? this.createCardCopy(card) : card;
-    
-    switch (dropZone.type) {
-      case 'center':
-        player.center = cardToPlace;
-        console.log(`${cardToPlace.name}をセンター②に配置`);
-        
-        // Debut配置中の場合、状態を更新
-        if (this.debutPlacementState && !this.debutPlacementState.centerPlaced) {
-          this.debutPlacementState.centerPlaced = true;
-          this.updateDebutPlacementStatus();
-        }
-        break;
-        
-      case 'back':
-        const backPositions = ['back1', 'back2', 'back3', 'back4', 'back5'];
-        const position = backPositions[dropZone.index];
-        player[position] = cardToPlace;
-        console.log(`${cardToPlace.name}をバック${dropZone.index + 1}(${position})に配置`);
-        
-        // Debut配置中の場合、状態を更新
-        if (this.debutPlacementState && !this.debutPlacementState.usedBackPositions.includes(position)) {
-          this.debutPlacementState.usedBackPositions.push(position);
-          this.updateDebutPlacementStatus();
-        }
-        break;
-    }
-    
-    // 手札から削除
-    player.hand.splice(handIndex, 1);
-    
-    // UI更新
-    this.updateHandDisplay();
-    this.updateUI();
+    return this.handManager.placeCardFromHandWithSwap(card, handIndex, dropZone);
   }
 
-  // サポートカード使用
+  // サポートカード効果使用（HandManagerに委任）
   useSupportCard(card, handIndex) {
-    const useCard = confirm(`「${card.name}」の効果を使用しますか？`);
-    
-    if (useCard) {
-      console.log(`${card.name}の効果を使用`);
-      
-      // 手札から削除
-      this.players[1].hand.splice(handIndex, 1);
-      
-      // アーカイブに移動（実際のゲームルールに応じて）
-      this.players[1].archive.push(card);
-      
-      // TODO: 実際のカード効果処理を実装
-      alert(`${card.name}の効果を発動しました！`);
-      
-      // UI更新
-      this.updateHandDisplay();
-      this.updateUI();
-    }
+    return this.handManager.useSupportCard(card, handIndex);
+  }
+
+  // カード位置交換（HandManagerに委任）
+  swapCards(sourceCard, sourcePosition, targetCard, targetPosition, playerId = 1) {
+    return this.handManager.swapCards(sourceCard, sourcePosition, targetCard, targetPosition, playerId);
+  }
+
+  // 手札からの配置処理（交換対応版、HandManagerに委任）
+  placeCardFromHandWithSwap(card, handIndex, dropZone) {
+    return this.handManager.placeCardFromHandWithSwap(card, handIndex, dropZone);
   }
 
   // サポートドロップゾーン作成

@@ -198,14 +198,11 @@ class HololiveCPULogic {
   shouldPlaySupportCard(card) {
     const cpu = this.battleEngine.players[2];
     
-    // LIMITED制限チェック
-    if (card.card_type.includes('LIMITED') && cpu.usedLimitedThisTurn.length > 0) {
-      return false;
-    }
-    
-    // 基本的な使用条件チェック
-    if (!cpu.canPlaySupport) {
-      return false;
+    // LIMITEDカード制限のみチェック（サポートカード全般の制限は削除）
+    if (card.card_type?.includes('LIMITED')) {
+      if (cpu.usedLimitedThisTurn.length > 0) {
+        return false;
+      }
     }
     
     // カード特有の使用条件は簡略化

@@ -67,11 +67,17 @@ class CardDisplayManager {
         displayType = 'vertical';
         break;
       case 'collab':
-        if (cards) cardsToDisplay = [cards];
+        if (cards) {
+          // console.log(`🎨 コラボポジションにカード表示: ${cards.name}`);
+          cardsToDisplay = [cards];
+        }
         displayType = 'single';
         break;
       case 'center':
-        if (cards) cardsToDisplay = [cards];
+        if (cards) {
+          // console.log(`🎨 センターポジションにカード表示: ${cards.name}`);
+          cardsToDisplay = [cards];
+        }
         displayType = 'single';
         break;
       case 'oshi':
@@ -107,7 +113,7 @@ class CardDisplayManager {
         
         // エールカードがある場合は追加
         if (card.yellCards && card.yellCards.length > 0) {
-          console.log(`🎨 [エール表示] ${card.name}: ${card.yellCards.length}枚のエールカードを表示`);
+          // console.log(`🎨 [エール表示] ${card.name}: ${card.yellCards.length}枚のエールカードを表示`);
           this.addYellCardsToArea(area, card, areaId, index);
         }
       }
@@ -169,6 +175,11 @@ class CardDisplayManager {
     // 横向き状態の判定
     if (card && card.isResting) {
       cardElement.classList.add('resting');
+    }
+    
+    // ホロパワーエリアのカードに回転クラスを追加
+    if (areaId === 'holo') {
+      cardElement.classList.add('holo-power-card');
     }
     
     const shouldShowFaceUp = this.shouldCardBeFaceUp(card, areaId);
@@ -321,6 +332,7 @@ class CardDisplayManager {
       // 対応するバックポジションにカードがある場合は表示
       const card = player[backPositions[index]];
       if (card) {
+        // console.log(`🎨 バックスロット${index + 1}にカード表示: ${card.name}`);
         const isPlayerCard = (playerId === 1); // プレイヤー1のカードのみドラッグ可能
         const cardElement = this.createCardElement(card, 'backs', index, isPlayerCard);
         // バックスロット内でのサイズ調整
@@ -396,7 +408,7 @@ class CardDisplayManager {
       return;
     }
     
-    console.log(`🎯 [エール描画] ${holomenCard.name} (${areaId}): ${holomenCard.yellCards.length}枚のエールカードを描画開始`);
+    // console.log(`🎯 [エール描画] ${holomenCard.name} (${areaId}): ${holomenCard.yellCards.length}枚のエールカードを描画開始`);
     
     // 既存のエールカードコンテナを削除（重複防止）
     const existingYellContainer = area.querySelector(`.yell-cards[data-card-index="${cardIndex}"]`);
@@ -508,7 +520,7 @@ class CardDisplayManager {
    * エールカードをカード表示に追加（旧関数・互換性のため残す）
    */
   addYellCardsToDisplay(cardElement, holomenCard, areaId) {
-    console.log(`🔍 [エールカード配置] areaId: "${areaId}", yellCards: ${holomenCard.yellCards?.length || 0}枚`);
+    // console.log(`🔍 [エールカード配置] areaId: "${areaId}", yellCards: ${holomenCard.yellCards?.length || 0}枚`);
     if (!holomenCard.yellCards || holomenCard.yellCards.length === 0) return;
     
     // 既存のエールカードコンテナを削除（重複防止）

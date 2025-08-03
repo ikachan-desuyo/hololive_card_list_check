@@ -475,8 +475,7 @@ class PhaseController {
       window.infoPanelManager.logStepProgress(this.battleEngine.gameState.turnCount, 'エンドステップ', playerName, 'ターン終了処理');
     }
     
-    // ターン終了時の処理
-    this.battleEngine.players[playerId].canPlaySupport = true;
+    // ターン終了時の処理（LIMITEDカード制限のみリセット）
     this.battleEngine.players[playerId].usedLimitedThisTurn = [];
     
     // エンドステップは自動で完了し、相手のターンに移行（プレイヤー・CPU共通）
