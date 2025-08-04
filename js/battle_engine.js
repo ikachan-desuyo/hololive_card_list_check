@@ -40,9 +40,9 @@ class HololiveBattleEngine {
         throw new Error('HandManager クラスが読み込まれていません');
       }
       this.handManager = new HandManager(this);
-      console.log('✅ HandManager初期化成功');
+      window.debugLog('✅ HandManager初期化成功');
     } catch (error) {
-      console.error('❌ HandManager初期化エラー:', error);
+      window.errorLog('❌ HandManager初期化エラー:', error);
       throw error;
     }
 
@@ -398,7 +398,7 @@ class HololiveBattleEngine {
       
       console.log('バトルエンジン初期化完了');
     } catch (error) {
-      console.error('バトルエンジン初期化エラー:', error);
+      window.errorLog('バトルエンジン初期化エラー:', error);
     }
   }
 
@@ -418,7 +418,7 @@ class HololiveBattleEngine {
       this.cardDatabase = await response.json();
       console.log('カードデータ読み込み完了');
     } catch (error) {
-      console.error('カードデータ読み込みエラー:', error);
+      window.errorLog('カードデータ読み込みエラー:', error);
     }
   }
 
@@ -428,7 +428,7 @@ class HololiveBattleEngine {
       this.stageData = await response.json();
       console.log('ステージデータ読み込み完了');
     } catch (error) {
-      console.error('ステージデータ読み込みエラー:', error);
+      window.errorLog('ステージデータ読み込みエラー:', error);
     }
   }
 
@@ -462,7 +462,7 @@ class HololiveBattleEngine {
     
     const missingElements = requiredElements.filter(id => !document.getElementById(id));
     if (missingElements.length > 0) {
-      console.warn('コントロールパネルの要素が見つかりません:', missingElements);
+      window.warnLog('コントロールパネルの要素が見つかりません:', missingElements);
       console.log('レガシーコントロールパネルを作成します...');
       // 後方互換性のため、動的作成を実行
       this.createLegacyControlPanel();
@@ -897,7 +897,7 @@ class HololiveBattleEngine {
       alert('ゲームがリセットされました。\n新しいバトルを開始できます。');
       
     } catch (error) {
-      console.error('ゲームリセット中にエラーが発生:', error);
+      window.errorLog('ゲームリセット中にエラーが発生:', error);
       alert('ゲームリセット中にエラーが発生しました。ページをリロードしてください。');
     }
   }
@@ -1536,7 +1536,7 @@ class HololiveBattleEngine {
     console.log(`デビューカード検出結果: ${debutCards.length}枚`, debutCards);
     
     if (debutCards.length === 0) {
-      console.error(`プレイヤー${playerId}にDebutホロメンがありません`);
+      window.errorLog(`プレイヤー${playerId}にDebutホロメンがありません`);
       return;
     }
     
@@ -1714,7 +1714,7 @@ class HololiveBattleEngine {
     console.log('debutPlacementState:', state);
     
     if (!state) {
-      console.error('debutPlacementStateが存在しません');
+      window.errorLog('debutPlacementStateが存在しません');
       return;
     }
     
@@ -1722,7 +1722,7 @@ class HololiveBattleEngine {
     const player = this.players[state.playerId];
     if (player.center !== null) {
       alert('⚠️ 自動配置エラー\n\nセンター２に既にカードが配置されています。\n手動で移動するか、クリアしてから自動配置を使用してください。');
-      console.error('センターに既にカードが配置されているため自動配置を実行できません');
+      window.errorLog('センターに既にカードが配置されているため自動配置を実行できません');
       return;
     }
     
@@ -1786,7 +1786,7 @@ class HololiveBattleEngine {
     const player = this.players[playerId];
     
     if (!player) {
-      console.error(`プレイヤー${playerId}が見つかりません`);
+      window.errorLog(`プレイヤー${playerId}が見つかりません`);
       return;
     }
     
@@ -1841,7 +1841,7 @@ class HololiveBattleEngine {
     // 利用可能なDebutカードの総数をチェック
     const totalDebutCards = handDebutCards.length + placedDebutCards.length;
     if (totalDebutCards === 0) {
-      console.warn(`プレイヤー${playerId}にDebutカードが見つかりません`);
+      window.warnLog(`プレイヤー${playerId}にDebutカードが見つかりません`);
       this.proceedToNextDebutPlayer(playerId);
       return;
     }
@@ -1898,7 +1898,7 @@ class HololiveBattleEngine {
       if (!player[position]) {
         const card = remainingHandDebuts[placedCount];
         if (!card || !card.id) {
-          console.error('バックカードまたはIDが無効です:', card);
+          window.errorLog('バックカードまたはIDが無効です:', card);
           continue;
         }
         
@@ -1906,7 +1906,7 @@ class HololiveBattleEngine {
         player[position] = cardCopy;
         const handIndex = player.hand.findIndex(handCard => handCard && handCard.id === card.id);
         if (handIndex === -1) {
-          console.error('手札からバックカードが見つかりません:', card);
+          window.errorLog('手札からバックカードが見つかりません:', card);
           continue;
         }
         player.hand.splice(handIndex, 1);
@@ -1981,7 +1981,7 @@ class HololiveBattleEngine {
     );
     
     if (debutCards.length === 0) {
-      console.error(`CPU（プレイヤー${playerId}）にDebutホロメンがありません`);
+      window.errorLog(`CPU（プレイヤー${playerId}）にDebutホロメンがありません`);
       return;
     }
     
@@ -2338,12 +2338,12 @@ class HololiveBattleEngine {
       // draggedCardDataが直接カードオブジェクトの場合
       sourceCard = draggedCardData;
     } else {
-      console.error('sourceCard の抽出に失敗:', draggedCardData);
+      window.errorLog('sourceCard の抽出に失敗:', draggedCardData);
       return false;
     }
     
     if (!sourceCard || !sourceCard.name) {
-      console.error('有効なsourceCard が見つかりません');
+      window.errorLog('有効なsourceCard が見つかりません');
       return false;
     }
     
@@ -2651,7 +2651,7 @@ class HololiveBattleEngine {
     const holomen = player[position];
     
     if (!holomen) {
-      console.error(`❌ [エール配置エラー] プレイヤー${playerId}の${position}にホロメンが存在しません`);
+      window.errorLog(`❌ [エール配置エラー] プレイヤー${playerId}の${position}にホロメンが存在しません`);
       this.isUpdatingYellCard = false;
       return;
     }
@@ -2691,7 +2691,7 @@ class HololiveBattleEngine {
             }
           }
         } catch (error) {
-          console.error(`❌ [同期エラー] State Manager同期に失敗:`, error.message);
+          window.errorLog(`❌ [同期エラー] State Manager同期に失敗:`, error.message);
           this.isUpdatingYellCard = false;
         }
       } else {
@@ -2789,8 +2789,8 @@ class HololiveBattleEngine {
           
           console.log('attachYellCard呼び出し後');
         } catch (error) {
-          console.error(`エール配置でエラーが発生:`, error);
-          console.error(`エラーの詳細:`, error.stack);
+          window.errorLog(`エール配置でエラーが発生:`, error);
+          window.errorLog(`エラーの詳細:`, error.stack);
         }
         
         // モーダルを削除
@@ -2873,7 +2873,7 @@ class HololiveBattleEngine {
    */
   handleBatonTouch(sourceCard, targetCard, targetPosition) {
     if (!this.stateManager) {
-      console.error('State Managerが見つかりません');
+      window.errorLog('State Managerが見つかりません');
       return false;
     }
 
@@ -2892,7 +2892,7 @@ class HololiveBattleEngine {
       this.showBatonTouchYellSelection(sourceCard, targetCard, targetPosition, batonCheck);
       return true;
     } catch (error) {
-      console.error('バトンタッチ処理エラー:', error);
+      window.errorLog('バトンタッチ処理エラー:', error);
       return false;
     }
   }

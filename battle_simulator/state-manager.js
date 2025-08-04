@@ -152,7 +152,7 @@ class HololiveStateManager {
   updateState(actionType, payload) {
     // UPDATE_PLAYER_CARDSは状態遷移中でも安全に実行可能
     if (this.transitionInProgress && actionType !== 'UPDATE_PLAYER_CARDS') {
-      console.warn(`状態遷移中のため更新をスキップ: ${actionType}`);
+      window.warnLog(`状態遷移中のため更新をスキップ: ${actionType}`);
       return { success: false, reason: 'transition_in_progress' };
     }
 
@@ -194,11 +194,11 @@ class HololiveStateManager {
         }
         return { success: true };
       } else {
-        console.error(`状態の妥当性チェックに失敗: ${actionType}`, payload);
+        window.errorLog(`状態の妥当性チェックに失敗: ${actionType}`, payload);
         return { success: false, reason: 'validation_failed' };
       }
     } catch (error) {
-      console.error(`状態更新中にエラーが発生: ${actionType}`, error);
+      window.errorLog(`状態更新中にエラーが発生: ${actionType}`, error);
       return { success: false, reason: 'error', error: error.message };
     } finally {
       // UPDATE_PLAYER_CARDSの場合はフラグをクリアしない
@@ -284,7 +284,7 @@ class HololiveStateManager {
             player.gameState.collabMovedThisTurn = false;
           }
           
-          console.log(`プレイヤー${payload.player}のターン制限フラグをリセット`);
+          window.debugLog(`プレイヤー${payload.player}のターン制限フラグをリセット`);
         }
         break;
         
@@ -384,19 +384,19 @@ class HololiveStateManager {
           const battleEnginePlayer = this.battleEngine?.players?.[payload.player];
           
           if (player && battleEnginePlayer) {
-            console.log(`🔍 [SWAP_CARDS実行前] Battle Engine状態:`);
-            console.log(`  - center: ${battleEnginePlayer.center?.name || 'null'}`);
-            console.log(`  - collab: ${battleEnginePlayer.collab?.name || 'null'}`);
-            console.log(`  - ${payload.sourcePosition}: ${battleEnginePlayer[payload.sourcePosition]?.name || 'null'}`);
-            console.log(`  - ${payload.targetPosition}: ${battleEnginePlayer[payload.targetPosition]?.name || 'null'}`);
+            window.debugLog(`🔍 [SWAP_CARDS実行前] Battle Engine状態:`);
+            window.debugLog(`  - center: ${battleEnginePlayer.center?.name || 'null'}`);
+            window.debugLog(`  - collab: ${battleEnginePlayer.collab?.name || 'null'}`);
+            window.debugLog(`  - ${payload.sourcePosition}: ${battleEnginePlayer[payload.sourcePosition]?.name || 'null'}`);
+            window.debugLog(`  - ${payload.targetPosition}: ${battleEnginePlayer[payload.targetPosition]?.name || 'null'}`);
             
             // Battle Engineから最新のカード情報を取得（エール情報含む）
             const sourceCard = battleEnginePlayer[payload.sourcePosition];
             const targetCard = battleEnginePlayer[payload.targetPosition];
             
-            console.log(`🔄 SWAP_CARDS: ${payload.sourcePosition} ↔ ${payload.targetPosition}`);
-            console.log(`📋 移動元カード: ${sourceCard?.name} (エール: ${sourceCard?.yellCards?.length || 0}枚)`);
-            console.log(`📋 移動先カード: ${targetCard?.name || 'null'} (エール: ${targetCard?.yellCards?.length || 0}枚)`);
+            window.debugLog(`🔄 SWAP_CARDS: ${payload.sourcePosition} ↔ ${payload.targetPosition}`);
+            window.debugLog(`📋 移動元カード: ${sourceCard?.name} (エール: ${sourceCard?.yellCards?.length || 0}枚)`);
+            window.debugLog(`📋 移動先カード: ${targetCard?.name || 'null'} (エール: ${targetCard?.yellCards?.length || 0}枚)`);
             
             // エール情報を含めてState Managerにも反映
             if (sourceCard) {
@@ -406,7 +406,7 @@ class HololiveStateManager {
                 yellCards: sourceCard.yellCards ? [...sourceCard.yellCards] : []
               };
               player.cards[payload.targetPosition] = sourceCardWithYell;
-              console.log(`✅ エール保持: ${sourceCard.name} → ${payload.targetPosition} (エール: ${sourceCardWithYell.yellCards.length}枚)`);
+              window.debugLog(`✅ エール保持: ${sourceCard.name} → ${payload.targetPosition} (エール: ${sourceCardWithYell.yellCards.length}枚)`);
             } else {
               player.cards[payload.targetPosition] = null;
             }
@@ -418,36 +418,36 @@ class HololiveStateManager {
                 yellCards: targetCard.yellCards ? [...targetCard.yellCards] : []
               };
               player.cards[payload.sourcePosition] = targetCardWithYell;
-              console.log(`✅ エール保持: ${targetCard.name} → ${payload.sourcePosition} (エール: ${targetCardWithYell.yellCards.length}枚)`);
+              window.debugLog(`✅ エール保持: ${targetCard.name} → ${payload.sourcePosition} (エール: ${targetCardWithYell.yellCards.length}枚)`);
             } else {
               player.cards[payload.sourcePosition] = null;
             }
             
             // Battle Engineでの実際の交換実行
-            console.log(`🔧 Battle Engine交換実行中...`);
+            window.debugLog(`🔧 Battle Engine交換実行中...`);
             
             // Battle Engineオブジェクトの診断
-            console.log('🔍 [診断] Battle Engineプロパティ確認:');
-            console.log(`  - battleEnginePlayer === battleEngine.players[${payload.player}]:`, battleEnginePlayer === battleEngine.players[payload.player]);
-            console.log(`  - battleEnginePlayerタイプ:`, typeof battleEnginePlayer);
-            console.log(`  - Battle Engineプロパティ書き込み可能性チェック:`);
+            window.debugLog('🔍 [診断] Battle Engineプロパティ確認:');
+            window.debugLog(`  - battleEnginePlayer === battleEngine.players[${payload.player}]:`, battleEnginePlayer === battleEngine.players[payload.player]);
+            window.debugLog(`  - battleEnginePlayerタイプ:`, typeof battleEnginePlayer);
+            window.debugLog(`  - Battle Engineプロパティ書き込み可能性チェック:`);
             
             // プロパティの詳細チェック
             const sourceDescriptor = Object.getOwnPropertyDescriptor(battleEnginePlayer, payload.sourcePosition);
             const targetDescriptor = Object.getOwnPropertyDescriptor(battleEnginePlayer, payload.targetPosition);
-            console.log(`  - ${payload.sourcePosition}プロパティ:`, sourceDescriptor);
-            console.log(`  - ${payload.targetPosition}プロパティ:`, targetDescriptor);
+            window.debugLog(`  - ${payload.sourcePosition}プロパティ:`, sourceDescriptor);
+            window.debugLog(`  - ${payload.targetPosition}プロパティ:`, targetDescriptor);
             
             // 一時的にカードを保存してから交換
             const tempSourceCard = battleEnginePlayer[payload.sourcePosition];
             const tempTargetCard = battleEnginePlayer[payload.targetPosition];
             
-            console.log(`🔍 [交換前] 一時変数確認:`);
-            console.log(`  - tempSourceCard (${payload.sourcePosition}): ${tempSourceCard?.name || 'null'}`);
-            console.log(`  - tempTargetCard (${payload.targetPosition}): ${tempTargetCard?.name || 'null'}`);
+            window.debugLog(`🔍 [交換前] 一時変数確認:`);
+            window.debugLog(`  - tempSourceCard (${payload.sourcePosition}): ${tempSourceCard?.name || 'null'}`);
+            window.debugLog(`  - tempTargetCard (${payload.targetPosition}): ${tempTargetCard?.name || 'null'}`);
             
             // Battle Engineのgettervsetterによる問題を解決するため、専用メソッドを使用
-            console.log('� [Battle Engine専用メソッド] swapCards実行...');
+            window.debugLog('� [Battle Engine専用メソッド] swapCards実行...');
             try {
                 // Battle Engineの専用swapCardsメソッドを使用
                 const swapResult = battleEngine.swapCards(
@@ -457,24 +457,24 @@ class HololiveStateManager {
                     payload.targetPosition, 
                     payload.player
                 );
-                console.log('✅ Battle Engine swapCards実行完了:', swapResult);
+                window.debugLog('✅ Battle Engine swapCards実行完了:', swapResult);
             } catch (error) {
-                console.error('❌ [Battle Engine swapCards エラー]:', error);
+                window.errorLog('❌ [Battle Engine swapCards エラー]:', error);
                 // フォールバック: 直接代入を試行
-                console.log('🔧 [フォールバック] 直接代入を試行...');
+                window.debugLog('🔧 [フォールバック] 直接代入を試行...');
                 battleEnginePlayer[payload.targetPosition] = tempSourceCard;
                 battleEnginePlayer[payload.sourcePosition] = tempTargetCard;
             }
             
-            console.log(`🔍 [交換直後] 値確認:`);
-            console.log(`  - battleEnginePlayer[${payload.sourcePosition}]: ${battleEnginePlayer[payload.sourcePosition]?.name || 'null'}`);
-            console.log(`  - battleEnginePlayer[${payload.targetPosition}]: ${battleEnginePlayer[payload.targetPosition]?.name || 'null'}`);
+            window.debugLog(`🔍 [交換直後] 値確認:`);
+            window.debugLog(`  - battleEnginePlayer[${payload.sourcePosition}]: ${battleEnginePlayer[payload.sourcePosition]?.name || 'null'}`);
+            window.debugLog(`  - battleEnginePlayer[${payload.targetPosition}]: ${battleEnginePlayer[payload.targetPosition]?.name || 'null'}`);
             
-            console.log(`🔍 [SWAP_CARDS実行後] Battle Engine状態:`);
-            console.log(`  - center: ${battleEnginePlayer.center?.name || 'null'}`);
-            console.log(`  - collab: ${battleEnginePlayer.collab?.name || 'null'}`);
-            console.log(`  - ${payload.sourcePosition}: ${battleEnginePlayer[payload.sourcePosition]?.name || 'null'}`);
-            console.log(`  - ${payload.targetPosition}: ${battleEnginePlayer[payload.targetPosition]?.name || 'null'}`);
+            window.debugLog(`🔍 [SWAP_CARDS実行後] Battle Engine状態:`);
+            window.debugLog(`  - center: ${battleEnginePlayer.center?.name || 'null'}`);
+            window.debugLog(`  - collab: ${battleEnginePlayer.collab?.name || 'null'}`);
+            window.debugLog(`  - ${payload.sourcePosition}: ${battleEnginePlayer[payload.sourcePosition]?.name || 'null'}`);
+            window.debugLog(`  - ${payload.targetPosition}: ${battleEnginePlayer[payload.targetPosition]?.name || 'null'}`);
             
             // エール情報も確実に反映
             if (tempSourceCard && tempSourceCard.yellCards && tempSourceCard.yellCards.length > 0) {
@@ -482,9 +482,9 @@ class HololiveStateManager {
               const movedCard = battleEnginePlayer[payload.targetPosition];
               if (movedCard) {
                 movedCard.yellCards = [...tempSourceCard.yellCards];
-                console.log(`🔧 Battle Engine同期: ${payload.targetPosition}にエール情報設定 (${tempSourceCard.yellCards.length}枚)`);
+                window.debugLog(`🔧 Battle Engine同期: ${payload.targetPosition}にエール情報設定 (${tempSourceCard.yellCards.length}枚)`);
               } else {
-                console.error(`⚠️ 移動先 ${payload.targetPosition} にカードが見つかりません`);
+                window.errorLog(`⚠️ 移動先 ${payload.targetPosition} にカードが見つかりません`);
               }
             }
           }
@@ -505,8 +505,8 @@ class HololiveStateManager {
               const existingCard = battleEnginePlayer?.[payload.position] || player[payload.position];
               if (existingCard) {
                 // ブルーム: 新しいカードを上に重ね、下のカードをstackedCardsに移動
-                console.log(`[PLACE_CARD/BACK] ブルーム処理開始: ${existingCard.name} → ${payload.card.name}`);
-                console.log(`[PLACE_CARD/BACK] 新しいカード画像URL: ${payload.card.image_url}`);
+                window.debugLog(`[PLACE_CARD/BACK] ブルーム処理開始: ${existingCard.name} → ${payload.card.name}`);
+                window.debugLog(`[PLACE_CARD/BACK] 新しいカード画像URL: ${payload.card.image_url}`);
                 
                 const newCard = this.addCardState(payload.card, {
                   bloomedThisTurn: true,
@@ -526,11 +526,11 @@ class HololiveStateManager {
                 // エール引き継ぎを確実にする追加処理
                 if (existingCard.yellCards && existingCard.yellCards.length > 0) {
                   newCard.yellCards = [...existingCard.yellCards];
-                  console.log(`[PLACE_CARD/BACK] エール引継ぎ: ${existingCard.yellCards.length}枚`);
+                  window.debugLog(`[PLACE_CARD/BACK] エール引継ぎ: ${existingCard.yellCards.length}枚`);
                 }
                 
                 // 新しいカードの情報を確認
-                console.log(`[PLACE_CARD/BACK] 配置完了: ${newCard.name}, 画像URL: ${newCard.image_url}`);
+                window.debugLog(`[PLACE_CARD/BACK] 配置完了: ${newCard.name}, 画像URL: ${newCard.image_url}`);
                 
                 player[payload.position] = newCard; // 直接プロパティアクセス
                 
@@ -549,8 +549,8 @@ class HololiveStateManager {
               const existingCard = battleEnginePlayer?.center || player.center;
               if (existingCard) {
                 // ブルーム: 新しいカードを上に重ね、下のカードをstackedCardsに移動
-                console.log(`[PLACE_CARD/CENTER] ブルーム処理開始: ${existingCard.name} → ${payload.card.name}`);
-                console.log(`[PLACE_CARD/CENTER] 新しいカード画像URL: ${payload.card.image_url}`);
+                window.debugLog(`[PLACE_CARD/CENTER] ブルーム処理開始: ${existingCard.name} → ${payload.card.name}`);
+                window.debugLog(`[PLACE_CARD/CENTER] 新しいカード画像URL: ${payload.card.image_url}`);
                 
                 const newCard = this.addCardState(payload.card, {
                   bloomedThisTurn: true,
@@ -570,11 +570,11 @@ class HololiveStateManager {
                 // エール引き継ぎを確実にする追加処理
                 if (existingCard.yellCards && existingCard.yellCards.length > 0) {
                   newCard.yellCards = [...existingCard.yellCards];
-                  console.log(`[PLACE_CARD/CENTER] エール引継ぎ: ${existingCard.yellCards.length}枚`);
+                  window.debugLog(`[PLACE_CARD/CENTER] エール引継ぎ: ${existingCard.yellCards.length}枚`);
                 }
                 
                 // 新しいカードの情報を確認
-                console.log(`[PLACE_CARD/CENTER] 配置完了: ${newCard.name}, 画像URL: ${newCard.image_url}`);
+                window.debugLog(`[PLACE_CARD/CENTER] 配置完了: ${newCard.name}, 画像URL: ${newCard.image_url}`);
                 
                 player.center = newCard; // 直接プロパティアクセス
                 
@@ -613,23 +613,23 @@ class HololiveStateManager {
                 
                 // エール情報を確実に引き継ぎ
                 if (updatedCard.yellCards && Array.isArray(updatedCard.yellCards)) {
-                  console.log(`[Battle Engine同期] エール情報引継ぎ: ${updatedCard.yellCards.length}枚`);
+                  window.debugLog(`[Battle Engine同期] エール情報引継ぎ: ${updatedCard.yellCards.length}枚`);
                 }
                 
                 // 同期するカード情報をログ出力
-                console.log(`[Battle Engine同期] カード名: ${updatedCard.name}, 画像URL: ${updatedCard.image_url}`);
-                console.log(`[Battle Engine同期] ポジション: ${payload.position}, プレイヤー: ${payload.player}`);
+                window.debugLog(`[Battle Engine同期] カード名: ${updatedCard.name}, 画像URL: ${updatedCard.image_url}`);
+                window.debugLog(`[Battle Engine同期] ポジション: ${payload.position}, プレイヤー: ${payload.player}`);
                 
                 this.battleEngine.players[payload.player][payload.position] = updatedCard;
                 
                 // UI更新は呼び出し元で適切なタイミングで行う
-                console.log(`[Battle Engine同期] 同期完了、UI更新は呼び出し元で実行`);
+                window.debugLog(`[Battle Engine同期] 同期完了、UI更新は呼び出し元で実行`);
                 
                 // 成功を返す
                 return { success: true, card: updatedCard };
                 
               } catch (error) {
-                console.error(`[PLACE_CARD] Battle Engine同期エラー:`, error);
+                window.errorLog(`[PLACE_CARD] Battle Engine同期エラー:`, error);
                 // フォールバック：直接代入
                 this.battleEngine.players[payload.player][payload.position] = player[payload.position];
                 return { success: false, error: error.message };
@@ -690,7 +690,7 @@ class HololiveStateManager {
         break;
         
       default:
-        console.warn(`未知のアクションタイプ: ${actionType}`);
+        window.warnLog(`未知のアクションタイプ: ${actionType}`);
     }
     
     return newState;
@@ -723,7 +723,7 @@ class HololiveStateManager {
       
       return true;
     } catch (error) {
-      console.error('状態妥当性チェックエラー:', error);
+      window.errorLog('状態妥当性チェックエラー:', error);
       return false;
     }
   }
@@ -761,7 +761,7 @@ class HololiveStateManager {
         try {
           callback(payload, oldState, newState);
         } catch (error) {
-          console.error(`リスナーエラー (${actionType}):`, error);
+          window.errorLog(`リスナーエラー (${actionType}):`, error);
         }
       });
     }
@@ -772,7 +772,7 @@ class HololiveStateManager {
         try {
           callback(actionType, payload, oldState, newState);
         } catch (error) {
-          console.error('グローバルリスナーエラー:', error);
+          window.errorLog('グローバルリスナーエラー:', error);
         }
       });
     }
@@ -803,7 +803,7 @@ class HololiveStateManager {
     const importantActions = ['GAME_START', 'GAME_END', 'PHASE_CHANGE', 'PLAYER_CHANGE', 'SWAP_CARDS'];
     
     if (importantActions.includes(actionType)) {
-      console.log(`[State] ${actionType}:`, payload);
+      window.debugLog(`[State] ${actionType}:`, payload);
     }
   }
 
@@ -949,7 +949,7 @@ class HololiveStateManager {
     
     // デバッグ用: 現在の状態を表示
     const playerTurnCount = currentState.turn.playerTurnCount[playerId] || 0;
-    console.log(`[checkDropValidity] ターン: ${currentState.turn.turnCount}, プレイヤー${playerId}ターン回数: ${playerTurnCount}, フェーズ: ${currentState.turn.currentPhase}, 現在プレイヤー: ${currentState.turn.currentPlayer}`);
+    window.debugLog(`[checkDropValidity] ターン: ${currentState.turn.turnCount}, プレイヤー${playerId}ターン回数: ${playerTurnCount}, フェーズ: ${currentState.turn.currentPhase}, 現在プレイヤー: ${currentState.turn.currentPlayer}`);
     
     // 基本的なバリデーション
     if (!card || !targetPosition) {
@@ -1006,16 +1006,16 @@ class HololiveStateManager {
         ? player.center 
         : player[targetPosition];
         
-      console.log(`[checkDropValidity] ブルーム対象確認: targetCard = ${targetCard ? targetCard.name : 'なし'}`);
+      window.debugLog(`[checkDropValidity] ブルーム対象確認: targetCard = ${targetCard ? targetCard.name : 'なし'}`);
         
       if (targetCard && this.checkBloomCompatibility(card, targetCard).valid) {
-        console.log(`[checkDropValidity] ブルーム互換性確認OK: ${card.name} → ${targetCard.name}`);
+        window.debugLog(`[checkDropValidity] ブルーム互換性確認OK: ${card.name} → ${targetCard.name}`);
         
         // ブルーム操作の場合の制限チェック
         
         // 1. 手札からのみ可能チェック
         if (!dragSource || dragSource !== 'hand') {
-          console.log(`[checkDropValidity] 手札制限により拒否: dragSource = ${dragSource}`);
+          window.debugLog(`[checkDropValidity] 手札制限により拒否: dragSource = ${dragSource}`);
           return {
             valid: false,
             reason: 'ブルームは手札からのみ可能です'
@@ -1023,13 +1023,13 @@ class HololiveStateManager {
         }
         
         // 2. ターン制限チェック
-        console.log(`[checkDropValidity] canBloomチェック実行中...`);
+        window.debugLog(`[checkDropValidity] canBloomチェック実行中...`);
         const canBloomResult = this.canBloom(card, targetCard, playerId);
         if (!canBloomResult.valid) {
-          console.log(`[checkDropValidity] canBloomにより拒否: ${canBloomResult.reason}`);
+          window.debugLog(`[checkDropValidity] canBloomにより拒否: ${canBloomResult.reason}`);
           return canBloomResult;
         }
-        console.log(`[checkDropValidity] canBloomチェック通過`);
+        window.debugLog(`[checkDropValidity] canBloomチェック通過`);
       }
     }
     
@@ -1040,7 +1040,7 @@ class HololiveStateManager {
         : player.cards.back_positions[targetPosition];
         
       if (targetCard && this.checkBloomCompatibility(card, targetCard).valid) {
-        console.log(`[checkDropValidity] フェーズ制限により拒否: 現在フェーズ${currentPhase}, ブルームはメインステップ(3)でのみ可能`);
+        window.debugLog(`[checkDropValidity] フェーズ制限により拒否: 現在フェーズ${currentPhase}, ブルームはメインステップ(3)でのみ可能`);
         return {
           valid: false,
           reason: 'ブルームはメインステップでのみ可能です'
@@ -1202,18 +1202,18 @@ class HololiveStateManager {
     const isDebutPhase = currentState.game.debutPlacementPhase;
     
     // デバッグログ追加
-    console.log(`[checkSwapValidity] 移動: ${sourcePosition} → ${targetPosition}`);
+    window.debugLog(`[checkSwapValidity] 移動: ${sourcePosition} → ${targetPosition}`);
     
     // Debut配置フェーズでは自由に移動可能（ブルーム以外）
     if (isDebutPhase) {
-      console.log('[checkSwapValidity] Debut配置フェーズ中の移動チェック');
+      window.debugLog('[checkSwapValidity] Debut配置フェーズ中の移動チェック');
       // 手札、センター、バック間の移動は自由
       if ((sourcePosition === 'hand' || sourcePosition === 'center' || sourcePosition.startsWith('back')) &&
           (targetPosition === 'hand' || targetPosition === 'center' || targetPosition.startsWith('back'))) {
         
         // 手札への移動は常に許可
         if (targetPosition === 'hand') {
-          console.log('[checkSwapValidity] Debut配置フェーズで手札への移動許可');
+          window.debugLog('[checkSwapValidity] Debut配置フェーズで手札への移動許可');
           return {
             valid: true,
             reason: 'Debut配置フェーズで手札への移動可能'
@@ -1223,7 +1223,7 @@ class HololiveStateManager {
         // Debutレベルのホロメンカードの配置先制限のみチェック（手札以外）
         if (targetPosition !== 'hand' && sourceCard.card_type?.includes('ホロメン')) {
           if (sourceCard.bloom_level !== 'Debut') {
-            console.log('[checkSwapValidity] Debutレベル以外のホロメンカードの配置拒否');
+            window.debugLog('[checkSwapValidity] Debutレベル以外のホロメンカードの配置拒否');
             return {
               valid: false,
               reason: 'Debut配置フェーズではDebutレベルのホロメンカードのみ配置可能'
@@ -1231,13 +1231,13 @@ class HololiveStateManager {
           }
         }
         
-        console.log('[checkSwapValidity] Debut配置フェーズで移動許可');
+        window.debugLog('[checkSwapValidity] Debut配置フェーズで移動許可');
         return {
           valid: true,
           reason: 'Debut配置フェーズで移動可能'
         };
       } else {
-        console.log('[checkSwapValidity] Debut配置フェーズの移動範囲外');
+        window.debugLog('[checkSwapValidity] Debut配置フェーズの移動範囲外');
         return {
           valid: false,
           reason: 'Debut配置フェーズでは手札・センター・バック間のみ移動可能'
@@ -1246,7 +1246,7 @@ class HololiveStateManager {
     }
 
     // ゲーム中の交換制限
-    console.log('[checkSwapValidity] Debut配置フェーズ以外での処理');
+    window.debugLog('[checkSwapValidity] Debut配置フェーズ以外での処理');
     if (currentPhase !== 3) { // メインフェーズ以外では交換不可
       return {
         valid: false,
@@ -1372,7 +1372,7 @@ class HololiveStateManager {
       };
     }
     
-    console.log(`[checkBloomCompatibility] ブルーム可能: ${targetLevel} → ${sourceLevel}`);
+    window.debugLog(`[checkBloomCompatibility] ブルーム可能: ${targetLevel} → ${sourceLevel}`);
 
     // 4. HP・ダメージ制限チェック
     const targetCardState = this.getCardState(targetCard);
@@ -1529,31 +1529,31 @@ class HololiveStateManager {
     const currentTurn = gameState.turn.turnCount;
     const playerTurnCount = gameState.turn.playerTurnCount[playerId] || 0;
     
-    console.log(`[canBloom] ターン制限チェック: プレイヤー${playerId}のターン回数${playerTurnCount}, 全体ターン${currentTurn}`);
+    window.debugLog(`[canBloom] ターン制限チェック: プレイヤー${playerId}のターン回数${playerTurnCount}, 全体ターン${currentTurn}`);
     
     // 1. 基本的な互換性チェック
     const compatibilityCheck = this.checkBloomCompatibility(card, targetCard, playerId);
     if (!compatibilityCheck.valid) {
-      console.log(`[canBloom] 互換性チェック失敗: ${compatibilityCheck.reason}`);
+      window.debugLog(`[canBloom] 互換性チェック失敗: ${compatibilityCheck.reason}`);
       return compatibilityCheck;
     }
 
     // 2. 初回ターン制限チェック（各プレイヤーの最初のターン）
     if (playerTurnCount <= 1) {
-      console.log(`[canBloom] ターン制限により拒否: プレイヤー${playerId}のターン回数${playerTurnCount} <= 1`);
+      window.debugLog(`[canBloom] ターン制限により拒否: プレイヤー${playerId}のターン回数${playerTurnCount} <= 1`);
       return {
         valid: false,
         reason: `プレイヤー${playerId}の最初のターンではブルームできません`
       };
     }
 
-    console.log(`[canBloom] ターン制限チェック通過: プレイヤー${playerId}のターン回数${playerTurnCount} > 1`);
+    window.debugLog(`[canBloom] ターン制限チェック通過: プレイヤー${playerId}のターン回数${playerTurnCount} > 1`);
 
     // 3. カード別ブルーム回数制限チェック（同一カードに対して1ターンに1回のみ）
     const targetCardState = this.getCardState(targetCard);
     
     if (targetCardState?.bloomedThisTurn) {
-      console.log(`[canBloom] カード別ブルーム制限により拒否: 対象カードは今ターンに既にブルーム済み`);
+      window.debugLog(`[canBloom] カード別ブルーム制限により拒否: 対象カードは今ターンに既にブルーム済み`);
       return {
         valid: false,
         reason: `このカードは今ターンに既にブルームしています`
@@ -1573,10 +1573,10 @@ class HololiveStateManager {
     }
 
     // 5. ステージに出たターンのブルーム禁止
-    console.log(`[canBloom] ステージ出場ターンチェック: targetCard.playedTurn=${targetCardState.playedTurn}, currentTurn=${currentTurn}`);
+    window.debugLog(`[canBloom] ステージ出場ターンチェック: targetCard.playedTurn=${targetCardState.playedTurn}, currentTurn=${currentTurn}`);
     // playedTurnがnullの場合は、古いカードとして扱い、ブルーム可能とする
     if (targetCardState.justPlayed || (targetCardState.playedTurn !== null && targetCardState.playedTurn === currentTurn)) {
-      console.log(`[canBloom] ステージに出たターンのブルーム禁止: justPlayed=${targetCardState.justPlayed}, playedTurn=${targetCardState.playedTurn}`);
+      window.debugLog(`[canBloom] ステージに出たターンのブルーム禁止: justPlayed=${targetCardState.justPlayed}, playedTurn=${targetCardState.playedTurn}`);
       return {
         valid: false,
         reason: 'ステージに出たターンではブルームできません'
@@ -1593,7 +1593,7 @@ class HololiveStateManager {
 
     // 7. お休み状態の確認（お休みでもブルーム可能、ただし状態は維持）
     if (targetCardState.resting) {
-      console.log('お休み状態のホロメンにブルームします（お休み状態は維持されます）');
+      window.debugLog('お休み状態のホロメンにブルームします（お休み状態は維持されます）');
     }
 
     return {
@@ -1636,8 +1636,8 @@ class HololiveStateManager {
       bloomedThisTurn: true // ブルーム対象のホロメンもブルーム済みマーク
     });
     
-    console.log(`ブルーム実行: ${card.name}(${card.bloom_level}) → ${targetCard.name}(${targetCard.bloom_level})`);
-    console.log(`引き継ぎ要素: エール${updatedCard.cardState?.yellCards?.length || 0}枚, サポート${updatedCard.cardState?.supportCards?.length || 0}枚, 重なったカード${updatedCard.cardState?.stackedCards?.length || 0}枚`);
+    window.debugLog(`ブルーム実行: ${card.name}(${card.bloom_level}) → ${targetCard.name}(${targetCard.bloom_level})`);
+    window.debugLog(`引き継ぎ要素: エール${updatedCard.cardState?.yellCards?.length || 0}枚, サポート${updatedCard.cardState?.supportCards?.length || 0}枚, 重なったカード${updatedCard.cardState?.stackedCards?.length || 0}枚`);
     
     return updatedCard;
   }
@@ -1650,12 +1650,12 @@ class HololiveStateManager {
   canPlayerCollab(playerId) {
     const playerState = this.state.players[playerId];
 
-    console.log(`🔍 プレイヤー${playerId}のコラボ可能性チェック開始`);
-    console.log(`- collabMovedThisTurn: ${playerState.gameState.collabMovedThisTurn}`);
+    window.debugLog(`🔍 プレイヤー${playerId}のコラボ可能性チェック開始`);
+    window.debugLog(`- collabMovedThisTurn: ${playerState.gameState.collabMovedThisTurn}`);
 
     // 1. このターンに既にコラボ移動を実行したかチェック
     if (playerState.gameState.collabMovedThisTurn) {
-      console.log(`❌ 既にこのターンでコラボ済み`);
+      window.debugLog(`❌ 既にこのターンでコラボ済み`);
       return {
         valid: false,
         reason: '1ターンに1度のみコラボ移動可能です'
@@ -1664,7 +1664,7 @@ class HololiveStateManager {
 
     // 2. コラボポジションが既に使用されているかチェック
     if (playerState.cards.collab) {
-      console.log(`❌ コラボポジション使用済み`);
+      window.debugLog(`❌ コラボポジション使用済み`);
       return {
         valid: false,
         reason: 'コラボポジションには既にカードが配置されています'
@@ -1673,7 +1673,7 @@ class HololiveStateManager {
 
     // 3. デッキ残り枚数チェック（ホロパワー配置のため）
     if (!playerState.cards.deck || playerState.cards.deck.length === 0) {
-      console.log(`❌ デッキが空（枚数: ${playerState.cards.deck?.length || 0}）`);
+      window.debugLog(`❌ デッキが空（枚数: ${playerState.cards.deck?.length || 0}）`);
       return {
         valid: false,
         reason: 'デッキが空のためホロパワーを置けません'
@@ -1692,14 +1692,14 @@ class HololiveStateManager {
     });
 
     if (!availableHolomen) {
-      console.log(`❌ コラボ可能なホロメンがバックにいません`);
+      window.debugLog(`❌ コラボ可能なホロメンがバックにいません`);
       return {
         valid: false,
         reason: 'コラボできるホロメンがバックポジションにいません'
       };
     }
 
-    console.log(`✅ コラボ実行可能`);
+    window.debugLog(`✅ コラボ実行可能`);
     return {
       valid: true,
       reason: 'コラボ実行可能'
@@ -1743,8 +1743,8 @@ class HololiveStateManager {
 
     // 4. コラボポジションが既に使用されているかチェック（Battle Engine参照で同期確保）
     const battleEnginePlayer = this.battleEngine.players[playerId];
-    console.log(`🔍 [canMoveToCollab] Battle Engine collab: ${battleEnginePlayer.collab ? '配置済み' : '空'}`, battleEnginePlayer.collab);
-    console.log(`🔍 [canMoveToCollab] State Manager collab: ${playerState.cards.collab ? '配置済み' : '空'}`, playerState.cards.collab);
+    window.debugLog(`🔍 [canMoveToCollab] Battle Engine collab: ${battleEnginePlayer.collab ? '配置済み' : '空'}`, battleEnginePlayer.collab);
+    window.debugLog(`🔍 [canMoveToCollab] State Manager collab: ${playerState.cards.collab ? '配置済み' : '空'}`, playerState.cards.collab);
     
     if (battleEnginePlayer.collab) {
       return {
@@ -1793,7 +1793,7 @@ class HololiveStateManager {
    * @returns {Object} 更新されたカード
    */
   recordCollabMove(card, playerId) {
-    console.log(`🤝 プレイヤー${playerId}のコラボ移動を記録: ${card.name}`);
+    window.debugLog(`🤝 プレイヤー${playerId}のコラボ移動を記録: ${card.name}`);
     
     // プレイヤーの状態を更新
     this.updateState('UPDATE_PLAYER_GAME_STATE', {
@@ -1802,7 +1802,7 @@ class HololiveStateManager {
       value: true
     });
     
-    console.log(`✅ collabMovedThisTurn = true に設定`);
+    window.debugLog(`✅ collabMovedThisTurn = true に設定`);
     
     // カードにコラボロック状態を付与
     const updatedCard = this.addCardState(card, {
@@ -2030,7 +2030,7 @@ class HololiveStateManager {
    */
   startDebutPlacementPhase() {
     this.updateState('DEBUT_PLACEMENT_START', {});
-    console.log('Debut配置フェーズを開始しました');
+    window.debugLog('Debut配置フェーズを開始しました');
   }
 
   /**
@@ -2038,7 +2038,7 @@ class HololiveStateManager {
    */
   endDebutPlacementPhase() {
     this.updateState('DEBUT_PLACEMENT_END', {});
-    console.log('Debut配置フェーズを終了しました');
+    window.debugLog('Debut配置フェーズを終了しました');
   }
 
   /**
@@ -2404,10 +2404,10 @@ class HololiveStateManager {
         targetPosition: targetPosition
       });
 
-      console.log(`バトンタッチ実行: ${sourceCard.name} ⇔ ${targetCard.name}`);
+      window.debugLog(`バトンタッチ実行: ${sourceCard.name} ⇔ ${targetCard.name}`);
       return true;
     } catch (error) {
-      console.error('バトンタッチ実行エラー:', error);
+      window.errorLog('バトンタッチ実行エラー:', error);
       return false;
     }
   }
@@ -2432,7 +2432,7 @@ class HololiveStateManager {
             player.cards.archive = [];
           }
           player.cards.archive.push(removedCard);
-          console.log(`エールカード削除: ${holomem.name}から${removedCard.name}をアーカイブに移動`);
+          window.debugLog(`エールカード削除: ${holomem.name}から${removedCard.name}をアーカイブに移動`);
         }
       }
     }

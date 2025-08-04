@@ -581,24 +581,16 @@ function setViewMode(mode) {
     }, 100); // 100ms のデバウンス
   }
 
-  // テキスト正規化関数（ひらがな/カタカナ、大文字/小文字統一）
-  function normalizeText(text) {
-    return text
-      .toLowerCase()
-      .replace(/[ぁ-ゖ]/g, s => String.fromCharCode(s.charCodeAt(0) + 0x60))  // ひらがな→カタカナ変換
-      .replace(/[\u3041-\u3096]/g, s => String.fromCharCode(s.charCodeAt(0) + 0x60)); // 残りのひらがな→カタカナ
-  }
-
   function performRender() {
-    const keyword = normalizeText(document.getElementById("nameSearch").value);
+    const keyword = window.normalizeText(document.getElementById("nameSearch").value);
     const getChecked = id => [...document.querySelectorAll(`#${id} input:checked`)].map(el => el.value);
     const ownedStates = getCheckedFromChips("ownedStateChipGroup");
     const rarity = getCheckedFromChips("rarityFilter");
     const color = getCheckedFromChips("colorFilter");
     const bloom = getCheckedFromChips("bloomFilter");
     const cardType = getCheckedFromChips("cardTypeFilter");
-    const product = normalizeText(document.getElementById("productFilter").value);
-    const tagFilter = normalizeText(document.getElementById("tagsFilter")?.value || "");
+    const product = window.normalizeText(document.getElementById("productFilter").value);
+    const tagFilter = window.normalizeText(document.getElementById("tagsFilter")?.value || "");
 
     const tableArea = document.getElementById("cardTable");
     const previewArea = document.getElementById("cardPreviewArea");
@@ -612,13 +604,13 @@ function setViewMode(mode) {
       if (!matchOwned) return false;
 
       const match = {
-        name: !keyword || normalizeText(card.name).includes(keyword),
+        name: !keyword || window.normalizeText(card.name).includes(keyword),
         rarity: rarity.length === 0 || rarity.includes(card.rarity),
         color: color.length === 0 || color.includes(card.color),
         bloom: bloom.length === 0 || bloom.includes(card.bloom),
         cardType: cardType.length === 0 || cardType.some(type => card.card_type?.includes(type)),
-        product: !product || normalizeText(card.product).includes(product),
-        tags: !tagFilter || (card.tags && Array.isArray(card.tags) && card.tags.map(t => normalizeText(t)).includes(tagFilter))
+        product: !product || window.normalizeText(card.product).includes(product),
+        tags: !tagFilter || (card.tags && Array.isArray(card.tags) && card.tags.map(t => window.normalizeText(t)).includes(tagFilter))
       };
       return !Object.values(match).includes(false);
     });

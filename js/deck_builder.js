@@ -26,13 +26,6 @@
           });
         }
 
-        function normalizeText(text) {
-          return text
-            .toLowerCase()
-            .replace(/[ぁ-ゖ]/g, s => String.fromCharCode(s.charCodeAt(0) + 0x60))  // ひらがな→カタカナ変換
-            .replace(/[\u3041-\u3096]/g, s => String.fromCharCode(s.charCodeAt(0) + 0x60)); // 残りのひらがな→カタカナ
-        }
-
         function toggleDarkMode() {
             const isDark = document.body.classList.toggle("dark");
             localStorage.setItem("darkMode", isDark ? "true" : "false");
@@ -509,7 +502,7 @@ function addCardToDeck(cardId) {
 
         function renderCardSelectionGallery() {
           const rawKeyword = document.getElementById("nameSearch").value.trim();
-          const keyword = normalizeText(rawKeyword);
+          const keyword = window.normalizeText(rawKeyword);
           const sortMethod = document.getElementById("sortMethod").value;
 
           const owned = getCheckedFromChips("ownedStateChipGroup");
@@ -538,7 +531,7 @@ function addCardToDeck(cardId) {
               (owned.includes("owned") && ownedCount > 0) ||
               (owned.includes("unowned") && ownedCount === 0);
 
-            const allText = normalizeText([
+            const allText = window.normalizeText([
               card.name,
               card.id,
               card.rarity,

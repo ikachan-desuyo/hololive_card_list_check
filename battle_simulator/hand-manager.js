@@ -29,7 +29,7 @@ class HandManager {
     }
     
     this.handArea = handArea;
-    console.log('手札エリア初期化完了');
+    window.debugLog('手札エリア初期化完了');
   }
 
   // 手札表示の更新
@@ -38,7 +38,7 @@ class HandManager {
     let handArea = document.querySelector('.hand-area');
     
     if (!handArea) {
-      console.error('手札エリアが見つかりません');
+      window.errorLog('手札エリアが見つかりません');
       this.setupHandArea(); // 手札エリアを作成
       handArea = this.handArea;
     }
@@ -107,7 +107,7 @@ class HandManager {
     if (this.battleEngine.gameState.currentPhase === 3) {
       this.battleEngine.playCard(card, index);
     } else {
-      console.log('メインステップでのみカードをプレイできます');
+      window.debugLog('メインステップでのみカードをプレイできます');
     }
   }
 
@@ -186,7 +186,7 @@ class HandManager {
       return this.placeHolomenCardDebut(card, handIndex);
     }
     
-    console.log('現在のフェーズではホロメンカードを配置できません');
+    window.debugLog('現在のフェーズではホロメンカードを配置できません');
   }
 
   // メインステップでのホロメンカード配置（制限削除）
@@ -214,7 +214,7 @@ class HandManager {
       );
       
       if (!validation.valid) {
-        console.log(`配置不可: ${validation.reason}`);
+        window.debugLog(`配置不可: ${validation.reason}`);
         return;
       }
       
@@ -312,14 +312,14 @@ class HandManager {
     // LIMITED制限チェック（これのみ残す）
     if (card.card_type.includes('LIMITED')) {
       if (player.usedLimitedThisTurn.length > 0) {
-        console.log('このターンには既にLIMITEDカードを使用しています');
+        window.debugLog('このターンには既にLIMITEDカードを使用しています');
         return;
       }
       player.usedLimitedThisTurn.push(card.id);
     }
     
     // サポート効果の実行（簡易版）
-    console.log(`${card.name}を使用しました`);
+    window.debugLog(`${card.name}を使用しました`);
     
     // 手札から除去してアーカイブへ
     player.hand.splice(handIndex, 1);
@@ -384,7 +384,7 @@ class HandManager {
   swapCards(sourceCard, sourcePosition, targetCard, targetPosition, playerId = 1) {
     // 引数の検証
     if (!sourceCard || !sourceCard.name || !sourcePosition || !targetPosition) {
-      console.error('HAND MANAGER: カード交換に必要な引数が不足しています');
+      window.errorLog('HAND MANAGER: カード交換に必要な引数が不足しています');
       alert('⚠️ エラー: カード交換に必要な情報が不足しています');
       return false;
     }
@@ -413,7 +413,7 @@ class HandManager {
         const collabCheck = this.battleEngine.stateManager.canMoveToCollab(sourceCard, playerId);
         
         if (!collabCheck.valid) {
-          console.warn(`⚠️ コラボ移動拒否: ${collabCheck.reason}`);
+          window.warnLog(`⚠️ コラボ移動拒否: ${collabCheck.reason}`);
           alert(`コラボ移動不可:\n${collabCheck.reason}`);
           return false;
         }
@@ -425,7 +425,7 @@ class HandManager {
       
       if (!holoPowerPlaced) {
         // ホロパワー配置に失敗した場合、コラボ移動を中止
-        console.error('ホロパワー配置失敗のためコラボ移動を中止');
+        window.errorLog('ホロパワー配置失敗のためコラボ移動を中止');
         return false;
       }
       
@@ -435,16 +435,16 @@ class HandManager {
       
       // カードが見つからない場合、sourceCardを代替として使用
       if (!originalCard && sourceCard) {
-        console.warn(`⚠️ Battle Engineでカードが見つからないため、sourceCardを使用: ${sourceCard.name}`);
+        window.warnLog(`⚠️ Battle Engineでカードが見つからないため、sourceCardを使用: ${sourceCard.name}`);
         originalCard = sourceCard;
       }
       
       if (!originalCard) {
-        console.error(`❌ コラボ移動エラー: ${sourcePosition}にカードがありません`);
+        window.errorLog(`❌ コラボ移動エラー: ${sourcePosition}にカードがありません`);
         return false;
       }
       
-      console.log(`🔄 コラボ移動: ${originalCard?.name} (エール: ${originalCard?.yellCards?.length || 0}枚)`);
+      window.debugLog(`🔄 コラボ移動: ${originalCard?.name} (エール: ${originalCard?.yellCards?.length || 0}枚)`);
       
       // 3. コラボ移動の記録（カード状態ベース）
       const updatedSourceCard = this.battleEngine.stateManager.recordCollabMove(sourceCard, playerId);
@@ -452,11 +452,11 @@ class HandManager {
       // 4. エール情報を新しいカードに確実に引き継ぎ
       if (originalCard?.yellCards && Array.isArray(originalCard.yellCards)) {
         updatedSourceCard.yellCards = [...originalCard.yellCards];
-        console.log(`✅ コラボ移動: エール引継ぎ ${originalCard.yellCards.length}枚`);
+        window.debugLog(`✅ コラボ移動: エール引継ぎ ${originalCard.yellCards.length}枚`);
       }
       
       // 5. コラボ移動実行（SWAP_CARDSで実際の移動を行う）
-      console.log(`🔄 コラボ移動実行: ${sourcePosition} → ${targetPosition}`);
+      window.debugLog(`🔄 コラボ移動実行: ${sourcePosition} → ${targetPosition}`);
       this.battleEngine.stateManager.updateState('SWAP_CARDS', {
         player: playerId,
         sourcePosition: sourcePosition,
@@ -469,12 +469,12 @@ class HandManager {
         if (collabCard && originalCard?.yellCards?.length > 0) {
           // エール情報を確実に設定
           collabCard.yellCards = [...originalCard.yellCards];
-          console.log(`🔧 コラボ移動後エール再設定: ${collabCard.name} (エール: ${collabCard.yellCards.length}枚)`);
+          window.debugLog(`🔧 コラボ移動後エール再設定: ${collabCard.name} (エール: ${collabCard.yellCards.length}枚)`);
           
           // State Managerにも反映
           if (this.battleEngine.stateManager.state.players[playerId].cards[targetPosition]) {
             this.battleEngine.stateManager.state.players[playerId].cards[targetPosition].yellCards = [...originalCard.yellCards];
-            console.log(`🔧 State Manager同期: ${targetPosition}にエール情報設定完了`);
+            window.debugLog(`🔧 State Manager同期: ${targetPosition}にエール情報設定完了`);
           }
           
           this.battleEngine.updateUI();
@@ -517,9 +517,9 @@ class HandManager {
         
         if (handIndex !== -1) {
           const removedCard = player.hand.splice(handIndex, 1)[0];
-          console.log(`swapCards: 手札から削除: ${removedCard.name} (${removedCard.bloom_level}) インデックス: ${handIndex}`);
+          window.debugLog(`swapCards: 手札から削除: ${removedCard.name} (${removedCard.bloom_level}) インデックス: ${handIndex}`);
         } else {
-          console.warn(`swapCards: 手札で対象カードが見つかりません:`, sourceCard);
+          window.warnLog(`swapCards: 手札で対象カードが見つかりません:`, sourceCard);
         }
       }
       
@@ -534,9 +534,9 @@ class HandManager {
       this.battleEngine.stateManager.addBloomHistory(playerId, targetPosition);
     } else {
       // 通常の交換処理（コラボ移動以外）- エール情報保持強化
-      console.log(`🔄 通常交換: ${sourcePosition} ↔ ${targetPosition}`);
-      console.log(`📋 移動元: ${sourceCard?.name} (エール: ${sourceCard?.yellCards?.length || 0}枚)`);
-      console.log(`📋 移動先: ${targetCard?.name || 'null'} (エール: ${targetCard?.yellCards?.length || 0}枚)`);
+      window.debugLog(`🔄 通常交換: ${sourcePosition} ↔ ${targetPosition}`);
+      window.debugLog(`📋 移動元: ${sourceCard?.name} (エール: ${sourceCard?.yellCards?.length || 0}枚)`);
+      window.debugLog(`📋 移動先: ${targetCard?.name || 'null'} (エール: ${targetCard?.yellCards?.length || 0}枚)`);
       
       this.battleEngine.stateManager.updateState('SWAP_CARDS', {
         player: playerId,
@@ -553,7 +553,7 @@ class HandManager {
           const movedCard = battleEnginePlayer[targetPosition];
           if (movedCard && movedCard.name === sourceCard.name) {
             movedCard.yellCards = [...sourceCard.yellCards];
-            console.log(`🔧 通常交換後エール保持: ${movedCard.name} → ${targetPosition} (エール: ${movedCard.yellCards.length}枚)`);
+            window.debugLog(`🔧 通常交換後エール保持: ${movedCard.name} → ${targetPosition} (エール: ${movedCard.yellCards.length}枚)`);
           }
         }
         
@@ -562,7 +562,7 @@ class HandManager {
           const movedCard = battleEnginePlayer[sourcePosition];
           if (movedCard && movedCard.name === targetCard.name) {
             movedCard.yellCards = [...targetCard.yellCards];
-            console.log(`🔧 通常交換後エール保持: ${movedCard.name} → ${sourcePosition} (エール: ${movedCard.yellCards.length}枚)`);
+            window.debugLog(`🔧 通常交換後エール保持: ${movedCard.name} → ${sourcePosition} (エール: ${movedCard.yellCards.length}枚)`);
           }
         }
         
@@ -596,17 +596,17 @@ class HandManager {
   placeHoloPowerFromDeck(playerId) {
     const player = this.battleEngine.players[playerId];
     
-    console.log(`🔍 [ホロパワー配置前] プレイヤー${playerId}状態:`);
-    console.log(`  - center: ${player.center?.name || 'null'}`);
-    console.log(`  - collab: ${player.collab?.name || 'null'}`);
-    console.log(`  - holoPower: ${player.holoPower?.length || 0}枚`);
-    console.log(`  - deck: ${player.deck?.length || 0}枚`);
+    window.debugLog(`🔍 [ホロパワー配置前] プレイヤー${playerId}状態:`);
+    window.debugLog(`  - center: ${player.center?.name || 'null'}`);
+    window.debugLog(`  - collab: ${player.collab?.name || 'null'}`);
+    window.debugLog(`  - holoPower: ${player.holoPower?.length || 0}枚`);
+    window.debugLog(`  - deck: ${player.deck?.length || 0}枚`);
     
     // デッキからホロパワーカードを取得
     if (player.deck && player.deck.length > 0) {
       const holoPowerCard = player.deck.shift(); // デッキの先頭から取得
       
-      console.log(`🔍 取得したホロパワーカード: ${holoPowerCard.name}`, holoPowerCard);
+      window.debugLog(`🔍 取得したホロパワーカード: ${holoPowerCard.name}`, holoPowerCard);
       
       // ホロパワーエリアに配置
       if (!player.holoPower) {
@@ -614,13 +614,13 @@ class HandManager {
       }
       player.holoPower.push(holoPowerCard);
       
-      console.log(`ホロパワーカード配置: ${holoPowerCard.name}`);
+      window.debugLog(`ホロパワーカード配置: ${holoPowerCard.name}`);
       
-      console.log(`🔍 [ホロパワー配置後] プレイヤー${playerId}状態:`);
-      console.log(`  - center: ${player.center?.name || 'null'}`);
-      console.log(`  - collab: ${player.collab?.name || 'null'}`);
-      console.log(`  - holoPower: ${player.holoPower?.length || 0}枚`);
-      console.log(`  - ホロパワー最新: ${player.holoPower[player.holoPower.length-1]?.name || 'null'}`);
+      window.debugLog(`🔍 [ホロパワー配置後] プレイヤー${playerId}状態:`);
+      window.debugLog(`  - center: ${player.center?.name || 'null'}`);
+      window.debugLog(`  - collab: ${player.collab?.name || 'null'}`);
+      window.debugLog(`  - holoPower: ${player.holoPower?.length || 0}枚`);
+      window.debugLog(`  - ホロパワー最新: ${player.holoPower[player.holoPower.length-1]?.name || 'null'}`);
       
       // UI更新
       this.battleEngine.updateUI();
@@ -630,7 +630,7 @@ class HandManager {
       
       return true; // 配置成功
     } else {
-      console.error(`プレイヤー${playerId}のデッキが空です - ホロパワー配置失敗`);
+      window.errorLog(`プレイヤー${playerId}のデッキが空です - ホロパワー配置失敗`);
       return false; // 配置失敗
     }
   }
@@ -751,7 +751,7 @@ class HandManager {
         // 既存カードのエール情報を新しいカードに引き継ぎ
         if (targetCard && targetCard.yellCards && Array.isArray(targetCard.yellCards)) {
           cardCopy.yellCards = [...targetCard.yellCards];
-          console.log(`エール引継ぎ: ${targetCard.yellCards.length}枚のエールを新しいカードに引き継ぎました`);
+          window.debugLog(`エール引継ぎ: ${targetCard.yellCards.length}枚のエールを新しいカードに引き継ぎました`);
         }
         
         // その他の重要な状態情報も引き継ぎ
@@ -765,9 +765,9 @@ class HandManager {
         }
         
         // ブルーム後のカード情報をログ出力
-        console.log(`ブルーム実行: ${targetCard.name} (${targetCard.bloom_level}) → ${cardCopy.name} (${cardCopy.bloom_level})`);
-        console.log(`新しいカード画像URL: ${cardCopy.image_url}`);
-        console.log(`カードコピー詳細:`, cardCopy);
+        window.debugLog(`ブルーム実行: ${targetCard.name} (${targetCard.bloom_level}) → ${cardCopy.name} (${cardCopy.bloom_level})`);
+        window.debugLog(`新しいカード画像URL: ${cardCopy.image_url}`);
+        window.debugLog(`カードコピー詳細:`, cardCopy);
         
         // State Managerでブルーム実行（カード重ね）
         const result = this.battleEngine.stateManager.updateState('PLACE_CARD', {
@@ -784,12 +784,12 @@ class HandManager {
           if (handIndex !== undefined && handIndex >= 0 && handIndex < player.hand.length) {
             // 元の手札インデックスを使用して正確に削除
             const removedCard = player.hand.splice(handIndex, 1)[0];
-            console.log(`手札から削除: ${removedCard.name} (インデックス: ${handIndex})`);
+            window.debugLog(`手札から削除: ${removedCard.name} (インデックス: ${handIndex})`);
           } else {
-            console.warn(`手札インデックスが無効: ${handIndex}`);
+            window.warnLog(`手札インデックスが無効: ${handIndex}`);
           }
           
-          console.log(`ブルーム成功: ${card.name} → ${targetPosition}`);
+          window.debugLog(`ブルーム成功: ${card.name} → ${targetPosition}`);
           
           // State Managerの状態更新が完了してからUI更新を実行
           const waitForBloomCompletion = () => {
@@ -797,7 +797,7 @@ class HandManager {
               this.battleEngine.stateManager.bloomCompleted = false; // フラグをリセット
               this.updateHandDisplay();
               this.battleEngine.updateUI();
-              console.log(`ブルーム後のUI更新完了: ${card.name}`);
+              window.debugLog(`ブルーム後のUI更新完了: ${card.name}`);
             } else {
               // ブルーム完了を待つ
               setTimeout(waitForBloomCompletion, 10);
@@ -809,7 +809,7 @@ class HandManager {
           return;
           
         } else {
-          console.error('ブルーム処理が失敗しました:', result);
+          window.errorLog('ブルーム処理が失敗しました:', result);
           alert('⚠️ ブルーム処理でエラーが発生しました');
           return;
         }
@@ -836,7 +836,7 @@ class HandManager {
       player[targetPosition] = cardWithState;
       player.hand.splice(handIndex, 1);
       
-      console.log(`通常配置: ${card.name} → ${targetPosition}`);
+      window.debugLog(`通常配置: ${card.name} → ${targetPosition}`);
     }
     
     // UI更新（ブルーム処理が成功した場合は遅延更新が既に実行されるためスキップ）

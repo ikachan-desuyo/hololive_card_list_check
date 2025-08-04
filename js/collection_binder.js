@@ -225,16 +225,8 @@
     }
 
     // カード選択画面での統合フィルタリング
-    // テキスト正規化関数（ひらがな/カタカナ、大文字/小文字統一）
-    function normalizeText(text) {
-      return text
-        .toLowerCase()
-        .replace(/[ぁ-ゖ]/g, s => String.fromCharCode(s.charCodeAt(0) + 0x60))  // ひらがな→カタカナ変換
-        .replace(/[\u3041-\u3096]/g, s => String.fromCharCode(s.charCodeAt(0) + 0x60)); // 残りのひらがな→カタカナ
-    }
-
     function filterCardsInSelector() {
-      const searchTerm = normalizeText(document.getElementById('cardSearchInput').value);
+      const searchTerm = window.normalizeText(document.getElementById('cardSearchInput').value);
       const rarityFilter = document.getElementById('rarityFilter').value;
       const cardTypeFilter = document.getElementById('cardTypeFilter').value;
       const modalProductFilter = document.getElementById('modalProductFilter').value;
@@ -249,7 +241,7 @@
       const filteredCards = ownedCards.filter(card => {
         const matchesProduct = !modalProductFilter ||
           (card.product && card.product.includes(modalProductFilter));
-        const matchesSearch = normalizeText(card.name).includes(searchTerm);
+        const matchesSearch = window.normalizeText(card.name).includes(searchTerm);
         const matchesRarity = !rarityFilter || card.rarity === rarityFilter;
 
         // カードタイプフィルタリングの改善

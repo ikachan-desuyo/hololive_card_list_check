@@ -14,7 +14,7 @@ class HololiveCPULogic {
   async executeCPUTurn() {
     if (this.battleEngine.gameState.currentPlayer !== 2) return;
     
-    console.log('CPUのターン開始');
+    window.debugLog('CPUのターン開始');
     
     // CPU用の処理は各ステップの中で自動実行される
     // ここでは手動でフェーズを進める必要はない
@@ -27,30 +27,30 @@ class HololiveCPULogic {
     
     switch (phase) {
       case 0: // リセットステップ
-        console.log('CPU: リセットステップ');
+        window.debugLog('CPU: リセットステップ');
         break;
         
       case 1: // 手札ステップ
-        console.log('CPU: 手札ステップ - カードを引く');
+        window.debugLog('CPU: 手札ステップ - カードを引く');
         break;
         
       case 2: // エールステップ
-        console.log('CPU: エールステップ - エールを送る');
+        window.debugLog('CPU: エールステップ - エールを送る');
         await this.cpuSendYell();
         break;
         
       case 3: // メインステップ
-        console.log('CPU: メインステップ - 戦略的行動');
+        window.debugLog('CPU: メインステップ - 戦略的行動');
         await this.cpuMainPhase();
         break;
         
       case 4: // パフォーマンスステップ
-        console.log('CPU: パフォーマンスステップ - アーツ使用');
+        window.debugLog('CPU: パフォーマンスステップ - アーツ使用');
         await this.cpuPerformancePhase();
         break;
         
       case 5: // エンドステップ
-        console.log('CPU: エンドステップ');
+        window.debugLog('CPU: エンドステップ');
         break;
     }
   }
@@ -65,7 +65,7 @@ class HololiveCPULogic {
     
     if (targets.length > 0) {
       const target = targets[0]; // 最優先のターゲット
-      console.log(`CPU: ${target.position}にエールを送付`);
+      window.debugLog(`CPU: ${target.position}にエールを送付`);
       
       // エール送付の実行
       const yellCard = cpu.yellDeck.pop();
@@ -110,8 +110,8 @@ class HololiveCPULogic {
     }
     holomem.yellCards.push(yellCard);
     
-    console.log(`CPU: ${holomem.name}に${yellCard.name}を配置`);
-    console.log(`現在の${holomem.name}のエール数: ${holomem.yellCards.length}枚`);
+    window.debugLog(`CPU: ${holomem.name}に${yellCard.name}を配置`);
+    window.debugLog(`現在の${holomem.name}のエール数: ${holomem.yellCards.length}枚`);
     
     // UI更新
     this.battleEngine.updateUI();
@@ -248,7 +248,7 @@ class HololiveCPULogic {
     cpu[position] = card;
     cpu.hand.splice(handIndex, 1);
     
-    console.log(`CPU: ${card.name}を${position}に配置`);
+    window.debugLog(`CPU: ${card.name}を${position}に配置`);
     this.battleEngine.updateUI();
   }
 
@@ -266,7 +266,7 @@ class HololiveCPULogic {
       cpu.usedLimitedThisTurn.push(card.id);
     }
     
-    console.log(`CPU: ${card.name}を使用`);
+    window.debugLog(`CPU: ${card.name}を使用`);
     
     // 簡易的な効果処理
     await this.processSupportEffect(card);
@@ -287,7 +287,7 @@ class HololiveCPULogic {
         for (let i = 0; i < drawCount; i++) {
           this.battleEngine.drawCard(2);
         }
-        console.log(`CPU: ${drawCount}枚ドロー`);
+        window.debugLog(`CPU: ${drawCount}枚ドロー`);
       }
     }
   }
@@ -365,7 +365,7 @@ class HololiveCPULogic {
   }
 
   async cpuUseArts(attacker, target) {
-    console.log(`CPU: ${attacker.name}が${target.position}を攻撃`);
+    window.debugLog(`CPU: ${attacker.name}が${target.position}を攻撃`);
     
     // ダメージ計算（簡易版）
     const damage = this.calculateDamage(attacker, target);
@@ -405,10 +405,10 @@ class HololiveCPULogic {
     
     if (damage >= hp) {
       // ホロメンダウン
-      console.log(`${holomem.name}がダウンしました`);
+      window.debugLog(`${holomem.name}がダウンしました`);
       await this.downHolomem(holomem);
     } else {
-      console.log(`${holomem.name}に${damage}ダメージ`);
+      window.debugLog(`${holomem.name}に${damage}ダメージ`);
     }
   }
 
@@ -418,7 +418,7 @@ class HololiveCPULogic {
     if (player.life.length > 0) {
       const lostLife = player.life.pop();
       player.archive.push(lostLife);
-      console.log('プレイヤーのライフが1減少');
+      window.debugLog('プレイヤーのライフが1減少');
       
       this.battleEngine.updateUI();
       this.battleEngine.checkVictoryConditions();
@@ -479,7 +479,7 @@ document.addEventListener('DOMContentLoaded', () => {
   const initCPU = () => {
     if (window.battleEngine) {
       cpuLogic = new HololiveCPULogic(window.battleEngine);
-      console.log('CPUロジック初期化完了');
+      window.debugLog('CPUロジック初期化完了');
     } else {
       setTimeout(initCPU, 100);
     }
