@@ -439,6 +439,23 @@ class HandManager {
     // 特別なケースの判定
     const isBloom = targetCard && this.battleEngine.placementController.isBloomMove(sourceCard, targetCard);
     const isCollabMove = targetPosition === 'collab' && sourcePosition.startsWith('back');
+    const isCollabToBackMove = sourcePosition === 'collab' && targetPosition.startsWith('back');
+    
+    // コラボからバックへの移動チェック（State Managerの機能を活用）
+    if (isCollabToBackMove) {
+      if (this.battleEngine.stateManager) {
+        const fromCollabCheck = this.battleEngine.stateManager.canMoveFromCollab(sourceCard, playerId);
+        
+        if (!fromCollabCheck.valid) {
+          alert(`⚠️ カード移動不可\n\n${fromCollabCheck.reason}`);
+          return false;
+        }
+      }
+    }
+    
+    // ブルーム移動かもう一度確認
+    const isBloomFromState = this.battleEngine.stateManager && targetCard && 
+                             this.battleEngine.stateManager.isBloom(sourceCard, targetCard);
     
     // 実際の交換処理
     const player = this.battleEngine.players[playerId];
@@ -507,7 +524,7 @@ class HandManager {
         window.debugLog(`✅ コラボ移動: エール引継ぎ ${originalCard.yellCards.length}枚`);
       }
       
-      // 5. コラボ移動実行（SWAP_CARDSで実際の移動を行う）
+      // 5. コラボ移動実行（State Managerがコラボロックを自動設定）
       window.debugLog(`🔄 コラボ移動実行: ${sourcePosition} → ${targetPosition}`);
       this.battleEngine.stateManager.updateState('SWAP_CARDS', {
         player: playerId,
@@ -515,7 +532,7 @@ class HandManager {
         targetPosition: targetPosition
       });
       
-      // 6. エール情報が確実に反映されるよう再度設定（SWAP_CARDS実行後）
+      // 7. エール情報が確実に反映されるよう再度設定（SWAP_CARDS実行後）
       setTimeout(() => {
         const collabCard = battleEnginePlayer[targetPosition];
         if (collabCard && originalCard?.yellCards?.length > 0) {
@@ -528,16 +545,35 @@ class HandManager {
             this.battleEngine.stateManager.state.players[playerId].cards[targetPosition].yellCards = [...originalCard.yellCards];
             window.debugLog(`🔧 State Manager同期: ${targetPosition}にエール情報設定完了`);
           }
-          
-          this.battleEngine.updateUI();
         }
-      }, 50); // 少し長めの遅延で確実に実行
+        
+        // 🔒 コラボロック状態を確実に設定
+        if (collabCard) {
+          // シンプルな方法：直接設定のみ
+          if (!collabCard.cardState) {
+            collabCard.cardState = {};
+          }
+          collabCard.cardState.collabLocked = true;
+          
+          window.debugLog(`🔒 [シンプル設定] コラボロック状態設定: ${collabCard.name} (collabLocked: ${collabCard.cardState.collabLocked})`);
+          
+          // 即座確認
+          setTimeout(() => {
+            const checkCard = battleEnginePlayer[targetPosition];
+            window.debugLog(`� [即座確認] ${targetPosition}カード状態: ${checkCard?.name} (collabLocked: ${checkCard?.cardState?.collabLocked})`);
+          }, 10);
+        }
+        
+        // コラボ移動後のUI更新
+        this.battleEngine.updateUI();
+        
+      }, 50);
       
       return true; // コラボ移動完了、以降の処理はスキップ
     }
     
-    // State Managerで交換可能性をチェック（コラボ移動以外）
-    if (!isCollabMove) {
+    // State Managerで交換可能性をチェック（コラボ移動・コラボからの移動以外）
+    if (!isCollabMove && !isCollabToBackMove) {
       const swapCheck = this.battleEngine.stateManager.checkSwapValidity(
         sourceCard, sourcePosition, targetCard, targetPosition, playerId
       );

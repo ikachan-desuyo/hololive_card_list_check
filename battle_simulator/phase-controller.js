@@ -166,48 +166,161 @@ class PhaseController {
     // 1. まず、バックにお休みになっているホロメンカードを通常に戻す
     const backPositions = ['back1', 'back2', 'back3', 'back4', 'back5'];
     console.log(`🔄 リセットステップ: プレイヤー${playerId}のバック状態をチェック`);
+    let resetCount = 0;
+    
     backPositions.forEach(pos => {
-      if (player[pos]) {
-        console.log(`📍 ${pos}: ${player[pos].name}, isResting: ${player[pos].isResting}`);
-        if (player[pos].isResting) {
-          player[pos].isResting = false;
-          console.log(`✅ ${player[pos].name}を縦向きに戻しました（リセットステップ開始時）`);
+      if (player[pos] && player[pos].isResting) {
+        const playerCard = this.battleEngine.players[playerId][pos];
+        
+        // Object.definePropertyを使用して確実にリセット
+        Object.defineProperty(playerCard, 'isResting', {
+          value: false,
+          writable: true,
+          enumerable: true,
+          configurable: true
+        });
+        
+        if (!playerCard.cardState) {
+          playerCard.cardState = {};
         }
+        Object.defineProperty(playerCard.cardState, 'resting', {
+          value: false,
+          writable: true,
+          enumerable: true,
+          configurable: true
+        });
+        
+        // player[pos]も同じオブジェクトを参照するように強制更新
+        player[pos] = playerCard;
+        
+        // player[pos]のプロパティも直接強制設定（ダブル保険）
+        Object.defineProperty(player[pos], 'isResting', {
+          value: false,
+          writable: true,
+          enumerable: true,
+          configurable: true
+        });
+        
+        if (!player[pos].cardState) {
+          player[pos].cardState = {};
+        }
+        Object.defineProperty(player[pos].cardState, 'resting', {
+          value: false,
+          writable: true,
+          enumerable: true,
+          configurable: true
+        });
+        
+        // State Manager経由でも状態を更新
+        if (this.battleEngine.stateManager) {
+          this.battleEngine.stateManager.updateState('UPDATE_CARD_STATE', {
+            playerId: playerId,
+            position: pos,
+            cardState: { 
+              resting: false,
+              isResting: false,
+              bloomedThisTurn: playerCard.cardState.bloomedThisTurn || false,
+              justPlayed: playerCard.cardState.justPlayed || false,
+              collabLocked: playerCard.cardState.collabLocked || false,
+              playedTurn: playerCard.cardState.playedTurn || 1
+            }
+          });
+        }
+        
+        resetCount++;
+        console.log(`� お休み状態のカードをリセット: ${pos} - ${playerCard.name}`);
       }
     });
     
+    console.log(`🔄 リセットステップ: ${resetCount}枚のカードをお休み状態から回復しました`);
+    
+    // バック状態更新後のUI更新
+    if (resetCount > 0) {
+      console.log(`🎨 バック状態更新のためUI更新実行`);
+      
+      // Card Display Manager更新
+      if (this.battleEngine.cardDisplayManager) {
+        this.battleEngine.cardDisplayManager.updateBackSlots('player');
+        this.battleEngine.cardDisplayManager.updateBackSlots('opponent');
+      }
+      
+      // 全体UI更新
+      this.battleEngine.updateUI();
+      
+      // 遅延UI更新で確実に表示反映
+      setTimeout(() => {
+        if (this.battleEngine.cardDisplayManager) {
+          this.battleEngine.cardDisplayManager.updateBackSlots('player');
+          this.battleEngine.cardDisplayManager.updateBackSlots('opponent');
+        }
+        this.battleEngine.updateUI();
+      }, 100);
+    }
+    
     // 2. コラボのホロメンカードを横向きにしてバックに移動
     if (player.collab) {
-      const collabCard = player.collab
+      const collabCard = player.collab;
       collabCard.isResting = true; // 横向き状態をマーク
       
       // cardState.restingも同期
       if (collabCard.cardState) {
         collabCard.cardState.resting = true;
+        // コラボロック状態を解除
+        collabCard.cardState.collabLocked = false;
       } else {
-        collabCard.cardState = { resting: true };
+        collabCard.cardState = { 
+          resting: true,
+          collabLocked: false
+        };
       }
       
       console.log(`🛌 コラボカードをお休み状態にしました: ${collabCard.name} (isResting: ${collabCard.isResting}, cardState.resting: ${collabCard.cardState.resting})`);
+      console.log(`🔓 コラボロック状態を解除しました: ${collabCard.name} (collabLocked: ${collabCard.cardState.collabLocked})`);
       
       // 空いているバックスロットを探す
+      let movedToPos = null;
       for (let pos of backPositions) {
         if (!player[pos]) {
           player[pos] = collabCard;
           player.collab = null;
+          movedToPos = pos;
           console.log(`${collabCard.name}をコラボからバック(${pos})に移動（横向き）`);
+          
+          // State Managerを通じても状態を更新
+          if (this.battleEngine.stateManager) {
+            this.battleEngine.stateManager.updateState('UPDATE_CARD_STATE', {
+              playerId: playerId,
+              position: pos,
+              cardState: { 
+                resting: true,
+                collabLocked: false // コラボロック解除
+              }
+            });
+          }
+          
+          // カード表示を即座に更新
+          if (window.cardDisplayManager) {
+            window.cardDisplayManager.updateCardDisplay(collabCard, pos, playerId);
+          }
+          
           break;
         }
       }
+      
+      if (movedToPos) {
+        console.log(`🎨 コラボ→バック移動のためUI更新実行`);
+        this.battleEngine.updateUI();
+      }
     }
     
-    // UI更新前の最終状態確認
-    console.log(`🎨 UI更新前の最終状態確認:`);
-    backPositions.forEach(pos => {
-      if (player[pos]) {
-        console.log(`📍 ${pos}: ${player[pos].name}, isResting: ${player[pos].isResting}`);
-      }
-    });
+    // 3. State Managerのコラボ移動フラグをリセット
+    if (this.battleEngine.stateManager) {
+      // プレイヤーのコラボ移動フラグをリセット
+      this.battleEngine.stateManager.updateState('RESET_COLLAB_MOVE', {
+        playerId: playerId
+      });
+      console.log(`🔄 プレイヤー${playerId}のコラボ移動フラグをリセットしました`);
+    }
     
     // UI更新
     this.battleEngine.updateUI();

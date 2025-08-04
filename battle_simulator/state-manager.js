@@ -292,6 +292,20 @@ class HololiveStateManager {
         }
         break;
         
+      case 'RESET_COLLAB_MOVE':
+        // 特定プレイヤーのコラボ移動フラグをリセット
+        if (payload.playerId && newState.players[payload.playerId]) {
+          const player = newState.players[payload.playerId];
+          if (player.gameState) {
+            const oldFlag = player.gameState.collabMovedThisTurn;
+            player.gameState.collabMovedThisTurn = false;
+            window.debugLog(`🔄 [RESET_COLLAB_MOVE] プレイヤー${payload.playerId}: collabMovedThisTurn ${oldFlag} → false`);
+          }
+        } else {
+          window.warnLog(`⚠️ [RESET_COLLAB_MOVE] プレイヤー${payload.playerId}が見つかりません`);
+        }
+        break;
+        
       case 'SET_WINNER':
         newState.game.winner = payload.winner;
         break;
@@ -492,6 +506,38 @@ class HololiveStateManager {
                 window.debugLog(`🔧 Battle Engine同期: ${payload.targetPosition}にエール情報設定 (${tempSourceCard.yellCards.length}枚)`);
               } else {
                 window.errorLog(`⚠️ 移動先 ${payload.targetPosition} にカードが見つかりません`);
+              }
+            }
+            
+            // 🔒 コラボ移動の場合は、コラボロック状態を確実に設定
+            if (isCollabMove) {
+              const collabCard = battleEnginePlayer[payload.targetPosition];
+              if (collabCard) {
+                // cardStateが存在しない場合は初期化
+                if (!collabCard.cardState) {
+                  collabCard.cardState = {};
+                }
+                
+                // コラボロック状態を設定
+                collabCard.cardState.collabLocked = true;
+                
+                // State Manager側でも同期
+                if (player.cards[payload.targetPosition]) {
+                  if (!player.cards[payload.targetPosition].cardState) {
+                    player.cards[payload.targetPosition].cardState = {};
+                  }
+                  player.cards[payload.targetPosition].cardState.collabLocked = true;
+                }
+                
+                window.debugLog(`🔒 [SWAP_CARDS] コラボロック設定完了: ${collabCard.name} (collabLocked: ${collabCard.cardState.collabLocked})`);
+                
+                // デバッグ用：現在の状態確認
+                setTimeout(() => {
+                  const finalCard = battleEnginePlayer[payload.targetPosition];
+                  window.debugLog(`🔍 [SWAP_CARDS後確認] ${payload.targetPosition}カード状態:`);
+                  window.debugLog(`  - name: ${finalCard?.name}`);
+                  window.debugLog(`  - collabLocked: ${finalCard?.cardState?.collabLocked}`);
+                }, 10);
               }
             }
           }
@@ -755,6 +801,34 @@ class HololiveStateManager {
             newState.ui.dragState = {};
           }
           newState.ui.dragState.validDropZones = payload.validZones;
+        }
+        break;
+
+      case 'UPDATE_CARD_STATE':
+        // カード状態の更新
+        if (payload.playerId && payload.position && payload.cardState) {
+          const playerId = payload.playerId;
+          const position = payload.position;
+          const cardState = payload.cardState;
+          
+          // プレイヤーデータが存在するかチェック
+          if (newState.players[playerId]) {
+            window.debugLog(`[State Manager] UPDATE_CARD_STATE: プレイヤー${playerId}の${position}のカード状態を更新`, cardState);
+            
+            // カード状態を追加・更新
+            if (!newState.players[playerId].cardStates) {
+              newState.players[playerId].cardStates = {};
+            }
+            
+            if (!newState.players[playerId].cardStates[position]) {
+              newState.players[playerId].cardStates[position] = {};
+            }
+            
+            // cardStateの各プロパティを更新
+            Object.assign(newState.players[playerId].cardStates[position], cardState);
+            
+            window.debugLog(`[State Manager] UPDATE_CARD_STATE完了: プレイヤー${playerId}の${position}`, newState.players[playerId].cardStates[position]);
+          }
         }
         break;
         
@@ -1926,16 +2000,31 @@ class HololiveStateManager {
    * @returns {Object} チェック結果
    */
   canMoveFromCollab(card, playerId) {
-    const cardState = this.getCardState(card);
-
-    // コラボにいてロックされているカードかチェック
-    if (cardState.collabLocked) {
+    window.debugLog(`🔍 [canMoveFromCollab] チェック開始: ${card?.name}`);
+    
+    // シンプルチェック：カードのcardState.collabLockedを確認
+    if (card && card.cardState && card.cardState.collabLocked === true) {
+      window.debugLog(`🔍 [canMoveFromCollab] コラボロック検出: ${card.name}`);
       return {
         valid: false,
         reason: 'コラボしたホロメンは次のリセットステップまで移動できません'
       };
     }
-
+    
+    // Battle Engineからも確認
+    if (this.battleEngine && this.battleEngine.players[playerId]) {
+      const collabCard = this.battleEngine.players[playerId].collab;
+      if (collabCard && collabCard.name === card.name && 
+          collabCard.cardState && collabCard.cardState.collabLocked === true) {
+        window.debugLog(`🔍 [canMoveFromCollab] Battle Engineでコラボロック検出: ${collabCard.name}`);
+        return {
+          valid: false,
+          reason: 'コラボしたホロメンは次のリセットステップまで移動できません'
+        };
+      }
+    }
+    
+    window.debugLog(`🔍 [canMoveFromCollab] 移動許可: ${card?.name}`);
     return {
       valid: true,
       reason: '移動可能'

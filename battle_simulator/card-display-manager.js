@@ -107,8 +107,16 @@ class CardDisplayManager {
           break;
         case 'collab':
           if (cards) {
-            // console.log(`🎨 コラボポジションにカード表示: ${cards.name}`);
+            console.log(`🎨 コラボポジションにカード表示: ${cards.name}`, cards);
+            console.log(`🎨 コラボ画像URL: ${cards.image_url}`);
+            console.log(`🎨 コラボカード状態:`, cards.cardState);
+            console.log(`🎨 コラボエール枚数: ${cards.yellCards?.length || 0}枚`);
+            if (!cards.cardState) {
+              console.warn(`⚠️ コラボカードに状態情報がありません:`, cards);
+            }
             cardsToDisplay = [cards];
+          } else {
+            console.log('🎨 コラボポジションにカードなし');
           }
           displayType = 'single';
           break;
@@ -817,6 +825,145 @@ class CardDisplayManager {
     } else if (counter) {
       counter.remove();
     }
+  }
+
+  /**
+   * 個別カードの表示を即座に更新
+   * @param {Object} card - カードオブジェクト
+   * @param {string} position - カードの位置
+   * @param {number} playerId - プレイヤーID
+   */
+  updateCardDisplay(card, position, playerId) {
+    if (!card || !position || !playerId) return;
+    
+    console.log(`🔄 [Card Display] 個別カード更新: ${card.name} at ${position} (player ${playerId})`);
+    console.log(`🔄 [Card Display] カード状態: isResting=${card.isResting}, cardState.resting=${card.cardState?.resting}`);
+    
+    // バックポジションの場合の特別処理
+    if (position.startsWith('back')) {
+      this.updateBackCardDisplay(card, position, playerId);
+      return;
+    }
+    
+    // コラボポジションの場合の特別処理
+    if (position === 'collab') {
+      this.updateCollabCardDisplay(card, playerId);
+      return;
+    }
+    
+    // その他のエリアの処理（必要に応じて追加）
+    console.log(`🔄 [Card Display] ${position}エリアの個別更新は未実装`);
+  }
+
+  /**
+   * コラボエリアの個別カード表示を更新
+   * @param {Object} card - カードオブジェクト
+   * @param {number} playerId - プレイヤーID
+   */
+  updateCollabCardDisplay(card, playerId) {
+    const sectionClass = playerId === 1 ? '.battle-player' : '.battle-opponent';
+    const collabArea = document.querySelector(`${sectionClass} .collab`);
+    
+    if (!collabArea) {
+      console.warn(`🔄 [Card Display] コラボエリアが見つかりません (player ${playerId})`);
+      return;
+    }
+    
+    // 既存のカード要素を取得
+    const existingCardElement = collabArea.querySelector('.card');
+    if (!existingCardElement) {
+      console.warn(`🔄 [Card Display] コラボエリアにカード要素が見つかりません`);
+      // 要素がない場合は全体更新に委ねる
+      this.updateCardAreas();
+      return;
+    }
+    
+    // お休み状態のクラス管理
+    if (card.isResting || card.cardState?.resting) {
+      existingCardElement.classList.add('resting');
+      console.log(`🔄 [Card Display] コラボ restingクラス追加: ${card.name}`);
+    } else {
+      existingCardElement.classList.remove('resting');
+      console.log(`🔄 [Card Display] コラボ restingクラス削除: ${card.name}`);
+    }
+    
+    // カード画像の更新
+    if (card.image_url) {
+      existingCardElement.style.backgroundImage = `url(${card.image_url})`;
+      existingCardElement.style.backgroundSize = 'cover';
+      existingCardElement.style.backgroundPosition = 'center';
+      existingCardElement.style.backgroundRepeat = 'no-repeat';
+      console.log(`🔄 [Card Display] コラボ画像更新: ${card.image_url}`);
+    }
+    
+    // data属性の更新
+    existingCardElement.setAttribute('data-card-name', card.name || '不明なカード');
+    existingCardElement.setAttribute('data-card-id', card.id);
+    
+    // 強制的にレンダリングを再実行
+    existingCardElement.style.display = 'none';
+    existingCardElement.offsetHeight; // リフロー強制
+    existingCardElement.style.display = '';
+    
+    console.log(`🔄 [Card Display] コラボ個別カード更新完了: ${card.name}`);
+  }
+
+  /**
+   * バックエリアの個別カード表示を更新
+   * @param {Object} card - カードオブジェクト
+   * @param {string} position - カードの位置（back1, back2など）
+   * @param {number} playerId - プレイヤーID
+   */
+  updateBackCardDisplay(card, position, playerId) {
+    const sectionClass = playerId === 1 ? '.battle-player' : '.battle-opponent';
+    const slotIndex = parseInt(position.replace('back', '')) - 1; // back1 -> 0, back2 -> 1...
+    
+    // 該当するバックスロットを取得
+    const backSlots = document.querySelectorAll(`${sectionClass} .back-slot`);
+    if (!backSlots[slotIndex]) {
+      console.warn(`🔄 [Card Display] バックスロット${slotIndex + 1}が見つかりません`);
+      return;
+    }
+    
+    const slot = backSlots[slotIndex];
+    
+    // 既存のカード要素を取得
+    const existingCardElement = slot.querySelector('.card');
+    if (!existingCardElement) {
+      console.warn(`🔄 [Card Display] バックスロット${slotIndex + 1}にカード要素が見つかりません`);
+      // 要素がない場合は全体更新に委ねる
+      this.updateBackSlots(playerId === 1 ? 'player' : 'cpu');
+      return;
+    }
+    
+    // お休み状態のクラス管理（直接CSSクラスを制御）
+    if (card.isResting || card.cardState?.resting) {
+      existingCardElement.classList.add('resting');
+      console.log(`🔄 [Card Display] restingクラス追加: ${position} - ${card.name}`);
+    } else {
+      existingCardElement.classList.remove('resting');
+      console.log(`🔄 [Card Display] restingクラス削除: ${position} - ${card.name}`);
+    }
+    
+    // カード画像の更新
+    const cardImg = existingCardElement.querySelector('img');
+    if (cardImg && card.image_url) {
+      cardImg.src = card.image_url;
+      cardImg.alt = card.name;
+    }
+    
+    // カード名の更新
+    const cardName = existingCardElement.querySelector('.card-name');
+    if (cardName) {
+      cardName.textContent = card.name;
+    }
+    
+    // 強制的にレンダリングを再実行
+    existingCardElement.style.display = 'none';
+    existingCardElement.offsetHeight; // リフロー強制
+    existingCardElement.style.display = '';
+    
+    console.log(`🔄 [Card Display] バック個別カード更新完了: ${card.name} (resting: ${existingCardElement.classList.contains('resting')})`);
   }
 }
 
