@@ -238,9 +238,11 @@ class CardDisplayManager {
     cardElement.style.zIndex = '100';
     cardElement.style.position = 'relative';
     
-    // 横向き状態の判定
+    // 横向き状態の判定と適切なクラス管理
     if (card && card.isResting) {
       cardElement.classList.add('resting');
+    } else {
+      cardElement.classList.remove('resting');
     }
     
     // ホロパワーエリアのカードに回転クラスを追加

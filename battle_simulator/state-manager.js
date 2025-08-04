@@ -530,6 +530,12 @@ class HololiveStateManager {
                   ]
                 });
                 
+                // お休み状態（isResting）も引き継ぎ
+                if (existingCard.isResting) {
+                  newCard.isResting = existingCard.isResting;
+                  window.debugLog(`✅ ブルーム時にお休み状態を引き継ぎました (BACK): ${newCard.name} (isResting: ${newCard.isResting})`);
+                }
+                
                 // エール引き継ぎを確実にする追加処理
                 if (existingCard.yellCards && existingCard.yellCards.length > 0) {
                   newCard.yellCards = [...existingCard.yellCards];
@@ -574,6 +580,12 @@ class HololiveStateManager {
                   ]
                 });
                 
+                // お休み状態（isResting）も引き継ぎ
+                if (existingCard.isResting) {
+                  newCard.isResting = existingCard.isResting;
+                  window.debugLog(`✅ ブルーム時にお休み状態を引き継ぎました (CENTER): ${newCard.name} (isResting: ${newCard.isResting})`);
+                }
+                
                 // エール引き継ぎを確実にする追加処理
                 if (existingCard.yellCards && existingCard.yellCards.length > 0) {
                   newCard.yellCards = [...existingCard.yellCards];
@@ -595,8 +607,58 @@ class HololiveStateManager {
                 });
                 player.center = newCard; // 直接プロパティアクセス
               }
+            } else if (payload.position === 'collab') {
+              // コラボポジションの場合
+              const existingCard = battleEnginePlayer?.collab || player.collab;
+              if (existingCard) {
+                // ブルーム: 新しいカードを上に重ね、下のカードをstackedCardsに移動
+                window.debugLog(`[PLACE_CARD/COLLAB] ブルーム処理開始: ${existingCard.name} → ${payload.card.name}`);
+                window.debugLog(`[PLACE_CARD/COLLAB] 新しいカード画像URL: ${payload.card.image_url}`);
+                
+                const newCard = this.addCardState(payload.card, {
+                  bloomedThisTurn: true,
+                  playedTurn: newState.turn.turnCount,
+                  bloomedFromCard: existingCard,
+                  // 既存カードから状態を引き継ぎ
+                  resting: existingCard.cardState?.resting || false,
+                  damage: existingCard.cardState?.damage || 0,
+                  yellCards: existingCard.yellCards || existingCard.cardState?.yellCards || [],
+                  supportCards: existingCard.cardState?.supportCards || [],
+                  stackedCards: [
+                    ...(existingCard.cardState?.stackedCards || []),
+                    existingCard
+                  ]
+                });
+                
+                // お休み状態（isResting）も引き継ぎ
+                if (existingCard.isResting) {
+                  newCard.isResting = existingCard.isResting;
+                  window.debugLog(`✅ ブルーム時にお休み状態を引き継ぎました (COLLAB): ${newCard.name} (isResting: ${newCard.isResting})`);
+                }
+                
+                // エール引き継ぎを確実にする追加処理
+                if (existingCard.yellCards && existingCard.yellCards.length > 0) {
+                  newCard.yellCards = [...existingCard.yellCards];
+                  window.debugLog(`[PLACE_CARD/COLLAB] エール引継ぎ: ${existingCard.yellCards.length}枚`);
+                }
+                
+                // 新しいカードの情報を確認
+                window.debugLog(`[PLACE_CARD/COLLAB] 配置完了: ${newCard.name}, 画像URL: ${newCard.image_url}`);
+                
+                player.collab = newCard; // 直接プロパティアクセス
+                
+                // ブルーム完了フラグを設定
+                this.bloomCompleted = true;
+              } else {
+                // 通常配置
+                const newCard = this.addCardState(payload.card, {
+                  playedTurn: newState.turn.turnCount,
+                  playedByPlayer: payload.player
+                });
+                player.collab = newCard; // 直接プロパティアクセス
+              }
             } else {
-              // その他のポジション（コラボなど）
+              // その他のポジション
               player.cards[payload.position] = payload.card;
             }
             
@@ -850,6 +912,13 @@ class HololiveStateManager {
     // 状態情報を更新
     Object.assign(cardWithState.cardState, stateInfo);
     
+    // isRestingプロパティとcardState.restingを同期
+    if (stateInfo.resting !== undefined) {
+      cardWithState.isResting = stateInfo.resting;
+    } else if (cardWithState.isResting !== undefined) {
+      cardWithState.cardState.resting = cardWithState.isResting;
+    }
+    
     // エール情報をカードの直接プロパティにも設定（UI表示用）
     if (cardWithState.cardState.yellCards && cardWithState.cardState.yellCards.length > 0) {
       cardWithState.yellCards = [...cardWithState.cardState.yellCards];
@@ -870,11 +939,13 @@ class HololiveStateManager {
    */
   getCardState(card) {
     if (!card || !card.cardState) {
+      // カードに直接設定されているisRestingプロパティもチェック
+      const isResting = card?.isResting || false;
       return {
         bloomedThisTurn: false,
         justPlayed: false,
         collabLocked: false,
-        resting: false,
+        resting: isResting, // card.isRestingの値を反映
         playedTurn: null,
         bloomedFromCard: null,
         damage: 0,
@@ -884,7 +955,14 @@ class HololiveStateManager {
         uniqueId: null
       };
     }
-    return card.cardState;
+    
+    // cardStateが存在する場合は、isRestingプロパティとcardState.restingを統合
+    const cardState = { ...card.cardState };
+    if (card.isResting !== undefined) {
+      cardState.resting = card.isResting;
+    }
+    
+    return cardState;
   }
 
   /**

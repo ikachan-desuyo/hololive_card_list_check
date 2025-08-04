@@ -816,6 +816,12 @@ class HandManager {
           };
         }
         
+        // お休み状態（isResting）を引き継ぎ
+        if (targetCard && targetCard.isResting) {
+          cardCopy.isResting = targetCard.isResting;
+          window.debugLog(`✅ ブルーム時にお休み状態を引き継ぎました: ${cardCopy.name} (isResting: ${cardCopy.isResting})`);
+        }
+        
         // ブルーム後のカード情報をログ出力
         window.debugLog(`ブルーム実行: ${targetCard.name} (${targetCard.bloom_level}) → ${cardCopy.name} (${cardCopy.bloom_level})`);
         window.debugLog(`新しいカード画像URL: ${cardCopy.image_url}`);

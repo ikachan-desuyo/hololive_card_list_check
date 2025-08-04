@@ -163,57 +163,51 @@ class PhaseController {
     
     const player = this.battleEngine.players[playerId];
     
-    // コラボのホロメンカードを横向きにしてバックに移動
+    // 1. まず、バックにお休みになっているホロメンカードを通常に戻す
+    const backPositions = ['back1', 'back2', 'back3', 'back4', 'back5'];
+    console.log(`🔄 リセットステップ: プレイヤー${playerId}のバック状態をチェック`);
+    backPositions.forEach(pos => {
+      if (player[pos]) {
+        console.log(`📍 ${pos}: ${player[pos].name}, isResting: ${player[pos].isResting}`);
+        if (player[pos].isResting) {
+          player[pos].isResting = false;
+          console.log(`✅ ${player[pos].name}を縦向きに戻しました（リセットステップ開始時）`);
+        }
+      }
+    });
+    
+    // 2. コラボのホロメンカードを横向きにしてバックに移動
     if (player.collab) {
       const collabCard = player.collab
       collabCard.isResting = true; // 横向き状態をマーク
       
+      // cardState.restingも同期
+      if (collabCard.cardState) {
+        collabCard.cardState.resting = true;
+      } else {
+        collabCard.cardState = { resting: true };
+      }
+      
+      console.log(`🛌 コラボカードをお休み状態にしました: ${collabCard.name} (isResting: ${collabCard.isResting}, cardState.resting: ${collabCard.cardState.resting})`);
+      
       // 空いているバックスロットを探す
-      const backPositions = ['back1', 'back2', 'back3', 'back4', 'back5'];
       for (let pos of backPositions) {
         if (!player[pos]) {
           player[pos] = collabCard;
-          player.collab= null;
+          player.collab = null;
           console.log(`${collabCard.name}をコラボからバック(${pos})に移動（横向き）`);
           break;
         }
       }
     }
     
-    // コラボが空の場合：バックの横向きホロメンカードをチェック
-    if (!player.collab) {
-      const backPositions = ['back1', 'back2', 'back3', 'back4', 'back5'];
-      let hasRestingCard = false;
-      
-      // 横向きのホロメンカードがあるかチェック
-      backPositions.forEach(pos => {
-        if (player[pos] && player[pos].isResting) {
-          hasRestingCard = true;
-        }
-      });
-      
-      if (hasRestingCard) {
-        // 横向きカードがある場合は縦に戻す
-        backPositions.forEach(pos => {
-          if (player[pos] && player[pos].isResting) {
-            player[pos].isResting = false;
-            console.log(`${player[pos].name}を縦向きに戻しました`);
-          }
-        });
-      } else {
-        // 横向きカードがない場合は特に処理なし
-        console.log('横向きのホロメンカードがないため、特に処理を行いません');
+    // UI更新前の最終状態確認
+    console.log(`🎨 UI更新前の最終状態確認:`);
+    backPositions.forEach(pos => {
+      if (player[pos]) {
+        console.log(`📍 ${pos}: ${player[pos].name}, isResting: ${player[pos].isResting}`);
       }
-    } else {
-      // コラボにカードがある場合は通常通りバックの横向きカードを縦に戻す
-      const backPositions = ['back1', 'back2', 'back3', 'back4', 'back5'];
-      backPositions.forEach(pos => {
-        if (player[pos] && player[pos].isResting) {
-          player[pos].isResting = false;
-          console.log(`${player[pos].name}を縦向きに戻しました`);
-        }
-      });
-    }
+    });
     
     // UI更新
     this.battleEngine.updateUI();
