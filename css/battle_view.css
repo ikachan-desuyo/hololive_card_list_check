@@ -220,15 +220,22 @@ body {
   grid-column: 6;
   grid-row: 1;
   writing-mode: horizontal-tb;
-  transform: rotate(90deg);
+  transform: rotate(90deg); /* 90度回転を復元 */
   font-size: 10px;
+  display: flex;
+  flex-direction: row; /* 横方向（X軸）に並べる */
+  align-items: center;
+  justify-content: center; /* 中央揃えに変更 */
+  padding: 10px;
+  overflow: visible;
+  height: 180px; /* 明示的な高さを設定 */
 }
 
 /* ホロパワーエリアのホバー効果（回転を維持） */
 .holo:hover {
   background: rgba(255, 255, 255, 0.15);
   border-color: rgba(255, 255, 255, 0.6);
-  transform: rotate(90deg) translateX(-2px);
+  transform: rotate(90deg) translateX(-2px); /* 90度回転を復元 */
   box-shadow: 0 4px 15px rgba(0, 0, 0, 0.2);
 }
 
@@ -323,7 +330,7 @@ body {
   position: relative;
   cursor: pointer;
   transition: all 0.3s ease;
-  background-size: cover;
+  background-size: contain; /* テスト: coverからcontainに変更して画像の切れを防ぐ */
   background-position: center;
   background-repeat: no-repeat;
   z-index: 20; /* ホロメンカードを確実に前面に配置 */
@@ -406,15 +413,17 @@ body {
 .holo-power-card {
   width: 120px;  /* 統一サイズに変更 */
   height: 168px; /* 統一サイズに変更 */
-  transform: rotate(180deg);
-  margin: 2px 0;
-  /* 注意: position/display/marginはJavaScript(card-display-manager.js)で動的設定されます */
+  transform: rotate(0deg); /* 回転なし */
+  margin: 0 -80px; /* 横方向（X軸）に重ねて表示 */
+  display: block;
+  position: relative;
+  /* 注意: z-indexはJavaScript(card-display-manager.js)で動的設定されます */
 }
 
-/* ホロパワーカードのホバー効果（回転を維持） */
+/* ホロパワーカードのホバー効果 */
 .holo .card:hover,
 .holo-power-card:hover {
-  transform: rotate(180deg) scale(1.05);
+  transform: rotate(0deg) scale(1.05); /* 回転なしでスケールのみ */
   z-index: 20; /* ホバー時はさらに前面に */
   box-shadow: 0 4px 20px rgba(0, 0, 0, 0.5);
 }

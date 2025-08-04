@@ -140,7 +140,7 @@ class CardDisplayManager {
         break;
       case 'holo':
         cardsToDisplay = cards || [];
-        displayType = 'spread';
+        displayType = 'stack';
         break;
       case 'deck':
         cardsToDisplay = (cards || []).slice(0, 3); // 上3枚のみ表示
@@ -394,11 +394,11 @@ class CardDisplayManager {
         cardElement.style.zIndex = `${20 - cardIndex}`; // 上のカードほど前面に（動的計算）
         break;
       case 'holo':
-        // ホロパワーの展開表示（CSSのrotate(90deg)を維持）
+        // ホロパワーの縦スタック表示（エリア自体が90度回転済み）
+        cardElement.style.zIndex = `${20 - cardIndex}`; // 上のカードほど前面に
         cardElement.style.position = 'relative';
-        cardElement.style.display = 'inline-block';
-        cardElement.style.margin = '2px';
-        // transform: rotate(90deg) はCSSで設定済みなので、ここでは上書きしない
+        cardElement.style.display = 'block';
+        // margin: -60px 0 はCSSで設定済み
         break;
       default:
         // その他（センター、推し、バック）は単体表示
