@@ -626,9 +626,9 @@ class CardDisplayManager {
         // バック配置：ホロメンカードの背後に、上部が少しはみ出るように配置
         // 左右は同じ場所、上下は上にずらして重ねる
         const offsetX = 0; // 左右は同じ場所
-        const offsetY = -20 - (index * 8); // 上により大きくはみ出し
+        const offsetY = -20 - (index * 15); // 上により大きくはみ出し
         yellElement.style.transform = `translate(${offsetX}px, ${offsetY}px) scale(1)`;
-        yellElement.style.zIndex = `${5 + index}`; // 通常時は後ろに、ホバー時はCSSで250に
+        yellElement.style.zIndex = `${5 - index}`; // 後ろのエールほど低いz-index、ホバー時はCSSで250に
       } else {
         // その他のエリア：左下にずらして重ねる  
         const offsetX = -8 - (index * 3);
@@ -738,9 +738,9 @@ class CardDisplayManager {
         // バック配置：ホロメンカードの背後に、上部が少しはみ出るように配置
         // 左右は同じ場所、上下は上にずらして重ねる
         const offsetX = 0; // 左右は同じ場所
-        const offsetY = -20 - (index * 8); // 上により大きくはみ出し
+        const offsetY = -20 - (index * 15); // 上により大きくはみ出し
         yellElement.style.transform = `translate(${offsetX}px, ${offsetY}px) scale(1)`;
-        yellElement.style.zIndex = `${5 + index}`; // 通常時は後ろに、ホバー時はCSSで250に
+        yellElement.style.zIndex = `${5 - index}`; // 後ろのエールほど低いz-index、ホバー時はCSSで250に
       } else {
         // その他のエリア：左下にずらして重ねる  
         const offsetX = -8 - (index * 3);
