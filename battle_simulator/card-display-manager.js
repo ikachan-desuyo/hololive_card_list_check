@@ -545,9 +545,11 @@ class CardDisplayManager {
     yellContainer.className = 'yell-cards';
     yellContainer.setAttribute('data-card-index', cardIndex);
     
-    // センターかバックかで配置を変える
-    if (areaId === 'collab' || areaId === 'center') {
+    // センター、コラボ、バックで配置を変える
+    if (areaId === 'center') {
       yellContainer.classList.add('center');
+    } else if (areaId === 'collab') {
+      yellContainer.classList.add('collab');
     } else {
       yellContainer.classList.add('back');
     }
@@ -595,12 +597,19 @@ class CardDisplayManager {
       yellElement.style.width = '120px'; // 他のカードと同じサイズに統一
       yellElement.style.height = '168px'; // 他のカードと同じサイズに統一
       
-      // センターとバックで異なる重なり方（ホロメンカードから少しずらす）
-      if (areaId === 'collab' || areaId === 'center') {
+      // センター、コラボ、バックで異なる重なり方（ホロメンカードから少しずらす）
+      if (areaId === 'center') {
         // センター配置：ホロメンカードの下に、右部分が少しはみ出るように配置
         // 上下は同じ高さ、左右は右にずらして重ねる
         const offsetX = -100 + (index * 25); // 右にもっと大きくはみ出し
         const offsetY = 0; // 上下は同じ高さ
+        yellElement.style.transform = `translate(${offsetX}px, ${offsetY}px) scale(1)`;
+        yellElement.style.zIndex = `${5 - index}`; // 通常時は後ろに、ホバー時はCSSで250に
+      } else if (areaId === 'collab') {
+        // コラボ配置：ホロメンカードの左下に、左下部分が少しはみ出るように配置
+        // センターとは異なる独自の配置
+        const offsetX = -30 - (index * 15); // 左にずらして重ねる
+        const offsetY = 20 + (index * 10); // 下にずらして重ねる
         yellElement.style.transform = `translate(${offsetX}px, ${offsetY}px) scale(1)`;
         yellElement.style.zIndex = `${5 - index}`; // 通常時は後ろに、ホバー時はCSSで250に
       } else if (areaId === 'backs') {
@@ -658,7 +667,7 @@ class CardDisplayManager {
     yellContainer.className = 'yell-cards';
     
     // センターかバックかで配置を変える
-    if (areaId === 'collab' || areaId === 'center') {
+    if (areaId === 'center') {
       yellContainer.classList.add('center');
     } else {
       yellContainer.classList.add('back');
@@ -708,7 +717,7 @@ class CardDisplayManager {
       yellElement.style.height = '168px'; // 他のカードと同じサイズに統一
       
       // センターとバックで異なる重なり方（ホロメンカードから少しずらす）
-      if (areaId === 'collab' || areaId === 'center') {
+      if (areaId === 'center') {
         // センター配置：ホロメンカードの下に、右部分が少しはみ出るように配置
         // 上下は同じ高さ、左右は右にずらして重ねる
         const offsetX = -100 + (index * 25); // 右にもっと大きくはみ出し

@@ -375,6 +375,14 @@ class PhaseController {
   executeMainStep(playerId) {
     console.log(`プレイヤー${playerId}のメインステップ`);
     
+    // メインステップ開始時にターン制限フラグをリセット（確実にリセットするため）
+    if (this.battleEngine.stateManager) {
+      this.battleEngine.stateManager.updateState('RESET_TURN_FLAGS', {
+        player: playerId
+      });
+      window.debugLog(`🔄 [executeMainStep] プレイヤー${playerId}のメインステップ開始時にフラグリセット`);
+    }
+    
     // 統合ログを記録
     if (window.infoPanelManager) {
       const playerName = playerId === 1 ? 'プレイヤー' : '対戦相手';

@@ -447,10 +447,25 @@ class HandManager {
     if (isCollabMove) {
       // State Managerでの移動可能性事前チェック
       if (this.battleEngine.stateManager) {
+        // デバッグ: 現在の状態を詳しく確認
+        const playerState = this.battleEngine.stateManager.state.players[playerId];
+        const currentTurn = this.battleEngine.stateManager.state.turn.currentPlayer;
+        const currentPhase = this.battleEngine.stateManager.state.turn.currentPhase;
+        
+        window.debugLog(`🔍 [コラボチェック] プレイヤー${playerId}, 現在ターン: ${currentTurn}, フェーズ: ${currentPhase}`);
+        window.debugLog(`🔍 [コラボチェック] collabMovedThisTurn: ${playerState.gameState.collabMovedThisTurn}`);
+        
         const collabCheck = this.battleEngine.stateManager.canMoveToCollab(sourceCard, playerId);
         
         if (!collabCheck.valid) {
           window.warnLog(`⚠️ コラボ移動拒否: ${collabCheck.reason}`);
+          // デバッグ情報も含めたエラーメッセージ
+          const debugInfo = `
+              プレイヤー: ${playerId} (現在ターン: ${currentTurn})
+              フェーズ: ${currentPhase}
+              コラボフラグ: ${playerState.gameState.collabMovedThisTurn}
+              理由: ${collabCheck.reason}`;
+                        console.log('コラボ移動チェック詳細:', debugInfo);
           alert(`コラボ移動不可:\n${collabCheck.reason}`);
           return false;
         }

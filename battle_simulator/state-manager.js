@@ -281,10 +281,14 @@ class HololiveStateManager {
           
           // ターン制限フラグもリセット
           if (player.gameState) {
+            const oldFlag = player.gameState.collabMovedThisTurn;
             player.gameState.collabMovedThisTurn = false;
+            window.debugLog(`🔄 [RESET_TURN_FLAGS] プレイヤー${payload.player}: collabMovedThisTurn ${oldFlag} → false`);
           }
           
-          window.debugLog(`プレイヤー${payload.player}のターン制限フラグをリセット`);
+          window.debugLog(`🔄 [RESET_TURN_FLAGS] プレイヤー${payload.player}のターン制限フラグをリセット完了`);
+        } else {
+          window.warnLog(`⚠️ [RESET_TURN_FLAGS] プレイヤー${payload.player}が見つかりません`);
         }
         break;
         
@@ -426,18 +430,6 @@ class HololiveStateManager {
             // Battle Engineでの実際の交換実行
             window.debugLog(`🔧 Battle Engine交換実行中...`);
             
-            // Battle Engineオブジェクトの診断
-            window.debugLog('🔍 [診断] Battle Engineプロパティ確認:');
-            window.debugLog(`  - battleEnginePlayer === battleEngine.players[${payload.player}]:`, battleEnginePlayer === battleEngine.players[payload.player]);
-            window.debugLog(`  - battleEnginePlayerタイプ:`, typeof battleEnginePlayer);
-            window.debugLog(`  - Battle Engineプロパティ書き込み可能性チェック:`);
-            
-            // プロパティの詳細チェック
-            const sourceDescriptor = Object.getOwnPropertyDescriptor(battleEnginePlayer, payload.sourcePosition);
-            const targetDescriptor = Object.getOwnPropertyDescriptor(battleEnginePlayer, payload.targetPosition);
-            window.debugLog(`  - ${payload.sourcePosition}プロパティ:`, sourceDescriptor);
-            window.debugLog(`  - ${payload.targetPosition}プロパティ:`, targetDescriptor);
-            
             // 一時的にカードを保存してから交換
             const tempSourceCard = battleEnginePlayer[payload.sourcePosition];
             const tempTargetCard = battleEnginePlayer[payload.targetPosition];
@@ -446,24 +438,39 @@ class HololiveStateManager {
             window.debugLog(`  - tempSourceCard (${payload.sourcePosition}): ${tempSourceCard?.name || 'null'}`);
             window.debugLog(`  - tempTargetCard (${payload.targetPosition}): ${tempTargetCard?.name || 'null'}`);
             
-            // Battle Engineのgettervsetterによる問題を解決するため、専用メソッドを使用
-            window.debugLog('� [Battle Engine専用メソッド] swapCards実行...');
-            try {
-                // Battle Engineの専用swapCardsメソッドを使用
-                const swapResult = battleEngine.swapCards(
-                    tempSourceCard, 
-                    payload.sourcePosition, 
-                    tempTargetCard, 
-                    payload.targetPosition, 
-                    payload.player
-                );
-                window.debugLog('✅ Battle Engine swapCards実行完了:', swapResult);
-            } catch (error) {
-                window.errorLog('❌ [Battle Engine swapCards エラー]:', error);
-                // フォールバック: 直接代入を試行
-                window.debugLog('🔧 [フォールバック] 直接代入を試行...');
+            // コラボ移動の場合は、HandManagerで既にチェック済みなので直接交換
+            const isCollabMove = payload.targetPosition === 'collab' && payload.sourcePosition.startsWith('back');
+            
+            if (isCollabMove) {
+              window.debugLog('🤝 [コラボ移動] 直接交換実行（二重チェック回避）');
+              // 直接代入でコラボ移動を実行
+              try {
                 battleEnginePlayer[payload.targetPosition] = tempSourceCard;
                 battleEnginePlayer[payload.sourcePosition] = tempTargetCard;
+                window.debugLog('✅ コラボ移動直接交換完了');
+              } catch (error) {
+                window.errorLog('❌ [コラボ移動直接交換エラー]:', error);
+              }
+            } else {
+              // 通常の交換処理
+              window.debugLog('🔄 [通常交換] Battle Engine swapCards実行...');
+              try {
+                  // Battle Engineの専用swapCardsメソッドを使用
+                  const swapResult = battleEngine.swapCards(
+                      tempSourceCard, 
+                      payload.sourcePosition, 
+                      tempTargetCard, 
+                      payload.targetPosition, 
+                      payload.player
+                  );
+                  window.debugLog('✅ Battle Engine swapCards実行完了:', swapResult);
+              } catch (error) {
+                  window.errorLog('❌ [Battle Engine swapCards エラー]:', error);
+                  // フォールバック: 直接代入を試行
+                  window.debugLog('🔧 [フォールバック] 直接代入を試行...');
+                  battleEnginePlayer[payload.targetPosition] = tempSourceCard;
+                  battleEnginePlayer[payload.sourcePosition] = tempTargetCard;
+              }
             }
             
             window.debugLog(`🔍 [交換直後] 値確認:`);
@@ -1715,6 +1722,12 @@ class HololiveStateManager {
    */
   canMoveToCollab(card, playerId) {
     const playerState = this.state.players[playerId];
+    const currentTurn = this.state.turn.currentPlayer;
+
+    // デバッグ: 詳細なターン状態を記録
+    window.debugLog(`🔍 [canMoveToCollab] プレイヤー${playerId}のコラボ移動チェック`);
+    window.debugLog(`🔍 [canMoveToCollab] 現在ターンプレイヤー: ${currentTurn}`);
+    window.debugLog(`🔍 [canMoveToCollab] collabMovedThisTurn: ${playerState.gameState.collabMovedThisTurn}`);
 
     // 1. ホロメンカードのみがコラボに移動可能
     if (!card.card_type?.includes('ホロメン')) {
@@ -1724,7 +1737,15 @@ class HololiveStateManager {
       };
     }
 
-    // 2. このターンに既にコラボ移動を実行したかチェック
+    // 2. 現在のターンプレイヤーのみがコラボ移動可能
+    if (playerId !== currentTurn) {
+      return {
+        valid: false,
+        reason: '自分のターンでないとコラボ移動できません'
+      };
+    }
+
+    // 3. このターンに既にコラボ移動を実行したかチェック
     if (playerState.gameState.collabMovedThisTurn) {
       return {
         valid: false,
@@ -1793,7 +1814,11 @@ class HololiveStateManager {
    * @returns {Object} 更新されたカード
    */
   recordCollabMove(card, playerId) {
-    window.debugLog(`🤝 プレイヤー${playerId}のコラボ移動を記録: ${card.name}`);
+    const currentTurn = this.state.turn.currentPlayer;
+    const currentFlag = this.state.players[playerId].gameState.collabMovedThisTurn;
+    
+    window.debugLog(`🤝 [recordCollabMove] プレイヤー${playerId}のコラボ移動を記録: ${card.name}`);
+    window.debugLog(`🤝 [recordCollabMove] 現在ターン: ${currentTurn}, 現在フラグ: ${currentFlag}`);
     
     // プレイヤーの状態を更新
     this.updateState('UPDATE_PLAYER_GAME_STATE', {
@@ -1802,7 +1827,11 @@ class HololiveStateManager {
       value: true
     });
     
-    window.debugLog(`✅ collabMovedThisTurn = true に設定`);
+    // 更新後の状態を確認
+    const updatedFlag = this.state.players[playerId].gameState.collabMovedThisTurn;
+    window.debugLog(`🤝 [recordCollabMove] フラグ更新: ${currentFlag} → ${updatedFlag}`);
+    
+    window.debugLog(`✅ collabMovedThisTurn = true に設定完了`);
     
     // カードにコラボロック状態を付与
     const updatedCard = this.addCardState(card, {
