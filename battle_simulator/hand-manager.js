@@ -335,8 +335,10 @@ class HandManager {
     // カードオブジェクトのディープコピーを作成
     const cardCopy = JSON.parse(JSON.stringify(card));
     
-    // エールカードリストを独立したオブジェクトとして初期化
-    cardCopy.yellCards = [];
+    // エールカードリストを保持（既存のものがあれば維持、なければ初期化）
+    if (!cardCopy.yellCards) {
+      cardCopy.yellCards = [];
+    }
     
     // 回転状態などの状態情報を保持
     if (card.isResting) {
@@ -396,23 +398,103 @@ class HandManager {
       alert(`⚠️ カード交換不可\n\n${placementCheck.reason}`);
       return false;
     }
-
-    // State Managerで交換可能性をチェック
-    const swapCheck = this.battleEngine.stateManager.checkSwapValidity(
-      sourceCard, sourcePosition, targetCard, targetPosition, playerId
-    );
     
-    if (!swapCheck.valid) {
-      alert(`⚠️ カード交換不可\n\n${swapCheck.reason}`);
-      return false;
-    }
-    
-    // 特別なケースの処理
+    // 特別なケースの判定
     const isBloom = targetCard && this.battleEngine.placementController.isBloomMove(sourceCard, targetCard);
     const isCollabMove = targetPosition === 'collab' && sourcePosition.startsWith('back');
     
     // 実際の交換処理
     const player = this.battleEngine.players[playerId];
+    
+    // コラボ移動の場合は専用処理を先に実行
+    if (isCollabMove) {
+      // State Managerでの移動可能性事前チェック
+      if (this.battleEngine.stateManager) {
+        const collabCheck = this.battleEngine.stateManager.canMoveToCollab(sourceCard, playerId);
+        
+        if (!collabCheck.valid) {
+          console.warn(`⚠️ コラボ移動拒否: ${collabCheck.reason}`);
+          alert(`コラボ移動不可:\n${collabCheck.reason}`);
+          return false;
+        }
+      }
+      
+      // 【公式ルール準拠】コラボ手順：
+      // 1. 先にホロパワーカード配置を実行
+      const holoPowerPlaced = this.placeHoloPowerFromDeck(playerId);
+      
+      if (!holoPowerPlaced) {
+        // ホロパワー配置に失敗した場合、コラボ移動を中止
+        console.error('ホロパワー配置失敗のためコラボ移動を中止');
+        return false;
+      }
+      
+      // 2. 移動元カードのエール情報を保持（Battle Engineのplayerオブジェクトを使用）
+      const battleEnginePlayer = this.battleEngine.players[playerId];
+      let originalCard = battleEnginePlayer[sourcePosition];
+      
+      // カードが見つからない場合、sourceCardを代替として使用
+      if (!originalCard && sourceCard) {
+        console.warn(`⚠️ Battle Engineでカードが見つからないため、sourceCardを使用: ${sourceCard.name}`);
+        originalCard = sourceCard;
+      }
+      
+      if (!originalCard) {
+        console.error(`❌ コラボ移動エラー: ${sourcePosition}にカードがありません`);
+        return false;
+      }
+      
+      console.log(`🔄 コラボ移動: ${originalCard?.name} (エール: ${originalCard?.yellCards?.length || 0}枚)`);
+      
+      // 3. コラボ移動の記録（カード状態ベース）
+      const updatedSourceCard = this.battleEngine.stateManager.recordCollabMove(sourceCard, playerId);
+      
+      // 4. エール情報を新しいカードに確実に引き継ぎ
+      if (originalCard?.yellCards && Array.isArray(originalCard.yellCards)) {
+        updatedSourceCard.yellCards = [...originalCard.yellCards];
+        console.log(`✅ コラボ移動: エール引継ぎ ${originalCard.yellCards.length}枚`);
+      }
+      
+      // 5. コラボ移動実行（SWAP_CARDSで実際の移動を行う）
+      console.log(`🔄 コラボ移動実行: ${sourcePosition} → ${targetPosition}`);
+      this.battleEngine.stateManager.updateState('SWAP_CARDS', {
+        player: playerId,
+        sourcePosition: sourcePosition,
+        targetPosition: targetPosition
+      });
+      
+      // 6. エール情報が確実に反映されるよう再度設定（SWAP_CARDS実行後）
+      setTimeout(() => {
+        const collabCard = battleEnginePlayer[targetPosition];
+        if (collabCard && originalCard?.yellCards?.length > 0) {
+          // エール情報を確実に設定
+          collabCard.yellCards = [...originalCard.yellCards];
+          console.log(`🔧 コラボ移動後エール再設定: ${collabCard.name} (エール: ${collabCard.yellCards.length}枚)`);
+          
+          // State Managerにも反映
+          if (this.battleEngine.stateManager.state.players[playerId].cards[targetPosition]) {
+            this.battleEngine.stateManager.state.players[playerId].cards[targetPosition].yellCards = [...originalCard.yellCards];
+            console.log(`🔧 State Manager同期: ${targetPosition}にエール情報設定完了`);
+          }
+          
+          this.battleEngine.updateUI();
+        }
+      }, 50); // 少し長めの遅延で確実に実行
+      
+      return true; // コラボ移動完了、以降の処理はスキップ
+    }
+    
+    // State Managerで交換可能性をチェック（コラボ移動以外）
+    if (!isCollabMove) {
+      const swapCheck = this.battleEngine.stateManager.checkSwapValidity(
+        sourceCard, sourcePosition, targetCard, targetPosition, playerId
+      );
+      
+      if (!swapCheck.valid) {
+        alert(`⚠️ カード交換不可\n\n${swapCheck.reason}`);
+        return false;
+      }
+    }
     
     // ブルームの場合は重ね置き処理を実行
     if (isBloom) {
@@ -451,22 +533,41 @@ class HandManager {
       // ブルーム履歴の記録のみ（重ね置きはPLACE_CARDで実行済み）
       this.battleEngine.stateManager.addBloomHistory(playerId, targetPosition);
     } else {
-      // 通常の交換処理
+      // 通常の交換処理（コラボ移動以外）- エール情報保持強化
+      console.log(`🔄 通常交換: ${sourcePosition} ↔ ${targetPosition}`);
+      console.log(`📋 移動元: ${sourceCard?.name} (エール: ${sourceCard?.yellCards?.length || 0}枚)`);
+      console.log(`📋 移動先: ${targetCard?.name || 'null'} (エール: ${targetCard?.yellCards?.length || 0}枚)`);
+      
       this.battleEngine.stateManager.updateState('SWAP_CARDS', {
         player: playerId,
         sourcePosition: sourcePosition,
         targetPosition: targetPosition
       });
-    }
-
-    if (isCollabMove) {
-      // コラボ移動の記録とホロパワー配置（カード状態ベース）
-      const updatedSourceCard = this.battleEngine.stateManager.recordCollabMove(sourceCard, playerId);
-      // 更新されたカードで状態を再設定
-      player[targetPosition] = updatedSourceCard;
       
-      // ホロパワーカード配置を強制実行
-      this.placeHoloPowerFromDeck(playerId);
+      // エール情報保持の追加確認（通常交換でも適用）
+      setTimeout(() => {
+        const battleEnginePlayer = this.battleEngine.players[playerId];
+        
+        // 移動元のエール情報を移動先に確実に反映
+        if (sourceCard?.yellCards?.length > 0) {
+          const movedCard = battleEnginePlayer[targetPosition];
+          if (movedCard && movedCard.name === sourceCard.name) {
+            movedCard.yellCards = [...sourceCard.yellCards];
+            console.log(`🔧 通常交換後エール保持: ${movedCard.name} → ${targetPosition} (エール: ${movedCard.yellCards.length}枚)`);
+          }
+        }
+        
+        // 移動先のエール情報を移動元に確実に反映
+        if (targetCard?.yellCards?.length > 0) {
+          const movedCard = battleEnginePlayer[sourcePosition];
+          if (movedCard && movedCard.name === targetCard.name) {
+            movedCard.yellCards = [...targetCard.yellCards];
+            console.log(`🔧 通常交換後エール保持: ${movedCard.name} → ${sourcePosition} (エール: ${movedCard.yellCards.length}枚)`);
+          }
+        }
+        
+        this.battleEngine.updateUI();
+      }, 30);
     }
 
     // Debutカード配置の記録（カード状態ベース）
@@ -490,13 +591,22 @@ class HandManager {
   /**
    * デッキからホロパワーカードを1枚配置（コラボ移動時の強制処理）
    * @param {number} playerId - プレイヤーID
+   * @returns {boolean} 配置成功/失敗
    */
   placeHoloPowerFromDeck(playerId) {
     const player = this.battleEngine.players[playerId];
     
+    console.log(`🔍 [ホロパワー配置前] プレイヤー${playerId}状態:`);
+    console.log(`  - center: ${player.center?.name || 'null'}`);
+    console.log(`  - collab: ${player.collab?.name || 'null'}`);
+    console.log(`  - holoPower: ${player.holoPower?.length || 0}枚`);
+    console.log(`  - deck: ${player.deck?.length || 0}枚`);
+    
     // デッキからホロパワーカードを取得
     if (player.deck && player.deck.length > 0) {
       const holoPowerCard = player.deck.shift(); // デッキの先頭から取得
+      
+      console.log(`🔍 取得したホロパワーカード: ${holoPowerCard.name}`, holoPowerCard);
       
       // ホロパワーエリアに配置
       if (!player.holoPower) {
@@ -506,13 +616,22 @@ class HandManager {
       
       console.log(`ホロパワーカード配置: ${holoPowerCard.name}`);
       
+      console.log(`🔍 [ホロパワー配置後] プレイヤー${playerId}状態:`);
+      console.log(`  - center: ${player.center?.name || 'null'}`);
+      console.log(`  - collab: ${player.collab?.name || 'null'}`);
+      console.log(`  - holoPower: ${player.holoPower?.length || 0}枚`);
+      console.log(`  - ホロパワー最新: ${player.holoPower[player.holoPower.length-1]?.name || 'null'}`);
+      
       // UI更新
       this.battleEngine.updateUI();
       
       // アニメーション効果（オプション）
       this.showHoloPowerPlacementEffect(holoPowerCard);
+      
+      return true; // 配置成功
     } else {
-      console.warn('デッキにカードがありません');
+      console.error(`プレイヤー${playerId}のデッキが空です - ホロパワー配置失敗`);
+      return false; // 配置失敗
     }
   }
 

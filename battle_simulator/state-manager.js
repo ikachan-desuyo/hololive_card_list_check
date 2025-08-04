@@ -267,8 +267,8 @@ class HololiveStateManager {
         }
         break;
         
-      case 'RESET_BLOOM_FLAGS':
-        // プレイヤーの全カードのブルームフラグをリセット
+      case 'RESET_TURN_FLAGS':
+        // プレイヤーの全カードのブルーム・ターン制限フラグをリセット
         if (payload.player && newState.players[payload.player]) {
           const player = newState.players[payload.player];
           const positions = ['center', 'collab', 'back1', 'back2', 'back3', 'back4', 'back5'];
@@ -278,6 +278,13 @@ class HololiveStateManager {
               player[position].cardState.bloomedThisTurn = false;
             }
           });
+          
+          // ターン制限フラグもリセット
+          if (player.gameState) {
+            player.gameState.collabMovedThisTurn = false;
+          }
+          
+          console.log(`プレイヤー${payload.player}のターン制限フラグをリセット`);
         }
         break;
         
@@ -371,16 +378,115 @@ class HololiveStateManager {
         break;
 
       case 'SWAP_CARDS':
-        // カード位置交換の実行
+        // カード位置交換の実行（エール情報保持強化）
         if (payload.player && payload.sourcePosition && payload.targetPosition) {
           const player = newState.players[payload.player];
-          if (player) {
-            const sourceCard = player.cards[payload.sourcePosition];
-            const targetCard = player.cards[payload.targetPosition];
+          const battleEnginePlayer = this.battleEngine?.players?.[payload.player];
+          
+          if (player && battleEnginePlayer) {
+            console.log(`🔍 [SWAP_CARDS実行前] Battle Engine状態:`);
+            console.log(`  - center: ${battleEnginePlayer.center?.name || 'null'}`);
+            console.log(`  - collab: ${battleEnginePlayer.collab?.name || 'null'}`);
+            console.log(`  - ${payload.sourcePosition}: ${battleEnginePlayer[payload.sourcePosition]?.name || 'null'}`);
+            console.log(`  - ${payload.targetPosition}: ${battleEnginePlayer[payload.targetPosition]?.name || 'null'}`);
             
-            // 位置を交換
-            player.cards[payload.sourcePosition] = targetCard;
-            player.cards[payload.targetPosition] = sourceCard;
+            // Battle Engineから最新のカード情報を取得（エール情報含む）
+            const sourceCard = battleEnginePlayer[payload.sourcePosition];
+            const targetCard = battleEnginePlayer[payload.targetPosition];
+            
+            console.log(`🔄 SWAP_CARDS: ${payload.sourcePosition} ↔ ${payload.targetPosition}`);
+            console.log(`📋 移動元カード: ${sourceCard?.name} (エール: ${sourceCard?.yellCards?.length || 0}枚)`);
+            console.log(`📋 移動先カード: ${targetCard?.name || 'null'} (エール: ${targetCard?.yellCards?.length || 0}枚)`);
+            
+            // エール情報を含めてState Managerにも反映
+            if (sourceCard) {
+              // エール情報が存在する場合は確実に保持
+              const sourceCardWithYell = {
+                ...sourceCard,
+                yellCards: sourceCard.yellCards ? [...sourceCard.yellCards] : []
+              };
+              player.cards[payload.targetPosition] = sourceCardWithYell;
+              console.log(`✅ エール保持: ${sourceCard.name} → ${payload.targetPosition} (エール: ${sourceCardWithYell.yellCards.length}枚)`);
+            } else {
+              player.cards[payload.targetPosition] = null;
+            }
+            
+            if (targetCard) {
+              // 移動先のカードのエール情報も保持
+              const targetCardWithYell = {
+                ...targetCard,
+                yellCards: targetCard.yellCards ? [...targetCard.yellCards] : []
+              };
+              player.cards[payload.sourcePosition] = targetCardWithYell;
+              console.log(`✅ エール保持: ${targetCard.name} → ${payload.sourcePosition} (エール: ${targetCardWithYell.yellCards.length}枚)`);
+            } else {
+              player.cards[payload.sourcePosition] = null;
+            }
+            
+            // Battle Engineでの実際の交換実行
+            console.log(`🔧 Battle Engine交換実行中...`);
+            
+            // Battle Engineオブジェクトの診断
+            console.log('🔍 [診断] Battle Engineプロパティ確認:');
+            console.log(`  - battleEnginePlayer === battleEngine.players[${payload.player}]:`, battleEnginePlayer === battleEngine.players[payload.player]);
+            console.log(`  - battleEnginePlayerタイプ:`, typeof battleEnginePlayer);
+            console.log(`  - Battle Engineプロパティ書き込み可能性チェック:`);
+            
+            // プロパティの詳細チェック
+            const sourceDescriptor = Object.getOwnPropertyDescriptor(battleEnginePlayer, payload.sourcePosition);
+            const targetDescriptor = Object.getOwnPropertyDescriptor(battleEnginePlayer, payload.targetPosition);
+            console.log(`  - ${payload.sourcePosition}プロパティ:`, sourceDescriptor);
+            console.log(`  - ${payload.targetPosition}プロパティ:`, targetDescriptor);
+            
+            // 一時的にカードを保存してから交換
+            const tempSourceCard = battleEnginePlayer[payload.sourcePosition];
+            const tempTargetCard = battleEnginePlayer[payload.targetPosition];
+            
+            console.log(`🔍 [交換前] 一時変数確認:`);
+            console.log(`  - tempSourceCard (${payload.sourcePosition}): ${tempSourceCard?.name || 'null'}`);
+            console.log(`  - tempTargetCard (${payload.targetPosition}): ${tempTargetCard?.name || 'null'}`);
+            
+            // Battle Engineのgettervsetterによる問題を解決するため、専用メソッドを使用
+            console.log('� [Battle Engine専用メソッド] swapCards実行...');
+            try {
+                // Battle Engineの専用swapCardsメソッドを使用
+                const swapResult = battleEngine.swapCards(
+                    tempSourceCard, 
+                    payload.sourcePosition, 
+                    tempTargetCard, 
+                    payload.targetPosition, 
+                    payload.player
+                );
+                console.log('✅ Battle Engine swapCards実行完了:', swapResult);
+            } catch (error) {
+                console.error('❌ [Battle Engine swapCards エラー]:', error);
+                // フォールバック: 直接代入を試行
+                console.log('🔧 [フォールバック] 直接代入を試行...');
+                battleEnginePlayer[payload.targetPosition] = tempSourceCard;
+                battleEnginePlayer[payload.sourcePosition] = tempTargetCard;
+            }
+            
+            console.log(`🔍 [交換直後] 値確認:`);
+            console.log(`  - battleEnginePlayer[${payload.sourcePosition}]: ${battleEnginePlayer[payload.sourcePosition]?.name || 'null'}`);
+            console.log(`  - battleEnginePlayer[${payload.targetPosition}]: ${battleEnginePlayer[payload.targetPosition]?.name || 'null'}`);
+            
+            console.log(`🔍 [SWAP_CARDS実行後] Battle Engine状態:`);
+            console.log(`  - center: ${battleEnginePlayer.center?.name || 'null'}`);
+            console.log(`  - collab: ${battleEnginePlayer.collab?.name || 'null'}`);
+            console.log(`  - ${payload.sourcePosition}: ${battleEnginePlayer[payload.sourcePosition]?.name || 'null'}`);
+            console.log(`  - ${payload.targetPosition}: ${battleEnginePlayer[payload.targetPosition]?.name || 'null'}`);
+            
+            // エール情報も確実に反映
+            if (tempSourceCard && tempSourceCard.yellCards && tempSourceCard.yellCards.length > 0) {
+              // 移動先にエール情報付きカードを配置
+              const movedCard = battleEnginePlayer[payload.targetPosition];
+              if (movedCard) {
+                movedCard.yellCards = [...tempSourceCard.yellCards];
+                console.log(`🔧 Battle Engine同期: ${payload.targetPosition}にエール情報設定 (${tempSourceCard.yellCards.length}枚)`);
+              } else {
+                console.error(`⚠️ 移動先 ${payload.targetPosition} にカードが見つかりません`);
+              }
+            }
           }
         }
         break;
@@ -1096,7 +1202,6 @@ class HololiveStateManager {
     const isDebutPhase = currentState.game.debutPlacementPhase;
     
     // デバッグログ追加
-    console.log(`[checkSwapValidity] currentPhase: ${currentPhase}, isDebutPhase: ${isDebutPhase}`);
     console.log(`[checkSwapValidity] 移動: ${sourcePosition} → ${targetPosition}`);
     
     // Debut配置フェーズでは自由に移動可能（ブルーム以外）
@@ -1143,7 +1248,6 @@ class HololiveStateManager {
     // ゲーム中の交換制限
     console.log('[checkSwapValidity] Debut配置フェーズ以外での処理');
     if (currentPhase !== 3) { // メインフェーズ以外では交換不可
-      console.log('[checkSwapValidity] メインフェーズ以外での交換拒否');
       return {
         valid: false,
         reason: 'メインフェーズでのみカード交換が可能です'
@@ -1160,6 +1264,7 @@ class HololiveStateManager {
             reason: 'コラボに移動できるのはバックのカードからのみです'
           };
         }
+        // コラボ移動の場合は、バリデーションのみ実行し、実際の移動はhand-manager.jsで制御
         return this.checkCollabMoveFromBack(sourceCard, player);
       }
       
@@ -1538,7 +1643,72 @@ class HololiveStateManager {
   }
 
   /**
+   * プレイヤーがコラボ可能かどうかの総合チェック
+   * @param {number} playerId - プレイヤーID
+   * @returns {Object} チェック結果
+   */
+  canPlayerCollab(playerId) {
+    const playerState = this.state.players[playerId];
+
+    console.log(`🔍 プレイヤー${playerId}のコラボ可能性チェック開始`);
+    console.log(`- collabMovedThisTurn: ${playerState.gameState.collabMovedThisTurn}`);
+
+    // 1. このターンに既にコラボ移動を実行したかチェック
+    if (playerState.gameState.collabMovedThisTurn) {
+      console.log(`❌ 既にこのターンでコラボ済み`);
+      return {
+        valid: false,
+        reason: '1ターンに1度のみコラボ移動可能です'
+      };
+    }
+
+    // 2. コラボポジションが既に使用されているかチェック
+    if (playerState.cards.collab) {
+      console.log(`❌ コラボポジション使用済み`);
+      return {
+        valid: false,
+        reason: 'コラボポジションには既にカードが配置されています'
+      };
+    }
+
+    // 3. デッキ残り枚数チェック（ホロパワー配置のため）
+    if (!playerState.cards.deck || playerState.cards.deck.length === 0) {
+      console.log(`❌ デッキが空（枚数: ${playerState.cards.deck?.length || 0}）`);
+      return {
+        valid: false,
+        reason: 'デッキが空のためホロパワーを置けません'
+      };
+    }
+
+    // 4. バックポジションにコラボ可能なホロメンが存在するかチェック
+    const backPositions = ['back1', 'back2', 'back3', 'back4', 'back5'];
+    const availableHolomen = backPositions.some(pos => {
+      const backCard = playerState.cards[pos];
+      if (!backCard || !backCard.card_type?.includes('ホロメン')) {
+        return false;
+      }
+      const cardState = this.getCardState(backCard);
+      return !cardState.resting; // お休み状態でないホロメンが存在
+    });
+
+    if (!availableHolomen) {
+      console.log(`❌ コラボ可能なホロメンがバックにいません`);
+      return {
+        valid: false,
+        reason: 'コラボできるホロメンがバックポジションにいません'
+      };
+    }
+
+    console.log(`✅ コラボ実行可能`);
+    return {
+      valid: true,
+      reason: 'コラボ実行可能'
+    };
+  }
+
+  /**
    * コラボ移動が可能かチェック
+   * 公式ルール準拠：デッキ枚数、ホロメン存在、お休み状態等を総合的にチェック
    * @param {Object} card - 移動しようとするカード
    * @param {number} playerId - プレイヤーID
    * @returns {Object} チェック結果
@@ -1571,11 +1741,42 @@ class HololiveStateManager {
       };
     }
 
-    // 4. コラボポジションが既に使用されているかチェック
-    if (playerState.cards.collab) {
+    // 4. コラボポジションが既に使用されているかチェック（Battle Engine参照で同期確保）
+    const battleEnginePlayer = this.battleEngine.players[playerId];
+    console.log(`🔍 [canMoveToCollab] Battle Engine collab: ${battleEnginePlayer.collab ? '配置済み' : '空'}`, battleEnginePlayer.collab);
+    console.log(`🔍 [canMoveToCollab] State Manager collab: ${playerState.cards.collab ? '配置済み' : '空'}`, playerState.cards.collab);
+    
+    if (battleEnginePlayer.collab) {
       return {
         valid: false,
         reason: 'コラボポジションには既にカードが配置されています'
+      };
+    }
+
+    // 5. デッキ残り枚数チェック（ホロパワー配置のため、Battle Engine参照）
+    if (!battleEnginePlayer.deck || battleEnginePlayer.deck.length === 0) {
+      return {
+        valid: false,
+        reason: 'デッキが空のためホロパワーを置けません'
+      };
+    }
+
+    // 6. バックポジションにコラボ可能なホロメンが存在するかチェック（Battle Engine参照）
+    const backPositions = ['back1', 'back2', 'back3', 'back4', 'back5'];
+    const availableHolomen = backPositions.some(pos => {
+      const backCard = battleEnginePlayer[pos];
+      if (!backCard || !backCard.card_type?.includes('ホロメン')) {
+        return false;
+      }
+      // お休み状態チェックはState Managerを使用（状態管理のため）
+      const cardState = this.getCardState(backCard);
+      return !cardState.resting; // お休み状態でないホロメンが存在
+    });
+
+    if (!availableHolomen) {
+      return {
+        valid: false,
+        reason: 'コラボできるホロメンがバックポジションにいません'
       };
     }
 
@@ -1592,12 +1793,16 @@ class HololiveStateManager {
    * @returns {Object} 更新されたカード
    */
   recordCollabMove(card, playerId) {
+    console.log(`🤝 プレイヤー${playerId}のコラボ移動を記録: ${card.name}`);
+    
     // プレイヤーの状態を更新
     this.updateState('UPDATE_PLAYER_GAME_STATE', {
       player: playerId,
       property: 'collabMovedThisTurn',
       value: true
     });
+    
+    console.log(`✅ collabMovedThisTurn = true に設定`);
     
     // カードにコラボロック状態を付与
     const updatedCard = this.addCardState(card, {

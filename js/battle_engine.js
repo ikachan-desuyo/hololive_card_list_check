@@ -2328,9 +2328,7 @@ class HololiveBattleEngine {
 
   // カード交換の実行（ドラッグ&ドロップからの呼び出し用）
   performCardSwap(draggedCardData, dropZone) {
-    // console.log('=== BATTLE ENGINE: performCardSwap 開始 ===');
-    console.log('draggedCardData:', draggedCardData);
-    console.log('dropZone:', dropZone);
+    console.log(`🔍 [performCardSwap] カード移動開始: ${draggedCardData?.card?.name || draggedCardData?.name}`);
     
     // データ構造の検証とカードの抽出
     let sourceCard;
@@ -2343,9 +2341,6 @@ class HololiveBattleEngine {
       console.error('sourceCard の抽出に失敗:', draggedCardData);
       return false;
     }
-    
-    console.log('抽出したsourceCard:', sourceCard);
-    console.log('sourceCard.name:', sourceCard ? sourceCard.name : 'なし');
     
     if (!sourceCard || !sourceCard.name) {
       console.error('有効なsourceCard が見つかりません');
@@ -2378,19 +2373,17 @@ class HololiveBattleEngine {
       case 'back':
         targetPosition = `back${dropZone.index + 1}`;
         targetCard = player[targetPosition];
-        console.log(`ドロップ先 ${targetPosition} のカード:`, targetCard ? targetCard.name : 'なし');
         break;
     }
     
-    // console.log('=== BATTLE ENGINE: HandManagerのswapCardsを呼び出し ===');
     console.log(`移動: ${sourcePosition} → ${targetPosition}`);
-    console.log('最終確認 - sourceCard:', sourceCard);
-    console.log('最終確認 - sourceCard.name:', sourceCard.name);
-    console.log('最終確認 - targetCard:', targetCard);
-    console.log('最終確認 - targetPosition:', targetPosition);
     
-    // State Manager経由でのチェック（新ルール対応）
-    if (this.stateManager) {
+    // コラボ移動の場合は、State ManagerのcheckSwapValidityをスキップ
+    // （Hand Managerで専用のコラボ処理を実行するため）
+    const isCollabMove = targetPosition === 'collab' && sourcePosition.startsWith('back');
+    
+    // State Manager経由でのチェック（コラボ移動以外）
+    if (this.stateManager && !isCollabMove) {
       const swapCheck = this.stateManager.checkSwapValidity(
         sourceCard, sourcePosition, targetCard, targetPosition, 1
       );
