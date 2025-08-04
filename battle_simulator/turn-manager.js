@@ -284,8 +284,43 @@ class HololiveTurnManager {
     this.engine.shuffleDeck(playerId);
     console.log(`プレイヤー${playerId}のデッキをシャッフルしました`);
     
+    // マリガン回数を増加（手札配布前に増加）
+    console.log(`🔍 マリガン実行前: プレイヤー${playerId}のマリガン回数 = ${this.gameState.mulliganCount[playerId]}`);
+    
+    // State Managerを通じてマリガン回数を更新
+    const currentCount = this.gameState.mulliganCount[playerId] || 0;
+    const newCount = currentCount + 1;
+    
+    // State Managerでマリガン回数を更新
+    if (this.engine.stateManager) {
+      console.log(`🔍 State Managerを使用してマリガン回数を更新: ${currentCount} → ${newCount}`);
+      const newCounts = { ...this.gameState.mulliganCount };
+      newCounts[playerId] = newCount;
+      this.engine.stateManager.updateState('SET_MULLIGAN_COUNT', { counts: newCounts });
+    } else {
+      // フォールバック: 直接更新
+      console.log(`🔍 直接更新でマリガン回数を更新: ${currentCount} → ${newCount}`);
+      this.gameState.mulliganCount[playerId] = newCount;
+    }
+    
+    const currentMulliganCount = this.gameState.mulliganCount[playerId];
+    console.log(`🔍 マリガン実行後: プレイヤー${playerId}のマリガン回数 = ${currentMulliganCount}`);
+    
     // 新しい手札を配る（ペナルティ適用）
-    const newHandSize = 7 - mulliganCount;
+    // 1回目はペナルティなし(7枚)、2回目から1枚ずつ減少
+    const newHandSize = Math.max(0, 7 - Math.max(0, currentMulliganCount - 1));
+    
+    console.log(`🔍 計算詳細: 7 - Math.max(0, ${currentMulliganCount} - 1) = 7 - ${Math.max(0, currentMulliganCount - 1)} = ${newHandSize}`);
+    console.log(`🔍 マリガン${currentMulliganCount}回目: 手札${newHandSize}枚配布予定`);
+    
+    // 手札が0枚になる場合は敗北
+    if (newHandSize === 0) {
+      console.log(`🔍 ⚠️ プレイヤー${playerId}の手札が0枚になりました - 敗北処理`);
+      alert(`プレイヤー${playerId}の手札が0枚になったため敗北しました`);
+      // 敗北処理をここで呼び出す可能性があるが、とりあえずログのみ
+      return;
+    }
+    
     for (let i = 0; i < newHandSize; i++) {
       if (player.deck.length > 0) {
         const card = player.deck.pop();
@@ -293,10 +328,7 @@ class HololiveTurnManager {
       }
     }
     
-    console.log(`プレイヤー${playerId}に新しい手札${newHandSize}枚を配りました`);
-    
-    // マリガン回数を増加
-    this.gameState.mulliganCount[playerId]++;
+    console.log(`プレイヤー${playerId}に新しい手札${newHandSize}枚を配りました（マリガン${currentMulliganCount}回目）`);
     
     // UIを更新して手札を表示
     this.engine.updateUI();
@@ -310,20 +342,20 @@ class HololiveTurnManager {
     const playerName = playerId === 1 ? 'あなた' : '相手';
     alert(`${playerName}がマリガンを実行しました（${newHandSize}枚配布）`);
     
-    // 手札にDebutがあるかチェックして、連続マリガンまたは次の処理を決定
+    // マリガン実行後、再度Debut有無をチェックして次のマリガン判定を行う
     setTimeout(() => {
       const hasDebut = player.hand.some(card => 
         card.card_type && card.card_type.includes('ホロメン') && card.bloom_level === 'Debut'
       );
       
       if (!hasDebut) {
-        // まだDebutがないので、再度マリガンが必要
+        // まだDebutがないので、強制マリガン継続
         console.log(`🔍 プレイヤー${playerId}: Debutなし、強制マリガン継続`);
         this.checkMulligan(playerId);
       } else {
-        // Debutが見つかったので、マリガン完了として次のプレイヤーへ
-        console.log(`🔍 プレイヤー${playerId}: Debut発見、マリガン完了`);
-        this.proceedToNextMulliganPlayer(playerId);
+        // Debutがあるので、任意マリガン選択を表示
+        console.log(`🔍 プレイヤー${playerId}: Debut発見、任意マリガン選択`);
+        this.checkMulligan(playerId);
       }
     }, 500);
   }
@@ -459,20 +491,37 @@ class HololiveTurnManager {
       console.log('🔍 CPU: Debutがないので強制マリガンします');
       this.executeMulligan(playerId);
     } else {
-      // 簡単なAI判定：手札が悪い場合マリガン
+      // 簡単なAI判定：手札が悪い場合マリガン（ただし回数制限を考慮）
+      const mulliganCount = this.gameState.mulliganCount[playerId];
       const goodCards = player.hand.filter(card => 
         (card.card_type && card.card_type.includes('ホロメン')) || 
         (card.card_type && card.card_type.includes('サポート'))
       ).length;
       
-      console.log(`🔍 CPU: 良いカード枚数: ${goodCards}`);
+      console.log(`🔍 CPU: 良いカード枚数: ${goodCards}, 現在のマリガン回数: ${mulliganCount}`);
       
-      // 3枚未満の場合はマリガン
-      if (goodCards < 3) {
-        console.log('CPU: 手札が悪いのでマリガンします');
+      // マリガン回数とカード品質を考慮した判定
+      let shouldMulligan = false;
+      
+      if (mulliganCount === 0) {
+        // 初回マリガン（ペナルティなし）：3枚未満の場合はマリガン
+        shouldMulligan = goodCards < 3;
+      } else if (mulliganCount === 1) {
+        // 2回目マリガン（1枚減少）：2枚未満の場合のみマリガン
+        shouldMulligan = goodCards < 2;
+      } else if (mulliganCount >= 6) {
+        // 7回目以降は手札が1枚以下になるため実行しない
+        shouldMulligan = false;
+      } else {
+        // 3回目以降：よほど悪くない限りマリガンしない（1枚未満）
+        shouldMulligan = goodCards < 1;
+      }
+      
+      if (shouldMulligan) {
+        console.log(`CPU: 手札が悪いのでマリガンします（${mulliganCount + 1}回目）`);
         this.executeMulligan(playerId);
       } else {
-        console.log('CPU: 手札が良いのでマリガンをスキップします');
+        console.log(`CPU: マリガンを終了します（${mulliganCount}回実行済み）`);
         this.skipMulligan(playerId);
       }
     }
