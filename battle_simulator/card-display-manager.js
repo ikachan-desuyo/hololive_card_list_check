@@ -3,104 +3,129 @@
 class CardDisplayManager {
   constructor(battleEngine) {
     this.battleEngine = battleEngine;
+    this.isUpdating = false;
+    this.updateQueue = [];
+    this.updateDebounceTimer = null;
   }
 
   /**
-   * 全カードエリアの表示を更新
+   * 全カードエリアの表示を更新（デバウンス対応）
    */
   updateCardAreas() {
-    console.log(`🔄 [Card Display] updateCardAreas開始`);
-    
-    // プレイヤーとCPUの両方のエリアを更新
-    [1, 2].forEach(playerId => {
-      console.log(`🔄 [Card Display] プレイヤー${playerId}の更新開始`);
-      // Battle Engineから直接プレイヤーデータを取得
-      const player = this.battleEngine.players[playerId];
-      if (!player) {
-        console.warn(`updateCardAreas: プレイヤー${playerId}の状態が見つかりません`);
-        return;
+    // 既に更新中の場合はキューに追加
+    if (this.isUpdating) {
+      if (this.updateDebounceTimer) {
+        clearTimeout(this.updateDebounceTimer);
       }
-      
-      console.log(`🔄 [Card Display] プレイヤー${playerId}データ:`, player);
-      
-      const sectionClass = playerId === 1 ? '.battle-player' : '.battle-opponent';
-      
-      // 各エリアのデータと要素を取得
-      const areas = [
-        { id: 'life', data: player.life, isMultiple: true },
-        { id: 'collab', data: player.collab, isMultiple: false },
-        { id: 'center', data: player.center, isMultiple: false },
-        { id: 'oshi', data: player.oshi, isMultiple: false },
-        { id: 'holo', data: player.holoPower, isMultiple: true },
-        { id: 'deck', data: player.deck, isMultiple: true },
-        { id: 'yell-deck', data: player.yellDeck, isMultiple: true },
-        { id: 'backs', data: null, isMultiple: true }, // バックスは特別処理
-        { id: 'archive', data: player.archive, isMultiple: true }
-      ];
-      
-      areas.forEach(areaInfo => {
-        const area = document.querySelector(`${sectionClass} .${areaInfo.id}`);
-        if (!area) return;
-        
-        if (areaInfo.id === 'backs') {
-          // バックスロットの特別処理
-          const playerType = playerId === 1 ? 'player' : 'cpu';
-          this.updateBackSlots(playerType);
-        } else {
-          this.displayCardsInArea(area, areaInfo.data, areaInfo.id, playerId, areaInfo.isMultiple);
-        }
-      });
-    });
+      this.updateDebounceTimer = setTimeout(() => this.updateCardAreas(), 50);
+      return;
+    }
     
-    // フェーズハイライトの更新
-    this.updatePhaseHighlight();
+    this.isUpdating = true;
+    
+    try {
+      console.log(`🔄 [Card Display] updateCardAreas開始`);
+      
+      // プレイヤーとCPUの両方のエリアを更新
+      [1, 2].forEach(playerId => {
+        console.log(`🔄 [Card Display] プレイヤー${playerId}の更新開始`);
+        // Battle Engineから直接プレイヤーデータを取得
+        const player = this.battleEngine.players[playerId];
+        if (!player) {
+          console.warn(`updateCardAreas: プレイヤー${playerId}の状態が見つかりません`);
+          return;
+        }
+        
+        console.log(`🔄 [Card Display] プレイヤー${playerId}データ:`, player);
+        
+        const sectionClass = playerId === 1 ? '.battle-player' : '.battle-opponent';
+        
+        // 各エリアのデータと要素を取得
+        const areas = [
+          { id: 'life', data: player.life, isMultiple: true },
+          { id: 'collab', data: player.collab, isMultiple: false },
+          { id: 'center', data: player.center, isMultiple: false },
+          { id: 'oshi', data: player.oshi, isMultiple: false },
+          { id: 'holo', data: player.holoPower, isMultiple: true },
+          { id: 'deck', data: player.deck, isMultiple: true },
+          { id: 'yell-deck', data: player.yellDeck, isMultiple: true },
+          { id: 'backs', data: null, isMultiple: true }, // バックスは特別処理
+          { id: 'archive', data: player.archive, isMultiple: true }
+        ];
+        
+        areas.forEach(areaInfo => {
+          const area = document.querySelector(`${sectionClass} .${areaInfo.id}`);
+          if (!area) return;
+          
+          if (areaInfo.id === 'backs') {
+            // バックスロットの特別処理
+            const playerType = playerId === 1 ? 'player' : 'cpu';
+            this.updateBackSlots(playerType);
+          } else {
+            this.displayCardsInArea(area, areaInfo.data, areaInfo.id, playerId, areaInfo.isMultiple);
+          }
+        });
+      });
+      
+      // フェーズハイライトの更新
+      this.updatePhaseHighlight();
+      
+    } catch (error) {
+      window.errorLog('UI更新中にエラーが発生しました:', error);
+    } finally {
+      this.isUpdating = false;
+    }
   }
 
   /**
    * 特定エリアにカードを表示
    */
   displayCardsInArea(area, cards, areaId, playerId, isMultiple = false) {
-    if (!area) return;
-    
-    // プレイヤーIDの特定（エリアのクラス名から判定）
-    const isPlayerArea = area.closest('.battle-player') !== null;
-    const actualPlayerId = isPlayerArea ? 1 : 2;
-    
-    // エリアをクリア（カウンターは残す）
-    const counters = area.querySelectorAll('.card-counter');
-    area.innerHTML = '';
-    counters.forEach(counter => area.appendChild(counter));
-    
-    let cardsToDisplay = [];
-    let displayType = 'stack'; // 'stack', 'spread', 'single'
-    
-    // エリアIDに基づいてカードデータと表示タイプを決定
-    switch (areaId) {
-      case 'life':
-        cardsToDisplay = cards || [];
-        displayType = 'vertical';
-        break;
-      case 'collab':
-        if (cards) {
-          // console.log(`🎨 コラボポジションにカード表示: ${cards.name}`);
-          cardsToDisplay = [cards];
-        }
-        displayType = 'single';
-        break;
-      case 'center':
-        if (cards) {
-          console.log(`🎨 センターポジションにカード表示: ${cards.name}`, cards);
-          console.log(`🎨 センター画像URL: ${cards.image_url}`);
-          console.log(`🎨 センターカード状態:`, cards.cardState);
-          if (!cards.cardState) {
-            console.warn(`⚠️ センターカードに状態情報がありません:`, cards);
+    try {
+      if (!area) return;
+      
+      // プレイヤーIDの特定（エリアのクラス名から判定）
+      const isPlayerArea = area.closest('.battle-player') !== null;
+      const actualPlayerId = isPlayerArea ? 1 : 2;
+      
+      // 既存のイベントリスナーをクリーンアップ
+      this.cleanupAreaEventListeners(area);
+      
+      // エリアをクリア（カウンターは残す）
+      const counters = area.querySelectorAll('.card-counter');
+      area.innerHTML = '';
+      counters.forEach(counter => area.appendChild(counter));
+      
+      let cardsToDisplay = [];
+      let displayType = 'stack'; // 'stack', 'spread', 'single'
+      
+      // エリアIDに基づいてカードデータと表示タイプを決定
+      switch (areaId) {
+        case 'life':
+          cardsToDisplay = cards || [];
+          displayType = 'vertical';
+          break;
+        case 'collab':
+          if (cards) {
+            // console.log(`🎨 コラボポジションにカード表示: ${cards.name}`);
+            cardsToDisplay = [cards];
           }
-          cardsToDisplay = [cards];
-        } else {
-          console.log('🎨 センターポジションにカードなし');
-        }
-        displayType = 'single';
-        break;
+          displayType = 'single';
+          break;
+        case 'center':
+          if (cards) {
+            console.log(`🎨 センターポジションにカード表示: ${cards.name}`, cards);
+            console.log(`🎨 センター画像URL: ${cards.image_url}`);
+            console.log(`🎨 センターカード状態:`, cards.cardState);
+            if (!cards.cardState) {
+              console.warn(`⚠️ センターカードに状態情報がありません:`, cards);
+            }
+            cardsToDisplay = [cards];
+          } else {
+            console.log('🎨 センターポジションにカードなし');
+          }
+          displayType = 'single';
+          break;
       case 'oshi':
         if (cards) cardsToDisplay = [cards];
         displayType = 'single';
@@ -151,6 +176,26 @@ class CardDisplayManager {
       area.classList.add('has-card');
     } else {
       area.classList.remove('has-card');
+    }
+    
+    } catch (error) {
+      window.errorLog(`カード表示中にエラーが発生しました (${areaId}):`, error);
+    }
+  }
+
+  /**
+   * エリア内のイベントリスナーをクリーンアップ
+   */
+  cleanupAreaEventListeners(area) {
+    try {
+      const existingCards = area.querySelectorAll('.card');
+      existingCards.forEach(cardElement => {
+        // クローンして古いイベントリスナーを削除
+        const newElement = cardElement.cloneNode(true);
+        cardElement.parentNode.replaceChild(newElement, cardElement);
+      });
+    } catch (error) {
+      window.errorLog('カードエリアのイベントリスナークリーンアップ中にエラー:', error);
     }
   }
 
@@ -243,14 +288,18 @@ class CardDisplayManager {
     
     // カードクリック処理の追加
     if (areaId !== 'deck' && areaId !== 'yell-deck') {
-      cardElement.addEventListener('click', (e) => {
+      const clickHandler = (e) => {
         if (typeof this.battleEngine.showCardModal === 'function') {
           this.battleEngine.showCardModal(card);
         } else {
           console.log('カード情報:', card);
         }
         e.stopPropagation();
-      });
+      };
+      
+      cardElement.addEventListener('click', clickHandler);
+      // ハンドラーを要素に保存（後でremoveEventListenerするため）
+      cardElement._clickHandler = clickHandler;
     }
     
     // 配置済みカードのドラッグ機能を追加（プレイヤー1のセンター、バックのホロメンカードのみ）
@@ -277,11 +326,16 @@ class CardDisplayManager {
         cardElement.setAttribute('data-slot-index', cardIndex);
       }
       
+      // ドラッグイベントハンドラーを安全に設定
       if (this.battleEngine.handlePlacedCardDragStart) {
-        cardElement.addEventListener('dragstart', (e) => this.battleEngine.handlePlacedCardDragStart(e, card, areaId, cardIndex));
+        const dragStartHandler = (e) => this.battleEngine.handlePlacedCardDragStart(e, card, areaId, cardIndex);
+        cardElement.addEventListener('dragstart', dragStartHandler);
+        cardElement._dragStartHandler = dragStartHandler;
       }
       if (this.battleEngine.handlePlacedCardDragEnd) {
-        cardElement.addEventListener('dragend', (e) => this.battleEngine.handlePlacedCardDragEnd(e));
+        const dragEndHandler = (e) => this.battleEngine.handlePlacedCardDragEnd(e);
+        cardElement.addEventListener('dragend', dragEndHandler);
+        cardElement._dragEndHandler = dragEndHandler;
       }
     } else {
       // ドラッグが設定されなかった理由をログ出力

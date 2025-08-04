@@ -70,17 +70,24 @@ class InfoPanelManager {
    * イベントリスナーの設定
    */
   setupEventListeners() {
-    // カードホバーイベントを監視
-    document.addEventListener('mouseover', (event) => {
+    // 既存のリスナーを削除（重複防止）
+    if (this.mouseOverHandler) {
+      document.removeEventListener('mouseover', this.mouseOverHandler);
+    }
+    if (this.mouseOutHandler) {
+      document.removeEventListener('mouseout', this.mouseOutHandler);
+    }
+    
+    // 新しいリスナーを設定
+    this.mouseOverHandler = (event) => {
       if (event.target.classList.contains('card') || 
           event.target.classList.contains('hand-card') ||
           event.target.classList.contains('yell-card')) {
         this.showCardDetail(event.target);
       }
-    });
+    };
 
-    // カードから離れた時の処理
-    document.addEventListener('mouseout', (event) => {
+    this.mouseOutHandler = (event) => {
       if (event.target.classList.contains('card') || 
           event.target.classList.contains('hand-card') ||
           event.target.classList.contains('yell-card')) {
@@ -91,7 +98,27 @@ class InfoPanelManager {
           }
         }, 100);
       }
-    });
+    };
+    
+    // カードホバーイベントを監視
+    document.addEventListener('mouseover', this.mouseOverHandler);
+
+    // カードから離れた時の処理
+    document.addEventListener('mouseout', this.mouseOutHandler);
+  }
+
+  /**
+   * イベントリスナーのクリーンアップ
+   */
+  cleanup() {
+    if (this.mouseOverHandler) {
+      document.removeEventListener('mouseover', this.mouseOverHandler);
+      this.mouseOverHandler = null;
+    }
+    if (this.mouseOutHandler) {
+      document.removeEventListener('mouseout', this.mouseOutHandler);
+      this.mouseOutHandler = null;
+    }
   }
 
   /**
