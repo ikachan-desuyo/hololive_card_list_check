@@ -26,20 +26,15 @@ class HololiveTurnManager {
       console.log('🔄 エンドステップフラグをリセット');
     }
     
+    // 現在のプレイヤー（ターン終了するプレイヤー）のブルームフラグをリセット
+    const currentPlayer = this.gameState.currentPlayer;
+    this.engine.stateManager.updateState('RESET_TURN_FLAGS', {
+      player: currentPlayer
+    });
+    
     // ターン終了
     this.gameState.currentPlayer = this.gameState.currentPlayer === 1 ? 2 : 1;
     this.gameState.currentPhase = 0;
-    
-    // 前のプレイヤーのブルームフラグ・ターン制限フラグをリセット
-    const previousPlayer = this.gameState.currentPlayer === 1 ? 2 : 1;
-    this.engine.stateManager.updateState('RESET_TURN_FLAGS', {
-      player: previousPlayer
-    });
-    
-    // 新しいプレイヤーのターン制限フラグもリセット（念のため）
-    this.engine.stateManager.updateState('RESET_TURN_FLAGS', {
-      player: this.gameState.currentPlayer
-    });
     
     // プレイヤー別ターン数を更新（新しいプレイヤーのターン開始時に増加）
     const newPlayer = this.gameState.currentPlayer;

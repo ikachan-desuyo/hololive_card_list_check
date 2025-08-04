@@ -561,8 +561,13 @@ class HololiveStateManager {
                 window.debugLog(`[PLACE_CARD/BACK] ブルーム処理開始: ${existingCard.name} → ${payload.card.name}`);
                 window.debugLog(`[PLACE_CARD/BACK] 新しいカード画像URL: ${payload.card.image_url}`);
                 
+                // 既存カードにブルーム済みマークを設定
+                if (existingCard.cardState) {
+                  existingCard.cardState.bloomedThisTurn = true;
+                }
+                
                 const newCard = this.addCardState(payload.card, {
-                  bloomedThisTurn: true,
+                  bloomedThisTurn: false, // 新しく配置されるカードはブルーム済みではない
                   playedTurn: newState.turn.turnCount,
                   bloomedFromCard: existingCard,
                   // 既存カードから状態を引き継ぎ
@@ -611,8 +616,13 @@ class HololiveStateManager {
                 window.debugLog(`[PLACE_CARD/CENTER] ブルーム処理開始: ${existingCard.name} → ${payload.card.name}`);
                 window.debugLog(`[PLACE_CARD/CENTER] 新しいカード画像URL: ${payload.card.image_url}`);
                 
+                // 既存カードにブルーム済みマークを設定
+                if (existingCard.cardState) {
+                  existingCard.cardState.bloomedThisTurn = true;
+                }
+                
                 const newCard = this.addCardState(payload.card, {
-                  bloomedThisTurn: true,
+                  bloomedThisTurn: false, // 新しく配置されるカードはブルーム済みではない
                   playedTurn: newState.turn.turnCount,
                   bloomedFromCard: existingCard,
                   // 既存カードから状態を引き継ぎ
@@ -661,8 +671,13 @@ class HololiveStateManager {
                 window.debugLog(`[PLACE_CARD/COLLAB] ブルーム処理開始: ${existingCard.name} → ${payload.card.name}`);
                 window.debugLog(`[PLACE_CARD/COLLAB] 新しいカード画像URL: ${payload.card.image_url}`);
                 
+                // 既存カードにブルーム済みマークを設定
+                if (existingCard.cardState) {
+                  existingCard.cardState.bloomedThisTurn = true;
+                }
+                
                 const newCard = this.addCardState(payload.card, {
-                  bloomedThisTurn: true,
+                  bloomedThisTurn: false, // 新しく配置されるカードはブルーム済みではない
                   playedTurn: newState.turn.turnCount,
                   bloomedFromCard: existingCard,
                   // 既存カードから状態を引き継ぎ
@@ -1723,14 +1738,6 @@ class HololiveStateManager {
     const cardState = this.getCardState(card);
     // targetCardStateは上で既に取得済み
 
-    // 4. 同ターンに既にブルームしたホロメンかチェック
-    if (targetCardState.bloomedThisTurn) {
-      return {
-        valid: false,
-        reason: 'このホロメンは既に今ターンでブルームしています'
-      };
-    }
-
     // 5. ステージに出たターンのブルーム禁止
     window.debugLog(`[canBloom] ステージ出場ターンチェック: targetCard.playedTurn=${targetCardState.playedTurn}, currentTurn=${currentTurn}`);
     // playedTurnがnullの場合は、古いカードとして扱い、ブルーム可能とする
@@ -1775,7 +1782,7 @@ class HololiveStateManager {
     
     // ブルームしたカードに状態を付与し、全ての要素を引き継ぐ
     const updatedCard = this.addCardState(card, {
-      bloomedThisTurn: true,
+      bloomedThisTurn: false, // 新しく配置されるカードはブルーム済みではない
       playedTurn: currentTurn,
       bloomedFromCard: targetCard,
       // 引き継がれる状態
