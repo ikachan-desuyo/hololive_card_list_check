@@ -46,6 +46,19 @@ class HololiveBattleEngine {
       throw error;
     }
 
+    // カード効果管理システムの初期化（新システム）
+    try {
+      if (typeof ScalableCardEffectManager === 'undefined') {
+        throw new Error('ScalableCardEffectManager クラスが読み込まれていません');
+      }
+      this.cardEffectManager = new ScalableCardEffectManager(this);
+      window.debugLog('✅ ScalableCardEffectManager初期化成功');
+    } catch (error) {
+      window.errorLog('❌ ScalableCardEffectManager初期化エラー:', error);
+      // カード効果システムがなくてもゲームは続行可能
+      this.cardEffectManager = null;
+    }
+
     this.initializeGame();
     
     // カード表示管理の初期化

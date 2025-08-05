@@ -73,13 +73,18 @@ const cardEffect_hBP04_047 = {
   }
 };
 
-// グローバルスコープに登録
-if (typeof window !== 'undefined') {
-  window.cardEffectManager = window.cardEffectManager || new ScalableCardEffectManager();
-  window.cardEffectManager.registerCardEffect('hBP04-047', cardEffect_hBP04_047);
+// 効果を登録（新システム対応）
+if (window.cardEffects) {
+  window.cardEffects['hBP04-047'] = cardEffect_hBP04_047;
+  console.log('🔮 [Card Effect] hBP04-047 の効果を登録しました');
+} else {
+  console.warn('🔮 [Card Effect] cardEffects not available, deferring registration');
+  window.pendingCardEffects = window.pendingCardEffects || [];
+  window.pendingCardEffects.push({
+    cardId: 'hBP04-047',
+    effect: cardEffect_hBP04_047
+  });
 }
 
-// エクスポート
-if (typeof module !== 'undefined' && module.exports) {
-  module.exports = cardEffect_hBP04_047;
-}
+// グローバルに公開
+window.cardEffect_hBP04_047 = cardEffect_hBP04_047;

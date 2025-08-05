@@ -539,18 +539,18 @@ class DeckSelectionUI {
   }
 
   /**
-   * デッキ内のカード効果を読み込み
+   * デッキ選択時の軽量カード情報準備（新システム）
    * @param {Object} deck - デッキオブジェクト
    */
   async loadCardEffects(deck) {
     try {
-      // カードローダーが利用可能かチェック
-      if (!window.cardEffectLoader) {
-        console.warn('CardEffectLoader not available, skipping effect loading');
+      // 新システム（ScalableCardEffectManager）が利用可能かチェック
+      if (!this.battleEngine?.cardEffectManager) {
+        console.warn('🔮 [Card Effects] ScalableCardEffectManager not available, skipping effect loading');
         return;
       }
 
-      console.log(`🔮 [Card Effects] デッキのカード効果を読み込み中...`);
+      console.log(`🔮 [Card Effects] デッキカード情報を準備中...`);
       
       // 全カードを配列にまとめる
       const allCards = [
@@ -560,27 +560,24 @@ class DeckSelectionUI {
         ...(deck.oshi ? [deck.oshi] : [])
       ];
 
-      // カードIDを抽出
-      const cardIds = allCards.map(card => card.id || card.number).filter(Boolean);
-      const uniqueCardIds = [...new Set(cardIds)]; // 重複除去
+      // デッキデータを変換（新システム用）
+      const deckData = {};
+      allCards.forEach(card => {
+        const cardId = card.id || card.number;
+        if (cardId) {
+          deckData[cardId] = card;
+        }
+      });
 
-      console.log(`🔮 [Card Effects] ${uniqueCardIds.length}種類のカード効果を読み込み対象: `, uniqueCardIds);
+      console.log(`🔮 [Card Effects] ${Object.keys(deckData).length}種類のカード情報を準備対象`);
 
-      // カード効果を一括読み込み
-      const loadResults = await window.cardEffectLoader.loadCards(uniqueCardIds);
+      // 軽量メタデータ準備（デッキ選択時）
+      await this.battleEngine.cardEffectManager.prepareDeckCards(deckData);
       
-      // 読み込み結果をログ出力
-      const successCount = loadResults.filter(result => result).length;
-      const failCount = loadResults.length - successCount;
-      
-      console.log(`🔮 [Card Effects] 読み込み完了: 成功 ${successCount}件, 失敗 ${failCount}件`);
-      
-      if (failCount > 0) {
-        console.warn(`🔮 [Card Effects] ${failCount}件のカード効果の読み込みに失敗しました（効果ファイルが存在しない可能性があります）`);
-      }
+      console.log(`🔮 [Card Effects] カード情報の準備完了`);
 
     } catch (error) {
-      console.error('🔮 [Card Effects] カード効果の読み込み中にエラーが発生:', error);
+      console.error('🔮 [Card Effects] カード情報準備中にエラーが発生:', error);
       // エラーが発生してもデッキ選択は続行
     }
   }

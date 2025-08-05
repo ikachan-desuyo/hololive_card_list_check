@@ -22,60 +22,97 @@ class ScalableCardEffectManager {
    * システム初期化
    */
   async initializeSystem() {
-    // 1. カードメタデータの読み込み（全カード分の軽量データ）
-    await this.loadCardMetadata();
-    
-    // 2. 効果パターンの登録
+    // 1. 効果パターンの登録
     this.registerEffectPatterns();
     
-    // 3. 高頻度使用カードの事前読み込み
-    await this.preloadCommonCards();
+    // 2. カードメタデータは必要時のみ読み込み（デッキ選択時）
+    // loadCardMetadata() は削除 - デッキベースで読み込み
   }
 
   /**
-   * カードメタデータの読み込み
-   * 全カードの基本情報のみ（効果実装は含まない）
+   * デッキ選択時の軽量初期化（メタデータのみ）
    */
-  async loadCardMetadata() {
+  async prepareDeckCards(deckData) {
+    const cardIds = Object.keys(deckData);
+    
+    console.log(`📋 デッキカード情報を準備中... (${cardIds.length}枚)`);
+    
+    // デッキ内のカードのメタデータのみ読み込み
+    for (const cardId of cardIds) {
+      await this.loadCardMetadata(cardId);
+    }
+    
+    console.log(`✅ デッキカード情報の準備完了`);
+  }
+
+  /**
+   * ゲーム開始時のカード効果初期化（実際の効果ファイル読み込み）
+   */
+  async initializeDeckCards(deckData) {
+    const cardIds = Object.keys(deckData);
+    
+    console.log(`🃏 ゲーム開始 - カード効果を初期化中... (${cardIds.length}枚)`);
+    
+    // メタデータが未読み込みの場合は読み込み
+    for (const cardId of cardIds) {
+      if (!this.cardMetadata.has(cardId)) {
+        await this.loadCardMetadata(cardId);
+      }
+    }
+    
+    // 高優先度カードを事前読み込み
+    await this.preloadDeckCards(cardIds);
+    
+    console.log(`✅ カード効果の初期化完了`);
+  }
+
+  /**
+   * 単一カードのメタデータを読み込み
+   */
+  async loadCardMetadata(cardId) {
+    if (this.cardMetadata.has(cardId)) return;
+    
     try {
-      // card_data.jsonから基本情報を抽出
+      // card_data.jsonから該当カードの情報を取得
       const response = await fetch('/json_file/card_data.json');
       const cardData = await response.json();
+      const card = cardData[cardId];
       
-      for (const [cardId, card] of Object.entries(cardData)) {
-        // 軽量メタデータのみ保存
-        this.cardMetadata.set(cardId, {
-          id: cardId,
-          name: card.name,
-          cardType: card.card_type,
-          rarity: card.rarity,
-          hasCustomEffect: this.detectCustomEffect(card),
-          effectPattern: this.detectEffectPattern(card),
-          loadPriority: this.calculateLoadPriority(card)
-        });
-      }
+      if (!card) return;
+      
+      // メタデータを保存
+      this.cardMetadata.set(cardId, {
+        id: cardId,
+        name: card.name,
+        cardType: card.card_type,
+        rarity: card.rarity,
+        hasCustomEffect: await this.detectCustomEffect(card),
+        effectPattern: this.detectEffectPattern(card),
+        loadPriority: this.calculateLoadPriority(card)
+      });
       
     } catch (error) {
+      console.warn(`カードメタデータの読み込みに失敗: ${cardId}`, error);
     }
   }
 
   /**
    * カスタム効果があるかの検出
    */
-  detectCustomEffect(card) {
-    // 複雑な効果を持つカードかを判定
-    if (!card.skills || card.skills.length === 0) return false;
+  async detectCustomEffect(card) {
+    // ファイル名を正規化してファイル存在チェック
+    const cardNumber = this.normalizeFileId(card.number || card.id);
+    if (!cardNumber) return false;
     
-    const skillText = card.skills[0]?.name || '';
+    const scriptPath = `/battle_simulator/card-effects/cards/${cardNumber}.js`;
     
-    // カスタム実装が必要そうなキーワード
-    const complexKeywords = [
-      'デッキから', 'シャッフル', '選ぶ', '公開',
-      'ターンに', '条件', 'なければ', 'ダメージ',
-      'ドロー', 'アーカイブ', 'エール', 'ホロパワー'
-    ];
-    
-    return complexKeywords.some(keyword => skillText.includes(keyword));
+    try {
+      // ファイル存在チェック
+      const fileExists = await this.checkFileExists(scriptPath);
+      return fileExists;
+    } catch (error) {
+      return false;
+    }
   }
 
   /**
@@ -153,7 +190,27 @@ class ScalableCardEffectManager {
   }
 
   /**
-   * 高頻度カードの事前読み込み
+   * デッキカードの事前読み込み
+   */
+  async preloadDeckCards(cardIds) {
+    // デッキ内のカードから優先度の高いものを事前読み込み
+    const deckCardMetadata = cardIds
+      .map(id => this.cardMetadata.get(id))
+      .filter(meta => meta)
+      .sort((a, b) => b.loadPriority - a.loadPriority)
+      .slice(0, this.batchSize);
+
+    console.log(`🔄 優先度の高いデッキカードを事前読み込み中... (${deckCardMetadata.length}枚)`);
+
+    for (const meta of deckCardMetadata) {
+      await this.loadCardEffect(meta.id);
+    }
+
+    console.log(`✅ デッキカード事前読み込み完了`);
+  }
+
+  /**
+   * 高頻度カードの事前読み込み（旧システム用）
    */
   async preloadCommonCards() {
     // 優先度の高いカードを事前読み込み
@@ -245,14 +302,44 @@ class ScalableCardEffectManager {
   }
 
   /**
+   * ファイル名用のIDを正規化（より厳密）
+   */
+  normalizeFileId(cardId) {
+    if (!cardId) return '';
+    let id = String(cardId);
+    
+    // レアリティ表記除去 (_U, _R, _RR, _C, _OSR など)
+    id = id.replace(/_[A-Z]+$/, '');
+    
+    // 連番除去 (_02, _03 など)
+    id = id.replace(/_\d+$/, '');
+    
+    return id;
+  }
+
+  /**
    * カスタム効果ファイルの読み込み
    */
   async loadCustomEffect(cardId) {
-    // ファイル名を正規化 (例: hBP04-089_U → hBP04-089)
-    const fileName = cardId.replace(/_[A-Z]+$/, '');
+    // ファイル名を正規化 (例: hBP04-089_U_02 → hBP04-089)
+    const fileName = this.normalizeFileId(cardId);
     const scriptPath = `/battle_simulator/card-effects/cards/${fileName}.js`;
 
     try {
+      // 既にwindow.cardEffectsに登録済みかチェック（最優先）
+      if (window.cardEffects && window.cardEffects[cardId]) {
+        return window.cardEffects[cardId];
+      }
+
+      // グローバル変数でも確認
+      const globalEffectName = `cardEffect_${fileName.replace(/-/g, '_')}`;
+      if (window[globalEffectName]) {
+        // 新システムに登録して返す
+        if (!window.cardEffects) window.cardEffects = {};
+        window.cardEffects[cardId] = window[globalEffectName];
+        return window[globalEffectName];
+      }
+
       // 既にDOM内にスクリプトがあるかチェック
       if (document.querySelector(`script[src="${scriptPath}"]`)) {
         return this.getEffectFromGlobal(cardId);
@@ -318,10 +405,20 @@ class ScalableCardEffectManager {
    */
   loadScript(src) {
     return new Promise((resolve, reject) => {
+      // 既に読み込み済みかチェック
+      if (document.querySelector(`script[src="${src}"]`)) {
+        resolve(); // 既に読み込み済みなので成功として扱う
+        return;
+      }
+
       const script = document.createElement('script');
       script.src = src;
       script.onload = resolve;
       script.onerror = reject;
+      
+      // 読み込み前に重複チェック用の属性を追加
+      script.setAttribute('data-card-effect', 'true');
+      
       document.head.appendChild(script);
     });
   }
@@ -342,10 +439,17 @@ class ScalableCardEffectManager {
    * グローバルから効果を取得
    */
   getEffectFromGlobal(cardId) {
-    // グローバルに登録された効果を取得
+    // 新システムの登録先を優先チェック
     if (window.cardEffects && window.cardEffects[cardId]) {
       return window.cardEffects[cardId];
     }
+    
+    // 旧システムのグローバル変数もチェック
+    const globalEffectName = `cardEffect_${cardId.replace(/-/g, '_')}`;
+    if (window[globalEffectName]) {
+      return window[globalEffectName];
+    }
+    
     return null;
   }
 

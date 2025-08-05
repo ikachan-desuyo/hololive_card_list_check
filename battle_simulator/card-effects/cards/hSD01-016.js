@@ -51,13 +51,18 @@ const cardEffect_hSD01_016 = {
   }
 };
 
-// グローバルスコープに登録
-if (typeof window !== 'undefined') {
-  window.cardEffectManager = window.cardEffectManager || new ScalableCardEffectManager();
-  window.cardEffectManager.registerCardEffect('hSD01-016', cardEffect_hSD01_016);
+// 効果を登録（新システム対応）
+if (window.cardEffects) {
+  window.cardEffects['hSD01-016'] = cardEffect_hSD01_016;
+  console.log('🔮 [Card Effect] hSD01-016 春先のどか の効果を登録しました');
+} else {
+  console.warn('🔮 [Card Effect] cardEffects not available, deferring registration');
+  window.pendingCardEffects = window.pendingCardEffects || [];
+  window.pendingCardEffects.push({
+    cardId: 'hSD01-016',
+    effect: cardEffect_hSD01_016
+  });
 }
 
-// エクスポート
-if (typeof module !== 'undefined' && module.exports) {
-  module.exports = cardEffect_hSD01_016;
-}
+// グローバルに公開
+window.cardEffect_hSD01_016 = cardEffect_hSD01_016;

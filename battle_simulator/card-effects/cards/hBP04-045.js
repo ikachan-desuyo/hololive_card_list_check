@@ -58,18 +58,21 @@ const cardEffect_hBP04_045 = {
   }
 };
 
-// 効果を登録
-if (window.cardEffectManager) {
-  window.cardEffectManager.registerCardEffect('hBP04-045', cardEffect_hBP04_045);
+// 効果を登録（新システム対応）
+if (window.cardEffects) {
+  window.cardEffects['hBP04-045'] = cardEffect_hBP04_045;
   console.log('🔮 [Card Effect] hBP04-045 の効果を登録しました');
 } else {
-  console.warn('🔮 [Card Effect] CardEffectManager not found, deferring registration');
+  console.warn('🔮 [Card Effect] cardEffects not available, deferring registration');
   window.pendingCardEffects = window.pendingCardEffects || [];
   window.pendingCardEffects.push({
     cardId: 'hBP04-045',
     effect: cardEffect_hBP04_045
   });
 }
+
+// グローバルに公開
+window.cardEffect_hBP04_045 = cardEffect_hBP04_045;
 
 // グローバルに公開
 window.cardEffect_hBP04_045 = cardEffect_hBP04_045;
