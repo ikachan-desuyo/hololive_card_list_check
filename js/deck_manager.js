@@ -521,6 +521,9 @@ class DeckSelectionUI {
         }
       }
 
+      // カード効果を読み込み
+      await this.loadCardEffects(deck);
+
       // バトルエンジンにデッキを設定
       this.applyDeckToBattle(deck);
 
@@ -532,6 +535,53 @@ class DeckSelectionUI {
 
     } catch (error) {
       alert("デッキの適用に失敗しました");
+    }
+  }
+
+  /**
+   * デッキ内のカード効果を読み込み
+   * @param {Object} deck - デッキオブジェクト
+   */
+  async loadCardEffects(deck) {
+    try {
+      // カードローダーが利用可能かチェック
+      if (!window.cardEffectLoader) {
+        console.warn('CardEffectLoader not available, skipping effect loading');
+        return;
+      }
+
+      console.log(`🔮 [Card Effects] デッキのカード効果を読み込み中...`);
+      
+      // 全カードを配列にまとめる
+      const allCards = [
+        ...(deck.holomen || []),
+        ...(deck.support || []),
+        ...(deck.yell || []),
+        ...(deck.oshi ? [deck.oshi] : [])
+      ];
+
+      // カードIDを抽出
+      const cardIds = allCards.map(card => card.id || card.number).filter(Boolean);
+      const uniqueCardIds = [...new Set(cardIds)]; // 重複除去
+
+      console.log(`🔮 [Card Effects] ${uniqueCardIds.length}種類のカード効果を読み込み対象: `, uniqueCardIds);
+
+      // カード効果を一括読み込み
+      const loadResults = await window.cardEffectLoader.loadCards(uniqueCardIds);
+      
+      // 読み込み結果をログ出力
+      const successCount = loadResults.filter(result => result).length;
+      const failCount = loadResults.length - successCount;
+      
+      console.log(`🔮 [Card Effects] 読み込み完了: 成功 ${successCount}件, 失敗 ${failCount}件`);
+      
+      if (failCount > 0) {
+        console.warn(`🔮 [Card Effects] ${failCount}件のカード効果の読み込みに失敗しました（効果ファイルが存在しない可能性があります）`);
+      }
+
+    } catch (error) {
+      console.error('🔮 [Card Effects] カード効果の読み込み中にエラーが発生:', error);
+      // エラーが発生してもデッキ選択は続行
     }
   }
 

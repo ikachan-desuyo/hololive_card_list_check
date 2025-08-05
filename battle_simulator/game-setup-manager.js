@@ -463,6 +463,78 @@ class HololiveGameSetupManager {
     }
 
   }
+
+  /**
+   * デッキのカード効果を事前読み込み
+   */
+  async preloadDeckCardEffects() {
+    try {
+      // カードローダーが利用可能かチェック
+      if (!window.cardEffectLoader) {
+        console.warn('🔮 [Card Effects] CardEffectLoader not available, skipping preload');
+        return;
+      }
+
+      console.log('🔮 [Card Effects] ゲーム開始時のカード効果事前読み込み開始...');
+
+      // 両プレイヤーのデッキから全カードIDを収集
+      const allCardIds = [];
+      
+      for (let playerId = 1; playerId <= 2; playerId++) {
+        const player = this.players[playerId];
+        
+        // メインデッキのカード
+        if (player.deck && player.deck.length > 0) {
+          player.deck.forEach(card => {
+            if (card && (card.id || card.number)) {
+              allCardIds.push(card.id || card.number);
+            }
+          });
+        }
+        
+        // エールデッキのカード
+        if (player.yellDeck && player.yellDeck.length > 0) {
+          player.yellDeck.forEach(card => {
+            if (card && (card.id || card.number)) {
+              allCardIds.push(card.id || card.number);
+            }
+          });
+        }
+        
+        // 推しホロメン
+        if (player.oshi && (player.oshi.id || player.oshi.number)) {
+          allCardIds.push(player.oshi.id || player.oshi.number);
+        }
+      }
+
+      // 重複除去
+      const uniqueCardIds = [...new Set(allCardIds)];
+      
+      if (uniqueCardIds.length === 0) {
+        console.log('🔮 [Card Effects] 読み込み対象のカードが見つかりませんでした');
+        return;
+      }
+
+      console.log(`🔮 [Card Effects] ${uniqueCardIds.length}種類のカード効果を読み込み中...`);
+
+      // カード効果を一括読み込み
+      const loadResults = await window.cardEffectLoader.loadCards(uniqueCardIds);
+      
+      // 読み込み結果をログ出力
+      const successCount = loadResults.filter(result => result).length;
+      const failCount = loadResults.length - successCount;
+      
+      console.log(`🔮 [Card Effects] ゲーム開始時読み込み完了: 成功 ${successCount}件, 失敗 ${failCount}件`);
+      
+      if (failCount > 0) {
+        console.warn(`🔮 [Card Effects] ${failCount}件のカード効果ファイルが見つかりませんでした（効果が定義されていないカードの可能性があります）`);
+      }
+
+    } catch (error) {
+      console.error('🔮 [Card Effects] カード効果の事前読み込み中にエラーが発生:', error);
+      // エラーが発生してもゲームは続行
+    }
+  }
 }
 
 // グローバルスコープに公開
