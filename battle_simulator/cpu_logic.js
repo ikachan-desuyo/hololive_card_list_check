@@ -188,10 +188,20 @@ class HololiveCPULogic {
   shouldPlaySupportCard(card) {
     const cpu = this.battleEngine.players[2];
     
-    // LIMITEDカード制限のみチェック（サポートカード全般の制限は削除）
+    // LIMITED制限チェック（統一管理関数を使用）
     if (card.card_type?.includes('LIMITED')) {
-      if (cpu.usedLimitedThisTurn.length > 0) {
-        return false;
+      // CardInteractionManagerの統一関数を使用
+      if (this.battleEngine.cardInteractionManager) {
+        const canUse = this.battleEngine.cardInteractionManager.canUseLimitedEffect(card, 'hand');
+        if (!canUse) {
+          return false;
+        }
+      } else {
+        // フォールバック（旧来の方式）
+        const limitedUsedThisTurn = cpu.usedLimitedThisTurn || 0;
+        if (limitedUsedThisTurn > 0) {
+          return false;
+        }
       }
     }
     
@@ -252,7 +262,7 @@ class HololiveCPULogic {
     cpu.archive.push(card);
     
     if (card.card_type.includes('LIMITED')) {
-      cpu.usedLimitedThisTurn.push(card.id);
+      cpu.usedLimitedThisTurn = (cpu.usedLimitedThisTurn || 0) + 1;
     }
     
     

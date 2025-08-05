@@ -14,23 +14,26 @@ const cardEffect_hSD01_016 = {
   effects: {
     // ドロー効果
     drawEffect: {
-      type: 'draw',
+      type: 'support',
       timing: 'manual',
       name: 'ドロー効果',
       description: '自分のデッキを３枚引く',
       limited: true, // LIMITED効果
-      condition: (card, gameState) => {
-        // LIMITED：ターンに１枚しか使えない
+      condition: (card, gameState, battleEngine) => {
+        // 春先のどかは特別な発動条件はなし（メインステップで手札にあれば発動可能）
         return true;
       },
       effect: (card, battleEngine) => {
         console.log(`📚 [ドロー効果] ${card.name || '春先のどか'}の効果が発動！`);
         
         const currentPlayer = battleEngine.gameState.currentPlayer;
+        const player = battleEngine.players[currentPlayer];
         const utils = new CardEffectUtils(battleEngine);
         
         // デッキを3枚引く
         const drawnCards = utils.drawCards(currentPlayer, 3);
+        
+        // NOTE: アーカイブ移動は CardInteractionManager で自動処理される
         
         if (drawnCards.length > 0) {
           utils.updateDisplay();
@@ -38,7 +41,8 @@ const cardEffect_hSD01_016 = {
           return {
             success: true,
             message: `${card.name || '春先のどか'}の効果でデッキを${drawnCards.length}枚引きました`,
-            drawnCards: drawnCards
+            drawnCards: drawnCards,
+            autoArchive: true // 自動アーカイブ移動を指示
           };
         } else {
           return {

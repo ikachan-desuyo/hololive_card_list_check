@@ -284,26 +284,28 @@ class CardInteractionManager {
    * カード効果の手動発動
    */
   async activateCardEffect(card, position) {
-    if (!this.battleEngine.cardEffectManager) {
-      this.showMessage('カード効果システムが初期化されていません', 'error');
-      return;
-    }
-
+    console.log(`🎯 [CardInteraction] activateCardEffect開始: ${card.name || card.id}, position: ${position}`);
+    
     const currentPlayer = this.battleEngine.gameState.currentPlayer;
     
     try {
-      // 新システムを使用してカード効果を取得
-      const cardEffect = await this.battleEngine.cardEffectManager.getCardEffect(card.id);
+      // カード効果定義を直接取得
+      const cardEffect = window.cardEffects[card.id];
       
       if (!cardEffect || !cardEffect.effects) {
+        console.log(`❌ [CardInteraction] カード効果定義なし: ${card.id}`);
         this.showMessage('このカードには効果がありません', 'info');
         return;
       }
 
+      console.log(`✅ [CardInteraction] カード効果定義取得: ${card.id}`, cardEffect);
+
       // 手動発動可能な効果を検索
       const manualEffects = Object.values(cardEffect.effects).filter(effect => 
-        effect.timing === 'manual' || effect.timing === 'activate'
+        effect.timing === 'manual'
       );
+
+      console.log(`🔍 [CardInteraction] 手動効果数: ${manualEffects.length}`);
 
       if (manualEffects.length === 0) {
         this.showMessage('手動発動可能な効果がありません', 'info');
@@ -312,29 +314,51 @@ class CardInteractionManager {
 
       // 最初の手動効果を発動（複数ある場合は選択UIが必要）
       const effect = manualEffects[0];
+      console.log(`🎯 [CardInteraction] 発動する効果: ${effect.name}`);
       
-      // 条件チェック
-      if (effect.condition && !effect.condition(card, this.battleEngine.gameState, this.battleEngine)) {
-        this.showMessage('効果の発動条件を満たしていません', 'warning');
-        return;
+      // 条件チェック（カード固有の条件のみ）
+      if (effect.condition && typeof effect.condition === 'function') {
+        try {
+          const conditionResult = effect.condition(card, this.battleEngine.gameState, this.battleEngine);
+          console.log(`🔍 [CardInteraction] 条件チェック結果: ${conditionResult}`);
+          if (conditionResult === false) {
+            this.showMessage('効果の発動条件を満たしていません', 'warning');
+            return;
+          }
+        } catch (conditionError) {
+          console.error('🚨 [CardInteraction] 条件チェックエラー:', conditionError);
+          this.showMessage('効果の発動条件チェック中にエラーが発生しました', 'error');
+          return;
+        }
       }
 
       // 効果を実行
+      console.log(`🔄 [CardInteraction] 効果実行中...`);
       const result = effect.effect(card, this.battleEngine);
+      console.log(`📊 [CardInteraction] 効果実行結果:`, result);
       
-      if (result && result.success) {
+      if (result && result.success !== false) {
+        // 自動アーカイブ処理（サポートカード・イベント・LIMITED等）
+        if (result.autoArchive && this.isArchivableCard(card, position)) {
+          this.moveCardToArchive(card, position);
+        }
+        
         this.showMessage(result.message || 'カード効果を発動しました', 'success');
         this.clearActionMarks();
         
         // UI更新
         this.battleEngine.updateUI();
+        console.log(`✅ [CardInteraction] 効果発動完了`);
       } else {
-        this.showMessage(result?.message || 'カード効果を発動できませんでした', 'error');
+        // 結果に応じてメッセージタイプを決定
+        const messageType = this.determineMessageType(result);
+        this.showMessage(result?.message || 'カード効果を発動できませんでした', messageType);
+        console.log(`📝 [CardInteraction] 効果結果: ${messageType} - ${result?.message}`);
       }
       
     } catch (error) {
-      console.error('Card effect activation error:', error);
-      this.showMessage('効果の発動中にエラーが発生しました', 'error');
+      console.error('🚨 [CardInteraction] Card effect activation error:', error);
+      this.showMessage('効果の発動中にエラーが発生しました: ' + error.message, 'error');
     }
   }
 
@@ -344,34 +368,48 @@ class CardInteractionManager {
   isPlayerCard(card, position) {
     const currentPlayer = this.battleEngine.gameState.currentPlayer;
     return currentPlayer === 1; // プレイヤー1のカードかどうか
-  }  async activateCardEffect(card, position) {
-    if (!this.battleEngine.cardEffectTriggerSystem) {
-      this.showMessage('カード効果システムが初期化されていません', 'error');
-      return;
-    }
+  }
 
-    const currentPlayer = this.battleEngine.gameState.currentPlayer;
-    
-    try {
-      const result = await this.battleEngine.cardEffectTriggerSystem.manualTrigger(card.id, currentPlayer);
-      
-      if (result && result.length > 0) {
-        const successResults = result.filter(r => r.success);
-        if (successResults.length > 0) {
-          // 効果使用済みマークを設定
-          this.markEffectAsUsed(card, position);
-          
-          this.showMessage('カード効果を発動しました', 'success');
-          this.clearActionMarks();
-        } else {
-          this.showMessage('カード効果を発動できませんでした', 'error');
-        }
-      } else {
-        this.showMessage('発動可能な効果がありません', 'error');
-      }
-    } catch (error) {
-      this.showMessage('効果の発動中にエラーが発生しました', 'error');
+  /**
+   * 効果結果に基づいてメッセージタイプを決定
+   */
+  determineMessageType(result) {
+    if (!result || !result.message) {
+      return 'error';
     }
+    
+    const message = result.message.toLowerCase();
+    
+    // 警告として扱うべきメッセージパターン
+    const warningPatterns = [
+      'ライフは既に最大',
+      'エールは既に最大',
+      '既に最大',
+      '対象が見つかりません',
+      '選択できるカードがありません',
+      'カードがありません'
+    ];
+    
+    // 情報として扱うべきメッセージパターン
+    const infoPatterns = [
+      '効果を使用しました',
+      '選択をキャンセル',
+      'キャンセル'
+    ];
+    
+    for (const pattern of warningPatterns) {
+      if (message.includes(pattern)) {
+        return 'warning';
+      }
+    }
+    
+    for (const pattern of infoPatterns) {
+      if (message.includes(pattern)) {
+        return 'info';
+      }
+    }
+    
+    return 'error';
   }
 
   /**
@@ -427,17 +465,25 @@ class CardInteractionManager {
     
     const cardEffect = window.cardEffects[card.id];
     
-    // 古い形式のトリガーシステム
+    // 新形式の効果定義をチェック
+    if (cardEffect.effects) {
+      const manualEffects = Object.values(cardEffect.effects).filter(effect => 
+        effect.timing === 'manual' || effect.timing === 'activate'
+      );
+      return manualEffects.length > 0;
+    }
+    
+    // 古い形式のトリガーシステム（後方互換性）
     if (cardEffect.triggers && cardEffect.triggers.some(t => t.timing === 'manual_trigger')) {
       return true;
     }
     
-    // 新しい形式のコラボエフェクト
+    // コラボエフェクト
     if (cardEffect.collabEffect) {
       return true;
     }
     
-    // ブルームエフェクトも手動発動可能
+    // ブルームエフェクト
     if (cardEffect.bloomEffect) {
       return true;
     }
@@ -460,6 +506,30 @@ class CardInteractionManager {
 
     const cardEffect = window.cardEffects[card.id];
     if (!cardEffect) return false;
+
+    // 新形式の効果定義（サポートカード対応）
+    if (cardEffect.effects) {
+      for (const effect of Object.values(cardEffect.effects)) {
+        if (effect.timing === 'manual') {
+          // LIMITED制限チェック（システム側で統一処理）
+          if (effect.limited && !this.canUseLimitedEffect(card, position)) {
+            return false;
+          }
+          
+          // カード固有の条件チェック
+          if (effect.condition) {
+            return effect.condition(card, gameState, this.battleEngine);
+          }
+          
+          // サポートカードの場合は手札からの発動をチェック
+          if (card.card_type?.includes('サポート')) {
+            return this.canActivateSupportEffect(card, position);
+          }
+          
+          return true;
+        }
+      }
+    }
 
     // 新しい形式のコラボエフェクト
     if (cardEffect.collabEffect && position === 'collab') {
@@ -500,6 +570,59 @@ class CardInteractionManager {
           return currentPhase === 3; // メインフェーズのみ
         }
       }
+    }
+    
+    return false;
+  }
+
+  /**
+   * サポート効果発動可能かチェック
+   */
+  canActivateSupportEffect(card, position) {
+    // 手札からのみ発動可能
+    if (position !== 'hand') {
+      return false;
+    }
+    
+    // LIMITED制限チェックは上位の canActivateEffect で処理済み
+    return true;
+  }
+
+  /**
+   * LIMITED効果使用可能かチェック（システム統一制御）
+   */
+  canUseLimitedEffect(card, position) {
+    const currentPlayer = this.battleEngine.gameState.currentPlayer;
+    const player = this.battleEngine.players[currentPlayer];
+    const currentTurn = this.battleEngine.gameState.turnCount;
+    
+    // 1ターンに1回制限
+    const limitedUsedThisTurn = player.usedLimitedThisTurn || 0;
+    if (limitedUsedThisTurn > 0) {
+      this.showMessage('LIMITED効果は1ターンに1回しか使用できません', 'warning');
+      return false;
+    }
+    
+    // 先行（プレイヤー1）の最初のターンは使用不可
+    if (currentPlayer === 1 && currentTurn === 1) {
+      this.showMessage('先行の最初のターンではLIMITED効果は使用できません', 'warning');
+      return false;
+    }
+    
+    return true;
+  }
+
+  /**
+   * LIMITED効果かチェック
+   */
+  isLimitedEffect(card) {
+    if (!window.cardEffects || !window.cardEffects[card.id]) {
+      return false;
+    }
+    
+    const cardEffect = window.cardEffects[card.id];
+    if (cardEffect.effects) {
+      return Object.values(cardEffect.effects).some(effect => effect.limited);
     }
     
     return false;
@@ -613,6 +736,46 @@ class CardInteractionManager {
         msgElement.remove();
       }
     }, 3000);
+  }
+
+  /**
+   * カードがアーカイブ移動対象かチェック
+   */
+  isArchivableCard(card, position) {
+    // 手札のサポートカード（イベント・スタッフ・LIMITED）のみアーカイブ対象
+    if (position !== 'hand') {
+      return false;
+    }
+    
+    // カードタイプでチェック
+    const cardType = card.card_type || '';
+    return cardType.includes('サポート') && 
+           (cardType.includes('イベント') || 
+            cardType.includes('スタッフ') || 
+            cardType.includes('LIMITED'));
+  }
+
+  /**
+   * カードをアーカイブに移動
+   */
+  moveCardToArchive(card, position) {
+    const currentPlayer = this.battleEngine.gameState.currentPlayer;
+    const player = this.battleEngine.players[currentPlayer];
+    
+    if (position === 'hand') {
+      // 手札からアーカイブに移動
+      const cardIndex = player.hand.findIndex(handCard => handCard.id === card.id);
+      if (cardIndex !== -1) {
+        const supportCard = player.hand.splice(cardIndex, 1)[0];
+        player.archive = player.archive || [];
+        player.archive.push(supportCard);
+        console.log(`📁 [自動アーカイブ] ${supportCard.name || supportCard.id} をアーカイブに移動`);
+        return true;
+      }
+    }
+    
+    console.warn(`⚠️ [自動アーカイブ] カードが見つかりません: ${card.id} in ${position}`);
+    return false;
   }
 }
 

@@ -37,6 +37,7 @@ class CardDisplayManager {
         }
         
         console.log(`🔄 [Card Display] プレイヤー${playerId}データ:`, player);
+        console.log(`🔍 [Card Display] プレイヤー${playerId}のカード例: center=${player.center?.name}, life[0]=${player.life?.[0]?.name}`);
         
         const sectionClass = playerId === 1 ? '.battle-player' : '.battle-opponent';
         
@@ -152,8 +153,9 @@ class CardDisplayManager {
     // カードを表示
     cardsToDisplay.forEach((card, index) => {
       if (card) {
-        // プレイヤー1のカードのみドラッグ可能
-        const isPlayerCard = (actualPlayerId === 1);
+        // プレイヤーIDに基づいて判定（エリアの場所ではなく、実際に処理中のプレイヤーIDを使用）
+        const isPlayerCard = (playerId === 1);
+        console.log(`🔍 [Card Display] カード表示: ${card.name}, プレイヤーID: ${playerId}, isPlayerCard: ${isPlayerCard}, エリア: ${areaId}`);
         const cardElement = this.createCardElement(card, areaId, index, isPlayerCard);
         area.appendChild(cardElement);
         
@@ -286,11 +288,17 @@ class CardDisplayManager {
       cardElement.title = card.name;
     }
     
+    // 効果発動ボタンを追加（条件を満たす場合のみ）
+    this.addEffectButtonIfNeeded(cardElement, card, areaId, isPlayerCard);
+    
     // カードクリック処理の追加
     if (areaId !== 'deck' && areaId !== 'yell-deck') {
       const clickHandler = (e) => {
-        if (typeof this.battleEngine.showCardModal === 'function') {
-          this.battleEngine.showCardModal(card);
+        // CardInteractionManagerを使用してカード詳細をinfo-panelに表示
+        if (this.battleEngine.cardInteractionManager) {
+          this.battleEngine.cardInteractionManager.showCardInfo(card, areaId);
+        } else if (typeof this.battleEngine.showCardModal === 'function') {
+          this.battleEngine.showCardModal(card, areaId);
         } else {
           console.log('カード情報:', card);
         }
@@ -944,12 +952,210 @@ class CardDisplayManager {
       cardName.textContent = card.name;
     }
     
-    // 強制的にレンダリングを再実行
+        // 強制的にレンダリングを再実行
     existingCardElement.style.display = 'none';
     existingCardElement.offsetHeight; // リフロー強制
     existingCardElement.style.display = '';
     
     console.log(`🔄 [Card Display] バック個別カード更新完了: ${card.name} (resting: ${existingCardElement.classList.contains('resting')})`);
+  }
+
+  /**
+   * 効果発動ボタンを必要に応じて追加
+   */
+  addEffectButtonIfNeeded(cardElement, card, areaId, isPlayerCard) {
+    console.log(`🔍 [効果ボタン] チェック開始: ${card.name || card.id}, エリア: ${areaId}, プレイヤーカード: ${isPlayerCard}`);
+    
+    // プレイヤーのカードのみ
+    if (!isPlayerCard) {
+      console.log(`❌ [効果ボタン] プレイヤーカードではない`);
+      return;
+    }
+    
+    // フェーズ判定の詳細ログ
+    const currentPhase = this.battleEngine.gameState?.currentPhase;
+    const gameState = this.battleEngine.gameState;
+    console.log(`🔍 [効果ボタン] フェーズ詳細:`, {
+      currentPhase: currentPhase,
+      gameStateExists: !!gameState,
+      gameState: gameState,
+      isMain1: currentPhase === 3,
+      isMain2: currentPhase === 'main',
+      typeof: typeof currentPhase
+    });
+    
+    // メインステップでのみ効果ボタンを表示（文字列と数値の両方に対応）
+    if (currentPhase !== 3 && currentPhase !== 'main') {
+      console.log(`❌ [効果ボタン] メインステップではない (現在フェーズ: ${currentPhase})`);
+      return;
+    }
+    
+    console.log(`✅ [効果ボタン] メインステップ確認OK (フェーズ: ${currentPhase})`);
+    
+    // 効果発動可能なエリアを定義
+    const validAreas = ['hand', 'center', 'collab', 'back1', 'back2', 'back3', 'back4', 'back5', 'backs', 'oshi', 'life', 'holo', 'archive'];
+    if (!validAreas.includes(areaId)) {
+      console.log(`❌ [効果ボタン] 無効なエリア: ${areaId}`);
+      return;
+    }
+    
+    // エリア別の効果発動可能性チェック
+    if (areaId === 'hand') {
+      // 手札：サポートカードのみ効果発動可能
+      const isSupport = card.card_type?.includes('サポート');
+      if (!isSupport) {
+        console.log(`❌ [効果ボタン] 手札のホロメンカードは効果発動不可: ${card.name || card.id}`);
+        return;
+      }
+      console.log(`✅ [効果ボタン] 手札のサポートカード: ${card.name || card.id}`);
+    } else if (['center', 'collab', 'backs', 'back1', 'back2', 'back3', 'back4', 'back5'].includes(areaId)) {
+      // フィールド：ホロメンカードの効果発動可能
+      const isHolomen = card.card_type?.includes('ホロメン');
+      if (!isHolomen) {
+        console.log(`❌ [効果ボタン] フィールドの非ホロメンカードは効果発動不可: ${card.name || card.id}`);
+        return;
+      }
+      console.log(`✅ [効果ボタン] フィールドのホロメンカード: ${card.name || card.id}`);
+    } else if (areaId === 'oshi') {
+      // 推しホロメン：効果発動可能
+      console.log(`✅ [効果ボタン] 推しホロメン: ${card.name || card.id}`);
+    } else if (['life', 'holo', 'archive'].includes(areaId)) {
+      // その他のエリア：通常は効果発動不可だが、特定の効果があれば可能
+      console.log(`🔍 [効果ボタン] 特殊エリア (${areaId}) のカード: ${card.name || card.id}`);
+    }
+    
+    // デバッグ用：hSD01-016の場合は強制的にボタンを表示
+    const isTestCard = card.id === 'hSD01-016' || card.number === 'hSD01-016';
+    console.log(`🔍 [効果ボタン] カード: ${card.name || card.id}, ID: ${card.id}, テストカード: ${isTestCard}, エリア: ${areaId}`);
+    
+    // カードに効果があるか確認（またはテストカード）
+    const hasEffect = this.cardHasActivatableEffect(card, areaId) || isTestCard;
+    console.log(`🔍 [効果ボタン] 効果チェック結果: ${hasEffect}`);
+    
+    if (!hasEffect) {
+      console.log(`❌ [効果ボタン] 発動可能な効果なし`);
+      return;
+    }
+    
+    console.log(`✅ [効果ボタン] 効果ボタンを作成中...`);
+    
+    const effectButton = document.createElement('div');
+    effectButton.className = 'card-effect-button';
+    
+    // LIMITED効果の場合は特別なスタイル
+    const isLimited = this.isLimitedSupport(card);
+    if (isLimited) {
+      effectButton.classList.add('limited');
+      effectButton.textContent = 'LIMITED効果';
+    } else {
+      effectButton.textContent = '効果発動';
+    }
+    
+    // ボタンクリックイベント
+    effectButton.addEventListener('click', (e) => {
+      e.stopPropagation();
+      console.log(`🎯 [効果ボタン] クリック: ${card.name || card.id}`);
+      this.activateCardEffect(card, areaId);
+    });
+    
+    cardElement.appendChild(effectButton);
+    console.log(`✅ [効果ボタン] 効果ボタンを追加完了: ${card.name || card.id}`);
+  }
+
+  /**
+   * カードに発動可能な効果があるかチェック
+   */
+  cardHasActivatableEffect(card, areaId) {
+    // デバッグログ追加
+    console.log(`🔍 [効果チェック] カード: ${card.name || card.id}, エリア: ${areaId}`);
+    
+    // カード効果定義をチェック
+    if (!window.cardEffects || !window.cardEffects[card.id]) {
+      console.log(`❌ [効果チェック] カード効果定義なし: ${card.id}`);
+      return false;
+    }
+    
+    const cardEffect = window.cardEffects[card.id];
+    console.log(`✅ [効果チェック] カード効果定義あり:`, cardEffect);
+    
+    // 新形式の効果定義をチェック
+    if (cardEffect.effects) {
+      const manualEffects = Object.values(cardEffect.effects).filter(effect => {
+        const isManual = effect.timing === 'manual';
+        let conditionMet = true;
+        
+        // conditionが定義されている場合のみチェック
+        if (effect.condition && typeof effect.condition === 'function') {
+          try {
+            const result = effect.condition(card, this.battleEngine.gameState, this.battleEngine);
+            // undefinedやnullの場合はtrueとして扱う
+            conditionMet = result !== false;
+            console.log(`🔍 [効果チェック] 条件関数結果: ${effect.name} = ${result} (判定: ${conditionMet})`);
+          } catch (error) {
+            console.warn(`🔶 [効果チェック] 条件関数エラー: ${effect.name}`, error);
+            conditionMet = false;
+          }
+        } else if (effect.condition === undefined) {
+          // 条件が未定義の場合は常に発動可能とみなす
+          console.log(`🔍 [効果チェック] 条件未定義のため発動可能: ${effect.name}`);
+          conditionMet = true;
+        }
+        
+        console.log(`🔍 [効果チェック] 効果: ${effect.name}, manual: ${isManual}, condition: ${conditionMet}`);
+        return isManual && conditionMet;
+      });
+      console.log(`📊 [効果チェック] 発動可能な効果数: ${manualEffects.length}`);
+      return manualEffects.length > 0;
+    }
+    
+    console.log(`❌ [効果チェック] 効果定義の形式が不正`);
+    return false;
+  }
+
+  /**
+   * サポートカードがLIMITED効果を持つかチェック
+   */
+  isLimitedSupport(card) {
+    // カード効果定義をチェック
+    if (!window.cardEffects || !window.cardEffects[card.id]) {
+      return false;
+    }
+    
+    const cardEffect = window.cardEffects[card.id];
+    
+    // 効果にLIMITEDが含まれるかチェック
+    if (cardEffect.effects) {
+      return Object.values(cardEffect.effects).some(effect => 
+        effect.timing === 'manual' && 
+        (effect.name?.includes('LIMITED') || effect.description?.includes('LIMITED'))
+      );
+    }
+    
+    return false;
+  }
+
+  /**
+   * カード効果を発動
+   */
+  async activateCardEffect(card, areaId) {
+    console.log(`🎯 [効果発動] 開始: ${card.name || card.id}, エリア: ${areaId}`);
+    
+    if (!this.battleEngine.cardInteractionManager) {
+      console.warn('🚨 [効果発動] CardInteractionManager not available');
+      alert('カードインタラクションシステムが初期化されていません');
+      return;
+    }
+    
+    console.log(`✅ [効果発動] CardInteractionManager確認OK`);
+    
+    try {
+      console.log(`🔄 [効果発動] activateCardEffect呼び出し中...`);
+      await this.battleEngine.cardInteractionManager.activateCardEffect(card, areaId);
+      console.log(`✅ [効果発動] activateCardEffect完了`);
+    } catch (error) {
+      console.error('🚨 [効果発動] Effect activation error:', error);
+      alert('効果の発動中にエラーが発生しました: ' + error.message);
+    }
   }
 }
 

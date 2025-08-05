@@ -54,7 +54,9 @@ class HandManager {
       
       // 手札が存在する場合のみ表示
       if (player.hand && Array.isArray(player.hand)) {
+        console.log(`🎴 [手札表示] 手札カード数: ${player.hand.length}`);
         player.hand.forEach((card, index) => {
+          console.log(`🎴 [手札表示] ${index}: ${card.name} (${card.id})`);
           const cardElement = this.createHandCardElement(card, index);
           handArea.appendChild(cardElement);
         });
@@ -135,14 +137,25 @@ class HandManager {
     cardElement._dragEndHandler = dragEndHandler;
     cardElement._clickHandler = clickHandler;
     
+    // 効果ボタンを追加（CardDisplayManagerを使用）
+    if (this.battleEngine.cardDisplayManager) {
+      this.battleEngine.cardDisplayManager.addEffectButtonIfNeeded(cardElement, card, 'hand', true);
+    }
+    
     return cardElement;
   }
 
   // 手札カードのクリック処理
   handleHandCardClick(card, index) {
-    // メインステップでのみカードをプレイ可能
+    // まずinfo-panelにカード詳細を表示
+    if (this.battleEngine.cardInteractionManager) {
+      this.battleEngine.cardInteractionManager.showCardInfo(card, 'hand');
+    }
+    
+    // メインステップでのみカードをプレイ可能（従来の処理も残す）
     if (this.battleEngine.gameState.currentPhase === 3) {
-      this.battleEngine.playCard(card, index);
+      // プレイ処理は一旦コメントアウト（詳細表示を優先）
+      // this.battleEngine.playCard(card, index);
     } else {
       window.debugLog('メインステップでのみカードをプレイできます');
     }
@@ -354,21 +367,35 @@ class HandManager {
 
   // サポートカード使用処理
   playSupportCard(card, handIndex) {
+    console.log(`🚨 [DEBUG] playSupportCard呼び出し: ${card.name}, handIndex: ${handIndex}`);
+    console.trace('playSupportCard call stack');
+    
     const player = this.battleEngine.players[this.battleEngine.gameState.currentPlayer];
     
-    // LIMITED制限チェック（これのみ残す）
+    // LIMITED制限チェック（統一管理関数を使用）
     if (card.card_type.includes('LIMITED')) {
-      if (player.usedLimitedThisTurn.length > 0) {
-        window.debugLog('このターンには既にLIMITEDカードを使用しています');
-        return;
+      if (this.battleEngine.cardInteractionManager) {
+        const canUse = this.battleEngine.cardInteractionManager.canUseLimitedEffect(card, 'hand');
+        if (!canUse) {
+          window.debugLog('LIMITED制限により使用できません');
+          return;
+        }
+      } else {
+        // フォールバック（旧来の方式）
+        const limitedUsedThisTurn = player.usedLimitedThisTurn || 0;
+        if (limitedUsedThisTurn > 0) {
+          window.debugLog('このターンには既にLIMITEDカードを使用しています');
+          return;
+        }
+        player.usedLimitedThisTurn = (player.usedLimitedThisTurn || 0) + 1;
       }
-      player.usedLimitedThisTurn.push(card.id);
     }
     
     // サポート効果の実行（簡易版）
     window.debugLog(`${card.name}を使用しました`);
     
     // 手札から除去してアーカイブへ
+    console.log(`🚨 [DEBUG] カードを手札から除去: ${card.name}`);
     player.hand.splice(handIndex, 1);
     player.archive.push(card);
     

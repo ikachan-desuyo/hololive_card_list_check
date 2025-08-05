@@ -428,6 +428,95 @@ body {
   box-shadow: 0 4px 20px rgba(0, 0, 0, 0.5);
 }
 
+/* カード効果発動ボタン */
+.card-effect-button {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  background: rgba(255, 215, 0, 0.95);
+  color: #333;
+  border: 2px solid #ffd700;
+  border-radius: 20px;
+  padding: 8px 16px;
+  font-size: 12px;
+  font-weight: bold;
+  cursor: pointer;
+  z-index: 25;
+  opacity: 0;
+  visibility: hidden;
+  transition: all 0.3s ease;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.4);
+  pointer-events: auto;
+  white-space: nowrap;
+}
+
+.card-effect-button:hover {
+  background: rgba(255, 223, 0, 1);
+  transform: translate(-50%, -50%) scale(1.05);
+  box-shadow: 0 6px 16px rgba(0, 0, 0, 0.5);
+}
+
+.card-effect-button.limited {
+  background: rgba(255, 105, 180, 0.95);
+  border-color: #ff69b4;
+  color: white;
+}
+
+.card-effect-button.limited:hover {
+  background: rgba(255, 105, 180, 1);
+}
+
+/* カードホバー時にボタンを表示 */
+.hand-card:hover .card-effect-button,
+.collab .card:hover .card-effect-button,
+.center .card:hover .card-effect-button,
+.back-slot .card:hover .card-effect-button {
+  opacity: 1;
+  visibility: visible;
+}
+
+/* アクションマーク（既存の実装を強化） */
+.card-action-marks {
+  position: absolute;
+  top: 5px;
+  right: 5px;
+  display: flex;
+  gap: 3px;
+  z-index: 30;
+  pointer-events: none;
+}
+
+.action-mark {
+  width: 24px;
+  height: 24px;
+  border-radius: 50%;
+  background: rgba(0, 0, 0, 0.8);
+  color: white;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 14px;
+  cursor: pointer;
+  pointer-events: auto;
+  transition: transform 0.2s;
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.3);
+}
+
+.action-mark:hover {
+  transform: scale(1.2);
+  background: rgba(0, 0, 0, 0.9);
+}
+
+.action-mark.action-effect {
+  background: rgba(255, 215, 0, 0.9);
+  color: #333;
+}
+
+.action-mark.action-effect:hover {
+  background: rgba(255, 215, 0, 1);
+}
+
 /* デッキとアーカイブのスタック表示はJavaScriptで制御 */
 /* 注意: .deck, .archive, .yell-deck内のカードの位置・重なりは
    JavaScript(card-display-manager.js)のapplyDisplayTypeStylesで動的計算されます */

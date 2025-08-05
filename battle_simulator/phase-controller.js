@@ -292,6 +292,9 @@ class PhaseController {
       });
     }
     
+    // 4. LIMITED効果の使用回数をリセット
+    player.usedLimitedThisTurn = 0;
+    
     // UI更新
     this.battleEngine.updateUI();
     
@@ -517,8 +520,8 @@ class PhaseController {
       window.infoPanelManager.logStepProgress(this.battleEngine.gameState.turnCount, 'エンドステップ', playerName, 'ターン終了処理');
     }
     
-    // ターン終了時の処理（LIMITEDカード制限のみリセット）
-    this.battleEngine.players[playerId].usedLimitedThisTurn = [];
+    // ターン終了時の処理（LIMITED効果の使用回数をリセット）
+    this.battleEngine.players[playerId].usedLimitedThisTurn = 0;
     
     // エンドステップは自動で完了し、相手のターンに移行（プレイヤー・CPU共通）
     setTimeout(() => {

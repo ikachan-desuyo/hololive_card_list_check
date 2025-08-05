@@ -64,6 +64,19 @@ class HololiveBattleEngine {
     // カード表示管理の初期化
     this.cardDisplayManager = new CardDisplayManager(this);
     
+    // カードインタラクション管理の初期化
+    try {
+      if (typeof CardInteractionManager === 'undefined') {
+        throw new Error('CardInteractionManager クラスが読み込まれていません');
+      }
+      this.cardInteractionManager = new CardInteractionManager(this);
+      window.debugLog('✅ CardInteractionManager初期化成功');
+    } catch (error) {
+      window.errorLog('❌ CardInteractionManager初期化エラー:', error);
+      // カードインタラクション機能がなくてもゲームは続行可能
+      this.cardInteractionManager = null;
+    }
+    
     // 情報パネル管理の初期化
     if (!window.infoPanelManager) {
       window.infoPanelManager = new InfoPanelManager();
@@ -274,8 +287,14 @@ class HololiveBattleEngine {
       set hand(value) { handProxy.set(value); },
       
       // ゲーム状態（LIMITEDカード制限のみ残す）
-      get usedLimitedThisTurn() { return self.stateManager.getStateByPath(`players.${playerId}.gameState.usedLimitedThisTurn`) || []; },
-      set usedLimitedThisTurn(value) { self.updatePlayerGameState(playerId, 'usedLimitedThisTurn', value); },
+      get usedLimitedThisTurn() { 
+        const current = self.stateManager.getStateByPath(`players.${playerId}.gameState.usedLimitedThisTurn`);
+        return typeof current === 'number' ? current : (Array.isArray(current) ? current.length : 0);
+      },
+      set usedLimitedThisTurn(value) { 
+        const numValue = typeof value === 'number' ? value : (Array.isArray(value) ? value.length : 0);
+        self.updatePlayerGameState(playerId, 'usedLimitedThisTurn', numValue); 
+      },
       
       get restHolomem() { return self.stateManager.getStateByPath(`players.${playerId}.gameState.restHolomem`) || []; },
       set restHolomem(value) { self.updatePlayerGameState(playerId, 'restHolomem', value); },

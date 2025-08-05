@@ -117,9 +117,19 @@ class EffectPatternTemplates {
    * 基本的なLIMITEDサポートカードの処理
    */
   async executeLimitedSupport(card, context, battleEngine) {
-    // LIMITED制限チェック
-    if (!this.checkLimitedRestriction(card, battleEngine)) {
-      return { success: false, reason: 'LIMITED制限により使用できません' };
+    // LIMITED制限チェック（統一管理関数を使用）
+    if (card.card_type?.includes('LIMITED')) {
+      if (battleEngine.cardInteractionManager) {
+        const canUse = battleEngine.cardInteractionManager.canUseLimitedEffect(card, 'hand');
+        if (!canUse) {
+          return { success: false, reason: 'LIMITED制限により使用できません' };
+        }
+      } else {
+        // フォールバック（旧来の方式）
+        if (!this.checkLimitedRestriction(card, battleEngine)) {
+          return { success: false, reason: 'LIMITED制限により使用できません' };
+        }
+      }
     }
 
     // 個別効果は別途実装されている場合はそちらを優先
