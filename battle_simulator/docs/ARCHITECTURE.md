@@ -16,7 +16,12 @@ HololiveBattleEngine (メインエンジン)
 ├── HololiveCPULogic (CPU思考)
 ├── HandManager (手札管理)
 ├── CardDisplayManager (カード表示)
-└── InfoPanelManager (情報パネル)
+├── CardInteractionManager (カードクリック管理)
+├── InfoPanelManager (情報パネル)
+└── カード効果システム
+    ├── CardEffectManager (効果実行)
+    ├── ScalableCardEffectManager (スケーラブル管理)
+    └── EffectRegistry (効果登録)
 ```
 
 ## モジュール構成
@@ -32,7 +37,17 @@ HololiveBattleEngine (メインエンジン)
 | cpu_logic.js | HololiveCPULogic | AI思考ロジック |
 | hand-manager.js | HandManager | 手札表示と管理 |
 | card-display-manager.js | CardDisplayManager | カード描画とUI更新 |
+| card-interaction-manager.js | CardInteractionManager | カードクリック時の動作管理 |
 | info-panel-manager.js | InfoPanelManager | 情報パネル表示 |
+
+### カード効果システム
+
+| ファイル名 | クラス名 | 責務 |
+|-----------|----------|------|
+| card-effects/card-effect-manager.js | CardEffectManager | カード効果の登録と実行 |
+| card-effects/scalable-card-effect-manager.js | ScalableCardEffectManager | スケーラブルなカード効果管理 |
+| card-effects/effect-registry.js | - | 効果の登録システム |
+| card-effects/card-loader.js | - | カード効果の動的読み込み |
 
 ## 主要な依存関係
 
@@ -47,6 +62,8 @@ graph TD
     A --> H[HandManager]
     A --> I[CardDisplayManager]
     A --> J[InfoPanelManager]
+    A --> K[CardInteractionManager]
+    A --> L[CardEffectManager]
     
     C --> B
     D --> B
@@ -55,6 +72,12 @@ graph TD
     G --> B
     H --> B
     I --> B
+    K --> B
+    L --> B
+    
+    K --> I
+    K --> J
+    I --> K
 ```
 
 ## ゲーム状態構造
@@ -63,8 +86,9 @@ graph TD
 gameState = {
   gameStarted: boolean,
   currentPlayer: number, // 1 or 2
-  currentPhase: number,  // -1=準備, 0=リセット, 1=ドロー, 2=エール, 3=メイン, 4=パフォーマンス, 5=エンド
+  currentPhase: string,  // 'setup', 'reset', 'draw', 'cheer', 'main', 'performance'
   turn: number,
+  turnCount: number,
   isGameOver: boolean,
   winner: number,
   p1Ready: boolean,
@@ -86,7 +110,16 @@ players[1/2] = {
   },
   gameState: {
     usedLimitedThisTurn: string[],
-    restHolomem: Card[]
+    restHolomem: Card[],
+    // カード効果の状態管理
+    effectStates: {
+      [cardId]: {
+        bloomEffectUsed: boolean,
+        collabEffectUsed: boolean,
+        bloomedTurn: number,
+        collabedTurn: number
+      }
+    }
   },
   deckInfo: {
     oshiCard: Card,

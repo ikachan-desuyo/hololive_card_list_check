@@ -138,18 +138,96 @@ function updateMultipleUIElements() {
 }
 ```
 
-### 4. モジュール間通信パターン
+### 5. カードインタラクション開発パターン
 ```javascript
-// 他のモジュールと連携する際の推奨パターン
-class ModuleA {
-    doSomething() {
-        // 1. 自分の責務を実行
-        this.performLocalOperation();
+// CardInteractionManagerを使用したカードクリック処理
+class CustomCardHandler {
+    setupCardClick(card, position) {
+        // カード情報表示とアクションマーク表示
+        battleEngine.cardInteractionManager.showCardInfo(card, position);
+    }
+    
+    // カスタム効果の追加
+    registerCustomEffect(cardId, effectConfig) {
+        battleEngine.cardEffectManager.registerCardEffect(cardId, {
+            canActivate: (card, context) => {
+                // 発動条件をチェック
+                return this.checkActivationConditions(card, context);
+            },
+            onActivate: (card, context) => {
+                // 効果実行処理
+                return this.executeCustomEffect(card, context);
+            }
+        });
+    }
+}
+```
+
+### 6. カード効果開発パターン
+```javascript
+// 新しいカード効果の実装例
+const cardEffectConfig = {
+    // ブルーム効果
+    bloomEffect: {
+        timing: 'on_bloom',
+        condition: (card, gameState) => {
+            return card.cardState?.bloomedThisTurn === true;
+        },
+        effect: (card, battleEngine) => {
+            // ブルーム効果の処理
+            console.log(`${card.name}のブルーム効果発動！`);
+            return { success: true, message: 'ブルーム効果が発動しました' };
+        }
+    },
+    
+    // コラボ効果
+    collabEffect: {
+        timing: 'on_collab',
+        condition: (card, gameState) => {
+            return card.collabedTurn === gameState.turnCount;
+        },
+        effect: (card, battleEngine) => {
+            // コラボ効果の処理
+            return { success: true, message: 'コラボ効果が発動しました' };
+        }
+    }
+};
+
+// 効果の登録
+battleEngine.cardEffectManager.registerCardEffect('hBP04-089_U', cardEffectConfig);
+```
+
+### 7. UI更新とデバウンス処理パターン
+```javascript
+// CardDisplayManagerの更新処理
+class UIUpdateManager {
+    constructor() {
+        this.updateQueue = [];
+        this.isUpdating = false;
+        this.debounceTimer = null;
+    }
+    
+    requestUpdate(updateType, data) {
+        // デバウンス処理で過度な更新を防ぐ
+        if (this.debounceTimer) {
+            clearTimeout(this.debounceTimer);
+        }
         
-        // 2. 他モジュールへ通知（直接呼び出しではなくイベント経由推奨）
-        document.dispatchEvent(new CustomEvent('moduleACompleted', {
-            detail: { result: 'success' }
-        }));
+        this.debounceTimer = setTimeout(() => {
+            this.executeUpdate(updateType, data);
+        }, 50);
+    }
+    
+    executeUpdate(updateType, data) {
+        if (this.isUpdating) return;
+        
+        this.isUpdating = true;
+        try {
+            // 実際の更新処理
+            this.performUpdate(updateType, data);
+        } finally {
+            this.isUpdating = false;
+        }
     }
 }
 ```

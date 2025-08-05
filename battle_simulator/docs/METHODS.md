@@ -154,16 +154,85 @@
 
 ### 表示管理系
 - `constructor(battleEngine)` - カード表示管理初期化
-- `updateCardAreas()` - 全カードエリア更新
-- `displayCardsInArea(area, cards, areaId)` - 指定エリアのカード表示
-- `createCardElement(card, areaId)` - カード要素作成
+- `updateCardAreas()` - 全カードエリア更新（デバウンス対応）
+- `displayCardsInArea(area, cards, areaId, playerId, isMultiple)` - 指定エリアのカード表示
+- `createCardElement(card, areaId, cardIndex, isPlayerCard)` - カード要素作成
 - `updateBackSlots(playerType)` - バックスロット更新
+- `cleanupAreaEventListeners(area)` - エリア内イベントリスナークリーンアップ
+
+### 個別更新系
+- `updateCardDisplay(card, position, playerId)` - 個別カード表示即座更新
+- `updateCollabCardDisplay(card, playerId)` - コラボエリア個別カード更新
+- `updateBackCardDisplay(card, position, playerId)` - バックエリア個別カード更新
 
 ### 視覚効果系
-- `addYellCardsToArea(area, card, areaId)` - エールカード表示追加
+- `addYellCardsToArea(area, holomenCard, areaId, cardIndex)` - エールカード表示追加
+- `addYellCardsToDisplay(cardElement, holomenCard, areaId)` - エールカード表示追加（旧関数）
 - `updateCardCounter(area, count)` - カードカウンター更新
-- `applyDisplayTypeStyles(cardElement, areaId)` - 表示スタイル適用
+- `applyDisplayTypeStyles(cardElement, areaId, cardIndex)` - 表示スタイル適用
 - `shouldCardBeFaceUp(card, areaId)` - 表向き表示判定
+- `updatePhaseHighlight()` - フェーズハイライト更新
+
+### ユーティリティ系
+- `getCardCount(player, areaId)` - カード数取得
+
+## CardInteractionManager (card-interaction-manager.js)
+
+### カードクリック処理系
+- `constructor(battleEngine)` - カードインタラクション管理初期化
+- `initializeCardInteractions()` - カードインタラクションの初期化
+- `showCardInfo(card, position)` - カード情報表示とアクションマーク表示
+- `showCardDetailInPanel(card)` - 右側パネルにカード詳細表示
+- `formatCardDetailForPanel(card)` - パネル用カード詳細HTMLフォーマット
+
+### アクション表示系
+- `showActionMarksOnCard(card, position)` - カード上にアクションマーク表示
+- `clearActionMarks()` - アクションマーククリア
+- `getAvailableActions(card, position)` - 利用可能アクション取得
+- `executeAction(actionId, cardId, position)` - アクション実行
+
+### カード効果発動系
+- `activateCardEffect(card, position)` - カード効果の手動発動
+- `hasManualEffect(card)` - 手動発動可能効果チェック
+- `canActivateEffect(card, position)` - 効果発動可能判定
+- `canActivateBloomEffect(card, position)` - ブルーム効果発動可能判定
+- `canActivateCollabEffect(card, position)` - コラボ効果発動可能判定
+- `canActivateGiftEffect(card, position)` - ギフト効果発動可能判定
+- `markEffectAsUsed(card, position)` - 効果使用済みマーク設定
+
+### ユーティリティ系
+- `findCardElement(cardId)` - カード要素検索
+- `findCard(cardId)` - カードオブジェクト検索
+- `isPlayerCard(card, position)` - プレイヤーカード判定
+- `showMessage(message, type)` - メッセージ表示
+
+## CardEffectManager (card-effects/card-effect-manager.js)
+
+### 効果管理系
+- `constructor(battleEngine)` - カード効果管理初期化
+- `registerCardEffect(cardId, effectConfig)` - カード効果登録
+- `executeEffect(card, triggerType, context)` - カード効果実行
+- `canActivate(card, triggerType, context)` - 効果発動可能判定
+- `getTriggers(card)` - カードのトリガー取得
+
+### 効果実行系
+- `triggerEffects(triggerType, context)` - 指定タイプの効果発動
+- `manualTrigger(cardId, playerId)` - 手動効果発動
+- `validateEffectExecution(card, effect)` - 効果実行検証
+
+## ScalableCardEffectManager (card-effects/scalable-card-effect-manager.js)
+
+### システム管理系
+- `constructor()` - スケーラブル効果管理初期化
+- `initializeSystem()` - システム初期化
+- `loadCardMetadata()` - カードメタデータ読み込み
+- `registerEffectPatterns()` - 効果パターン登録
+- `preloadCommonCards()` - 高頻度カード事前読み込み
+
+### 動的読み込み系
+- `loadCardEffect(cardId)` - カード効果動的読み込み
+- `unloadCardEffect(cardId)` - カード効果アンロード
+- `getEffectPattern(patternName)` - 効果パターン取得
 
 ## InfoPanelManager (info-panel-manager.js)
 

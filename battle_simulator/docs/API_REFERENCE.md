@@ -45,6 +45,9 @@ battleEngine.setupManager: HololiveGameSetupManager
 battleEngine.cpuLogic: HololiveCPULogic
 battleEngine.handManager: HandManager
 battleEngine.cardDisplayManager: CardDisplayManager
+battleEngine.cardInteractionManager: CardInteractionManager
+battleEngine.infoPanelManager: InfoPanelManager
+battleEngine.cardEffectManager: CardEffectManager
 ```
 
 #### メソッド
@@ -217,17 +220,60 @@ handManager.getHandSize(playerId: number): number
 
 #### メソッド
 ```javascript
-// 全カードエリア更新
+// 全カードエリア更新（デバウンス対応）
 cardDisplayManager.updateCardAreas(): void
 
 // 指定エリアのカード表示
-cardDisplayManager.displayCardsInArea(area: Element, cards: Card[], areaId: string, playerId: number): void
+cardDisplayManager.displayCardsInArea(area: Element, cards: Card[], areaId: string, playerId: number, isMultiple: boolean): void
 
 // カード要素作成
-cardDisplayManager.createCardElement(card: Card, areaId: string, cardIndex: number): HTMLElement
+cardDisplayManager.createCardElement(card: Card, areaId: string, cardIndex: number, isPlayerCard: boolean): HTMLElement
 
 // バックスロット更新
 cardDisplayManager.updateBackSlots(playerType: string): void
+
+// 個別カード表示更新
+cardDisplayManager.updateCardDisplay(card: Card, position: string, playerId: number): void
+
+// エールカード表示
+cardDisplayManager.addYellCardsToArea(area: Element, holomenCard: Card, areaId: string, cardIndex: number): void
+```
+
+### CardInteractionManager
+
+#### メソッド
+```javascript
+// カード情報表示
+cardInteractionManager.showCardInfo(card: Card, position: string): void
+
+// カード上にアクションマーク表示
+cardInteractionManager.showActionMarksOnCard(card: Card, position: string): void
+
+// カード効果発動
+cardInteractionManager.activateCardEffect(card: Card, position: string): Promise<void>
+
+// 効果発動可能判定
+cardInteractionManager.canActivateEffect(card: Card, position: string): boolean
+
+// アクションマーククリア
+cardInteractionManager.clearActionMarks(): void
+```
+
+### CardEffectManager
+
+#### メソッド
+```javascript
+// カード効果登録
+cardEffectManager.registerCardEffect(cardId: string, effectConfig: object): void
+
+// カード効果実行
+cardEffectManager.executeEffect(card: Card, triggerType: string, context: object): object
+
+// 効果発動可能判定
+cardEffectManager.canActivate(card: Card, triggerType: string, context: object): boolean
+
+// 手動効果発動
+cardEffectManager.manualTrigger(cardId: string, playerId: number): Promise<object[]>
 ```
 
 ## データ型定義
@@ -243,14 +289,23 @@ interface Card {
     hp?: number;
     attack?: number;
     description?: string;
+    skill_description?: string;
     image_url?: string;
     bloom_level?: number;
     yellCards?: Card[];
     cardState?: {
         bloomedThisTurn?: boolean;
         isResting?: boolean;
+        resting?: boolean;
         position?: string;
+        bloomEffectUsed?: boolean;
+        collabEffectUsed?: boolean;
     };
+    isResting?: boolean;
+    bloomedTurn?: number;
+    collabedTurn?: number;
+    bloomEffectUsed?: boolean;
+    collabEffectUsed?: boolean;
 }
 ```
 
@@ -276,6 +331,14 @@ interface PlayerState {
     gameState: {
         usedLimitedThisTurn: string[];
         restHolomem: Card[];
+        effectStates?: {
+            [cardId: string]: {
+                bloomEffectUsed?: boolean;
+                collabEffectUsed?: boolean;
+                bloomedTurn?: number;
+                collabedTurn?: number;
+            };
+        };
     };
     deckInfo: {
         oshiCard: Card;
@@ -290,8 +353,9 @@ interface PlayerState {
 interface GameState {
     gameStarted: boolean;
     currentPlayer: number;
-    currentPhase: number;
+    currentPhase: string; // 'setup', 'reset', 'draw', 'cheer', 'main', 'performance'
     turn: number;
+    turnCount: number;
     isGameOver: boolean;
     winner: number;
     p1Ready: boolean;

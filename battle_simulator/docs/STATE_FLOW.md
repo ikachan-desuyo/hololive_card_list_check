@@ -16,8 +16,7 @@ stateDiagram-v2
         ドローフェーズ --> エールフェーズ : nextPhase()
         エールフェーズ --> メインフェーズ : nextPhase()
         メインフェーズ --> パフォーマンスフェーズ : nextPhase()
-        パフォーマンスフェーズ --> エンドフェーズ : nextPhase()
-        エンドフェーズ --> [*] : endTurn()
+        パフォーマンスフェーズ --> [*] : endTurn()
     }
     
     プレイヤー1ターン --> プレイヤー2ターン : ターン終了
@@ -29,7 +28,7 @@ stateDiagram-v2
 
 ## フェーズ詳細フロー
 
-### リセットフェーズ (Phase 0)
+### リセットフェーズ (Phase: 'reset')
 ```mermaid
 flowchart TD
     A[リセットフェーズ開始] --> B[カード状態リセット]
@@ -39,7 +38,7 @@ flowchart TD
     E --> F[次フェーズへ]
 ```
 
-### ドローフェーズ (Phase 1)
+### ドローフェーズ (Phase: 'draw')
 ```mermaid
 flowchart TD
     A[ドローフェーズ開始] --> B{ターン1?}
@@ -51,7 +50,7 @@ flowchart TD
     F --> G[次フェーズへ]
 ```
 
-### エールフェーズ (Phase 2)
+### エールフェーズ (Phase: 'cheer')
 ```mermaid
 flowchart TD
     A[エールフェーズ開始] --> B[エールデッキからドロー]
@@ -63,7 +62,7 @@ flowchart TD
     F --> G
 ```
 
-### メインフェーズ (Phase 3)
+### メインフェーズ (Phase: 'main')
 ```mermaid
 flowchart TD
     A[メインフェーズ開始] --> B[手札からカード選択]
@@ -84,20 +83,18 @@ flowchart TD
     L -->|No| M[次フェーズへ]
 ```
 
-### パフォーマンスフェーズ (Phase 4)
+### パフォーマンスフェーズ (Phase: 'performance')
 ```mermaid
 flowchart TD
     A[パフォーマンスフェーズ開始] --> B[パフォーマンス可能ホロメン確認]
     B --> C{パフォーマンス実行?}
     C -->|Yes| D[ターゲット選択]
-    C -->|No| H[次フェーズへ]
+    C -->|No| H[ターン終了]
     D --> E[ダメージ計算]
     E --> F[ダメージ適用]
     F --> G[勝利条件チェック]
     G --> H
 ```
-
-### エンドフェーズ (Phase 5)
 ```mermaid
 flowchart TD
     A[エンドフェーズ開始] --> B[ターン終了効果発動]
@@ -183,7 +180,40 @@ flowchart LR
 
 ## イベント処理チェーン
 
-### カードクリックイベント
+### カードクリックイベント（新システム）
+```mermaid
+flowchart TD
+    A[カードクリック] --> B[CardInteractionManager.showCardInfo]
+    B --> C[右側パネル更新]
+    B --> D[アクションマーク表示]
+    D --> E{アクション選択}
+    E -->|効果発動| F[activateCardEffect]
+    E -->|詳細表示| G[カード詳細表示]
+    F --> H[CardEffectManager.executeEffect]
+    H --> I[効果処理実行]
+    I --> J[状態更新]
+    J --> K[UI更新]
+    G --> L[モーダル表示]
+```
+
+### カード効果発動フロー
+```mermaid
+flowchart TD
+    A[効果発動トリガー] --> B{効果発動可能?}
+    B -->|No| C[エラーメッセージ]
+    B -->|Yes| D[効果実行]
+    D --> E{効果タイプ}
+    E -->|ブルーム| F[ブルーム効果処理]
+    E -->|コラボ| G[コラボ効果処理]
+    E -->|ギフト| H[ギフト効果処理]
+    F --> I[使用済みマーク設定]
+    G --> I
+    H --> J[継続効果適用]
+    I --> K[UI更新]
+    J --> K
+```
+
+### カードクリックイベント（レガシー）
 1. `card.addEventListener('click')` - カード要素
 2. `handleCardClick()` - BattleEngine
 3. `validateAction()` - PhaseController
