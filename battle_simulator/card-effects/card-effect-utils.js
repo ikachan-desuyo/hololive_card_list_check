@@ -264,17 +264,8 @@ class CardEffectUtils {
     const newLife = Math.max(0, originalLife - damage);
     player.life = newLife;
 
-
-    // ダメージ受けた時のトリガーを発火
-    if (this.battleEngine.cardEffectTriggerSystem) {
-      this.battleEngine.cardEffectTriggerSystem.fireTrigger('on_damage_receive', {
-        playerId: targetPlayerId,
-        damage: damage,
-        source: source,
-        originalLife: originalLife,
-        newLife: newLife
-      });
-    }
+    // 新システムでのイベント通知（将来的に実装）
+    // TODO: cardEffectManagerにイベント通知機能を追加
 
     return { 
       success: true, 
@@ -306,15 +297,8 @@ class CardEffectUtils {
       targetCard.yellCards.push(yellCard);
     }
 
-    // エール付けた時のトリガーを発火
-    if (this.battleEngine.cardEffectTriggerSystem) {
-      this.battleEngine.cardEffectTriggerSystem.fireTrigger('on_yell_attach', {
-        playerId: playerId,
-        targetCard: targetCard,
-        targetPosition: targetPosition,
-        yellCards: yellCards
-      });
-    }
+    // 新システムでのイベント通知（将来的に実装）
+    // TODO: cardEffectManagerにイベント通知機能を追加
 
     return { 
       success: true, 

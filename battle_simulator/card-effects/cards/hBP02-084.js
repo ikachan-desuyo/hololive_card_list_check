@@ -7,29 +7,53 @@
 const cardEffect_hBP02_084 = {
   // カード基本情報
   cardId: 'hBP02-084',
-  cardName: 'hBP02-084',
+  cardName: 'みっころね24',
   
   // 効果定義
   effects: {
-    // 基本的な効果テンプレート
-    basicEffect: {
-      type: 'basic',
+    // 複合効果
+    comboEffect: {
+      type: 'combo',
       timing: 'manual',
+      name: '複合効果',
+      description: 'ドローとエール付与を同時に行う効果',
       condition: (card, gameState) => {
         // 効果発動条件
         return true;
       },
       effect: (card, battleEngine) => {
-        // 効果処理
-        console.log(`${card.name || 'hBP02-084'}の効果が発動しました`);
+        console.log(`🎪 [複合効果] ${card.name || 'hBP02-084'}の効果が発動！`);
         
-        // 実際の効果処理をここに実装
-        // 例: ドロー、ダメージ、カード移動など
+        const currentPlayer = battleEngine.gameState.currentPlayer;
+        const utils = new CardEffectUtils(battleEngine);
         
-        return {
-          success: true,
-          message: '効果が発動しました'
-        };
+        // 1枚ドロー
+        const drawResult = utils.drawCards(currentPlayer, 1);
+        
+        // センターにエール1枚
+        const player = battleEngine.players[currentPlayer];
+        let yellResult = { success: false };
+        
+        if (player.center && player.yellDeck && player.yellDeck.length > 0) {
+          const yellCard = player.yellDeck.shift();
+          yellResult = utils.attachYell(currentPlayer, 'center', [yellCard]);
+        }
+        
+        if (drawResult.success || yellResult.success) {
+          utils.updateDisplay();
+          
+          return {
+            success: true,
+            message: `${card.name || 'hBP02-084'}の効果でドローとエール付与を実行`,
+            cardsDrawn: drawResult.success ? drawResult.cards.length : 0,
+            yellAttached: yellResult.success ? 1 : 0
+          };
+        } else {
+          return {
+            success: false,
+            message: 'ドローもエール付与もできませんでした'
+          };
+        }
       }
     }
   }

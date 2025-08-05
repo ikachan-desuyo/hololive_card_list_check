@@ -284,7 +284,7 @@ class CardInteractionManager {
    * カード効果の手動発動
    */
   async activateCardEffect(card, position) {
-    if (!this.battleEngine.cardEffectTriggerSystem) {
+    if (!this.battleEngine.cardEffectManager) {
       this.showMessage('カード効果システムが初期化されていません', 'error');
       return;
     }
@@ -292,20 +292,48 @@ class CardInteractionManager {
     const currentPlayer = this.battleEngine.gameState.currentPlayer;
     
     try {
-      const result = await this.battleEngine.cardEffectTriggerSystem.manualTrigger(card.id, currentPlayer);
+      // 新システムを使用してカード効果を取得
+      const cardEffect = await this.battleEngine.cardEffectManager.getCardEffect(card.id);
       
-      if (result && result.length > 0) {
-        const successResults = result.filter(r => r.success);
-        if (successResults.length > 0) {
-          this.showMessage('カード効果を発動しました', 'success');
-          this.clearActionMarks();
-        } else {
-          this.showMessage('カード効果を発動できませんでした', 'error');
-        }
-      } else {
-        this.showMessage('発動可能な効果がありません', 'error');
+      if (!cardEffect || !cardEffect.effects) {
+        this.showMessage('このカードには効果がありません', 'info');
+        return;
       }
+
+      // 手動発動可能な効果を検索
+      const manualEffects = Object.values(cardEffect.effects).filter(effect => 
+        effect.timing === 'manual' || effect.timing === 'activate'
+      );
+
+      if (manualEffects.length === 0) {
+        this.showMessage('手動発動可能な効果がありません', 'info');
+        return;
+      }
+
+      // 最初の手動効果を発動（複数ある場合は選択UIが必要）
+      const effect = manualEffects[0];
+      
+      // 条件チェック
+      if (effect.condition && !effect.condition(card, this.battleEngine.gameState, this.battleEngine)) {
+        this.showMessage('効果の発動条件を満たしていません', 'warning');
+        return;
+      }
+
+      // 効果を実行
+      const result = effect.effect(card, this.battleEngine);
+      
+      if (result && result.success) {
+        this.showMessage(result.message || 'カード効果を発動しました', 'success');
+        this.clearActionMarks();
+        
+        // UI更新
+        this.battleEngine.updateUI();
+      } else {
+        this.showMessage(result?.message || 'カード効果を発動できませんでした', 'error');
+      }
+      
     } catch (error) {
+      console.error('Card effect activation error:', error);
       this.showMessage('効果の発動中にエラーが発生しました', 'error');
     }
   }

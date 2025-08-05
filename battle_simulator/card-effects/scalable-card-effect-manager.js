@@ -201,6 +201,50 @@ class ScalableCardEffectManager {
   }
 
   /**
+   * カード効果を取得（新システム用）
+   */
+  async getCardEffect(cardId) {
+    // カードIDを正規化
+    const normalizedId = this.normalizeCardId(cardId);
+    
+    // 登録済み効果を優先的に確認
+    if (this.effectRegistry.has(normalizedId)) {
+      return this.effectRegistry.get(normalizedId);
+    }
+
+    // グローバルに登録されている効果を確認
+    const globalEffectName = `cardEffect_${normalizedId.replace(/-/g, '_')}`;
+    if (window[globalEffectName]) {
+      const effect = window[globalEffectName];
+      this.effectRegistry.set(normalizedId, effect);
+      return effect;
+    }
+
+    // 動的読み込みを試行
+    return await this.loadCardEffect(normalizedId);
+  }
+
+  /**
+   * カード効果を登録（新システム用）
+   */
+  registerCardEffect(cardId, effect) {
+    const normalizedId = this.normalizeCardId(cardId);
+    this.effectRegistry.set(normalizedId, effect);
+    this.loadedEffects.add(normalizedId);
+  }
+
+  /**
+   * カードIDを正規化
+   */
+  normalizeCardId(cardId) {
+    if (!cardId) return '';
+    let id = String(cardId);
+    id = id.split('_')[0]; // レアリティ表記除去
+    id = id.replace(/_\d+$/, ''); // 連番除去
+    return id;
+  }
+
+  /**
    * カスタム効果ファイルの読み込み
    */
   async loadCustomEffect(cardId) {

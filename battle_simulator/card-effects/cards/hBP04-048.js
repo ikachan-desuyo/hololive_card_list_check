@@ -1,110 +1,111 @@
 /**
- * 雪花ラミィ (hBP04-048_RR) - 2ndブルーム
- * ブルームエフェクト「ユニーリアの令嬢」
+ * hBP04-048 - 雪花ラミィ (2nd) カード効果定義
+ * ブルームエフェクト: ユニーリアの令嬢
  */
 
-(function() {
-  const cardEffect = {
-  cardId: 'hBP04-048_RR',
-  name: '雪花ラミィ',
-  type: 'holomen',
-  triggers: [
-    { type: 'on_bloom', timing: 'on_bloom' } // ブルームエフェクトのみ
-  ],
+// カード効果の定義
+const cardEffect_hBP04_048 = {
+  // カード基本情報
+  cardId: 'hBP04-048',
+  cardName: '雪花ラミィ',
+  cardType: 'ホロメン',
+  bloomLevel: '2nd',
   
-  // ブルームエフェクト「ユニーリアの令嬢」
-  onBloomEffect: async (card, context, battleEngine) => {
-    const utils = battleEngine.cardEffectTriggerSystem.utils;
-    const currentPlayer = battleEngine.gameState.currentPlayer;
-    
-    try {
-      // 〈雪民〉が付いている〈雪花ラミィ〉を検索
-      const stageHolomens = utils.getStageHolomens(currentPlayer);
-      const lamyWithYukimin = stageHolomens.filter(h => 
-        h.card.name && h.card.name.includes('雪花ラミィ') &&
-        h.attachments && h.attachments.some(att => att.name && att.name.includes('雪民'))
-      );
-      
-      if (lamyWithYukimin.length === 0) {
-        return { success: false, reason: '〈雪民〉が付いている〈雪花ラミィ〉がいません' };
-      }
-      
-      // エールデッキの上から1枚を対象のラミィに送る
-      const player = battleEngine.players[currentPlayer];
-      if (player.yellDeck && player.yellDeck.length > 0) {
+  // 効果定義
+  effects: {
+    // ブルームエフェクト: ユニーリアの令嬢
+    bloomEffect: {
+      type: 'bloom',
+      timing: 'on_bloom',
+      name: 'ユニーリアの令嬢',
+      description: '自分のエールデッキの上から1枚を、自分の〈雪民〉が付いている〈雪花ラミィ〉に送る。',
+      condition: (card, gameState, battleEngine) => {
+        // ブルーム時のみ発動
+        return true;
+      },
+      effect: (card, battleEngine) => {
+        console.log(`🌸 [ブルームエフェクト] ${card.name}の「ユニーリアの令嬢」が発動！`);
+        
+        const currentPlayer = battleEngine.gameState.currentPlayer;
+        const player = battleEngine.players[currentPlayer];
+        
+        if (!player || !player.cards) {
+          return { success: false, message: 'プレイヤー情報が見つかりません' };
+        }
+
+        // 〈雪民〉が付いている〈雪花ラミィ〉を検索
+        const lamyWithYukimin = this.findLamyWithYukimin(player);
+        
+        if (lamyWithYukimin.length === 0) {
+          console.log(`🌸 [ユニーリアの令嬢] 〈雪民〉が付いている〈雪花ラミィ〉がいません`);
+          return { success: false, message: '〈雪民〉が付いている〈雪花ラミィ〉がいません' };
+        }
+
+        // エールデッキから1枚取る
+        if (!player.yellDeck || player.yellDeck.length === 0) {
+          console.log(`🌸 [ユニーリアの令嬢] エールデッキにカードがありません`);
+          return { success: false, message: 'エールデッキにカードがありません' };
+        }
+
         const yellCard = player.yellDeck.shift();
         const targetLamy = lamyWithYukimin[0]; // 最初の条件を満たすラミィ
-        
-        if (!targetLamy.attachments) targetLamy.attachments = [];
-        targetLamy.attachments.push(yellCard);
-        
-        utils.updateDisplay();
-        
+
+        // エールを付ける
+        if (!targetLamy.yellCards) {
+          targetLamy.yellCards = [];
+        }
+        targetLamy.yellCards.push(yellCard);
+
+        // UI更新
+        battleEngine.updateUI();
+
+        console.log(`🌸 [ユニーリアの令嬢] ${targetLamy.name}にエール1枚を付けました`);
+
         return {
           success: true,
-          message: `${targetLamy.card.name}にエール1枚を付けました`
+          message: `${targetLamy.name}にエール1枚を付けました`,
+          yellAttached: 1
         };
       }
-      
-      return { success: false, reason: 'エールデッキにカードがありません' };
-    } catch (error) {
-      return { success: false, reason: 'エラーが発生しました', error };
     }
   },
-
-  // 手動トリガー「今日も祝福がありますように」
-  manualTrigger: async (card, context, battleEngine) => {
-    const utils = battleEngine.cardEffectTriggerSystem.utils;
-    const currentPlayer = battleEngine.gameState.currentPlayer;
-    const opponent = currentPlayer === 1 ? 2 : 1;
+  
+  // ヘルパーメソッド
+  findLamyWithYukimin: function(player) {
+    const positions = ['center', 'collab', 'back1', 'back2', 'back3', 'back4', 'back5'];
+    const result = [];
     
-    try {
-      // このカードのエールを1枚アーカイブ
-      const cardPosition = utils.findCardPosition(currentPlayer, card.id);
-      
-      if (!cardPosition || !cardPosition.attachments || cardPosition.attachments.length === 0) {
-        return { success: false, reason: 'エールが付いていません' };
-      }
-      
-      // エールを1枚アーカイブ
-      const yellToArchive = cardPosition.attachments.shift();
-      const archiveResult = utils.archiveCards(currentPlayer, [yellToArchive]);
-      
-      if (archiveResult.success) {
-        // 相手のセンターホロメンかバックホロメンに特殊ダメージ30
-        const opponentHolomens = utils.getStageHolomens(opponent);
-        if (opponentHolomens.length > 0) {
-          // 簡易実装：最初のホロメンにダメージ
-          const target = opponentHolomens[0];
-          const damageResult = utils.dealDamage(opponent, 30, {
-            source: card,
-            type: 'special',
-            target: target.card.id
-          });
-          
-          utils.updateDisplay();
-          
-          return {
-            success: true,
-            message: `エールをアーカイブし、${target.card.name}に特殊ダメージ30を与えました`
-          };
+    for (const position of positions) {
+      const card = player.cards[position];
+      if (card && card.name && card.name.includes('雪花ラミィ')) {
+        // このカードに〈雪民〉が付いているかチェック
+        if (card.yellCards && card.yellCards.length > 0) {
+          const hasYukimin = card.yellCards.some(yellCard => 
+            yellCard.name && yellCard.name.includes('雪民')
+          );
+          if (hasYukimin) {
+            result.push(card);
+          }
         }
       }
-      
-      return { success: false, reason: '効果を実行できませんでした' };
-    } catch (error) {
-      return { success: false, reason: 'エラーが発生しました', error };
     }
+    
+    return result;
   }
 };
 
-  // カード効果をグローバルに登録
-  if (typeof window !== 'undefined' && window.cardEffects) {
-    window.cardEffects[cardEffect.cardId] = cardEffect;
-  }
+// 効果を登録
+if (window.cardEffectManager) {
+  window.cardEffectManager.registerCardEffect('hBP04-048', cardEffect_hBP04_048);
+  console.log('🔮 [Card Effect] hBP04-048 雪花ラミィ の効果を登録しました');
+} else {
+  console.warn('🔮 [Card Effect] CardEffectManager not found, deferring registration');
+  window.pendingCardEffects = window.pendingCardEffects || [];
+  window.pendingCardEffects.push({
+    cardId: 'hBP04-048',
+    effect: cardEffect_hBP04_048
+  });
+}
 
-  // Node.js環境でのエクスポート
-  if (typeof module !== 'undefined' && module.exports) {
-    module.exports = cardEffect;
-  }
-})();
+// グローバルに公開
+window.cardEffect_hBP04_048 = cardEffect_hBP04_048;

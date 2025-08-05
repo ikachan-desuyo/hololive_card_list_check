@@ -1,127 +1,85 @@
 /**
- * 雪花ラミィ (hBP04-047_R)
- * ホロメン・1st・青
- * HP: 120
- * 
- * コラボエフェクト「fleur」：
- * 自分の〈雪民〉が付いている〈雪花ラミィ〉がいる時、相手のホロメン1人に特殊ダメージ20を与える。
- * ただし、ダウンしても相手のライフは減らない。
- * 
- * アーツ「雪が煌く花束」: 50ダメージ [青1・無色1]
+ * hBP04-047 - カード効果定義
+ * ホロメンカード - 雪花ラミィ (1st)
  */
 
-(function() {
-    'use strict';
-    
-    const cardEffect = {
-        id: 'hBP04-047_R',
-        name: '雪花ラミィ',
-        type: 'ホロメン',
-        color: '青',
-        hp: 120,
-        bloomLevel: '1st',
+// カード効果の定義
+const cardEffect_hBP04_047 = {
+  // カード基本情報
+  cardId: 'hBP04-047',
+  cardName: '雪花ラミィ',
+  cardType: 'ホロメン',
+  bloomLevel: '1st',
+  
+  // 効果定義
+  effects: {
+    // コラボエフェクト: fleur
+    collabEffect_fleur: {
+      type: 'collab',
+      timing: 'on_collab',
+      name: 'fleur',
+      description: '自分の〈雪民〉が付いている〈雪花ラミィ〉がいる時、相手のホロメン1人に特殊ダメージ20を与える。ただし、ダウンしても相手のライフは減らない。',
+      condition: (card, gameState, battleEngine) => {
+        // コラボポジションにいるかチェック
+        const currentPlayer = battleEngine.gameState.currentPlayer;
+        const player = battleEngine.players[currentPlayer];
+        if (!player || !player.cards) return false;
         
-        collabEffect: {
-            name: 'fleur',
-            
-            canActivate: function(gameState, playerId) {
-                const player = gameState.players[playerId];
-                
-                // 雪民が付いている雪花ラミィがいるかチェック
-                const hasLamyWithYukimin = player.stage.some(holomen => {
-                    if (!holomen || !holomen.name || !holomen.name.includes('雪花ラミィ')) {
-                        return false;
-                    }
-                    return holomen.attachedCards && holomen.attachedCards.some(attached => 
-                        attached.name && attached.name.includes('雪民')
-                    );
-                });
-                
-                // 相手にホロメンがいるかチェック
-                const opponentPlayerId = playerId === 1 ? 2 : 1;
-                const opponentPlayer = gameState.players[opponentPlayerId];
-                const hasOpponentHolomen = opponentPlayer.stage.some(holomen => 
-                    holomen && holomen.name
-                );
-                
-                return hasLamyWithYukimin && hasOpponentHolomen;
-            },
-            
-            execute: async function(gameState, playerId) {
-                
-                const player = gameState.players[playerId];
-                const opponentPlayerId = playerId === 1 ? 2 : 1;
-                const opponentPlayer = gameState.players[opponentPlayerId];
-                
-                // 雪民が付いている雪花ラミィがいるかチェック
-                const lamyWithYukimin = player.stage.find(holomen => {
-                    if (!holomen || !holomen.name || !holomen.name.includes('雪花ラミィ')) {
-                        return false;
-                    }
-                    return holomen.attachedCards && holomen.attachedCards.some(attached => 
-                        attached.name && attached.name.includes('雪民')
-                    );
-                });
-                
-                if (!lamyWithYukimin) {
-                    return false;
-                }
-                
-                // 相手のホロメンを取得
-                const opponentHolomens = opponentPlayer.stage.filter(holomen => 
-                    holomen && holomen.name
-                );
-                
-                if (opponentHolomens.length === 0) {
-                    return false;
-                }
-                
-                // 最初のホロメンをターゲットとする（実際のゲームでは選択）
-                const targetHolomen = opponentHolomens[0];
-                
-                // 特殊ダメージを与える（ライフは減らない）
-                const damage = 20;
-                if (!targetHolomen.damage) targetHolomen.damage = 0;
-                targetHolomen.damage += damage;
-                
-                
-                // HPチェック（ダウンしてもライフは減らない）
-                if (targetHolomen.damage >= targetHolomen.hp) {
-                    // ダウン処理（ライフを減らさない特殊処理）
-                    targetHolomen.isDown = true;
-                }
-                
-                
-                return true;
-            }
-        },
+        // コラボポジションにこのカードがいるかチェック
+        if (player.cards.collab?.id !== card.id) return false;
         
-        arts: [
-            {
-                name: '雪が煌く花束',
-                damage: 50,
-                cost: { blue: 1, any: 1 },
-                
-                canActivate: function(gameState, playerId, position) {
-                    return true;
-                },
-                
-                execute: function(gameState, playerId, position, targetPlayerId, targetPosition) {
-                    
-                    return {
-                        damage: 50,
-                        effects: []
-                    };
-                }
-            }
-        ]
-    };
-    
-    // カード効果を登録
-    if (typeof window !== 'undefined') {
-        if (!window.cardEffects) {
-            window.cardEffects = {};
+        // 〈雪民〉が付いている〈雪花ラミィ〉がいるかチェック
+        const stage = player.stage || [];
+        const hasYukiminLamii = stage.some(holomem => 
+          holomem.name?.includes('雪花ラミィ') && 
+          holomem.attachedFans?.some(fan => fan.name?.includes('雪民'))
+        );
+        
+        return hasYukiminLamii;
+      },
+      effect: (card, battleEngine) => {
+        console.log(`❄️ [fleur] ${card.name || '雪花ラミィ'}のコラボエフェクトが発動！`);
+        
+        const utils = new CardEffectUtils(battleEngine);
+        const currentPlayer = battleEngine.gameState.currentPlayer;
+        const opponentPlayer = currentPlayer === 1 ? 2 : 1;
+        
+        // 相手のホロメン1人に特殊ダメージ20を与える
+        const opponent = battleEngine.players[opponentPlayer];
+        if (opponent && opponent.stage && opponent.stage.length > 0) {
+          const target = opponent.stage[0]; // 最初のホロメンを対象
+          
+          const damage = utils.dealDamage(target, 20, { 
+            isSpecial: true, 
+            noLifeDamage: true // ダウンしてもライフは減らない
+          });
+          
+          utils.updateDisplay();
+          
+          return {
+            success: true,
+            message: `${card.name || '雪花ラミィ'}のコラボエフェクト「fleur」で${target.name}に特殊ダメージ20を与えました`,
+            damage: damage,
+            target: target
+          };
+        } else {
+          return {
+            success: false,
+            message: '相手にホロメンがいません'
+          };
         }
-        window.cardEffects[cardEffect.id] = cardEffect;
+      }
     }
-})();
+  }
+};
+
+// グローバルスコープに登録
+if (typeof window !== 'undefined') {
+  window.cardEffectManager = window.cardEffectManager || new ScalableCardEffectManager();
+  window.cardEffectManager.registerCardEffect('hBP04-047', cardEffect_hBP04_047);
+}
+
+// エクスポート
+if (typeof module !== 'undefined' && module.exports) {
+  module.exports = cardEffect_hBP04_047;
+}

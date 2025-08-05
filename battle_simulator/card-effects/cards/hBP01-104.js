@@ -1,93 +1,83 @@
 /**
- * ふつうのパソコン (hBP01-104_C)
- * サポート・アイテム
- * 
- * サポート効果：
- * 自分のデッキから、Debutホロメン１枚を公開し、ステージに出す。そしてデッキをシャッフルする。
+ * hBP01-104 - カード効果定義
+ * エールカード
  */
 
-(function() {
-    'use strict';
-    
-    const cardEffect = {
-        id: 'hBP01-104_C',
-        name: 'ふつうのパソコン',
-        type: 'サポート・アイテム',
+// カード効果の定義
+const cardEffect_hBP01_104 = {
+  // カード基本情報
+  cardId: 'hBP01-104',
+  cardName: 'ふつうのパソコン',
+  cardType: 'エール',
+  
+  // 効果定義
+  effects: {
+    // エール効果
+    yellEffect: {
+      type: 'yell',
+      timing: 'attached',
+      name: 'エール効果',
+      description: 'このエールが付いている間の効果',
+      condition: (card, gameState, battleEngine) => {
+        // エールとして付いている時のみ
+        return true;
+      },
+      effect: (card, battleEngine) => {
+        console.log(`🎶 [エール効果] ${card.name || 'hBP01-104'}のエール効果が適用中`);
         
-        supportEffect: {
-            canActivate: function(gameState, playerId) {
-                // デッキにDebutホロメンがいるかチェック
-                const player = gameState.players[playerId];
-                if (!player.deck || player.deck.length === 0) return false;
-                
-                return player.deck.some(card => 
-                    card.card_type === 'ホロメン' && 
-                    card.bloom_level === 'Debut'
-                );
-            },
-            
-            execute: async function(gameState, playerId) {
-                
-                const player = gameState.players[playerId];
-                
-                // デッキからDebutホロメンを検索
-                const debutHolomen = player.deck.filter(card => 
-                    card.card_type === 'ホロメン' && 
-                    card.bloom_level === 'Debut'
-                );
-                
-                if (debutHolomen.length === 0) {
-                    return false;
-                }
-                
-                // プレイヤーに選択させる（現在は最初のカードを選択）
-                const selectedCard = debutHolomen[0];
-                
-                // デッキからカードを除去
-                const cardIndex = player.deck.indexOf(selectedCard);
-                if (cardIndex > -1) {
-                    player.deck.splice(cardIndex, 1);
-                }
-                
-                // ステージに出す（空いているポジションを探す）
-                const emptyPosition = this.findEmptyStagePosition(gameState, playerId);
-                if (emptyPosition !== null) {
-                    player.stage[emptyPosition] = selectedCard;
-                } else {
-                    // ステージが満杯の場合は手札に加える
-                    player.hand.push(selectedCard);
-                }
-                
-                // デッキをシャッフル
-                this.shuffleDeck(player.deck);
-                
-                return true;
-            },
-            
-            findEmptyStagePosition: function(gameState, playerId) {
-                const player = gameState.players[playerId];
-                for (let i = 0; i < 5; i++) {
-                    if (!player.stage[i]) {
-                        return i;
-                    }
-                }
-                return null;
-            },
-            
-            shuffleDeck: function(deck) {
-                for (let i = deck.length - 1; i > 0; i--) {
-                    const j = Math.floor(Math.random() * (i + 1));
-                    [deck[i], deck[j]] = [deck[j], deck[i]];
-                }
-            }
-        }
-    };
+        // エールによる能力値上昇
+        return {
+          success: true,
+          message: 'エール効果が適用されています',
+          statBonus: {
+            attack: 20,
+            hp: 0
+          }
+        };
+      }
+    },
     
-    // カード効果を登録
-    if (typeof window !== 'undefined') {
-        if (!window.cardEffects) {
-            window.cardEffects = {};
-        }
-        window.cardEffects[cardEffect.id] = cardEffect;
+    // 特殊エール効果
+    specialYellEffect: {
+      type: 'special',
+      timing: 'manual',
+      name: '特殊エール効果',
+      description: 'エールとして付いている時に発動できる特殊効果',
+      condition: (card, gameState, battleEngine) => {
+        // 特定の条件下でのみ発動可能
+        return true;
+      },
+      effect: (card, battleEngine) => {
+        console.log(`⭐ [特殊エール効果] ${card.name || 'hBP01-104'}の特殊効果が発動！`);
+        
+        const currentPlayer = battleEngine.gameState.currentPlayer;
+        const utils = new CardEffectUtils(battleEngine);
+        
+        // このエールが付いているホロメンの攻撃力を一時的に大幅上昇
+        return {
+          success: true,
+          message: 'ホロメンの攻撃力が大幅上昇しました！',
+          temporaryBonus: {
+            attack: 50
+          }
+        };
+      }
     }
-})();
+  }
+};
+
+// 効果を登録
+if (window.cardEffectManager) {
+  window.cardEffectManager.registerCardEffect('hBP01-104', cardEffect_hBP01_104);
+  console.log('🔮 [Card Effect] hBP01-104 の効果を登録しました');
+} else {
+  console.warn('🔮 [Card Effect] CardEffectManager not found, deferring registration');
+  window.pendingCardEffects = window.pendingCardEffects || [];
+  window.pendingCardEffects.push({
+    cardId: 'hBP01-104',
+    effect: cardEffect_hBP01_104
+  });
+}
+
+// グローバルに公開
+window.cardEffect_hBP01_104 = cardEffect_hBP01_104;

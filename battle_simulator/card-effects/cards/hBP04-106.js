@@ -1,47 +1,90 @@
 /**
- * 雪民 (hBP04-106_U) - ファンカード
- * ギフト効果
+ * hBP04-106 - カード効果定義
+ * サポートカード
  */
 
-(function() {
-  const cardEffect = {
-    cardId: 'hBP04-106_U',
-    name: '雪民',
-    type: 'fan',
-    triggers: [{ type: 'gift', timing: 'gift' }], // ギフト効果
-    
-    // ギフト効果（場にいる間常時発動）
-    execute: async (card, context, battleEngine) => {
-      const utils = battleEngine.cardEffectTriggerSystem.utils;
-      const currentPlayer = battleEngine.gameState.currentPlayer;
-      
-      try {
-        // 付けられたホロメンが〈雪花ラミィ〉の場合の特殊効果
-        if (context.targetCard && context.targetCard.name && context.targetCard.name.includes('雪花ラミィ')) {
-          // ラミィに雪民が付いた時の効果（将来的に実装予定）
+// カード効果の定義
+const cardEffect_hBP04_106 = {
+  // カード基本情報
+  cardId: 'hBP04-106',
+  cardName: '雪民',
+  cardType: 'サポート',
+  
+  // 効果定義
+  effects: {
+    // サポート効果
+    supportEffect: {
+      type: 'support',
+      timing: 'manual',
+      name: 'サポート効果',
+      description: 'サポートカードの効果',
+      condition: (card, gameState, battleEngine) => {
+        // メインステップで手札にある時のみ
+        const currentPhase = battleEngine.gameState.currentPhase;
+        return currentPhase === 3; // メインステップ
+      },
+      effect: async (card, battleEngine) => {
+        console.log(`🎯 [サポート効果] ${card.name || 'hBP04-106'}の効果が発動！`);
+        
+        const currentPlayer = battleEngine.gameState.currentPlayer;
+        const utils = new CardEffectUtils(battleEngine);
+        
+        // デッキから好きなカードを1枚手札に加える
+        const searchResult = await utils.selectCardsFromDeck(currentPlayer, {
+          count: 1,
+          description: 'デッキから好きなカードを1枚選択してください',
+          allowLess: true
+        });
+        
+        if (searchResult.success && searchResult.cards.length > 0) {
+          // 選択したカードを手札に加える
+          const addResult = utils.addCardsToHand(currentPlayer, searchResult.cards, true);
+          
+          if (addResult.success) {
+            // このサポートカードをアーカイブ
+            const player = battleEngine.players[currentPlayer];
+            const handIndex = player.hand.indexOf(card);
+            if (handIndex !== -1) {
+              player.hand.splice(handIndex, 1);
+              player.archive.push(card);
+            }
+            
+            utils.updateDisplay();
+            
+            return {
+              success: true,
+              message: `${card.name || 'hBP04-106'}の効果でカードをサーチしました`,
+              cardsAdded: addResult.cards.length
+            };
+          } else {
+            return {
+              success: false,
+              message: addResult.reason
+            };
+          }
+        } else {
           return {
-            success: true,
-            message: '雪民が雪花ラミィに付きました（ギフト効果有効）'
+            success: false,
+            message: searchResult.reason || 'カードの選択がキャンセルされました'
           };
         }
-        
-        return {
-          success: true,
-          message: '雪民のギフト効果が発動中'
-        };
-    } catch (error) {
-      return { success: false, reason: 'エラーが発生しました', error };
+      }
     }
   }
 };
 
-  // カード効果をグローバルに登録
-  if (typeof window !== 'undefined' && window.cardEffects) {
-    window.cardEffects[cardEffect.cardId] = cardEffect;
-  }
+// 効果を登録
+if (window.cardEffectManager) {
+  window.cardEffectManager.registerCardEffect('hBP04-106', cardEffect_hBP04_106);
+  console.log('🔮 [Card Effect] hBP04-106 の効果を登録しました');
+} else {
+  console.warn('🔮 [Card Effect] CardEffectManager not found, deferring registration');
+  window.pendingCardEffects = window.pendingCardEffects || [];
+  window.pendingCardEffects.push({
+    cardId: 'hBP04-106',
+    effect: cardEffect_hBP04_106
+  });
+}
 
-  // Node.js環境でのエクスポート
-  if (typeof module !== 'undefined' && module.exports) {
-    module.exports = cardEffect;
-  }
-})();
+// グローバルに公開
+window.cardEffect_hBP04_106 = cardEffect_hBP04_106;

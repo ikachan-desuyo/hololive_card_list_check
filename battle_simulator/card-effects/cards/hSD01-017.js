@@ -7,29 +7,53 @@
 const cardEffect_hSD01_017 = {
   // カード基本情報
   cardId: 'hSD01-017',
-  cardName: 'hSD01-017',
+  cardName: 'マネちゃん',
   
   // 効果定義
   effects: {
-    // 基本的な効果テンプレート
-    basicEffect: {
-      type: 'basic',
+    // 回復効果
+    healEffect: {
+      type: 'heal',
       timing: 'manual',
+      name: '回復効果',
+      description: 'ライフを回復する効果',
       condition: (card, gameState) => {
         // 効果発動条件
         return true;
       },
       effect: (card, battleEngine) => {
-        // 効果処理
-        console.log(`${card.name || 'hSD01-017'}の効果が発動しました`);
+        console.log(`❤️ [回復効果] ${card.name || 'hSD01-017'}の効果が発動！`);
         
-        // 実際の効果処理をここに実装
-        // 例: ドロー、ダメージ、カード移動など
+        const currentPlayer = battleEngine.gameState.currentPlayer;
+        const player = battleEngine.players[currentPlayer];
+        const utils = new CardEffectUtils(battleEngine);
         
-        return {
-          success: true,
-          message: '効果が発動しました'
-        };
+        // ライフ1回復（簡易実装）
+        if (player.life !== undefined) {
+          const maxLife = player.oshi?.life || 6;
+          const currentLife = player.life || 0;
+          
+          if (currentLife < maxLife) {
+            player.life = Math.min(maxLife, currentLife + 1);
+            utils.updateDisplay();
+            
+            return {
+              success: true,
+              message: `${card.name || 'hSD01-017'}の効果でライフが1回復しました`,
+              lifeHealed: 1
+            };
+          } else {
+            return {
+              success: false,
+              message: 'ライフは既に最大です'
+            };
+          }
+        } else {
+          return {
+            success: false,
+            message: 'ライフシステムが初期化されていません'
+          };
+        }
       }
     }
   }

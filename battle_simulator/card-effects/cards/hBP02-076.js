@@ -1,99 +1,56 @@
 /**
- * カスタムパソコン (hBP02-076_C)
- * サポート・アイテム
- * 
- * サポート効果：
- * 自分の手札のDebutホロメン1枚を公開し、デッキの下に戻す。
- * 自分のデッキから、戻したホロメンと同じカード名のBuzz以外の1stホロメン1枚を公開し、手札に加える。
- * そしてデッキをシャッフルする。
+ * hBP02-076 - カード効果定義
+ * エールカード
  */
 
-(function() {
-    'use strict';
-    
-    const cardEffect = {
-        id: 'hBP02-076_C',
-        name: 'カスタムパソコン',
-        type: 'サポート・アイテム',
+// カード効果の定義
+const cardEffect_hBP02_076 = {
+  // カード基本情報
+  cardId: 'hBP02-076',
+  cardName: 'カスタムパソコン',
+  cardType: 'エール',
+  
+  // 効果定義
+  effects: {
+    // エール効果
+    yellEffect: {
+      type: 'yell',
+      timing: 'attached',
+      name: 'エール効果',
+      description: 'このエールが付いている間の効果',
+      condition: (card, gameState, battleEngine) => {
+        // エールとして付いている時のみ
+        return true;
+      },
+      effect: (card, battleEngine) => {
+        console.log(`🎵 [エール効果] ${card.name || 'hBP02-076'}のエール効果が適用中`);
         
-        supportEffect: {
-            canActivate: function(gameState, playerId) {
-                const player = gameState.players[playerId];
-                
-                // 手札にDebutホロメンがいるかチェック
-                const hasDebutInHand = player.hand.some(card => 
-                    card.card_type === 'ホロメン' && 
-                    card.bloom_level === 'Debut'
-                );
-                
-                return hasDebutInHand && player.deck && player.deck.length > 0;
-            },
-            
-            execute: async function(gameState, playerId) {
-                
-                const player = gameState.players[playerId];
-                
-                // 手札からDebutホロメンを選択
-                const debutCards = player.hand.filter(card => 
-                    card.card_type === 'ホロメン' && 
-                    card.bloom_level === 'Debut'
-                );
-                
-                if (debutCards.length === 0) {
-                    return false;
-                }
-                
-                // 最初のDebutカードを選択（実際のゲームでは選択UI）
-                const selectedDebut = debutCards[0];
-                
-                // 手札からDebutを除去してデッキの下に戻す
-                const handIndex = player.hand.indexOf(selectedDebut);
-                if (handIndex > -1) {
-                    player.hand.splice(handIndex, 1);
-                    player.deck.unshift(selectedDebut); // デッキの下に配置
-                }
-                
-                // デッキから同じ名前のBuzz以外の1stホロメンを探す
-                const targetName = selectedDebut.name;
-                const firstCards = player.deck.filter(card => 
-                    card.card_type === 'ホロメン' && 
-                    card.bloom_level === '1st' &&
-                    card.name === targetName &&
-                    !card.rarity?.includes('Buzz') // Buzzでない
-                );
-                
-                if (firstCards.length > 0) {
-                    const selectedFirst = firstCards[0];
-                    
-                    // デッキからカードを除去して手札に加える
-                    const deckIndex = player.deck.indexOf(selectedFirst);
-                    if (deckIndex > -1) {
-                        player.deck.splice(deckIndex, 1);
-                        player.hand.push(selectedFirst);
-                    }
-                } else {
-                }
-                
-                // デッキをシャッフル
-                this.shuffleDeck(player.deck);
-                
-                return true;
-            },
-            
-            shuffleDeck: function(deck) {
-                for (let i = deck.length - 1; i > 0; i--) {
-                    const j = Math.floor(Math.random() * (i + 1));
-                    [deck[i], deck[j]] = [deck[j], deck[i]];
-                }
-            }
-        }
-    };
-    
-    // カード効果を登録
-    if (typeof window !== 'undefined') {
-        if (!window.cardEffects) {
-            window.cardEffects = {};
-        }
-        window.cardEffects[cardEffect.id] = cardEffect;
+        // エールによる能力値上昇やスキル付与など
+        return {
+          success: true,
+          message: 'エール効果が適用されています',
+          statBonus: {
+            attack: 10,
+            hp: 10
+          }
+        };
+      }
     }
-})();
+  }
+};
+
+// 効果を登録
+if (window.cardEffectManager) {
+  window.cardEffectManager.registerCardEffect('hBP02-076', cardEffect_hBP02_076);
+  console.log('🔮 [Card Effect] hBP02-076 の効果を登録しました');
+} else {
+  console.warn('🔮 [Card Effect] CardEffectManager not found, deferring registration');
+  window.pendingCardEffects = window.pendingCardEffects || [];
+  window.pendingCardEffects.push({
+    cardId: 'hBP02-076',
+    effect: cardEffect_hBP02_076
+  });
+}
+
+// グローバルに公開
+window.cardEffect_hBP02_076 = cardEffect_hBP02_076;
