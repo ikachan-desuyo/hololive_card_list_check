@@ -284,8 +284,6 @@ class CardInteractionManager {
    * カード効果の手動発動
    */
   async activateCardEffect(card, position) {
-    console.log(`🎯 [CardInteraction] activateCardEffect開始: ${card.name || card.id}, position: ${position}`);
-    
     const currentPlayer = this.battleEngine.gameState.currentPlayer;
     
     try {
@@ -293,19 +291,14 @@ class CardInteractionManager {
       const cardEffect = window.cardEffects[card.id];
       
       if (!cardEffect || !cardEffect.effects) {
-        console.log(`❌ [CardInteraction] カード効果定義なし: ${card.id}`);
         this.showMessage('このカードには効果がありません', 'info');
         return;
       }
-
-      console.log(`✅ [CardInteraction] カード効果定義取得: ${card.id}`, cardEffect);
 
       // 手動発動可能な効果を検索
       const manualEffects = Object.values(cardEffect.effects).filter(effect => 
         effect.timing === 'manual'
       );
-
-      console.log(`🔍 [CardInteraction] 手動効果数: ${manualEffects.length}`);
 
       if (manualEffects.length === 0) {
         this.showMessage('手動発動可能な効果がありません', 'info');
@@ -314,13 +307,16 @@ class CardInteractionManager {
 
       // 最初の手動効果を発動（複数ある場合は選択UIが必要）
       const effect = manualEffects[0];
-      console.log(`🎯 [CardInteraction] 発動する効果: ${effect.name}`);
+      
+      // LIMITED制限チェック（ダブルチェック）
+      if (effect.limited && !this.canUseLimitedEffect(card, position)) {
+        return; // 制限により発動不可
+      }
       
       // 条件チェック（カード固有の条件のみ）
       if (effect.condition && typeof effect.condition === 'function') {
         try {
           const conditionResult = effect.condition(card, this.battleEngine.gameState, this.battleEngine);
-          console.log(`🔍 [CardInteraction] 条件チェック結果: ${conditionResult}`);
           if (conditionResult === false) {
             this.showMessage('効果の発動条件を満たしていません', 'warning');
             return;
@@ -333,11 +329,14 @@ class CardInteractionManager {
       }
 
       // 効果を実行
-      console.log(`🔄 [CardInteraction] 効果実行中...`);
       const result = effect.effect(card, this.battleEngine);
-      console.log(`📊 [CardInteraction] 効果実行結果:`, result);
       
       if (result && result.success !== false) {
+        // LIMITED効果の使用回数をカウント
+        if (effect.limited) {
+          this.recordLimitedEffectUsage();
+        }
+        
         // 自動アーカイブ処理（サポートカード・イベント・LIMITED等）
         if (result.autoArchive && this.isArchivableCard(card, position)) {
           this.moveCardToArchive(card, position);
@@ -348,12 +347,10 @@ class CardInteractionManager {
         
         // UI更新
         this.battleEngine.updateUI();
-        console.log(`✅ [CardInteraction] 効果発動完了`);
       } else {
         // 結果に応じてメッセージタイプを決定
         const messageType = this.determineMessageType(result);
         this.showMessage(result?.message || 'カード効果を発動できませんでした', messageType);
-        console.log(`📝 [CardInteraction] 効果結果: ${messageType} - ${result?.message}`);
       }
       
     } catch (error) {
@@ -594,22 +591,41 @@ class CardInteractionManager {
   canUseLimitedEffect(card, position) {
     const currentPlayer = this.battleEngine.gameState.currentPlayer;
     const player = this.battleEngine.players[currentPlayer];
-    const currentTurn = this.battleEngine.gameState.turnCount;
     
-    // 1ターンに1回制限
-    const limitedUsedThisTurn = player.usedLimitedThisTurn || 0;
-    if (limitedUsedThisTurn > 0) {
+    // usedLimitedThisTurnの型を強制修正（数値0をfalseに変換）
+    if (typeof player.usedLimitedThisTurn !== 'boolean') {
+      Object.defineProperty(player, 'usedLimitedThisTurn', {
+        value: false,
+        writable: true,
+        enumerable: true,
+        configurable: true
+      });
+    }
+    
+    // 1ターンに1回制限（フラグベース）
+    if (player.usedLimitedThisTurn === true) {
       this.showMessage('LIMITED効果は1ターンに1回しか使用できません', 'warning');
       return false;
     }
     
-    // 先行（プレイヤー1）の最初のターンは使用不可
-    if (currentPlayer === 1 && currentTurn === 1) {
-      this.showMessage('先行の最初のターンではLIMITED効果は使用できません', 'warning');
+    // 先行プレイヤーの最初のターン（個人ターン1回目）のみ使用不可
+    const playerTurnCount = this.battleEngine.stateManager.getStateByPath(`turn.playerTurnCount.${currentPlayer}`) || 0;
+    if (player.isFirstPlayer === true && playerTurnCount <= 1) {
+      this.showMessage('先行プレイヤーの最初のターンではLIMITED効果は使用できません', 'warning');
       return false;
     }
     
     return true;
+  }
+
+  /**
+   * LIMITED効果の使用回数を記録
+   */
+  recordLimitedEffectUsage() {
+    const currentPlayer = this.battleEngine.gameState.currentPlayer;
+    const player = this.battleEngine.players[currentPlayer];
+    
+    player.usedLimitedThisTurn = true;
   }
 
   /**
@@ -769,7 +785,6 @@ class CardInteractionManager {
         const supportCard = player.hand.splice(cardIndex, 1)[0];
         player.archive = player.archive || [];
         player.archive.push(supportCard);
-        console.log(`📁 [自動アーカイブ] ${supportCard.name || supportCard.id} をアーカイブに移動`);
         return true;
       }
     }

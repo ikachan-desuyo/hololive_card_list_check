@@ -198,8 +198,7 @@ class HololiveCPULogic {
         }
       } else {
         // フォールバック（旧来の方式）
-        const limitedUsedThisTurn = cpu.usedLimitedThisTurn || 0;
-        if (limitedUsedThisTurn > 0) {
+        if (cpu.usedLimitedThisTurn) {
           return false;
         }
       }
@@ -262,7 +261,7 @@ class HololiveCPULogic {
     cpu.archive.push(card);
     
     if (card.card_type.includes('LIMITED')) {
-      cpu.usedLimitedThisTurn = (cpu.usedLimitedThisTurn || 0) + 1;
+      cpu.usedLimitedThisTurn = true;
     }
     
     

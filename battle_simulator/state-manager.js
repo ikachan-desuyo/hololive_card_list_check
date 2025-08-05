@@ -102,7 +102,7 @@ class HololiveStateManager {
       
       // ゲーム状態
       gameState: {
-        usedLimitedThisTurn: 0, // LIMITED効果使用回数（数値型）
+        usedLimitedThisTurn: false, // LIMITED効果使用済みフラグ（boolean型）
         restHolomem: [],
         collabMovedThisTurn: false, // このターンにコラボ移動を実行したか
         batonTouchUsedThisTurn: false // このターンにバトンタッチを実行したか

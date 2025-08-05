@@ -382,12 +382,11 @@ class HandManager {
         }
       } else {
         // フォールバック（旧来の方式）
-        const limitedUsedThisTurn = player.usedLimitedThisTurn || 0;
-        if (limitedUsedThisTurn > 0) {
+        if (player.usedLimitedThisTurn) {
           window.debugLog('このターンには既にLIMITEDカードを使用しています');
           return;
         }
-        player.usedLimitedThisTurn = (player.usedLimitedThisTurn || 0) + 1;
+        player.usedLimitedThisTurn = true;
       }
     }
     

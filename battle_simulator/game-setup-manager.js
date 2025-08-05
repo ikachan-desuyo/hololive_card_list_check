@@ -397,6 +397,13 @@ class HololiveGameSetupManager {
     this.gameState.currentPlayer = playerId;
     this.gameState.turnOrderDecided = true;
     
+    // プレイヤーに先行・後攻フラグを設定
+    this.engine.players[1].isFirstPlayer = (playerId === 1); // プレイヤー1が先行かどうか
+    this.engine.players[2].isFirstPlayer = (playerId === 2); // プレイヤー2が先行かどうか
+    
+    console.log(`🎯 [先行・後攻設定] プレイヤー1: ${this.engine.players[1].isFirstPlayer ? '先行' : '後攻'}`);
+    console.log(`🎯 [先行・後攻設定] プレイヤー2: ${this.engine.players[2].isFirstPlayer ? '先行' : '後攻'}`);
+    
     const methodText = isManual ? '手動選択' : 'ランダム';
     const playerText = playerId === 1 ? 'プレイヤー' : '相手';
     

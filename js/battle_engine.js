@@ -406,8 +406,9 @@ class HololiveBattleEngine {
       hand: [],
       
       // ゲーム状態
-      usedLimitedThisTurn: [], // LIMITEDカード制限のみ残す
+      usedLimitedThisTurn: false, // LIMITED効果使用済みフラグ（boolean型に統一）
       restHolomem: [], // お休み状態のホロメン
+      isFirstPlayer: null, // 先行フラグ（true: 先行, false: 後攻, null: 未設定）
       
       // デッキ構築情報
       oshiCard: null,

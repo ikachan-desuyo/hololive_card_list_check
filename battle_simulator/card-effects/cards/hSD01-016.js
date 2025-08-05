@@ -45,9 +45,14 @@ const cardEffect_hSD01_016 = {
             autoArchive: true // 自動アーカイブ移動を指示
           };
         } else {
+          // デッキが空でも効果は発動扱い（カードはアーカイブに移動）
+          utils.updateDisplay();
+          
           return {
-            success: false,
-            message: 'デッキにカードがありません'
+            success: true,
+            message: `${card.name || '春先のどか'}の効果を発動しましたが、デッキにカードがありませんでした`,
+            drawnCards: [],
+            autoArchive: true // 自動アーカイブ移動を指示
           };
         }
       }
