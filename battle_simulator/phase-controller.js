@@ -480,24 +480,31 @@ class PhaseController {
       window.infoPanelManager.logStepProgress(this.battleEngine.gameState.turnCount, 'パフォーマンスステップ', playerName, action);
     }
     
-    if (playerId === 1) {
-      // プレイヤーの場合は手動操作を待つ（自動進行しない）
-      
-      // 操作待ちログは統合ログで処理されるため削除
-      
-      // 手動操作を待つため、ここでは自動進行しない
+    // Performance Managerでパフォーマンスステップを実行
+    if (this.battleEngine.performanceManager) {
+      this.battleEngine.performanceManager.startPerformanceStep(playerId);
     } else {
-      // CPUの場合は自動進行（CPU AIロジックを呼び出し）
-      setTimeout(async () => {
-        try {
-          if (this.battleEngine.cpuLogic) {
-            await this.battleEngine.cpuLogic.cpuPerformancePhase();
+      console.error('🚨 [Phase] PerformanceManager が初期化されていません');
+      // フォールバック：従来の処理
+      if (playerId === 1) {
+        // プレイヤーの場合は手動操作を待つ（自動進行しない）
+        
+        // 操作待ちログは統合ログで処理されるため削除
+        
+        // 手動操作を待つため、ここでは自動進行しない
+      } else {
+        // CPUの場合は自動進行（CPU AIロジックを呼び出し）
+        setTimeout(async () => {
+          try {
+            if (this.battleEngine.cpuLogic) {
+              await this.battleEngine.cpuLogic.cpuPerformancePhase();
+            }
+            this.nextPhase();
+          } catch (error) {
+            this.nextPhase(); // エラーでも進行は続ける
           }
-          this.nextPhase();
-        } catch (error) {
-          this.nextPhase(); // エラーでも進行は続ける
-        }
-      }, 2000);
+        }, 2000);
+      }
     }
   }
 

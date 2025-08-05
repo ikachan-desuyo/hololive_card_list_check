@@ -418,6 +418,11 @@ class HandManager {
       cardCopy.isResting = card.isResting;
     }
     
+    // HPの初期化（ホロメンカードの場合）
+    if (card.hp && !cardCopy.current_hp) {
+      cardCopy.current_hp = card.hp;
+    }
+    
     return cardCopy;
   }
 

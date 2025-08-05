@@ -77,6 +77,19 @@ class HololiveBattleEngine {
       this.cardInteractionManager = null;
     }
     
+    // パフォーマンス管理の初期化
+    try {
+      if (typeof PerformanceManager === 'undefined') {
+        throw new Error('PerformanceManager クラスが読み込まれていません');
+      }
+      this.performanceManager = new PerformanceManager(this);
+      window.debugLog('✅ PerformanceManager初期化成功');
+    } catch (error) {
+      window.errorLog('❌ PerformanceManager初期化エラー:', error);
+      // パフォーマンス機能がなくてもゲームは続行可能
+      this.performanceManager = null;
+    }
+    
     // 情報パネル管理の初期化
     if (!window.infoPanelManager) {
       window.infoPanelManager = new InfoPanelManager();
@@ -754,32 +767,59 @@ class HololiveBattleEngine {
   }
 
   checkVictoryConditions() {
-    // 勝利条件の確認
+    // 敗北条件をチェック（敗北条件を満たした方が負け）
     for (let playerId = 1; playerId <= 2; playerId++) {
       const player = this.players[playerId];
-      const opponent = this.players[playerId === 1 ? 2 : 1];
+      const opponentId = playerId === 1 ? 2 : 1;
       
-      // 条件1: 相手のライフが0
-      if (opponent.life.length === 0) {
-        this.endGame(playerId);
+      // 敗北条件1: ライフが0枚になったとき
+      if (player.life.length === 0) {
+        console.log(`💀 [Victory] プレイヤー${playerId}敗北: ライフが0枚`);
+        this.endGame(opponentId);
         return;
       }
       
-      // 条件2: 相手のステージに推しホロメン以外がいない
-      const hasStageHolomem = opponent.collab || opponent.center || 
-                             opponent.back1 || opponent.back2 || opponent.back3;
-      if (!hasStageHolomem) {
-        this.endGame(playerId);
+      // 敗北条件2: 自分の場のホロメンカードが0枚になったとき
+      const fieldHolomen = this.getFieldHolomenCards(playerId);
+      if (fieldHolomen.length === 0) {
+        console.log(`💀 [Victory] プレイヤー${playerId}敗北: 場のホロメンが0枚`);
+        this.endGame(opponentId);
         return;
       }
       
-      // 条件3: 相手のデッキが0枚で手札ステップでカードを引けない
-      if (opponent.deck.length === 0 && this.gameState.currentPlayer !== playerId && 
-          this.gameState.currentPhase === 1) {
-        this.endGame(playerId);
+      // 敗北条件3: デッキが0枚になった状態でエールステップになり、デッキが引けないとき
+      if (player.deck.length === 0 && 
+          this.gameState.currentPlayer === playerId && 
+          this.gameState.currentPhase === 1) { // 手札ステップ
+        console.log(`💀 [Victory] プレイヤー${playerId}敗北: デッキ切れでドロー不可`);
+        this.endGame(opponentId);
         return;
       }
     }
+  }
+
+  /**
+   * 場のホロメンカードを取得
+   * @param {number} playerId - プレイヤーID
+   * @returns {Array} ホロメンカードリスト
+   */
+  getFieldHolomenCards(playerId) {
+    const player = this.players[playerId];
+    const fieldCards = [];
+
+    // センター・コラボ・バック全てをチェック（推しホロメンは除外）
+    const positions = ['center', 'collab', 'back1', 'back2', 'back3', 'back4', 'back5'];
+    
+    positions.forEach(position => {
+      if (player[position] && this.isHolomenCard(player[position])) {
+        fieldCards.push({
+          card: player[position],
+          position: position
+        });
+      }
+    });
+
+    return fieldCards;
   }
 
   endGame(winnerId) {
