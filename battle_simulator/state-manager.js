@@ -1463,6 +1463,14 @@ class HololiveStateManager {
 
     // メインフェーズでのカード移動制限
     if (currentPhase === 3) {
+      // コラボからの移動制限: リセットステップ以外では一切移動不可
+      if (sourcePosition === 'collab') {
+        return {
+          valid: false,
+          reason: 'コラボのホロメンは次のリセットステップまで移動できません'
+        };
+      }
+      
       // コラボへの移動制限: バックからのみ可能
       if (targetPosition === 'collab') {
         if (!sourcePosition.startsWith('back')) {
