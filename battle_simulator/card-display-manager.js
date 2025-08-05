@@ -107,30 +107,23 @@ class CardDisplayManager {
           break;
         case 'collab':
           if (cards) {
-            console.log(`🎨 コラボポジションにカード表示: ${cards.name}`, cards);
-            console.log(`🎨 コラボ画像URL: ${cards.image_url}`);
-            console.log(`🎨 コラボカード状態:`, cards.cardState);
-            console.log(`🎨 コラボエール枚数: ${cards.yellCards?.length || 0}枚`);
+            // コラボカード表示処理
             if (!cards.cardState) {
               console.warn(`⚠️ コラボカードに状態情報がありません:`, cards);
             }
             cardsToDisplay = [cards];
           } else {
-            console.log('🎨 コラボポジションにカードなし');
+            // コラボポジションにカードなし
           }
           displayType = 'single';
           break;
         case 'center':
           if (cards) {
-            console.log(`🎨 センターポジションにカード表示: ${cards.name}`, cards);
-            console.log(`🎨 センター画像URL: ${cards.image_url}`);
-            console.log(`🎨 センターカード状態:`, cards.cardState);
+            // センターカード表示処理
             if (!cards.cardState) {
               console.warn(`⚠️ センターカードに状態情報がありません:`, cards);
             }
             cardsToDisplay = [cards];
-          } else {
-            console.log('🎨 センターポジションにカードなし');
           }
           displayType = 'single';
           break;
@@ -264,15 +257,12 @@ class CardDisplayManager {
       cardElement.classList.remove('face-down');
       cardElement.classList.add('face-up');
       
-      console.log(`🎨 [Card Element] 表向きカード作成: ${card.name}, 画像URL: ${card.image_url}`);
-      
       // カード画像の設定
       if (card.image_url) {
         cardElement.style.backgroundImage = `url(${card.image_url})`;
         cardElement.style.backgroundSize = 'cover';
         cardElement.style.backgroundPosition = 'center';
         cardElement.style.backgroundRepeat = 'no-repeat';
-        console.log(`🎨 [Card Element] 画像設定完了: ${card.image_url}`);
       } else {
         console.log(`⚠️ [Card Element] 画像URLなし: ${card.name}`);
         // 画像がない場合はカード内容を表示
@@ -457,11 +447,7 @@ class CardDisplayManager {
       // 対応するバックポジションにカードがある場合は表示
       const card = player[backPositions[index]];
       if (card) {
-        console.log(`🎨 バックスロット${index + 1}にカード表示: ${card.name}`);
-        console.log(`🎨 バック画像URL: ${card.image_url}`);
-        console.log(`🎨 バックカード状態:`, card.cardState);
-        console.log(`🎨 カードレベル: ${card.bloom_level || 'レベル不明'}`);
-        console.log(`🎨 エール枚数: ${card.yellCards?.length || 0}枚`);
+        // カード表示処理
         if (card.cardState?.bloomedThisTurn) {
           console.log(`🌸 このターンにブルームしたカード: ${card.name}`);
         }

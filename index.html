@@ -449,7 +449,6 @@
           updateViaCache: 'none' // モバイル向け：キャッシュを使わず常に最新をチェック
         })
           .then((registration) => {
-            console.log('SW registered: ', registration);
 
             // モバイル向け：即座に更新チェック
             registration.update();
@@ -473,13 +472,11 @@
                   window.location.href = window.location.href + '?v=' + Date.now();
                 }
               } catch (error) {
-                console.error('Version check error:', error);
               }
             };
 
             // Check for waiting service worker with new system
             if (registration.waiting) {
-              console.log('SW update available');
               setTimeout(checkForUpdates, 500);
             }
 
@@ -501,7 +498,6 @@
             });
           })
           .catch((registrationError) => {
-            console.log('SW registration failed: ', registrationError);
           });
       });
     }
@@ -513,10 +509,8 @@
           const registration = await navigator.serviceWorker.getRegistration();
           if (registration) {
             await registration.update();
-            console.log('Mobile: Periodic update check completed');
           }
         } catch (error) {
-          console.log('Mobile: Periodic update check failed:', error);
         }
       }, 5 * 60 * 1000); // 5分間隔
     }
@@ -547,7 +541,6 @@
         navigator.serviceWorker.register('./sw.js')
           .then((registration) => {
             serviceWorkerRegistration = registration;
-            console.log('SW registered: ', registration);
             // ... existing code above
           });
       });
@@ -632,7 +625,6 @@
 
             statusEl.innerHTML = `🚀 更新が利用可能です (${versionCheckResult.outdatedPages.length}ページ)<br><small>詳細情報を確認してください</small>`;
             statusEl.style.color = '#4caf50';
-            console.log('Version check details:', versionCheckResult);
 
             setTimeout(() => {
               if (confirm(detailMessage + 'バージョン不一致のページを更新してアプリケーションを再読み込みしますか？')) {
@@ -640,7 +632,6 @@
                 statusEl.style.color = '#ff9800';
 
                 // バージョン不一致のページのみをターゲットにした更新処理
-                console.log('Starting targeted cache clear and update for outdated pages...');
 
                 // Service Workerに強制更新を要求（対象ページのみ）
                 if (navigator.serviceWorker.controller) {
@@ -654,24 +645,20 @@
                 if ('caches' in window) {
                   caches.keys().then(cacheNames => {
                     return Promise.all(cacheNames.map(cacheName => {
-                      console.log('Deleting cache for outdated pages:', cacheName);
                       return caches.delete(cacheName);
                     }));
                   }).then(() => {
-                    console.log('Caches cleared for outdated pages');
                     statusEl.innerHTML = `🔄 アプリケーションを再読み込み中...<br><small>更新されたページを反映します</small>`;
                     // Service Workerの更新を待つ
                     return new Promise(resolve => setTimeout(resolve, 1000));
                   }).then(() => {
                     // 対象ページの更新を反映するためのリロード
-                    console.log('Performing targeted reload for updated pages...');
                     if (window.location.reload) {
                       window.location.reload(true); // 強制リロード
                     } else {
                       window.location.href = window.location.href + '?t=' + Date.now();
                     }
                   }).catch(error => {
-                    console.error('Targeted cache clear failed, forcing reload anyway:', error);
                     window.location.href = window.location.href + '?t=' + Date.now();
                   });
                 } else {
@@ -717,7 +704,6 @@
         }
 
       } catch (error) {
-        console.error('Update check failed:', error);
         statusEl.textContent = '❌ 更新確認に失敗しました: ' + error.message;
         statusEl.style.color = '#f44336';
       } finally {
@@ -728,14 +714,11 @@
 
     // セーフナビゲーション関数（フォールバック付き）
     function safeNavigate(url) {
-      console.log('Attempting to navigate to:', url);
       
       // offline-utils.js が読み込まれているかチェック
       if (typeof window.navigateToPage === 'function') {
-        console.log('Using offline-aware navigation');
         window.navigateToPage(url);
       } else {
-        console.log('offline-utils.js not loaded, using fallback navigation');
         // フォールバック: 通常のナビゲーション
         if (navigator.onLine) {
           window.location.href = url;
@@ -750,14 +733,11 @@
 
     // 画像ダウンロード確認ダイアログを表示
     async function showImageDownloadDialog() {
-      console.log('showImageDownloadDialog called');
       
       // モバイル版のみ表示（より厳密な判定）
       const isMobile = window.innerWidth <= 768 || /Android|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent);
-      console.log('isMobile check:', isMobile, 'window.innerWidth:', window.innerWidth);
       
       if (!isMobile) {
-        console.log('Image bulk download is available only on mobile devices');
         alert('画像一括ダウンロードはモバイル版でのみ利用可能です。');
         return;
       }
@@ -767,14 +747,11 @@
         return;
       }
 
-      console.log('Current cards array length:', cards.length);
       
       // カードデータを読み込み
       if (cards.length === 0) {
-        console.log('Loading card data...');
         const loadedCards = await loadCardData();
         if (loadedCards.length === 0) {
-          console.log('Failed to load card data');
           return; // データ読み込み失敗
         }
       }
@@ -789,7 +766,6 @@
       const imageUrls = extractImageUrls();
       const totalCount = imageUrls.length;
       
-      console.log(`Found ${totalCount} images to download`);
       
       if (totalCount === 0) {
         alert('ダウンロード対象の画像が見つかりませんでした。カードデータの読み込みを確認してください。');
@@ -840,13 +816,11 @@
         }
         
       }).catch(error => {
-        console.error('Cache status error:', error);
         currentCacheInfoEl.textContent = '❌ 情報取得失敗';
         startBtn.disabled = false;
         startBtn.textContent = '📥 ダウンロード開始';
       });
       
-      console.log('Showing modal');
       modal.style.display = 'block';
     }
 
@@ -860,7 +834,6 @@
         
         // 中断フラグを設定
         imageDownloadInProgress = false;
-        console.log('Image download was cancelled by user');
       }
       
       modal.style.display = 'none';
@@ -874,8 +847,6 @@
       const imageUrls = [];
       const seenUrls = new Set();
       
-      console.log('Cards array length:', cards.length);
-      console.log('Sample card:', cards[0]);
       
       // カードデータがオブジェクト形式の場合、値を取得
       const cardArray = Array.isArray(cards) ? cards : Object.values(cards);
@@ -889,8 +860,6 @@
         }
       }
       
-      console.log(`Extracted ${imageUrls.length} unique image URLs`);
-      console.log('Sample image URL:', imageUrls[0]);
       return imageUrls;
     }
 
@@ -947,7 +916,6 @@
         let successCount = 0;
         let failureCount = 0;
         
-        console.log(`Starting download of ${totalCount} uncached images`);
         
         progressText.textContent = `未キャッシュ画像を事前読み込み中... (${totalCount}枚)`;
         
@@ -956,18 +924,15 @@
         
         for (let i = 0; i < imageUrls.length; i += batchSize) {
           if (!imageDownloadInProgress) {
-            console.log('Download was cancelled by user');
             break; // 中断された場合
           }
           
           const batch = imageUrls.slice(i, i + batchSize);
-          console.log(`Processing batch ${Math.floor(i/batchSize) + 1}/${Math.ceil(imageUrls.length/batchSize)}`);
           
           const batchPromises = batch.map(async (url) => {
             return new Promise(async (resolve) => {
               try {
                 const timeout = setTimeout(() => {
-                  console.warn(`Timeout for: ${url}`);
                   resolve({ success: false, url, error: 'Timeout' });
                 }, 15000); // 15秒タイムアウト
                 
@@ -978,15 +943,12 @@
                 
                 // レスポンス状態をチェック
                 if (response.ok || response.type === 'opaque') {
-                  console.log(`Successfully fetched: ${url} (status: ${response.status || 'opaque'})`);
                   resolve({ success: true, url, cached: true });
                 } else {
-                  console.warn(`Failed to fetch: ${url} - Status: ${response.status}`);
                   resolve({ success: false, url, error: `HTTP ${response.status}` });
                 }
                 
               } catch (error) {
-                console.warn(`Fetch failed for: ${url} - ${error.message}`);
                 
                 // fetch失敗の場合、Imageオブジェクトでフォールバック
                 try {
@@ -997,7 +959,6 @@
                   
                   img.onload = () => {
                     clearTimeout(imgTimeout);
-                    console.log(`Image fallback succeeded for: ${url}`);
                     resolve({ success: true, url, cached: false });
                   };
                   
@@ -1023,7 +984,6 @@
               successCount++;
             } else {
               failureCount++;
-              console.warn(`Failed: ${result.url} - ${result.error}`);
             }
           });
           
@@ -1065,7 +1025,6 @@
         }
         
       } catch (error) {
-        console.error('Image download error:', error);
         progressText.textContent = '❌ ダウンロードエラーが発生しました';
         alert(`画像ダウンロード中にエラーが発生しました：${error.message}`);
         
@@ -1092,7 +1051,6 @@
         
         // すべてのキャッシュを取得
         const cacheNames = await caches.keys();
-        console.log('Available caches:', cacheNames);
         
         let deletedCount = 0;
         let totalSize = 0;
@@ -1124,7 +1082,6 @@
               
               await cache.delete(request);
               deletedCount++;
-              console.log('Deleted cached image:', request.url);
             }
           }
         }
@@ -1145,7 +1102,6 @@
         }, 2000);
         
       } catch (error) {
-        console.error('Cache clear error:', error);
         clearBtn.textContent = '❌ エラー';
         alert(`キャッシュ削除中にエラーが発生しました：${error.message}`);
         
@@ -1193,7 +1149,6 @@
         };
         
       } catch (error) {
-        console.error('Cache status check error:', error);
         return {
           total: 0,
           cached: 0,
@@ -1217,11 +1172,8 @@
         
         // オブジェクトの場合は配列に変換
         cards = Array.isArray(cardData) ? cardData : Object.values(cardData);
-        console.log(`Loaded ${cards.length} cards for image download`);
-        console.log('Sample card:', cards[0]);
         return cards;
       } catch (error) {
-        console.error('Card data loading error:', error);
         alert('カードデータの読み込みに失敗しました。ネットワーク接続を確認してください。');
         return [];
       }

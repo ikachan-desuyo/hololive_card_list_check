@@ -655,12 +655,10 @@ function addCardToDeck(cardId) {
 
       // Use cached data if available and not too old, or if offline
       if (cachedCardData && cachedReleaseData && (cacheAge < maxCacheAge || !navigator.onLine)) {
-        console.log('Using cached data');
         rawData = JSON.parse(cachedCardData);
         releaseMapData = JSON.parse(cachedReleaseData);
       } else {
         // Fetch fresh data
-        console.log('Fetching fresh data');
         const [cardRes, releaseRes] = await Promise.all([
           fetch("json_file/card_data.json"),
           fetch("json_file/release_dates.json")
@@ -695,7 +693,6 @@ function addCardToDeck(cardId) {
       setupFilterChips();
       updateDeckUI();
     } catch (err) {
-      console.error(err);
       alert("カードデータの読み込みに失敗しました！");
     }
   };
@@ -718,7 +715,6 @@ function addCardToDeck(cardId) {
         decks = JSON.parse(savedDecks);
         currentDeck = Object.keys(decks)[0] ?? null;
         } catch {
-        console.warn("保存されたデッキの読み込みに失敗しました");
         }
     }
     // 🎴 カードデータ読み込み (オフライン対応)
@@ -749,7 +745,6 @@ function addCardToDeck(cardId) {
                 localStorage.setItem('cached_release_data', JSON.stringify(releaseMapData));
                 localStorage.setItem('cache_timestamp', Date.now().toString());
             } catch (fetchError) {
-                console.warn('オンラインデータの取得に失敗:', fetchError);
                 // フェッチに失敗した場合はキャッシュデータにフォールバック
                 if (cachedCardData && cachedReleaseData) {
                     rawData = JSON.parse(cachedCardData);
@@ -799,13 +794,11 @@ function addCardToDeck(cardId) {
         updateDeckUI();
 
         // データ読み込み成功をコンソールに記録
-        console.log('カードデータ読み込み完了:', {
             cardCount: cards.length,
             dataSource: navigator.onLine && !isCacheValid ? 'オンライン' : 'キャッシュ',
             cacheAge: cacheTime ? `${Math.round((Date.now() - parseInt(cacheTime)) / (60 * 60 * 1000))}時間` : '新規'
         });
     } catch (err) {
-        console.error('カードデータ読み込みエラー:', err);
         alert("カードデータの読み込みに失敗しました！オフライン時は過去にアクセスした際のデータが必要です。");
     }
 
@@ -813,12 +806,10 @@ function addCardToDeck(cardId) {
     if ('serviceWorker' in navigator) {
         navigator.serviceWorker.register('sw.js')
           .then((registration) => {
-            console.log('SW registered: ', registration);
 
             // Listen for messages from Service Worker
             navigator.serviceWorker.addEventListener('message', event => {
               if (event.data && event.data.type === 'CACHE_UPDATED') {
-                console.log('Cache updated, forcing reload');
                 window.location.reload(true);
               }
             });
@@ -829,7 +820,6 @@ function addCardToDeck(cardId) {
               newWorker.addEventListener('statechange', () => {
                 if (newWorker.state === 'installed' && navigator.serviceWorker.controller) {
                   // New content available, reload the page immediately
-                  console.log('🚀 強制更新: エールフィルター機能が修正されました');
                   // Clear all caches first
                   caches.keys().then(cacheNames => {
                     return Promise.all(cacheNames.map(cacheName => caches.delete(cacheName)));
@@ -842,7 +832,6 @@ function addCardToDeck(cardId) {
             });
           })
           .catch((registrationError) => {
-            console.log('SW registration failed: ', registrationError);
           });
     }
 
@@ -965,12 +954,10 @@ async function checkForUpdates() {
         detailMessage += `  ┗ 理由: ${reasonText}\n\n`;
 
         statusEl.innerHTML = `🚀 このページの更新が利用可能です`;
-        console.log('Single page version check details:', versionCheckResult);
 
         setTimeout(() => {
           if (confirm(detailMessage + 'このページを更新してアプリケーションを再読み込みしますか？')) {
             // より強力なキャッシュクリア処理
-            console.log('Starting forced cache clear and update...');
 
             // Service Workerに強制更新を要求
             if (navigator.serviceWorker.controller) {
@@ -981,23 +968,19 @@ async function checkForUpdates() {
             if ('caches' in window) {
               caches.keys().then(cacheNames => {
                 return Promise.all(cacheNames.map(cacheName => {
-                  console.log('Deleting cache:', cacheName);
                   return caches.delete(cacheName);
                 }));
               }).then(() => {
-                console.log('All browser caches cleared');
                 // Service Workerの更新を待つ
                 return new Promise(resolve => setTimeout(resolve, 1000));
               }).then(() => {
                 // より強力なリロード
-                console.log('Performing hard reload...');
                 if (window.location.reload) {
                   window.location.reload(true); // 強制リロード
                 } else {
                   window.location.href = window.location.href + '?t=' + Date.now();
                 }
               }).catch(error => {
-                console.error('Cache clear failed, forcing reload anyway:', error);
                 window.location.href = window.location.href + '?t=' + Date.now();
               });
             } else {
@@ -1023,7 +1006,6 @@ async function checkForUpdates() {
     }
 
   } catch (error) {
-    console.error('Update check failed:', error);
     statusEl.textContent = '[v4.0.0-ERROR: ' + error.message + ']';
     statusEl.style.color = '#f44336';
     setTimeout(() => {
@@ -1043,7 +1025,6 @@ async function displayVersionInfo() {
       statusEl.textContent = `[v${versionInfo.data.pageVersions['deck_builder.html']}-CENTRALIZED]`;
     }
   } catch (error) {
-    console.warn('Version display error:', error);
     statusEl.textContent = '[v4.0.0-CENTRALIZED]';
   }
 }
@@ -1059,8 +1040,6 @@ document.addEventListener('DOMContentLoaded', function() {
 // ✅ Service Worker登録
 if ('serviceWorker' in navigator) {
   navigator.serviceWorker.register('./sw.js').then(function(registration) {
-    console.log('Service Worker registered successfully:', registration.scope);
   }).catch(function(error) {
-    console.log('Service Worker registration failed:', error);
   });
 }

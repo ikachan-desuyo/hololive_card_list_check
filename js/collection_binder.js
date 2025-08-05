@@ -26,7 +26,6 @@
     // 表示モード設定の保存・読み込み
     function saveViewModePreference(viewMode) {
       localStorage.setItem('binderViewMode', JSON.stringify(viewMode));
-      console.log('View mode preference saved:', viewMode ? '閲覧モード' : '編集モード');
     }
 
     function loadViewModePreference() {
@@ -34,13 +33,10 @@
       if (saved !== null) {
         try {
           const viewMode = JSON.parse(saved);
-          console.log('View mode preference loaded:', viewMode ? '閲覧モード' : '編集モード');
           return viewMode;
         } catch (error) {
-          console.error('Error loading view mode preference:', error);
         }
       }
-      console.log('Using default view mode: 編集モード');
       return false; // デフォルトは編集モード
     }
 
@@ -69,16 +65,13 @@
 
     // 初期化
     document.addEventListener('DOMContentLoaded', async function() {
-      console.log('DOMContentLoaded fired');
 
       // URLパラメータからバインダーIDを取得
       const urlParams = new URLSearchParams(window.location.search);
       binderState.binderId = urlParams.get('binderId');
 
-      console.log('Binder ID from URL:', binderState.binderId);
 
       if (!binderState.binderId) {
-        console.log('No binder ID specified, checking for existing binders...');
 
         // 既存のバインダーをチェック
         const saved = localStorage.getItem('binderCollection');
@@ -87,14 +80,12 @@
           if (collection.binders && collection.binders.length > 0) {
             // 最初のバインダーにリダイレクト
             const firstBinder = collection.binders[0];
-            console.log('Redirecting to first binder:', firstBinder.id);
             window.location.href = `collection_binder.html?binderId=${firstBinder.id}`;
             return;
           }
         }
 
         // バインダーが存在しない場合、バインダーコレクションページにリダイレクト
-        console.log('No binders found, redirecting to binder collection');
         alert('バインダーがありません。新しいバインダーを作成してください。');
         window.location.href = 'binder_collection.html';
         return;
@@ -116,14 +107,11 @@
       // バインダー更新通知のリスナーを設定
       setupBinderUpdateListener();
 
-      console.log('Initialization complete');
 
       // デバッグ用: 強制的にクリックテスト
       setTimeout(() => {
         const slots = document.querySelectorAll('.card-slot');
-        console.log('Found slots:', slots.length);
         slots.forEach((slot, index) => {
-          console.log(`Slot ${index}:`, slot);
         });
       }, 1000);
     });
@@ -131,11 +119,8 @@
     // カードデータの読み込み
     async function loadCardData() {
       try {
-        console.log('Loading card data...');
         const response = await fetch('./json_file/card_data.json');
         const rawCardData = await response.json();
-        console.log('Raw card data loaded:', Object.keys(rawCardData).length, 'entries');
-        console.log('First 3 raw entries:', Object.keys(rawCardData).slice(0, 3));
 
         // オブジェクトから配列に変換
         cardsData = Object.entries(rawCardData).map(([key, card]) => ({
@@ -144,20 +129,16 @@
           cardImageURL: card.image_url  // 互換性のため
         }));
 
-        console.log('Card data converted to array:', cardsData.length, 'cards');
-        console.log('First 3 converted cards:', cardsData.slice(0, 3).map(c => ({id: c.id, name: c.name})));
 
         binderState.totalCards = cardsData.length;
 
         // cardsDataが配列であることを確認
         if (!Array.isArray(cardsData)) {
-          console.error('Card data is not an array:', cardsData);
           cardsData = [];
         }
 
         // 商品リストの初期化はloadUserCollection()後に実行される
       } catch (error) {
-        console.error('Failed to load card data:', error);
         cardsData = []; // エラー時は空配列に設定
       }
     }
@@ -188,7 +169,6 @@
         productSelect.appendChild(option);
       });
 
-      console.log('Initialized product list with', productSet.size, 'products (owned cards only)');
     }
 
     // カードタイプフィルターの初期化（所有カードのみ）
@@ -221,7 +201,6 @@
         cardTypeSelect.appendChild(option);
       });
 
-      console.log('Initialized card type list with', cardTypeSet.size, 'types (owned cards only)');
     }
 
     // カード選択画面での統合フィルタリング
@@ -262,12 +241,10 @@
       // カードグリッドを再描画
       renderCardGrid(filteredCards);
 
-      console.log(`Modal filters applied - Product: "${modalProductFilter}", Search: "${searchTerm}", Rarity: "${rarityFilter}", Type: "${cardTypeFilter}" - Showing ${filteredCards.length} cards`);
     }
 
     // ユーザーコレクションの読み込み
     function loadUserCollection() {
-      console.log('Loading user collection from card_list.html format...');
 
       // card_list.html形式のデータを読み込み（"count_" + cardId の形式）
       userCollection = {};
@@ -281,15 +258,11 @@
         if (key && key.startsWith('count_')) {
           totalStorageItems++;
           const value = localStorage.getItem(key);
-          console.log(`Found localStorage item: ${key} = ${value}`);
         }
       }
 
-      console.log(`Total localStorage items with 'count_' prefix: ${totalStorageItems}`);
 
       if (Array.isArray(cardsData)) {
-        console.log('Processing', cardsData.length, 'cards...');
-        console.log('First 3 cards from cardsData:', cardsData.slice(0, 3).map(c => ({id: c.id, name: c.name})));
 
         cardsData.forEach((card, index) => {
           const savedCount = localStorage.getItem("count_" + card.id);
@@ -300,27 +273,20 @@
             ownedCount++;
             validCounts++;
             if (validCounts <= 5) {  // 最初の5枚のみログ出力
-              console.log(`Card ${card.id} (${card.name}): count = ${count}`);
             }
           }
 
           // 最初の10枚の詳細ログ
           if (index < 10) {
-            console.log(`Debug card ${index}: id=${card.id}, name=${card.name}, savedCount=${savedCount}, count=${count}`);
           }
         });
       } else {
-        console.error('cardsData is not an array:', cardsData);
       }
 
-      console.log('Loaded userCollection from card_list format:', Object.keys(userCollection).length, 'cards');
-      console.log('Total owned card types:', ownedCount);
-      console.log('Valid counts found:', validCounts);
 
       // 所持カード数を計算
       binderState.ownedCards = ownedCount;
 
-      console.log('Final owned cards count:', binderState.ownedCards);
       
       // ユーザーコレクション読み込み完了後に商品リストを初期化
       initializeProductList();
@@ -328,23 +294,18 @@
 
     // バインダーコレクションの読み込み
     function loadBinderCollection() {
-      console.log('Loading binder collection for ID:', binderState.binderId);
 
       const saved = localStorage.getItem('binderCollection');
-      console.log('Saved binder collection:', saved);
 
       if (saved) {
         binderCollection = JSON.parse(saved);
       }
 
-      console.log('Parsed binder collection:', binderCollection);
 
       // 指定されたバインダーを取得
       binderState.binderData = binderCollection.binders.find(b => b.id == binderState.binderId);
-      console.log('Found binder data:', binderState.binderData);
 
       if (!binderState.binderData) {
-        console.log('Binder not found, creating test binder');
         // テスト用バインダーを作成
         const testBinder = {
           id: binderState.binderId,
@@ -373,7 +334,6 @@
         binderCollection.binders.push(testBinder);
         localStorage.setItem('binderCollection', JSON.stringify(binderCollection));
         binderState.binderData = testBinder;
-        console.log('Created test binder:', testBinder);
       }
 
       // バインダーのページデータを復元
@@ -392,10 +352,8 @@
           cols: 3,
           slotsPerPage: 9
         };
-        console.log('Added default layout to existing binder');
       }
 
-      console.log('Final binder state pages:', binderState.pages);
 
       // ヘッダータイトルを更新
       updateBinderTitle();
@@ -469,9 +427,6 @@
 
     // バインダーのレンダリング
     function renderBinder() {
-      console.log('renderBinder called');
-      console.log('binderState:', binderState);
-      console.log('currentPage:', binderState.currentPage);
 
       const container = document.getElementById('binderPages');
       container.innerHTML = '';
@@ -481,7 +436,6 @@
       }
 
       const currentPageData = binderState.pages[binderState.currentPage];
-      console.log('currentPageData:', currentPageData);
 
       if (!currentPageData) {
         binderState.currentPage = 0;
@@ -492,7 +446,6 @@
       const layout = binderState.binderData?.layout || { type: '3x3', cols: 3, slotsPerPage: 9 };
       const slotsPerPage = layout.slotsPerPage;
 
-      console.log('renderBinder layout info:', {
         binderData: binderState.binderData,
         layout: layout,
         slotsPerPage: slotsPerPage,
@@ -543,17 +496,12 @@
         container.appendChild(pagesContainer);
 
         // グリッドをレンダリング
-        console.log('Rendering desktop multi-page view');
-        console.log('Current page:', binderState.currentPage);
-        console.log('Total pages:', binderState.pages.length);
 
         renderPageSlots(currentPageData.slots, 'currentPageGrid');
         if (binderState.currentPage > 0) {
-          console.log('Rendering prev page slots');
           renderPageSlots(binderState.pages[binderState.currentPage - 1].slots, 'prevPageGrid');
         }
         if (binderState.currentPage < binderState.pages.length - 1) {
-          console.log('Rendering next page slots');
           renderPageSlots(binderState.pages[binderState.currentPage + 1].slots, 'nextPageGrid');
         }
       } else {
@@ -596,10 +544,8 @@
 
     // ページスロットのレンダリング
     function renderPageSlots(slots, gridId = 'currentPageGrid') {
-      console.log('renderPageSlots called with gridId:', gridId, 'viewMode:', binderState.viewMode);
       const grid = document.getElementById(gridId);
       if (!grid) {
-        console.error('Grid not found:', gridId);
         return;
       }
 
@@ -612,7 +558,6 @@
       } else if (gridId === 'nextPageGrid') {
         pageIndex = binderState.currentPage + 1;
       }
-      console.log('Page index for', gridId, ':', pageIndex);
 
       slots.forEach((slotData, index) => {
         const slot = document.createElement('div');
@@ -622,14 +567,11 @@
 
         if (slotData) {
           // カードが配置されている場合
-          console.log('Rendering card in slot', index, 'cardId:', slotData.cardId);
           slot.classList.add('occupied');
           const card = cardsData.find(c => c.id === slotData.cardId);
-          console.log('Found card:', card);
 
           if (card) {
             const imageUrl = card.cardImageURL || card.image_url || './images/placeholder.png';
-            console.log('Card image URL:', imageUrl);
 
             // R以上のレアリティの光エフェクトを適用
             const rarityRank = {
@@ -661,10 +603,8 @@
               if (!binderState.viewMode) {
                 // 編集モード：ドラッグを有効にする
                 cardContainer.setAttribute('draggable', 'true');
-                console.log('Adding drag listeners to card in', gridId, 'slot', index, 'page', pageIndex);
 
                 cardContainer.addEventListener('dragstart', (e) => {
-                  console.log('Dragstart event fired for page', pageIndex, 'slot', index);
                   handleDragStart(e, index, pageIndex);
                 });
                 cardContainer.addEventListener('dragend', handleDragEnd);
@@ -674,7 +614,6 @@
               }
             }
           } else {
-            console.warn('Card not found for id:', slotData.cardId);
             slot.innerHTML = `
               <div class="empty-slot-content">
                 <div class="slot-number">${index + 1}</div>
@@ -693,7 +632,6 @@
         }
 
         // イベントリスナーの追加
-        console.log('Adding event listeners to slot', index, 'in', gridId);
         const isMainPage = gridId === 'currentPageGrid';
         const isPrevPage = gridId === 'prevPageGrid';
         const isNextPage = gridId === 'nextPageGrid';
@@ -701,9 +639,7 @@
         if (!binderState.viewMode) {
           if (isMainPage) {
             // メインページ：クリックとドラッグ&ドロップ両方可能
-            console.log('Adding main page listeners to slot', index);
             slot.addEventListener('click', (e) => {
-              console.log('Slot clicked:', index);
               
               // モバイルの場合はダブルタップとスワップ機能をチェック
               if (isMobile) {
@@ -712,7 +648,6 @@
                 
                 // ダブルタップの検出（500ms以内の2回タップ）
                 if (timeDiff < 500 && lastTapSlot === index) {
-                  console.log('Double tap detected on slot', index);
                   handleDoubleTap(index);
                   lastTapTime = 0;
                   lastTapSlot = null;
@@ -740,7 +675,6 @@
               }
             });
             slot.addEventListener('dragover', (e) => {
-              console.log('Dragover event on main page slot', index);
               handleDragOver(e);
             });
             slot.addEventListener('dragleave', handleDragLeave);
@@ -748,17 +682,13 @@
           } else if (isPrevPage || isNextPage) {
             // 前後ページ：ドラッグ&ドロップのみ可能
             const targetPageIndex = isPrevPage ? binderState.currentPage - 1 : binderState.currentPage + 1;
-            console.log('Adding cross-page listeners to slot', index, 'target page', targetPageIndex);
             slot.addEventListener('dragover', (e) => {
-              console.log('Dragover event listener triggered on cross-page slot', index, 'target page', targetPageIndex);
               handleDragOver(e);
             });
             slot.addEventListener('dragleave', (e) => {
-              console.log('Dragleave event on cross-page slot', index);
               handleDragLeave(e);
             });
             slot.addEventListener('drop', (e) => {
-              console.log('Drop event on cross-page slot', index, 'target page', targetPageIndex);
               handleDrop(e, index, targetPageIndex);
             });
             slot.style.cursor = 'default';
@@ -774,12 +704,9 @@
 
     // カード選択モーダルを開く
     function openCardSelector(slotIndex) {
-      console.log('openCardSelector called with slotIndex:', slotIndex);
-      console.log('cardsData status:', cardsData, 'is array:', Array.isArray(cardsData));
 
       // cardsDataが配列であることを確認
       if (!Array.isArray(cardsData)) {
-        console.error('cardsData is not an array:', cardsData);
         if (isMobile) {
           showMobileAlert('カードデータの読み込み中です。しばらくお待ちください。', '⏳');
         } else {
@@ -793,19 +720,12 @@
 
       // 所持カードのみを表示
       availableCards = cardsData.filter(card => userCollection[card.id] > 0);
-      console.log('Filtering cards:');
-      console.log('Total cards:', cardsData.length);
-      console.log('UserCollection sample:', Object.entries(userCollection).slice(0, 5));
-      console.log('Cards with count > 0:', Object.entries(userCollection).filter(([id, count]) => count > 0));
-      console.log('Available cards:', availableCards.length);
 
       if (availableCards.length === 0) {
-        console.log('No available cards found. Debugging...');
         // デバッグ用：最初の5枚のカードの所持状況をチェック
         const debugCards = cardsData.slice(0, 5);
         debugCards.forEach(card => {
           const count = userCollection[card.id];
-          console.log(`Card ${card.id} (${card.name}): stored count = ${count}, localStorage = ${localStorage.getItem("count_" + card.id)}`);
         });
 
         if (isMobile) {
@@ -848,13 +768,9 @@
 
     // スロットにカードを配置
     function placeCardInSlot(slotIndex, cardId) {
-      console.log('placeCardInSlot called:', slotIndex, cardId);
       const currentPage = binderState.pages[binderState.currentPage];
-      console.log('Current page before:', currentPage);
 
       currentPage.slots[slotIndex] = { cardId, placedAt: Date.now() };
-      console.log('Current page after:', currentPage);
-      console.log('Slot data:', currentPage.slots[slotIndex]);
 
       saveBinder();
       renderBinder();
@@ -925,7 +841,6 @@
 
     // カードグリッドをレンダリング
     function renderCardGrid(cards) {
-      console.log('renderCardGrid called with', cards.length, 'cards');
       const cardGrid = document.getElementById('cardGrid');
       cardGrid.innerHTML = '';
 
@@ -935,7 +850,6 @@
       }
 
       cards.forEach((card, index) => {
-        console.log(`Rendering card ${index}:`, card.id, card.name);
         const cardItem = document.createElement('div');
 
         // R以上のレアリティの光エフェクトを適用
@@ -963,9 +877,7 @@
           </div>
         `;
 
-        console.log(`Adding click listener for card:`, card.id);
         cardItem.addEventListener('click', () => {
-          console.log('Card clicked at:', new Date().toISOString(), 'cardId:', card.id);
           selectCard(card.id);
         });
         cardGrid.appendChild(cardItem);
@@ -989,7 +901,6 @@
         cardGrid.style.display = 'grid';
       });
 
-      console.log('renderCardGrid completed, total cards rendered:', cards.length);
     }
 
     // 一時的なメッセージを表示
@@ -1024,16 +935,13 @@
 
     // カードを選択
     function selectCard(cardId) {
-      console.log('selectCard called with cardId:', cardId);
 
       // 既に同じカードが選択されている場合は何もしない
       if (selectedCardId === cardId) {
-        console.log('Same card already selected, ignoring');
         return;
       }
 
       selectedCardId = cardId;
-      console.log('selectedCardId set to:', selectedCardId);
       highlightSelectedCard();
     }
 
@@ -1055,7 +963,6 @@
 
     // 選択されたカードを配置
     function placeSelectedCard() {
-      console.log('placeSelectedCard called at:', new Date().toISOString(), {
         selectedCardId,
         currentSlotIndex,
         typeOfSelectedCardId: typeof selectedCardId,
@@ -1064,7 +971,6 @@
       });
 
       if (selectedCardId && currentSlotIndex !== null) {
-        console.log('Placing card:', selectedCardId, 'in slot:', currentSlotIndex);
 
         // カード名を取得して表示
         const card = cardsData.find(c => c.id === selectedCardId);
@@ -1081,7 +987,6 @@
 
         closeCardSelector();
       } else {
-        console.warn('Invalid data for placing card:', { selectedCardId, currentSlotIndex });
 
         if (!selectedCardId) {
           if (isMobile) {
@@ -1445,7 +1350,6 @@
       // 現在のバインダーのレイアウトから正しいスロット数を取得
       const totalSlots = binderState.binderData?.layout?.slotsPerPage || 9;
 
-      console.log('updateStats called:', {
         binderData: binderState.binderData,
         layout: binderState.binderData?.layout,
         totalSlots: totalSlots,
@@ -1504,8 +1408,6 @@
     }
 
     function saveBinder() {
-      console.log('saveBinder called');
-      console.log('binderState.binderData:', binderState.binderData);
 
       if (binderState.binderData) {
         // バインダーデータを更新
@@ -1516,14 +1418,10 @@
         }, 0);
         binderState.binderData.updatedAt = new Date().toISOString();
 
-        console.log('Updated binder data:', binderState.binderData);
-        console.log('Card count:', binderState.binderData.cardCount);
 
         // バインダーコレクション全体を保存
         localStorage.setItem('binderCollection', JSON.stringify(binderCollection));
-        console.log('Saved to localStorage');
       } else {
-        console.warn('No binderData to save');
       }
     }
 
@@ -1537,17 +1435,14 @@
 
     function handleDragStart(e, slotIndex, sourcePageIndex = null) {
       const effectivePageIndex = sourcePageIndex !== null ? sourcePageIndex : binderState.currentPage;
-      console.log('Drag started from slot:', slotIndex, 'page:', effectivePageIndex, 'currentPage:', binderState.currentPage);
 
       const sourcePage = binderState.pages[effectivePageIndex];
       if (!sourcePage) {
-        console.error('Invalid source page:', effectivePageIndex, 'Available pages:', binderState.pages.length);
         e.preventDefault();
         return;
       }
 
       const slotData = sourcePage.slots[slotIndex];
-      console.log('Slot data:', slotData);
 
       if (slotData) {
         draggedCardData = {
@@ -1567,15 +1462,12 @@
           e.dataTransfer.setData('application/json', JSON.stringify(draggedCardData));
         }
 
-        console.log('Dragging card:', draggedCardData);
       } else {
-        console.warn('No card found in slot', slotIndex, 'of page', effectivePageIndex);
         e.preventDefault();
       }
     }
 
     function handleDragEnd(e) {
-      console.log('Drag ended');
       e.currentTarget.classList.remove('dragging');
       e.currentTarget.style.opacity = '1';
 
@@ -1591,7 +1483,6 @@
       e.preventDefault();
       e.stopPropagation();
 
-      console.log('Dragover event on slot', e.currentTarget.dataset.slotIndex, 'page', e.currentTarget.dataset.pageIndex);
 
       // ドロップエフェクトを明示的に設定
       if (e.dataTransfer) {
@@ -1604,7 +1495,6 @@
 
       if (draggedCardData && (draggedCardData.fromSlot !== slotIndex || draggedCardData.fromPage !== pageIndex)) {
         e.currentTarget.classList.add('drag-over');
-        console.log('Adding drag-over highlight to slot', slotIndex, 'page', pageIndex);
       }
     }
 
@@ -1616,7 +1506,6 @@
       e.preventDefault();
       e.currentTarget.classList.remove('drag-over');
 
-      console.log('handleDrop called:', {
         slotIndex,
         targetPageIndex,
         currentPage: binderState.currentPage,
@@ -1624,18 +1513,14 @@
       });
 
       if (!draggedCardData) {
-        console.log('No dragged card data');
         return;
       }
 
       // ターゲットページを決定（指定されない場合は現在のページ）
       const finalTargetPageIndex = targetPageIndex !== null ? targetPageIndex : binderState.currentPage;
-      console.log('Final target page index:', finalTargetPageIndex);
-      console.log('Dragged card data:', draggedCardData);
 
       // 同じスロットへのドロップは無視
       if (draggedCardData.fromSlot === slotIndex && draggedCardData.fromPage === finalTargetPageIndex) {
-        console.log('Dropped on same slot, ignoring');
         return;
       }
 
@@ -1643,26 +1528,20 @@
       const targetPage = binderState.pages[finalTargetPageIndex];
 
       if (!sourcePage || !targetPage) {
-        console.error('Invalid source or target page - source:', !!sourcePage, 'target:', !!targetPage);
-        console.log('Available pages:', binderState.pages.length);
         return;
       }
 
       const targetSlot = targetPage.slots[slotIndex];
       const sourceSlot = sourcePage.slots[draggedCardData.fromSlot];
 
-      console.log('Source slot data:', sourceSlot);
-      console.log('Target slot data:', targetSlot);
 
       // カードの移動処理
       if (targetSlot) {
         // ターゲットスロットにカードがある場合は入れ替え
-        console.log('Swapping cards between pages/slots', draggedCardData.fromPage, draggedCardData.fromSlot, 'and', finalTargetPageIndex, slotIndex);
         sourcePage.slots[draggedCardData.fromSlot] = targetSlot;
         targetPage.slots[slotIndex] = sourceSlot;
       } else {
         // ターゲットスロットが空の場合は移動
-        console.log('Moving card from page', draggedCardData.fromPage, 'slot', draggedCardData.fromSlot, 'to page', finalTargetPageIndex, 'slot', slotIndex);
         targetPage.slots[slotIndex] = sourceSlot;
         sourcePage.slots[draggedCardData.fromSlot] = null;
       }
@@ -1881,7 +1760,6 @@
 
     // モバイル用カードセレクター
     function showMobileCardSelector(slotIndex, ownedCards) {
-      console.log('showMobileCardSelector called with', ownedCards.length, 'owned cards');
 
       if (!ownedCards || ownedCards.length === 0) {
         showAlert('持っているカードがありません', '😕');
@@ -1988,7 +1866,6 @@
       // 全バインダー内での現在のカードインデックスを設定
       if (cardData && allBinderCards.length > 0) {
         currentCardIndex = allBinderCards.findIndex(item => item.card.id === cardData.id);
-        console.log('Current card index:', currentCardIndex, 'of', allBinderCards.length);
       }
 
       // レイアウトの切り替え
@@ -2119,7 +1996,6 @@
         arrow.style.pointerEvents = hasNext ? 'auto' : 'none';
       });
       
-      console.log('Navigation buttons updated:', {
         currentIndex: currentCardIndex,
         totalCards: allBinderCards.length,
         hasPrevious,
@@ -2170,7 +2046,6 @@
         });
       }
       
-      console.log('Updated card navigation:', {
         currentPageCards: currentPageCards.length,
         allBinderCards: allBinderCards.length,
         currentPage: binderState.currentPage
@@ -2179,7 +2054,6 @@
 
     function previousCardDetail() {
       if (!currentModalCard || allBinderCards.length === 0 || currentCardIndex <= 0) {
-        console.log('Cannot go to previous card:', {
           hasCurrentCard: !!currentModalCard,
           totalCards: allBinderCards.length,
           currentIndex: currentCardIndex
@@ -2195,7 +2069,6 @@
           // カードが見つかった場合
           // 必要に応じてページを移動
           if (prevCardInfo.pageIndex !== binderState.currentPage) {
-            console.log('Moving to page:', prevCardInfo.pageIndex);
             binderState.currentPage = prevCardInfo.pageIndex;
             renderBinder(); // ページを再描画
             
@@ -2214,12 +2087,10 @@
         prevIndex--;
       }
       
-      console.log('No previous card found');
     }
 
     function nextCardDetail() {
       if (!currentModalCard || allBinderCards.length === 0 || currentCardIndex >= allBinderCards.length - 1) {
-        console.log('Cannot go to next card:', {
           hasCurrentCard: !!currentModalCard,
           totalCards: allBinderCards.length,
           currentIndex: currentCardIndex,
@@ -2236,7 +2107,6 @@
           // カードが見つかった場合
           // 必要に応じてページを移動
           if (nextCardInfo.pageIndex !== binderState.currentPage) {
-            console.log('Moving to page:', nextCardInfo.pageIndex);
             binderState.currentPage = nextCardInfo.pageIndex;
             renderBinder(); // ページを再描画
             
@@ -2255,7 +2125,6 @@
         nextIndex++;
       }
       
-      console.log('No next card found');
     }
 
     // カード画像クリック処理
@@ -2564,7 +2433,6 @@
         channel.onmessage = function(event) {
           const { type, binderId, binderData } = event.data;
           if (type === 'BINDER_UPDATED' && binderId == binderState.binderId) {
-            console.log('Received binder update notification:', binderData);
             // バインダーデータを更新
             binderState.binderData = binderData;
             binderState.settings.name = binderData.name || 'コレクションバインダー';
@@ -2586,7 +2454,6 @@
           try {
             const data = JSON.parse(event.newValue);
             if (data && data.type === 'BINDER_UPDATED' && data.binderId == binderState.binderId) {
-              console.log('Received binder update via localStorage:', data.binderData);
               // バインダーデータを更新
               binderState.binderData = data.binderData;
               binderState.settings.name = data.binderData.name || 'コレクションバインダー';
@@ -2600,7 +2467,6 @@
               renderBinder();
             }
           } catch (error) {
-            console.error('Error parsing binder update notification:', error);
           }
         }
       });

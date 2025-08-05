@@ -1,0 +1,98 @@
+/* カードインタラクション用CSS - シンプル版 */
+
+/* アクションマーク */
+.card-action-marks {
+  position: absolute;
+  top: 5px;
+  right: 5px;
+  display: flex;
+  gap: 3px;
+  z-index: 10;
+  pointer-events: none;
+}
+
+.action-mark {
+  width: 24px;
+  height: 24px;
+  border-radius: 50%;
+  background: rgba(0, 0, 0, 0.8);
+  color: white;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 14px;
+  cursor: pointer;
+  pointer-events: auto;
+  transition: transform 0.2s;
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.3);
+}
+
+.action-mark:hover {
+  transform: scale(1.2);
+}
+
+/* メッセージ */
+.card-action-message {
+  position: fixed;
+  top: 20px;
+  right: 20px;
+  padding: 15px 20px;
+  border-radius: 6px;
+  color: white;
+  font-weight: bold;
+  z-index: 1200;
+  box-shadow: 0 4px 15px rgba(0, 0, 0, 0.3);
+  animation: slideIn 0.3s ease-out;
+}
+
+.card-action-message.success {
+  background: linear-gradient(45deg, #66bb6a, #43a047);
+}
+
+.card-action-message.error {
+  background: linear-gradient(45deg, #ef5350, #d32f2f);
+}
+
+.card-action-message.info {
+  background: linear-gradient(45deg, #42a5f5, #1976d2);
+}
+
+@keyframes slideIn {
+  from {
+    transform: translateX(100%);
+    opacity: 0;
+  }
+  to {
+    transform: translateX(0);
+    opacity: 1;
+  }
+}
+
+/* カード詳細パネル用の追加スタイル */
+.card-detail .skill-item {
+  margin: 5px 0;
+  padding: 5px;
+  background: rgba(255, 255, 255, 0.1);
+  border-radius: 3px;
+  font-size: 0.9em;
+  line-height: 1.4;
+}
+
+.card-detail .card-skills {
+  margin-top: 10px;
+}
+
+/* レスポンシブ対応 */
+@media (max-width: 768px) {
+  .action-mark {
+    width: 20px;
+    height: 20px;
+    font-size: 12px;
+  }
+  
+  .card-action-message {
+    right: 10px;
+    left: 10px;
+    text-align: center;
+  }
+}

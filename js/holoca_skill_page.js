@@ -352,8 +352,6 @@
     }
 
     window.onload = async () => {
-      console.log('� HOLOCA SKILL PAGE v2.7-UPDATE - RESTORED UPDATE NOTIFICATIONS �');
-      console.log('⏰ Loaded at:', new Date().toLocaleString());
 
       if (localStorage.getItem("darkMode") === "true") {
         document.body.classList.add("dark");
@@ -374,12 +372,10 @@
 
         // Use cached data if available and not too old, or if offline
         if (cachedCardData && cachedReleaseData && (cacheAge < maxCacheAge || !navigator.onLine)) {
-          console.log('Using cached data');
           rawData = JSON.parse(cachedCardData);
           releaseMapData = JSON.parse(cachedReleaseData);
         } else {
           // Fetch fresh data
-          console.log('Fetching fresh data');
           const [cardRes, releaseRes] = await Promise.all([
             fetch("json_file/card_data.json"),
             fetch("json_file/release_dates.json")
@@ -414,14 +410,12 @@
         setupFilters();
         renderTable();
       } catch (err) {
-        console.error(err);
 
         // Try to load from localStorage as fallback
         const cachedCardData = localStorage.getItem('cardData');
         const cachedReleaseData = localStorage.getItem('releaseData');
 
         if (cachedCardData && cachedReleaseData) {
-          console.log('Network failed, using cached data as fallback');
           const rawData = JSON.parse(cachedCardData);
           releaseMap = JSON.parse(cachedReleaseData);
 
@@ -454,12 +448,10 @@
       window.addEventListener('load', () => {
         navigator.serviceWorker.register('./sw.js')
           .then((registration) => {
-            console.log('SW registered: ', registration);
 
             // Listen for messages from Service Worker
             navigator.serviceWorker.addEventListener('message', event => {
               if (event.data && event.data.type === 'CACHE_UPDATED') {
-                console.log('Cache updated, forcing reload');
                 window.location.reload(true);
               }
             });
@@ -470,7 +462,6 @@
               newWorker.addEventListener('statechange', () => {
                 if (newWorker.state === 'installed' && navigator.serviceWorker.controller) {
                   // New content available, reload the page immediately
-                  console.log('🚀 強制更新: エールフィルター機能が修正されました');
                   // Clear all caches first
                   caches.keys().then(cacheNames => {
                     return Promise.all(cacheNames.map(cacheName => caches.delete(cacheName)));
@@ -483,7 +474,6 @@
             });
           })
           .catch((registrationError) => {
-            console.log('SW registration failed: ', registrationError);
           });
       });
     }
@@ -615,7 +605,6 @@ async function checkForUpdates() {
         setTimeout(() => {
           if (confirm(detailMessage + 'このページを更新してアプリケーションを再読み込みしますか？')) {
             // より強力なキャッシュクリア処理
-            console.log('Starting forced cache clear and update...');
 
             // Service Workerに強制更新を要求
             if (navigator.serviceWorker.controller) {
@@ -626,23 +615,19 @@ async function checkForUpdates() {
             if ('caches' in window) {
               caches.keys().then(cacheNames => {
                 return Promise.all(cacheNames.map(cacheName => {
-                  console.log('Deleting cache:', cacheName);
                   return caches.delete(cacheName);
                 }));
               }).then(() => {
-                console.log('All browser caches cleared');
                 // Service Workerの更新を待つ
                 return new Promise(resolve => setTimeout(resolve, 1000));
               }).then(() => {
                 // より強力なリロード
-                console.log('Performing hard reload...');
                 if (window.location.reload) {
                   window.location.reload(true); // 強制リロード
                 } else {
                   window.location.href = window.location.href + '?t=' + Date.now();
                 }
               }).catch(error => {
-                console.error('Cache clear failed, forcing reload anyway:', error);
                 window.location.href = window.location.href + '?t=' + Date.now();
               });
             } else {
@@ -668,7 +653,6 @@ async function checkForUpdates() {
     }
 
   } catch (error) {
-    console.error('Update check failed:', error);
     statusEl.textContent = '[v4.0.0-ERROR: ' + error.message + ']';
     statusEl.style.color = '#f44336';
     setTimeout(() => {
@@ -688,7 +672,6 @@ async function displayVersionInfo() {
       statusEl.textContent = `[v${versionInfo.data.pageVersions['holoca_skill_page.html']}-CENTRALIZED]`;
     }
   } catch (error) {
-    console.warn('Version display error:', error);
     statusEl.textContent = '[v4.0.0-CENTRALIZED]';
   }
 }
@@ -704,8 +687,6 @@ document.addEventListener('DOMContentLoaded', function() {
 // ✅ Service Worker登録
 if ('serviceWorker' in navigator) {
   navigator.serviceWorker.register('./sw.js').then(function(registration) {
-    console.log('Service Worker registered successfully:', registration.scope);
   }).catch(function(error) {
-    console.log('Service Worker registration failed:', error);
   });
 }

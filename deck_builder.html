@@ -138,14 +138,11 @@
   <script>
     // セーフナビゲーション関数（フォールバック付き）
     function safeNavigate(url) {
-      console.log('Deck Builder: Attempting to navigate to:', url);
       
       // offline-utils.js が読み込まれているかチェック
       if (typeof window.navigateToPage === 'function') {
-        console.log('Using offline-aware navigation');
         window.navigateToPage(url);
       } else {
-        console.log('offline-utils.js not loaded, using fallback navigation');
         // フォールバック: 通常のナビゲーション
         if (navigator.onLine) {
           window.location.href = url;

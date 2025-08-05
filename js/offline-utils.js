@@ -83,7 +83,6 @@ function initOfflineMonitoring() {
   const onlineIndicator = createOnlineIndicator();
 
   function updateOnlineStatus() {
-    console.log('Network status changed:', navigator.onLine ? 'Online' : 'Offline');
     
     if (navigator.onLine) {
       // オンライン状態
@@ -110,28 +109,23 @@ function initOfflineMonitoring() {
   window.addEventListener('online', updateOnlineStatus);
   window.addEventListener('offline', updateOnlineStatus);
 
-  console.log('Offline monitoring initialized');
 }
 
 // ページ間の安全なナビゲーション（Service Worker信頼版）
 function navigateToPage(url) {
-  console.log('navigateToPage called with:', url);
   
   // Service Workerがアクティブな場合は、オンライン/オフライン関係なく
   // Service Workerのキャッシュ戦略に任せる
   if ('serviceWorker' in navigator && navigator.serviceWorker.controller) {
-    console.log('Service Worker active, navigating with SW cache support:', url);
     window.location.href = url;
     return;
   }
   
   if (navigator.onLine) {
     // Service Worker無効でオンライン時は通常のナビゲーション
-    console.log('No SW, online: navigating to', url);
     window.location.href = url;
   } else {
     // Service Worker無効でオフライン時のみ警告
-    console.log('No SW, offline: showing warning for', url);
     
     const debugInfo = `このページはオフラインでは利用できません。
 
@@ -152,7 +146,6 @@ async function checkPageAvailability(url) {
   try {
     // Service Workerがアクティブかチェック
     if (!('serviceWorker' in navigator) || !navigator.serviceWorker.controller) {
-      console.log('Service Worker not available');
       return false;
     }
 
@@ -165,11 +158,9 @@ async function checkPageAvailability(url) {
       url.replace(/^\.\//, ''),
     ];
 
-    console.log('Checking availability for URLs:', urlsToCheck);
 
     // キャッシュをチェック
     const cacheNames = await caches.keys();
-    console.log('Available cache names:', cacheNames);
     
     for (const cacheName of cacheNames) {
       const cache = await caches.open(cacheName);
@@ -179,19 +170,15 @@ async function checkPageAvailability(url) {
         try {
           const response = await cache.match(checkUrl);
           if (response) {
-            console.log('Page found in cache:', checkUrl, 'in cache:', cacheName);
             return true;
           }
         } catch (matchError) {
-          console.warn('Cache match error for', checkUrl, ':', matchError);
         }
       }
     }
     
-    console.log('Page not found in any cache for:', url);
     return false;
   } catch (error) {
-    console.error('Page availability check failed:', error);
     return false;
   }
 }
@@ -230,7 +217,6 @@ if (typeof window !== 'undefined') {
       const indicator = document.getElementById('offline-indicator');
       if (indicator) {
         indicator.style.display = 'block';
-        console.log('オフライン状態をシミュレート中...');
       }
     }
   };
@@ -246,8 +232,6 @@ if (typeof window !== 'undefined') {
         onlineIndicator.style.display = 'none';
       }, 3000);
     }
-    console.log('オンライン状態に復帰');
   };
   
-  console.log('Offline utilities loaded successfully');
 }

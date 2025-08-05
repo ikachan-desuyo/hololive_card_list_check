@@ -14,7 +14,6 @@ class DeckManager {
       const savedDecks = localStorage.getItem("deckData");
       return savedDecks ? JSON.parse(savedDecks) : {};
     } catch (error) {
-      console.error("デッキデータの読み込みに失敗:", error);
       return {};
     }
   }
@@ -32,7 +31,6 @@ class DeckManager {
   // デッキをカードオブジェクトに変換
   async convertDeckToCards(deckCardIds) {
     if (!window.battleEngine || !window.battleEngine.cardDatabase) {
-      console.error("カードデータベースが読み込まれていません");
       return { holomen: [], support: [], yell: [], oshi: null };
     }
 
@@ -47,7 +45,6 @@ class DeckManager {
     deckCardIds.forEach(cardId => {
       const card = cardDatabase[cardId];
       if (!card) {
-        console.warn(`カード ${cardId} が見つかりません`);
         return;
       }
 
@@ -501,7 +498,6 @@ class DeckSelectionUI {
       `;
 
     } catch (error) {
-      console.error("デッキプレビューの更新に失敗:", error);
       previewContainer.innerHTML = `
         <div style="color: red; text-align: center;">
           <p>デッキプレビューの読み込みに失敗しました</p>
@@ -535,14 +531,12 @@ class DeckSelectionUI {
       alert(`デッキ「${this.selectedDeck}」が${playerName}用に適用されました！`);
 
     } catch (error) {
-      console.error("デッキ適用エラー:", error);
       alert("デッキの適用に失敗しました");
     }
   }
 
   applyDeckToBattle(deck) {
     if (!this.battleEngine.players[this.playerId]) {
-      console.error(`プレイヤー${this.playerId}が存在しません!`);
       return;
     }
 
@@ -582,7 +576,6 @@ class DeckSelectionUI {
     // デッキをシャッフル
     this.battleEngine.shuffleDeck(this.playerId);
 
-    console.log(`デッキ「${this.selectedDeck}」をプレイヤー${this.playerId}に適用しました`);
     
     // UIを更新
     this.battleEngine.updateUI();

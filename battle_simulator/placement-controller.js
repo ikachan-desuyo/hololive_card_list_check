@@ -12,7 +12,6 @@ class HololivePlacementController {
     // 配置ルール定義
     this.placementRules = this.initializePlacementRules();
     
-    console.log('Placement Controller初期化完了');
   }
 
   /**
@@ -598,7 +597,6 @@ class HololivePlacementController {
       }));
     }
     
-    console.log(`配置制御更新: ${description.phase} - ${description.description}`);
   }
 }
 

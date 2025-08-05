@@ -5,6 +5,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>ホロライブTCG バトルシミュレーター</title>
   <link rel="stylesheet" href="css/battle_view.css">
+  <link rel="stylesheet" href="css/card-interaction.css">
 </head>
 <body>
   <!-- ナビゲーションヘッダー -->
@@ -70,6 +71,28 @@
   <script src="battle_simulator/placement-controller.js"></script>
   <script src="battle_simulator/game-setup-manager.js"></script>
   <script src="battle_simulator/turn-manager.js"></script>
+  
+  <!-- カード効果システム -->
+  <script src="battle_simulator/card-effects/card-effect-utils.js"></script>
+  <script src="battle_simulator/card-effects/trigger-system.js"></script>
+  <script src="battle_simulator/card-effects/scalable-card-effect-manager.js"></script>
+  <script src="battle_simulator/card-effects/card-metadata.js"></script>
+  <script src="battle_simulator/card-effects/card-effect-builder.js"></script>
+  <script src="battle_simulator/card-effects/simplified-card-examples.js"></script>
+  <script src="battle_simulator/card-effects/test-card-effects.js"></script>
+  <script src="battle_simulator/card-effects/card-loader.js"></script>
+  
+  <!-- 個別カード効果ファイル -->
+  <script src="battle_simulator/card-effects/cards/hBP04-048.js"></script>
+  <script src="battle_simulator/card-effects/cards/hBP04-043.js"></script>
+  <script src="battle_simulator/card-effects/cards/hBP04-106.js"></script>
+  <script src="battle_simulator/card-effects/cards/hBP04-101.js"></script>
+  <script src="battle_simulator/card-effects/cards/hY04-001.js"></script>
+  <script src="battle_simulator/card-effects/cards/hBP04-999.js"></script>
+  
+  <!-- カードインタラクション -->
+  <script src="battle_simulator/card-interaction-manager.js"></script>
+  
   <script src="js/battle_engine.js"></script>
   <script src="battle_simulator/cpu_logic.js"></script>
 </body>

@@ -34,20 +34,12 @@ class PhaseController {
    * 次のフェーズに進む
    */
   nextPhase() {
-    console.log(`=== nextPhase 呼び出し ===`);
-    console.log(`gameStarted: ${this.battleEngine.gameState.gameStarted}, gameEnded: ${this.battleEngine.gameState.gameEnded}`);
-    console.log(`現在のプレイヤー: ${this.battleEngine.gameState.currentPlayer}`);
-    console.log(`現在のフェーズ: ${this.battleEngine.gameState.currentPhase}`);
-    console.log(`ターン数: ${this.battleEngine.gameState.turnCount}`);
-    console.log(`呼び出し元のスタックトレース:`);
     console.trace();
-    console.log(`========================`);
     
     if (!this.battleEngine.gameState.gameStarted || this.battleEngine.gameState.gameEnded) return;
     
     // 既にフェーズ進行中の場合は実行を避ける
     if (this.phaseInProgress) {
-      console.log('フェーズ進行中のため、次のフェーズ呼び出しをスキップします');
       return;
     }
     
@@ -60,7 +52,6 @@ class PhaseController {
     // 次のフェーズへ移行
     this.battleEngine.gameState.currentPhase++;
     
-    console.log(`フェーズ更新後: ${this.battleEngine.gameState.currentPhase}`);
     
     // 新しいステップ名を取得
     const currentStepName = this.getPhaseNameByIndex(this.battleEngine.gameState.currentPhase);
@@ -82,7 +73,6 @@ class PhaseController {
     // エンドステップ（フェーズ5）を超えた場合はフェーズ進行を停止
     // （endTurnはexecuteEndStepで処理される）
     if (this.battleEngine.gameState.currentPhase > 5) {
-      console.log(`フェーズ5を超えました - executeEndStepでターン終了処理が実行されます`);
       this.phaseInProgress = false;
       return;
     }
@@ -107,11 +97,6 @@ class PhaseController {
     const currentPlayer = this.battleEngine.gameState.currentPlayer;
     const phase = this.battleEngine.gameState.currentPhase;
     
-    console.log(`=== executePhase デバッグ ===`);
-    console.log(`currentPlayer: ${currentPlayer}, phase: ${phase}`);
-    console.log(`turnCount: ${this.battleEngine.gameState.turnCount}`);
-    console.log(`window.infoPanelManager exists: ${!!window.infoPanelManager}`);
-    console.log(`==========================`);
     
     // 統合ログは各executeXXXStep()で個別に処理
     
@@ -145,12 +130,6 @@ class PhaseController {
    * @param {number} playerId - プレイヤーID
    */
   executeResetStep(playerId) {
-    console.log(`=== executeResetStep ===`);
-    console.log(`プレイヤー${playerId}のリセットステップを実行`);
-    console.log(`現在のcurrentPlayer: ${this.battleEngine.gameState.currentPlayer}`);
-    console.log(`現在のcurrentPhase: ${this.battleEngine.gameState.currentPhase}`);
-    console.log(`ターン数: ${this.battleEngine.gameState.turnCount}`);
-    console.log(`======================`);
     
     // 統合ログを記録
     if (window.infoPanelManager) {
@@ -165,7 +144,6 @@ class PhaseController {
     
     // 1. まず、バックにお休みになっているホロメンカードを通常に戻す
     const backPositions = ['back1', 'back2', 'back3', 'back4', 'back5'];
-    console.log(`🔄 リセットステップ: プレイヤー${playerId}のバック状態をチェック`);
     let resetCount = 0;
     
     backPositions.forEach(pos => {
@@ -228,15 +206,12 @@ class PhaseController {
         }
         
         resetCount++;
-        console.log(`� お休み状態のカードをリセット: ${pos} - ${playerCard.name}`);
       }
     });
     
-    console.log(`🔄 リセットステップ: ${resetCount}枚のカードをお休み状態から回復しました`);
     
     // バック状態更新後のUI更新
     if (resetCount > 0) {
-      console.log(`🎨 バック状態更新のためUI更新実行`);
       
       // Card Display Manager更新
       if (this.battleEngine.cardDisplayManager) {
@@ -274,8 +249,6 @@ class PhaseController {
         };
       }
       
-      console.log(`🛌 コラボカードをお休み状態にしました: ${collabCard.name} (isResting: ${collabCard.isResting}, cardState.resting: ${collabCard.cardState.resting})`);
-      console.log(`🔓 コラボロック状態を解除しました: ${collabCard.name} (collabLocked: ${collabCard.cardState.collabLocked})`);
       
       // 空いているバックスロットを探す
       let movedToPos = null;
@@ -284,7 +257,6 @@ class PhaseController {
           player[pos] = collabCard;
           player.collab = null;
           movedToPos = pos;
-          console.log(`${collabCard.name}をコラボからバック(${pos})に移動（横向き）`);
           
           // State Managerを通じても状態を更新
           if (this.battleEngine.stateManager) {
@@ -308,7 +280,6 @@ class PhaseController {
       }
       
       if (movedToPos) {
-        console.log(`🎨 コラボ→バック移動のためUI更新実行`);
         this.battleEngine.updateUI();
       }
     }
@@ -319,14 +290,12 @@ class PhaseController {
       this.battleEngine.stateManager.updateState('RESET_COLLAB_MOVE', {
         playerId: playerId
       });
-      console.log(`🔄 プレイヤー${playerId}のコラボ移動フラグをリセットしました`);
     }
     
     // UI更新
     this.battleEngine.updateUI();
     
     // リセットステップは自動で完了し、次のステップへ移行
-    console.log('リセットステップ完了 - 自動でドローステップに進みます');
     setTimeout(() => {
       this.nextPhase();
     }, 2000); // プレイヤーがフェーズを確認できるよう2秒に延長
@@ -337,11 +306,6 @@ class PhaseController {
    * @param {number} playerId - プレイヤーID
    */
   executeDrawStep(playerId) {
-    console.log(`=== executeDrawStep ===`);
-    console.log(`プレイヤー${playerId}の手札ステップを実行`);
-    console.log(`現在のcurrentPlayer: ${this.battleEngine.gameState.currentPlayer}`);
-    console.log(`ターン数: ${this.battleEngine.gameState.turnCount}`);
-    console.log(`======================`);
     
     // 統合ログを記録
     if (window.infoPanelManager) {
@@ -352,9 +316,7 @@ class PhaseController {
     // デッキからカードを1枚引く
     const drawnCard = this.battleEngine.drawCard(playerId);
     if (drawnCard) {
-      console.log(`プレイヤー${playerId}がカードを1枚引きました:`, drawnCard.name);
     } else {
-      console.log(`プレイヤー${playerId}のデッキが空です`);
       // デッキ切れの処理
       this.battleEngine.checkVictoryConditions();
       return;
@@ -364,7 +326,6 @@ class PhaseController {
     this.battleEngine.updateUI();
     
     // ドローステップは自動で完了し、次のステップへ移行（プレイヤー・CPU共通）
-    console.log('ドローステップ完了 - 自動でエールステップに進みます');
     setTimeout(() => {
       this.nextPhase();
     }, 2000); // プレイヤーがフェーズを確認できるよう2秒に延長
@@ -375,11 +336,6 @@ class PhaseController {
    * @param {number} playerId - プレイヤーID
    */
   executeYellStep(playerId) {
-    console.log(`=== executeYellStep ===`);
-    console.log(`プレイヤー${playerId}のエールステップを実行`);
-    console.log(`現在のcurrentPlayer: ${this.battleEngine.gameState.currentPlayer}`);
-    console.log(`ターン数: ${this.battleEngine.gameState.turnCount}`);
-    console.log(`======================`);
     
     // 統合ログを記録
     if (window.infoPanelManager) {
@@ -390,10 +346,8 @@ class PhaseController {
     const player = this.battleEngine.players[playerId];
     
     if (player.yellDeck.length === 0) {
-      console.log(`プレイヤー${playerId}のエールデッキが空です`);
       // プレイヤー1・CPU共に自動進行
       if (playerId === 1) {
-        console.log('エールデッキが空です - 自動でメインステップに進みます');
         setTimeout(() => {
           this.nextPhase();
         }, 1000);
@@ -408,7 +362,6 @@ class PhaseController {
     
     // エールデッキからカードを1枚引く
     const yellCard = player.yellDeck.pop();
-    console.log(`プレイヤー${playerId}がエールカードを引きました:`, yellCard.name);
     
     // 場のホロメンカード（推しホロメン除く）にエールをセット
     const availableTargets = [];
@@ -425,22 +378,17 @@ class PhaseController {
       }
     });
     
-    console.log(`エール配置可能なターゲット数: ${availableTargets.length}`);
     availableTargets.forEach((target, index) => {
-      console.log(`ターゲット${index}: ${target.position} - ${target.card.name}`);
     });
     
     if (availableTargets.length > 0) {
       // プレイヤーの場合は選択UI表示、CPUの場合は自動選択
       if (playerId === 1) {
-        console.log('プレイヤー用エール選択UIを表示します');
         this.battleEngine.showYellTargetSelection(playerId, yellCard, availableTargets);
         // プレイヤーの場合は選択UIで処理するため、ここでは自動進行しない
       } else {
         // CPUの場合は自動選択
-        console.log('CPU用自動エール配置を実行します');
         const target = availableTargets[0];
-        console.log(`CPU選択ターゲット: ${target.position} - ${target.card.name}`);
         this.battleEngine.attachYellCard(playerId, target.position, yellCard);
         
         // UI更新（エール表示を反映）
@@ -455,14 +403,12 @@ class PhaseController {
     } else {
       // ホロメンがいない場合はアーカイブへ
       player.archive.push(yellCard);
-      console.log(`エールカードをアーカイブに送りました: ${yellCard.name}`);
       
       // UI更新
       this.battleEngine.updateUI();
       
       // プレイヤー1・CPU共に自動進行
       if (playerId === 1) {
-        console.log('エールカードをアーカイブに送りました - 自動でメインステップに進みます');
         setTimeout(() => {
           this.nextPhase();
         }, 2000);
@@ -480,14 +426,12 @@ class PhaseController {
    * @param {number} playerId - プレイヤーID
    */
   executeMainStep(playerId) {
-    console.log(`プレイヤー${playerId}のメインステップ`);
     
     // メインステップ開始時にターン制限フラグをリセット（確実にリセットするため）
     if (this.battleEngine.stateManager) {
       this.battleEngine.stateManager.updateState('RESET_TURN_FLAGS', {
         player: playerId
       });
-      window.debugLog(`🔄 [executeMainStep] プレイヤー${playerId}のメインステップ開始時にフラグリセット`);
     }
     
     // 統合ログを記録
@@ -499,28 +443,21 @@ class PhaseController {
     
     if (playerId === 1) {
       // プレイヤーの場合は手動操作を待つ（自動進行しない）
-      console.log('メインステップです。カードをプレイした後、「次のフェーズ」ボタンを押してください。');
       
       // 操作待ちログは統合ログで処理されるため削除
       
       // プレイヤーがフェーズを確認できるよう少し待機
       setTimeout(() => {
-        console.log('プレイヤーのメインステップ - 操作をお待ちしています');
       }, 1000);
     } else {
       // CPUの場合は自動進行（CPU AIロジックを呼び出し）
-      console.log('CPU用メインステップ処理を開始します');
       setTimeout(async () => {
         try {
           if (this.battleEngine.cpuLogic) {
-            console.log('CPUメインフェーズ実行中...');
             await this.battleEngine.cpuLogic.cpuMainPhase();
-            console.log('CPUメインフェーズ完了');
           }
-          console.log('CPUメインステップからパフォーマンスステップへ移行');
           this.nextPhase();
         } catch (error) {
-          console.error('CPUメインステップでエラー:', error);
           this.nextPhase(); // エラーでも進行は続ける
         }
       }, 2000); // フェーズ確認のため2秒に延長
@@ -532,7 +469,6 @@ class PhaseController {
    * @param {number} playerId - プレイヤーID
    */
   executePerformanceStep(playerId) {
-    console.log(`プレイヤー${playerId}のパフォーマンスステップ`);
     
     // 統合ログを記録
     if (window.infoPanelManager) {
@@ -543,25 +479,19 @@ class PhaseController {
     
     if (playerId === 1) {
       // プレイヤーの場合は手動操作を待つ（自動進行しない）
-      console.log('パフォーマンスステップです。攻撃やスキルを使用した後、「ターン終了」ボタンを押してください。');
       
       // 操作待ちログは統合ログで処理されるため削除
       
       // 手動操作を待つため、ここでは自動進行しない
     } else {
       // CPUの場合は自動進行（CPU AIロジックを呼び出し）
-      console.log('CPU用パフォーマンスステップ処理を開始します');
       setTimeout(async () => {
         try {
           if (this.battleEngine.cpuLogic) {
-            console.log('CPUパフォーマンスフェーズ実行中...');
             await this.battleEngine.cpuLogic.cpuPerformancePhase();
-            console.log('CPUパフォーマンスフェーズ完了');
           }
-          console.log('CPUパフォーマンスステップからエンドステップへ移行');
           this.nextPhase();
         } catch (error) {
-          console.error('CPUパフォーマンスステップでエラー:', error);
           this.nextPhase(); // エラーでも進行は続ける
         }
       }, 2000);
@@ -573,16 +503,13 @@ class PhaseController {
    * @param {number} playerId - プレイヤーID
    */
   executeEndStep(playerId) {
-    console.log(`プレイヤー${playerId}のエンドステップを実行`);
     
     // 重複実行防止チェック
     if (this.endStepInProgress) {
-      console.log(`⚠️ エンドステップ重複実行防止: プレイヤー${playerId}のエンドステップは既に進行中です`);
       return;
     }
     
     this.endStepInProgress = true;
-    console.log(`🔒 エンドステップ進行中フラグを設定: プレイヤー${playerId}`);
     
     // 統合ログを記録
     if (window.infoPanelManager) {
@@ -594,9 +521,7 @@ class PhaseController {
     this.battleEngine.players[playerId].usedLimitedThisTurn = [];
     
     // エンドステップは自動で完了し、相手のターンに移行（プレイヤー・CPU共通）
-    console.log('エンドステップ完了 - 自動で相手のリセットステップに移行します');
     setTimeout(() => {
-      console.log(`🔓 エンドステップ進行中フラグをクリア: プレイヤー${playerId}`);
       this.endStepInProgress = false;
       this.battleEngine.endTurn();
     }, 1000);

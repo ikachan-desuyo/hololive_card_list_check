@@ -1,12 +1,10 @@
 // トグルボタンで簡易表示・表モードを切り替え
 function toggleViewMode() {
-  console.log('[toggleViewMode] before:', viewMode);
   if (viewMode === "table") {
     setViewMode("compact");
   } else {
     setViewMode("table");
   }
-  console.log('[toggleViewMode] after:', viewMode);
   updateViewModeButton();
 }
 
@@ -168,13 +166,11 @@ function updateViewModeButton() {
       }
 
 function setViewMode(mode) {
-  console.log('[setViewMode] called with:', mode, 'current:', viewMode);
   viewMode = mode;
   renderLimit = 100;
   localStorage.setItem("viewMode", mode); // ビューモードを保存
   renderTable();
   updateViewModeButton();
-  console.log('[setViewMode] new viewMode:', viewMode);
 }
 
       // フィルター状態を保存する関数
@@ -232,7 +228,6 @@ function setViewMode(mode) {
           }, 100);
 
         } catch (error) {
-          console.warn("Failed to restore filter state:", error);
         }
       }
 
@@ -929,7 +924,6 @@ window.onload = async () => {
         );
       }
     } catch (error) {
-      console.warn('Version display error:', error);
       const versionEl = document.getElementById('versionDisplay');
       if (versionEl) {
         versionEl.textContent = '[v4.1.0-CENTRALIZED]';
@@ -949,12 +943,10 @@ window.onload = async () => {
 
       // Use cached data if available and not too old, or if offline
       if (cachedCardData && cachedReleaseData && (cacheAge < maxCacheAge || !navigator.onLine)) {
-        console.log('Using cached data');
         cardRaw = JSON.parse(cachedCardData);
         releaseMapData = JSON.parse(cachedReleaseData);
       } else {
         // Fetch fresh data
-        console.log('Fetching fresh data');
         const [cardRes, releaseRes] = await Promise.all([
           fetch("json_file/card_data.json"),
           fetch("json_file/release_dates.json")
@@ -971,8 +963,6 @@ window.onload = async () => {
       releaseMap = releaseMapData;
 
       // デバッグ：releaseMapの内容を確認
-      console.log('Release Map loaded:', Object.keys(releaseMap).length, 'entries');
-      console.log('クインテットスペクトラム date:', releaseMap["ブースターパック「クインテットスペクトラム」"]);
 
       cards = Object.entries(cardRaw).map(([key, card]) => ({
         id: key,
@@ -998,14 +988,12 @@ window.onload = async () => {
         renderTable();
       }, 200);
     } catch (err) {
-      console.error(err);
 
       // Try to load from localStorage as fallback
       const cachedCardData = localStorage.getItem('cardData');
       const cachedReleaseData = localStorage.getItem('releaseData');
 
       if (cachedCardData && cachedReleaseData) {
-        console.log('Network failed, using cached data as fallback');
         const cardRaw = JSON.parse(cachedCardData);
         releaseMap = JSON.parse(cachedReleaseData);
 
@@ -1042,12 +1030,10 @@ window.onload = async () => {
     window.addEventListener('load', () => {
       navigator.serviceWorker.register('./sw.js')
         .then((registration) => {
-          console.log('SW registered: ', registration);
 
           // Listen for messages from Service Worker
           navigator.serviceWorker.addEventListener('message', event => {
             if (event.data && event.data.type === 'CACHE_UPDATED') {
-              console.log('Cache updated, forcing reload');
               window.location.reload(true);
             }
           });
@@ -1061,9 +1047,7 @@ window.onload = async () => {
                 const messageChannel = new MessageChannel();
                 messageChannel.port1.onmessage = (event) => {
                   if (event.data.type === 'UPDATE_MESSAGE_RESPONSE') {
-                    console.log('🚀 強制更新:', event.data.data.details.description);
                   } else {
-                    console.log('🚀 強制更新: エールフィルター機能が修正されました');
                   }
                 };
 
@@ -1073,7 +1057,6 @@ window.onload = async () => {
                     [messageChannel.port2]
                   );
                 } catch (msgError) {
-                  console.log('🚀 強制更新: エールフィルター機能が修正されました');
                 }
 
                 // Clear all caches first
@@ -1088,7 +1071,6 @@ window.onload = async () => {
           });
         })
         .catch((registrationError) => {
-          console.log('SW registration failed: ', registrationError);
         });
     });
   }
@@ -1218,7 +1200,6 @@ window.onload = async () => {
       }
 
     } catch (error) {
-      console.error('Update check failed:', error);
       statusEl.textContent = '[v4.1.0-ERROR: ' + error.message + ']';
       statusEl.style.color = '#f44336';
       setTimeout(() => {
@@ -1250,7 +1231,6 @@ window.onload = async () => {
         statusEl.textContent = '[4.10.0-VERSION-SYNC-UPDATE]';
       }
     } catch (error) {
-      console.warn('Version display error:', error);
       statusEl.textContent = '[4.10.0-VERSION-SYNC-UPDATE]';
     }
   }
@@ -1282,7 +1262,6 @@ function showImageDownloadDialog() {
   // モバイル版のみ表示（より厳密な判定）
   const isMobile = window.innerWidth <= 768 || /Android|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent);
   if (!isMobile) {
-    console.log('Image bulk download is available only on mobile devices');
     return;
   }
   
@@ -1301,7 +1280,6 @@ function showImageDownloadDialog() {
   const imageUrls = extractImageUrls();
   const totalCount = imageUrls.length;
   
-  console.log(`Found ${totalCount} images to download`);
   
   // 推定サイズを計算（1枚あたり150-200KBで計算）
   const avgSizeKB = 175; // 平均サイズ
@@ -1347,7 +1325,6 @@ function showImageDownloadDialog() {
     }
     
   }).catch(error => {
-    console.error('Cache status error:', error);
     currentCacheInfoEl.textContent = '❌ 情報取得失敗';
     startBtn.disabled = false;
     startBtn.textContent = '📥 ダウンロード開始';
@@ -1366,7 +1343,6 @@ function hideImageDownloadDialog() {
     
     // 中断フラグを設定
     imageDownloadInProgress = false;
-    console.log('Image download was cancelled by user');
   }
   
   modal.style.display = 'none';
@@ -1380,8 +1356,6 @@ function extractImageUrls() {
   const imageUrls = [];
   const seenUrls = new Set();
   
-  console.log('Cards array length:', cards.length);
-  console.log('Sample card:', cards[0]);
   
   for (const card of cards) {
     // image プロパティから画像URLを取得
@@ -1391,8 +1365,6 @@ function extractImageUrls() {
     }
   }
   
-  console.log(`Extracted ${imageUrls.length} unique image URLs`);
-  console.log('Sample image URL:', imageUrls[0]);
   return imageUrls;
 }
 
@@ -1449,7 +1421,6 @@ async function startImageDownload() {
     let successCount = 0;
     let failureCount = 0;
     
-    console.log(`Starting download of ${totalCount} uncached images`);
     
     progressText.textContent = `未キャッシュ画像を事前読み込み中... (${totalCount}枚)`;
     
@@ -1458,18 +1429,15 @@ async function startImageDownload() {
     
     for (let i = 0; i < imageUrls.length; i += batchSize) {
       if (!imageDownloadInProgress) {
-        console.log('Download was cancelled by user');
         break; // 中断された場合
       }
       
       const batch = imageUrls.slice(i, i + batchSize);
-      console.log(`Processing batch ${Math.floor(i/batchSize) + 1}/${Math.ceil(imageUrls.length/batchSize)}`);
       
       const batchPromises = batch.map(async (url) => {
         return new Promise(async (resolve) => {
           try {
             const timeout = setTimeout(() => {
-              console.warn(`Timeout for: ${url}`);
               resolve({ success: false, url, error: 'Timeout' });
             }, 15000); // 15秒タイムアウトに戻す
             
@@ -1480,15 +1448,12 @@ async function startImageDownload() {
             
             // レスポンス状態をチェック
             if (response.ok || response.type === 'opaque') {
-              console.log(`Successfully fetched: ${url} (status: ${response.status || 'opaque'})`);
               resolve({ success: true, url, cached: true });
             } else {
-              console.warn(`Failed to fetch: ${url} - Status: ${response.status}`);
               resolve({ success: false, url, error: `HTTP ${response.status}` });
             }
             
           } catch (error) {
-            console.warn(`Fetch failed for: ${url} - ${error.message}`);
             
             // fetch失敗の場合、Imageオブジェクトでフォールバック
             try {
@@ -1499,7 +1464,6 @@ async function startImageDownload() {
               
               img.onload = () => {
                 clearTimeout(imgTimeout);
-                console.log(`Image fallback succeeded for: ${url}`);
                 resolve({ success: true, url, cached: false });
               };
               
@@ -1525,7 +1489,6 @@ async function startImageDownload() {
           successCount++;
         } else {
           failureCount++;
-          console.warn(`Failed: ${result.url} - ${result.error}`);
         }
       });
       
@@ -1567,7 +1530,6 @@ async function startImageDownload() {
     }
     
   } catch (error) {
-    console.error('Image download error:', error);
     progressText.textContent = '❌ ダウンロードエラーが発生しました';
     alert(`画像ダウンロード中にエラーが発生しました：${error.message}`);
     
@@ -1600,7 +1562,6 @@ async function clearImageCache() {
     
     // すべてのキャッシュを取得
     const cacheNames = await caches.keys();
-    console.log('Available caches:', cacheNames);
     
     let deletedCount = 0;
     let totalSize = 0;
@@ -1632,7 +1593,6 @@ async function clearImageCache() {
           
           await cache.delete(request);
           deletedCount++;
-          console.log('Deleted cached image:', request.url);
         }
       }
     }
@@ -1653,7 +1613,6 @@ async function clearImageCache() {
     }, 2000);
     
   } catch (error) {
-    console.error('Cache clear error:', error);
     clearBtn.textContent = '❌ エラー';
     alert(`キャッシュ削除中にエラーが発生しました：${error.message}`);
     
@@ -1701,7 +1660,6 @@ async function checkCacheStatus() {
     };
     
   } catch (error) {
-    console.error('Cache status check error:', error);
     return {
       total: 0,
       cached: 0,
@@ -1752,7 +1710,6 @@ async function estimateCacheSize() {
       sizeText: totalSize > 0 ? `約 ${(totalSize / (1024 * 1024)).toFixed(1)} MB` : '不明'
     };
   } catch (error) {
-    console.error('Cache size estimation error:', error);
     return { count: 0, size: 0, sizeText: '取得失敗' };
   }
 }

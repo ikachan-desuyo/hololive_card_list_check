@@ -11,7 +11,6 @@ class HololiveGameSetupManager {
     this.cardDatabase = battleEngine.cardDatabase;
     this.modalUI = battleEngine.modalUI;
     
-    window.debugLog('Game Setup Manager初期化完了');
   }
 
   /**
@@ -20,7 +19,6 @@ class HololiveGameSetupManager {
   createTestDeckIfNeeded() {
     const savedDecks = localStorage.getItem("deckData");
     if (!savedDecks || Object.keys(JSON.parse(savedDecks)).length === 0) {
-      window.debugLog('テスト用デッキを作成します');
       this.createAndSaveTestDeck();
     }
   }
@@ -64,14 +62,12 @@ class HololiveGameSetupManager {
     const decks = { 'テストデッキ': testDeck };
     localStorage.setItem("deckData", JSON.stringify(decks));
     
-    window.debugLog('テスト用デッキを作成・保存しました:', testDeck.length, '枚');
   }
 
   /**
    * ゲーム開始処理
    */
   startGame() {
-    window.debugLog('ゲーム開始準備チェック');
     
     // プレイヤーデッキチェック
     if (this.players[1].deck.length === 0 && this.players[1].yellDeck.length === 0) {
@@ -79,7 +75,6 @@ class HololiveGameSetupManager {
       
       if (confirm('テストデッキでゲームを開始しますか？\n\n⚠️ 注意: テストデッキは学習目的のみで、バランスが調整されていません。')) {
         // テストデッキで続行
-        window.debugLog('テストデッキでゲーム開始');
       } else {
         // プレイヤーデッキ選択画面を開く
         this.engine.showDeckSelection(1);
@@ -93,7 +88,6 @@ class HololiveGameSetupManager {
       
       if (confirm('相手もテストデッキでゲームを開始しますか？')) {
         // 相手もテストデッキで続行
-        window.debugLog('相手もテストデッキでゲーム開始');
       } else {
         // 相手デッキ選択画面を開く
         this.engine.showDeckSelection(2);
@@ -124,6 +118,9 @@ class HololiveGameSetupManager {
     
     // セットアップ実行
     this.executeGameSetup();
+    
+    // デッキカード効果の事前読み込み
+    this.preloadDeckCardEffects();
     
     // UIの更新
     this.engine.updateTurnInfo();
@@ -182,13 +179,8 @@ class HololiveGameSetupManager {
    * ゲームセットアップの実行
    */
   executeGameSetup() {
-    window.debugLog('ゲームセットアップ実行');
     
     // デバッグ：ゲーム状態確認
-    window.debugLog('=== ゲーム状態確認 ===');
-    window.debugLog('gameStarted:', this.gameState.gameStarted);
-    window.debugLog('firstPlayer:', this.gameState.firstPlayer);
-    window.debugLog('turnOrderDecided:', this.gameState.turnOrderDecided);
     
     // 0. 先行・後攻の決定
     this.decideTurnOrder();
@@ -199,19 +191,15 @@ class HololiveGameSetupManager {
     // 1. デッキシャッフル
     this.shuffleDeck(1);
     this.shuffleDeck(2);
-    window.debugLog('デッキをシャッフルしました');
     
     // 2. 推しホロメンを配置
     this.placeOshiCards();
-    window.debugLog('推しホロメンを配置しました');
     
     // 3. ライフを設定
     this.setupLifeCards();
-    window.debugLog('ライフカードを設定しました');
     
     // 4. 初期手札を配る
     this.dealInitialHands();
-    window.debugLog('初期手札（7枚）を配りました');
     
     // 5. ゲーム状況を表示
     this.logGameStatus();
@@ -228,7 +216,6 @@ class HololiveGameSetupManager {
       const player = this.players[playerId];
       const lifeCount = player.oshi?.life || 6;
       
-      window.debugLog(`プレイヤー${playerId} ライフ設定前: エールデッキ${player.yellDeck.length}枚`);
       
       // 既存のライフをクリア
       player.life = [];
@@ -239,7 +226,6 @@ class HololiveGameSetupManager {
         player.life.push(lifeCard);
       }
       
-      window.debugLog(`プレイヤー${playerId} ライフ設定後: ライフ${player.life.length}枚, エールデッキ${player.yellDeck.length}枚`);
     }
   }
 
@@ -250,18 +236,7 @@ class HololiveGameSetupManager {
     const player1 = this.players[1];
     const player2 = this.players[2];
     
-    window.debugLog('=== ゲーム開始時の状況 ===');
-    window.debugLog('プレイヤー1:');
-    window.debugLog(`  メインデッキ: ${player1.deck.length}枚`);
-    window.debugLog(`  エールデッキ: ${player1.yellDeck.length}枚`);
-    window.debugLog(`  ライフ: ${player1.life.length}枚`);
-    window.debugLog(`  手札: ${player1.hand.length}枚`);
     
-    window.debugLog('プレイヤー2 (CPU):');
-    window.debugLog(`  メインデッキ: ${player2.deck.length}枚`);
-    window.debugLog(`  エールデッキ: ${player2.yellDeck.length}枚`);
-    window.debugLog(`  ライフ: ${player2.life.length}枚`);
-    window.debugLog(`  手札: ${player2.hand.length}枚`);
     
     // ゲーム開始のメッセージを表示
     const message = `🎮 ホロライブTCG バトル開始！\n\n` +
@@ -281,7 +256,6 @@ class HololiveGameSetupManager {
   createTestDecks() {
     // プレイヤー1のデッキが空の場合のみテストデッキを作成
     if (this.players[1].deck.length === 0) {
-      window.debugLog('プレイヤー1のデッキが設定されていません。テストデッキを作成します。');
       const testCards1 = this.getTestCards();
       
       // プロキシ経由で設定（State Managerに反映される）
@@ -289,12 +263,10 @@ class HololiveGameSetupManager {
       this.players[1].yellDeck = [...testCards1.yell];
       this.players[1].oshi = testCards1.oshi;
       
-      window.debugLog(`プレイヤー1テストデッキ作成: メイン${this.players[1].deck.length}枚, エール${this.players[1].yellDeck.length}枚`);
     }
     
     // プレイヤー2のデッキが空の場合のみテストデッキを作成
     if (this.players[2].deck.length === 0) {
-      window.debugLog('プレイヤー2のデッキが設定されていません。テストデッキを作成します。');
       const testCards2 = this.getTestCards();
       
       // プロキシ経由で設定（State Managerに反映される）
@@ -302,7 +274,6 @@ class HololiveGameSetupManager {
       this.players[2].yellDeck = [...testCards2.yell];
       this.players[2].oshi = testCards2.oshi;
       
-      window.debugLog(`プレイヤー2テストデッキ作成: メイン${this.players[2].deck.length}枚, エール${this.players[2].yellDeck.length}枚`);
     }
     
     // デッキシャッフルと推しホロメン配置は executeGameSetup() で行うため削除
@@ -342,20 +313,16 @@ class HololiveGameSetupManager {
     this.players[1].oshi = this.players[1].oshi;
     this.players[2].oshi = this.players[2].oshi;
     
-    window.debugLog('推しホロメンを配置しました（ライフ設定は別処理で実行）');
   }
 
   /**
    * 初期手札を配布
    */
   dealInitialHands() {
-    window.debugLog('=== 初期手札配布開始 ===');
     
     // シャッフル後のデッキの状態を確認
     const player1DeckTop = this.players[1].deck.slice(-7).map(c => c.name || c.card_id);
     const player2DeckTop = this.players[2].deck.slice(-7).map(c => c.name || c.card_id);
-    window.debugLog('プレイヤー1のデッキトップ7枚:', player1DeckTop);
-    window.debugLog('プレイヤー2のデッキトップ7枚:', player2DeckTop);
     
     // 初期手札を7枚配る
     for (let i = 0; i < 7; i++) {
@@ -366,9 +333,6 @@ class HololiveGameSetupManager {
     // 配布後の手札を確認
     const player1Hand = this.players[1].hand.map(c => c.name || c.card_id);
     const player2Hand = this.players[2].hand.map(c => c.name || c.card_id);
-    window.debugLog('プレイヤー1の手札:', player1Hand);
-    window.debugLog('プレイヤー2の手札:', player2Hand);
-    window.debugLog('=== 初期手札配布完了 ===');
   }
 
   /**
@@ -378,7 +342,6 @@ class HololiveGameSetupManager {
     const deck = this.players[playerId].deck;
     const shuffledDeck = [...deck]; // コピーを作成
     
-    window.debugLog(`プレイヤー${playerId}のデッキシャッフル前:`, shuffledDeck.slice(0, 5).map(c => c.name || c.card_id));
     
     // Fisher-Yates シャッフル
     for (let i = shuffledDeck.length - 1; i > 0; i--) {
@@ -386,55 +349,41 @@ class HololiveGameSetupManager {
       [shuffledDeck[i], shuffledDeck[j]] = [shuffledDeck[j], shuffledDeck[i]];
     }
     
-    window.debugLog(`プレイヤー${playerId}のデッキシャッフル後:`, shuffledDeck.slice(0, 5).map(c => c.name || c.card_id));
     
     // シャッフル結果をプロキシ経由で設定（State Managerに反映される）
     this.players[playerId].deck = shuffledDeck;
-    window.debugLog(`プレイヤー${playerId}のデッキをシャッフルしました（${shuffledDeck.length}枚）`);
   }
 
   /**
    * 先行・後攻の決定
    */
   decideTurnOrder() {
-    window.debugLog('=== decideTurnOrder 開始 ===');
-    window.debugLog('turnOrderDecided:', this.gameState.turnOrderDecided);
     
     if (this.gameState.turnOrderDecided) {
-      window.debugLog('先行・後攻は既に決定済みです');
       return;
     }
 
     // ランダムで先行・後攻を決定
     const randomFirstPlayer = Math.random() < 0.5 ? 1 : 2;
-    window.debugLog('ランダム先行プレイヤー:', randomFirstPlayer);
     
     // ポップアップで選択
     this.showTurnOrderPopup(randomFirstPlayer);
     
-    window.debugLog('=== decideTurnOrder 完了 ===');
   }
 
   /**
    * 先行・後攻選択のポップアップを表示
    */
   showTurnOrderPopup(suggestedPlayer) {
-    window.debugLog('=== showTurnOrderPopup 開始 ===');
-    window.debugLog('推奨プレイヤー:', suggestedPlayer);
-    window.debugLog('modalUI:', this.modalUI);
     
     // モーダルUIで選択
     if (this.modalUI && this.modalUI.showTurnOrderModal) {
-      window.debugLog('モーダルUI呼び出し開始');
       this.modalUI.showTurnOrderModal(0.5, suggestedPlayer, (playerId, isManual) => {
-        window.debugLog('モーダルコールバック実行:', playerId, isManual);
         this.setFirstPlayer(playerId, isManual);
       });
     } else {
-      console.error('モーダルUIまたはshowTurnOrderModalが利用できません');
     }
     
-    window.debugLog('=== showTurnOrderPopup 完了 ===');
   }
 
   /**
@@ -448,7 +397,6 @@ class HololiveGameSetupManager {
     const methodText = isManual ? '手動選択' : 'ランダム';
     const playerText = playerId === 1 ? 'プレイヤー' : '相手';
     
-    window.debugLog(`${methodText}により${playerText}が先行です`);
     
     // メッセージ表示
     alert(`${methodText}により${playerId === 1 ? 'あなた' : '相手'}が先行です`);
@@ -457,6 +405,63 @@ class HololiveGameSetupManager {
     setTimeout(() => {
       this.engine.startMulliganPhase();
     }, 500);
+  }
+
+  /**
+   * デッキに含まれるカードの効果を事前読み込み
+   */
+  async preloadDeckCardEffects() {
+    if (!this.engine.cardEffectManager) {
+      return;
+    }
+
+    
+    let totalLoaded = 0;
+    const uniqueCardIds = new Set();
+
+    // 全プレイヤーのデッキからユニークなカードIDを収集
+    for (let playerId of [1, 2]) {
+      const player = this.players[playerId];
+      
+      // メインデッキ
+      if (player.deck) {
+        player.deck.forEach(card => {
+          if (card.id) uniqueCardIds.add(card.id);
+        });
+      }
+      
+      // エールデッキ
+      if (player.yellDeck) {
+        player.yellDeck.forEach(card => {
+          if (card.id) uniqueCardIds.add(card.id);
+        });
+      }
+      
+      // 推しホロメン
+      if (player.oshi && player.oshi.id) {
+        uniqueCardIds.add(player.oshi.id);
+      }
+    }
+
+
+    let effectFilesFound = 0;
+    let effectFilesNotFound = 0;
+
+    // 効果を順次読み込み
+    for (const cardId of uniqueCardIds) {
+      try {
+        const effect = await this.engine.cardEffectManager.loadCardEffect(cardId);
+        if (effect) {
+          totalLoaded++;
+          effectFilesFound++;
+        } else {
+          effectFilesNotFound++;
+        }
+      } catch (error) {
+        effectFilesNotFound++;
+      }
+    }
+
   }
 }
 

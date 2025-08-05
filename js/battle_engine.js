@@ -313,7 +313,7 @@ class HololiveBattleEngine {
     
     // エールカード情報を保持（cards配列から取得）
     if (cards && cards.length > 0 && cards[0] && cards[0].yellCards) {
-      console.log(`📤 [State Manager送信] ${area}: ${cards[0].name} (エール${cards[0].yellCards.length}枚)`);
+      // State Manager送信時のエール情報（必要時のみ）
     }
     
     // 状態遷移中の場合は少し待ってから実行
@@ -396,7 +396,7 @@ class HololiveBattleEngine {
       // UI要素の初期化
       this.initializeUI();
       
-      console.log('バトルエンジン初期化完了');
+      // 初期化完了
     } catch (error) {
       window.errorLog('バトルエンジン初期化エラー:', error);
     }
@@ -416,7 +416,7 @@ class HololiveBattleEngine {
     try {
       const response = await fetch('./json_file/card_data.json');
       this.cardDatabase = await response.json();
-      console.log('カードデータ読み込み完了');
+      // カードデータ読み込み完了
     } catch (error) {
       window.errorLog('カードデータ読み込みエラー:', error);
     }
@@ -426,7 +426,7 @@ class HololiveBattleEngine {
     try {
       const response = await fetch('./json_file/stage_data.json');
       this.stageData = await response.json();
-      console.log('ステージデータ読み込み完了');
+      // ステージデータ読み込み完了
     } catch (error) {
       window.errorLog('ステージデータ読み込みエラー:', error);
     }
@@ -463,7 +463,6 @@ class HololiveBattleEngine {
     const missingElements = requiredElements.filter(id => !document.getElementById(id));
     if (missingElements.length > 0) {
       window.warnLog('コントロールパネルの要素が見つかりません:', missingElements);
-      console.log('レガシーコントロールパネルを作成します...');
       // 後方互換性のため、動的作成を実行
       this.createLegacyControlPanel();
       return;
@@ -483,8 +482,6 @@ class HololiveBattleEngine {
 
   // 後方互換性のため
   createLegacyControlPanel() {
-    console.log('レガシーコントロールパネルの作成を開始...');
-    
     const controlPanel = document.createElement('div');
     controlPanel.className = 'control-panel';
     controlPanel.innerHTML = `
@@ -503,9 +500,6 @@ class HololiveBattleEngine {
     `;
     
     document.body.appendChild(controlPanel);
-    console.log('コントロールパネルをDOMに追加完了');
-    console.log('作成されたコントロールパネル:', controlPanel);
-    console.log('body内の.control-panel要素:', document.querySelectorAll('.control-panel').length);
 
     // イベントリスナーの設定（レガシー版）
     document.getElementById('select-player-deck').addEventListener('click', () => this.showDeckSelection(1));
@@ -514,8 +508,6 @@ class HololiveBattleEngine {
     document.getElementById('next-phase').addEventListener('click', () => this.nextPhase());
     document.getElementById('end-turn').addEventListener('click', () => this.endTurn());
     document.getElementById('reset-game').addEventListener('click', () => this.resetGame());
-    
-    console.log('イベントリスナーの設定完了');
     
     // 初期状態の更新
     this.updateGameStatus();
@@ -577,10 +569,7 @@ class HololiveBattleEngine {
   }
 
   setupCardAreaListeners() {
-    console.log('setupCardAreaListeners 開始');
-    
     const cardAreas = document.querySelectorAll('.card-area');
-    console.log('card-area数:', cardAreas.length);
     
     cardAreas.forEach(area => {
       area.addEventListener('click', (e) => this.handleCardAreaClick(e));
@@ -592,10 +581,8 @@ class HololiveBattleEngine {
     
     // バックスロットにもリスナーを追加
     const backSlots = document.querySelectorAll('.back-slot');
-    console.log('back-slot数:', backSlots.length);
     
     backSlots.forEach((slot, index) => {
-      console.log(`back-slot[${index}]:`, slot);
       slot.addEventListener('click', (e) => this.handleCardAreaClick(e));
       slot.addEventListener('dragover', (e) => this.handleDragOver(e));
       slot.addEventListener('dragenter', (e) => this.handleDragEnter(e));
@@ -981,8 +968,6 @@ class HololiveBattleEngine {
     const area = event.currentTarget;
     const areaId = area.className.split(' ')[0];
     
-    console.log(`${areaId}がクリックされました`);
-    
     // エリアに応じた処理
     this.handleAreaInteraction(areaId);
   }
@@ -1021,7 +1006,6 @@ class HololiveBattleEngine {
   handleDrop(event) {
     event.preventDefault();
     // ドラッグ&ドロップ処理
-    console.log('カードがドロップされました');
   }
 
   updateUI() {
@@ -1113,12 +1097,8 @@ class HololiveBattleEngine {
   }
 
   updatePhaseHighlight() {
-    // console.log(`=== updatePhaseHighlight 呼び出し ===`);
-    console.log(`プレイヤー: ${this.gameState.currentPlayer}, フェーズ: ${this.gameState.currentPhase}`);
-    
     // すべてのハイライトを削除
     const existingHighlights = document.querySelectorAll('.phase-highlight');
-    console.log(`既存のハイライト数: ${existingHighlights.length}`);
     existingHighlights.forEach(element => {
       element.classList.remove('phase-highlight');
     });
@@ -1126,58 +1106,32 @@ class HololiveBattleEngine {
     const currentPlayer = this.gameState.currentPlayer;
     const currentPhase = this.gameState.currentPhase;
     
-    console.log(`フェーズハイライト更新: プレイヤー${currentPlayer}, フェーズ${currentPhase}`);
-    
     // 現在のプレイヤーのエリアをハイライト
     this.highlightPhaseArea(currentPlayer, currentPhase);
-    
-    // 更新後のハイライト確認
-    const newHighlights = document.querySelectorAll('.phase-highlight');
-    console.log(`新しいハイライト数: ${newHighlights.length}`);
-    newHighlights.forEach((element, index) => {
-      console.log(`ハイライト${index}: ${element.className}`);
-    });
-    // console.log(`=== updatePhaseHighlight 完了 ===`);
   }
 
   // 指定プレイヤーのフェーズエリアをハイライト
   highlightPhaseArea(playerId, phase) {
-    console.log(`=== highlightPhaseArea ===`);
-    console.log(`プレイヤー${playerId}, フェーズ${phase}`);
-    
     const playerArea = playerId === 1 ? '.battle-player' : '.battle-opponent';
-    console.log(`対象エリア: ${playerArea}`);
     
     // フェーズに応じてハイライトを適用
     switch (phase) {
       case 0: // リセットステップ
-        console.log('リセットステップ - プレイヤーエリア全体をハイライト');
         const battleArea = document.querySelector(playerArea);
         if (battleArea) {
           battleArea.classList.add('phase-highlight');
-          console.log('✅ リセットステップハイライト適用完了');
-        } else {
-          console.log('❌ プレイヤーエリアが見つかりません');
         }
         break;
       case 1: // ドローステップ
-        console.log('ドローステップ - デッキエリアをハイライト');
         const deckArea = document.querySelector(`${playerArea} .deck`);
         if (deckArea) {
           deckArea.classList.add('phase-highlight');
-          console.log('✅ ドローステップハイライト適用完了');
-        } else {
-          console.log('❌ デッキエリアが見つかりません');
         }
         break;
       case 2: // エールステップ
-        console.log('エールステップ - エールデッキをハイライト');
         const yellDeck = document.querySelector(`${playerArea} .yell-deck`);
         if (yellDeck) {
           yellDeck.classList.add('phase-highlight');
-          console.log('✅ エールステップハイライト適用完了');
-        } else {
-          console.log('❌ エールデッキが見つかりません');
         }
         break;
       case 3: // メインステップ
@@ -2696,7 +2650,7 @@ class HololiveBattleEngine {
                 this.isUpdatingYellCard = false;
                 this.updateUI();
                 this.updateCardAreas();
-                console.log(`🎨 [UI更新完了] エール表示を更新しました`);
+                // エール表示更新完了
               }, 50);
             }
           }
@@ -2710,7 +2664,7 @@ class HololiveBattleEngine {
           this.isUpdatingYellCard = false;
           this.updateUI();
           this.updateCardAreas();
-          console.log(`🎨 [UI更新完了] 直接UI更新を実行しました`);
+          // 直接UI更新完了
         }, 100);
       }
     }, 100);

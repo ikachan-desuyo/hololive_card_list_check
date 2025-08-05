@@ -267,7 +267,6 @@
 
             img.src = e.target.result;
           } catch (error) {
-            console.error('Image processing error:', error);
             alert('画像の処理中にエラーが発生しました。');
             resetSubmitButton();
           }
@@ -289,18 +288,13 @@
     // バインダー作成の完了
     function finalizeBinderCreation(binder) {
       try {
-        console.log('Creating binder:', binder);
         binderCollection.binders.push(binder);
-        console.log('Binder added to collection');
 
         saveBinderCollection();
-        console.log('Binder collection saved');
 
         closeCreateBinderModal();
-        console.log('Modal closed');
 
         renderBinders();
-        console.log('Binders rendered');
 
         // 作成完了アニメーション
         setTimeout(() => {
@@ -311,11 +305,8 @@
         }, 100);
 
         alert(`バインダー「${binder.name}」を作成しました！`);
-        console.log('Binder creation completed successfully');
 
       } catch (error) {
-        console.error('Binder creation error:', error);
-        console.error('Error stack:', error.stack);
         alert('バインダーの作成中にエラーが発生しました。コンソールでエラー詳細を確認してください。');
         resetSubmitButton();
       }
@@ -328,10 +319,8 @@
       
       // オフライン対応ナビゲーションを使用
       if (typeof window.navigateToPage === 'function') {
-        console.log('Using offline-aware navigation for binder');
         window.navigateToPage(url);
       } else {
-        console.log('Fallback to direct navigation for binder');
         window.location.href = url;
       }
     }
@@ -554,7 +543,6 @@
 
         alert('バインダーコレクションをエクスポートしました！');
       } catch (error) {
-        console.error('Export error:', error);
         alert('エクスポートに失敗しました');
       }
     }
@@ -629,7 +617,6 @@
             alert(`${binderCollection.binders.length}個のバインダーを正常にインポートしました！`);
           }
         } catch (error) {
-          console.error('Import error:', error);
           alert('インポートに失敗しました。ファイル形式を確認してください。');
         }
       };

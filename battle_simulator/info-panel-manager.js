@@ -497,7 +497,6 @@ window.logCardEvent = (player, action, cardName, target) => {
 // 自動初期化
 document.addEventListener('DOMContentLoaded', () => {
   if (!window.infoPanelManager) {
-    console.log('Info Panel Manager を初期化します');
     window.infoPanelManager = new InfoPanelManager();
   }
 });
