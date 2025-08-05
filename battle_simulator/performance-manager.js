@@ -19,6 +19,16 @@ class PerformanceManager {
     console.log(`🎭 [Performance] パフォーマンスステップ開始 - プレイヤー${playerId}`);
     console.log(`🎭 [Performance] プレイヤー状態:`, this.battleEngine.players[playerId]);
     
+    // パフォーマンス実行済みチェック
+    if (this.hasPerformedThisTurn(playerId)) {
+      console.log(`❌ [Performance] このターンは既にパフォーマンスを実行済み - プレイヤー${playerId}`);
+      this.showPerformanceMessage('このターンは既にパフォーマンスを実行しました');
+      setTimeout(() => {
+        this.endPerformanceStep();
+      }, 2000);
+      return;
+    }
+    
     if (playerId === 1) {
       // プレイヤーの場合：攻撃可能なカードをハイライト
       this.highlightAttackableCards(playerId);
@@ -27,6 +37,79 @@ class PerformanceManager {
       // CPUの場合：AI処理（後で実装）
       this.executeCPUPerformance(playerId);
     }
+  }
+
+  /**
+   * このターンにパフォーマンスを実行済みかチェック
+   * @param {number} playerId - プレイヤーID
+   * @returns {boolean} 実行済みかどうか
+   */
+  hasPerformedThisTurn(playerId) {
+    const player = this.battleEngine.players[playerId];
+    const currentTurn = this.battleEngine.gameState.turnCount || 1;
+    
+    // 攻撃済みカード配列を初期化
+    if (!player.attackedCardsThisTurn || player.attackedCardsTurn !== currentTurn) {
+      player.attackedCardsThisTurn = [];
+      player.attackedCardsTurn = currentTurn;
+    }
+    
+    // センターとコラボの両方が攻撃済みかチェック
+    const hasCenter = player.center && !player.center.isResting;
+    const hasCollab = player.collab && !player.collab.isResting;
+    const centerAttacked = player.attackedCardsThisTurn.includes('center');
+    const collabAttacked = player.attackedCardsThisTurn.includes('collab');
+    
+    // 攻撃可能なカードが全て攻撃済みかどうか
+    if (hasCenter && hasCollab) {
+      return centerAttacked && collabAttacked;
+    } else if (hasCenter) {
+      return centerAttacked;
+    } else if (hasCollab) {
+      return collabAttacked;
+    }
+    
+    return true; // 攻撃可能なカードがない場合は実行済みとみなす
+  }
+
+  /**
+   * カードの攻撃済みフラグを設定
+   * @param {number} playerId - プレイヤーID
+   * @param {string} position - 攻撃したカードのポジション
+   */
+  markCardAttacked(playerId, position) {
+    const player = this.battleEngine.players[playerId];
+    const currentTurn = this.battleEngine.gameState.turnCount || 1;
+    
+    // 攻撃済みカード配列を初期化
+    if (!player.attackedCardsThisTurn || player.attackedCardsTurn !== currentTurn) {
+      player.attackedCardsThisTurn = [];
+      player.attackedCardsTurn = currentTurn;
+    }
+    
+    // 攻撃済みカードに追加
+    if (!player.attackedCardsThisTurn.includes(position)) {
+      player.attackedCardsThisTurn.push(position);
+    }
+    
+    console.log(`🎭 [Performance] カード攻撃済みマーク設定 - プレイヤー${playerId}, ${position}, ターン${currentTurn}`, player.attackedCardsThisTurn);
+  }
+
+  /**
+   * 特定のカードが攻撃済みかチェック
+   * @param {number} playerId - プレイヤーID
+   * @param {string} position - カードのポジション
+   * @returns {boolean} 攻撃済みかどうか
+   */
+  hasCardAttackedThisTurn(playerId, position) {
+    const player = this.battleEngine.players[playerId];
+    const currentTurn = this.battleEngine.gameState.turnCount || 1;
+    
+    if (!player.attackedCardsThisTurn || player.attackedCardsTurn !== currentTurn) {
+      return false;
+    }
+    
+    return player.attackedCardsThisTurn.includes(position);
   }
 
   /**
@@ -40,14 +123,19 @@ class PerformanceManager {
     console.log(`🔍 [Performance] センターカード:`, player.center);
     console.log(`🔍 [Performance] コラボカード:`, player.collab);
 
-    // センターとコラボをチェック
-    if (player.center && !player.center.isResting) {
+    // センターとコラボをチェック（お休み状態と攻撃済み状態を確認）
+    if (player.center && !player.center.isResting && !this.hasCardAttackedThisTurn(playerId, 'center')) {
       attackablePositions.push('center');
       console.log(`✅ [Performance] センター攻撃可能: ${player.center.name}`);
+    } else if (player.center && this.hasCardAttackedThisTurn(playerId, 'center')) {
+      console.log(`❌ [Performance] センター攻撃済み: ${player.center.name}`);
     }
-    if (player.collab && !player.collab.isResting) {
+    
+    if (player.collab && !player.collab.isResting && !this.hasCardAttackedThisTurn(playerId, 'collab')) {
       attackablePositions.push('collab');
       console.log(`✅ [Performance] コラボ攻撃可能: ${player.collab.name}`);
+    } else if (player.collab && this.hasCardAttackedThisTurn(playerId, 'collab')) {
+      console.log(`❌ [Performance] コラボ攻撃済み: ${player.collab.name}`);
     }
 
     console.log(`🎯 [Performance] 攻撃可能ポジション: ${attackablePositions.join(', ')}`);
@@ -58,9 +146,13 @@ class PerformanceManager {
       this.addAttackButton(position, playerId);
     });
 
+    // パスボタンを追加（攻撃しないでスキップすることも可能）
+    this.addPassButton();
+
     if (attackablePositions.length === 0) {
       console.log(`❌ [Performance] 攻撃可能なカードがありません`);
-      this.showPerformanceMessage('攻撃可能なカードがありません');
+      this.showPerformanceMessage('攻撃可能なカードがありません。パフォーマンスステップを終了します');
+      
       setTimeout(() => {
         this.endPerformanceStep();
       }, 2000);
@@ -330,6 +422,9 @@ class PerformanceManager {
 
     console.log(`⚔️ [Performance] 攻撃実行: ${attacker.name} → ${defender.name}`);
 
+    // カード攻撃済みフラグを設定
+    this.markCardAttacked(this.currentAttacker.playerId, this.currentAttacker.position);
+
     // 攻撃ボタンを削除
     this.clearPerformanceButtons();
 
@@ -365,7 +460,7 @@ class PerformanceManager {
     // 攻撃終了処理
     setTimeout(() => {
       this.currentAttacker = null;
-      this.continuePerformanceStep();
+      this.continuePerformanceStep(); // 他にも攻撃可能なカードがあるかチェック
     }, 2000);
   }
 
@@ -580,29 +675,14 @@ class PerformanceManager {
     const currentPlayer = this.battleEngine.gameState.currentPlayer;
     
     // まだ攻撃可能なカードがあるかチェック
-    const hasMoreAttackers = this.hasAttackableCards(currentPlayer);
-    
-    if (hasMoreAttackers) {
+    if (!this.hasPerformedThisTurn(currentPlayer)) {
       // 続けて攻撃可能
       this.highlightAttackableCards(currentPlayer);
-      this.showPerformanceMessage('他にも攻撃できます。攻撃するか、パスしてください');
-      this.addPassButton();
+      this.showPerformanceMessage('他にも攻撃できるカードがあります。続けて攻撃するか、パスしてください');
     } else {
       // 攻撃できるカードがない場合は終了
       this.endPerformanceStep();
     }
-  }
-
-  /**
-   * 攻撃可能なカードがあるかチェック
-   * @param {number} playerId - プレイヤーID
-   * @returns {boolean} 攻撃可能かどうか
-   */
-  hasAttackableCards(playerId) {
-    const player = this.battleEngine.players[playerId];
-    
-    return (player.center && !player.center.isResting) || 
-           (player.collab && !player.collab.isResting);
   }
 
   /**
@@ -628,6 +708,7 @@ class PerformanceManager {
     `;
 
     passButton.addEventListener('click', () => {
+      console.log('🎭 [Performance] パフォーマンスをパス');
       this.endPerformanceStep();
     });
 
@@ -661,33 +742,33 @@ class PerformanceManager {
   executeCPUPerformance(playerId) {
     console.log(`🤖 [Performance] CPU パフォーマンス開始 - プレイヤー${playerId}`);
     
-    // 簡単なAI: 攻撃可能なカードで攻撃
     const player = this.battleEngine.players[playerId];
-    const opponentId = playerId === 1 ? 2 : 1;
-    const opponent = this.battleEngine.players[opponentId];
-
-    let attacked = false;
+    let attackCount = 0;
 
     // センターで攻撃
-    if (player.center && !player.center.isResting) {
-      const target = this.selectCPUTarget(opponentId);
+    if (player.center && !player.center.isResting && !this.hasCardAttackedThisTurn(playerId, 'center')) {
+      const target = this.selectCPUTarget(playerId === 1 ? 2 : 1);
       if (target) {
         this.executeCPUAttack(player.center, 'center', playerId, target);
-        attacked = true;
+        this.markCardAttacked(playerId, 'center');
+        attackCount++;
       }
     }
 
     // コラボで攻撃
-    if (!attacked && player.collab && !player.collab.isResting) {
-      const target = this.selectCPUTarget(opponentId);
+    if (player.collab && !player.collab.isResting && !this.hasCardAttackedThisTurn(playerId, 'collab')) {
+      const target = this.selectCPUTarget(playerId === 1 ? 2 : 1);
       if (target) {
         this.executeCPUAttack(player.collab, 'collab', playerId, target);
-        attacked = true;
+        this.markCardAttacked(playerId, 'collab');
+        attackCount++;
       }
     }
 
-    if (!attacked) {
+    if (attackCount === 0) {
       console.log('🤖 [Performance] CPU: 攻撃対象なし');
+    } else {
+      console.log(`🤖 [Performance] CPU: ${attackCount}回攻撃実行`);
     }
 
     // 終了
