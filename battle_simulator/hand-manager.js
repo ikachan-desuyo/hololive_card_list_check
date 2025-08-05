@@ -157,6 +157,11 @@ class HandManager {
       source: 'hand'
     };
     
+    // StateManagerにドラッグ状態を通知
+    if (this.battleEngine.stateManager) {
+      this.battleEngine.stateManager.setDragState(true, card, 'hand');
+    }
+    
     // ドラッグエフェクトを追加
     e.target.classList.add('dragging');
     
@@ -186,6 +191,11 @@ class HandManager {
     
     // ハイライトを削除
     this.battleEngine.clearDropZoneHighlights();
+    
+    // StateManagerのドラッグ状態をクリア
+    if (this.battleEngine.stateManager) {
+      this.battleEngine.stateManager.setDragState(false, null, null);
+    }
     
     // ドラッグ状態をクリア
     this.battleEngine.draggedCard = null;
@@ -795,6 +805,10 @@ class HandManager {
       case 'center':
         targetCard = player.center;
         targetPosition = 'center';
+        break;
+      case 'collab':
+        targetCard = player.collab;
+        targetPosition = 'collab';
         break;
       case 'back':
         const backPositions = ['back1', 'back2', 'back3', 'back4', 'back5'];

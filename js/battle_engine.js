@@ -2213,6 +2213,13 @@ class HololiveBattleEngine {
         console.log('センター②をハイライト');
       }
       
+      // コラボエリアをチェック
+      const collabArea = document.querySelector('.battle-player .collab-area');
+      if (collabArea) {
+        collabArea.classList.add('drop-zone-active');
+        console.log('コラボエリアをハイライト');
+      }
+      
       // バックスロットをチェック（デバッグ強化）
       console.log('全体のバックスロット:', document.querySelectorAll('.back-slot').length);
       console.log('プレイヤーエリアのバックスロット:', document.querySelectorAll('.battle-player .back-slot').length);
@@ -2299,6 +2306,9 @@ class HololiveBattleEngine {
     switch (dropZone.type) {
       case 'center':
         // センターは空の場合も、カードがある場合（ブルーム/交換）も有効
+        return true;
+      case 'collab':
+        // コラボエリアも有効なドロップ先として追加
         return true;
       case 'back':
         return this.canPlaceCardInBackSlot(card, dropZone.index);

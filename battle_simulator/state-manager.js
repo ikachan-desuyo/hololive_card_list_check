@@ -1175,10 +1175,12 @@ class HololiveStateManager {
     const player = currentState.players[playerId];
     
     // ブルーム配置の制限チェック（メインステップでのみ可能）
-    if ((targetPosition.startsWith('back') || targetPosition === 'center') && currentPhase === 3) {
+    if ((targetPosition.startsWith('back') || targetPosition === 'center' || targetPosition === 'collab') && currentPhase === 3) {
       const targetCard = targetPosition === 'center' 
         ? player.center 
-        : player[targetPosition];
+        : targetPosition === 'collab'
+          ? player.collab
+          : player[targetPosition];
         
       window.debugLog(`[checkDropValidity] ブルーム対象確認: targetCard = ${targetCard ? targetCard.name : 'なし'}`);
         
@@ -1208,10 +1210,12 @@ class HololiveStateManager {
     }
     
     // メインステップ以外でのブルーム試行を拒否
-    if ((targetPosition.startsWith('back') || targetPosition === 'center') && currentPhase !== 3) {
+    if ((targetPosition.startsWith('back') || targetPosition === 'center' || targetPosition === 'collab') && currentPhase !== 3) {
       const targetCard = targetPosition === 'center' 
-        ? player.cards.center 
-        : player.cards.back_positions[targetPosition];
+        ? player.center 
+        : targetPosition === 'collab'
+          ? player.collab
+          : player.cards.back_positions[targetPosition];
         
       if (targetCard && this.checkBloomCompatibility(card, targetCard).valid) {
         window.debugLog(`[checkDropValidity] フェーズ制限により拒否: 現在フェーズ${currentPhase}, ブルームはメインステップ(3)でのみ可能`);
@@ -1261,13 +1265,40 @@ class HololiveStateManager {
     }
 
     // コラボポジションが既に使用されているかチェック
-    if (player.cards.collab) {
+    const targetCard = player.collab || player.cards?.collab;
+    if (targetCard) {
+      // 既存カードがある場合、ブルーム可能性をチェック
+      window.debugLog(`[checkCollabPlacement] 既存カード確認: ${targetCard.name}`);
+      
+      // ブルーム互換性チェック
+      const compatibilityResult = this.checkBloomCompatibility(card, targetCard, 1);
+      if (compatibilityResult.valid) {
+        window.debugLog(`[checkCollabPlacement] ブルーム互換性OK: ${card.name} → ${targetCard.name}`);
+        // ブルーム可能性チェック
+        const canBloomResult = this.canBloom(card, targetCard, 1);
+        if (canBloomResult.valid) {
+          window.debugLog(`[checkCollabPlacement] コラボでブルーム可能`);
+          return {
+            valid: true,
+            reason: 'コラボでブルーム可能',
+            isBloom: true,
+            willStayResting: canBloomResult.willStayResting
+          };
+        } else {
+          window.debugLog(`[checkCollabPlacement] ブルーム不可: ${canBloomResult.reason}`);
+          return canBloomResult;
+        }
+      } else {
+        window.debugLog(`[checkCollabPlacement] ブルーム互換性なし: ${compatibilityResult.reason}`);
+      }
+      
       return {
         valid: false,
         reason: 'コラボポジションには既にカードが配置されています'
       };
     }
 
+    window.debugLog(`[checkCollabPlacement] コラボポジション空き - 通常配置可能`);
     return {
       valid: true,
       reason: 'コラボ配置可能'
@@ -1295,7 +1326,9 @@ class HololiveStateManager {
     // ターゲットカードの取得（ポジションに応じて適切にアクセス）
     let targetCard;
     if (targetPosition === 'center') {
-      targetCard = player.cards.center;
+      targetCard = player.center;
+    } else if (targetPosition === 'collab') {
+      targetCard = player.collab;
     } else if (targetPosition.startsWith('back')) {
       targetCard = player.cards.back_positions[targetPosition];
     } else {
