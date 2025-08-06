@@ -138,7 +138,32 @@ function updateMultipleUIElements() {
 }
 ```
 
-### 5. カードインタラクション開発パターン
+### 4. パフォーマンス処理開発パターン⭐新規追加
+```javascript
+// PerformanceManagerを使用したパフォーマンスステップ処理
+class CustomPerformanceHandler {
+    setupPerformanceStep(playerId) {
+        // パフォーマンスステップ開始
+        battleEngine.performanceManager.startPerformanceStep(playerId);
+    }
+    
+    // カスタム攻撃処理の追加
+    registerCustomAttack(cardId, attackConfig) {
+        battleEngine.performanceManager.registerCustomAttack(cardId, {
+            canAttack: (card, context) => {
+                // 攻撃可能条件をチェック
+                return this.checkAttackConditions(card, context);
+            },
+            onAttack: (card, target, context) => {
+                // 攻撃処理実行
+                return this.executeCustomAttack(card, target, context);
+            }
+        });
+    }
+}
+```
+
+### 5. カードインタラクション開発パターン⭐更新
 ```javascript
 // CardInteractionManagerを使用したカードクリック処理
 class CustomCardHandler {
@@ -197,7 +222,80 @@ const cardEffectConfig = {
 battleEngine.cardEffectManager.registerCardEffect('hBP04-089_U', cardEffectConfig);
 ```
 
-### 7. UI更新とデバウンス処理パターン
+### 8. 新しいStateManager統合パターン⭐新規追加
+```javascript
+// StateManagerを使用した状態管理パターン
+class StateManagementHelper {
+    updateGameStateViaSM(property, value) {
+        // StateManagerを通じた状態更新
+        battleEngine.stateManager.updateState('UPDATE_GAME_STATE', {
+            property: property,
+            value: value
+        });
+    }
+    
+    // プレイヤー状態の安全な更新
+    updatePlayerStateViaSM(playerId, area, cards) {
+        battleEngine.stateManager.updateState('UPDATE_PLAYER_CARDS', {
+            player: playerId,
+            area: area,
+            cards: cards
+        });
+    }
+    
+    // カード状態の個別更新
+    updateCardStateViaSM(playerId, position, cardState) {
+        battleEngine.stateManager.updateState('UPDATE_CARD_STATE', {
+            playerId: playerId,
+            position: position,
+            cardState: cardState
+        });
+    }
+    
+    // 状態監視とデバッグ
+    subscribeToStateChanges() {
+        battleEngine.stateManager.subscribe((action, payload) => {
+            console.log(`状態変更: ${action}`, payload);
+        });
+    }
+}
+```
+
+### 9. フェーズ制御の拡張パターン⭐新規追加
+```javascript
+// PhaseControllerの拡張機能利用
+class PhaseControlExtensions {
+    setupCustomPhaseValidation() {
+        // カスタムフェーズアクション検証
+        const originalValidate = battleEngine.phaseController.validatePhaseAction;
+        battleEngine.phaseController.validatePhaseAction = function(action) {
+            // カスタム検証ロジック
+            if (this.customValidateAction(action)) {
+                return originalValidate.call(this, action);
+            }
+            return false;
+        };
+    }
+    
+    // フェーズ遷移イベントのリスニング
+    listenToPhaseChanges() {
+        document.addEventListener('phaseChanged', (event) => {
+            const { from, to, phase, player } = event.detail;
+            console.log(`フェーズ変更: ${from} → ${to} (プレイヤー${player})`);
+            this.onPhaseChanged(from, to, phase, player);
+        });
+    }
+    
+    customValidateAction(action) {
+        // カスタム検証ロジックを実装
+        return true;
+    }
+    
+    onPhaseChanged(from, to, phase, player) {
+        // フェーズ変更時の処理を実装
+    }
+}
+```
 ```javascript
 // CardDisplayManagerの更新処理
 class UIUpdateManager {

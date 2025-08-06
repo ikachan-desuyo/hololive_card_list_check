@@ -18,19 +18,18 @@ battleEngine
 
 #### プロパティ
 ```javascript
-// ゲーム状態
+// ゲーム状態（StateManagerから取得）
 battleEngine.gameState: {
     gameStarted: boolean,
     currentPlayer: number,
-    currentPhase: number,
+    currentPhase: number, // -1: 準備, 0-5: リセット〜エンド
     turn: number,
     isGameOver: boolean,
     winner: number,
-    p1Ready: boolean,
-    p2Ready: boolean
+    // その他StateManager管理の状態
 }
 
-// プレイヤー状態
+// プレイヤー状態（StateManagerから取得）
 battleEngine.players: {
     1: PlayerState,
     2: PlayerState
@@ -47,7 +46,8 @@ battleEngine.handManager: HandManager
 battleEngine.cardDisplayManager: CardDisplayManager
 battleEngine.cardInteractionManager: CardInteractionManager
 battleEngine.infoPanelManager: InfoPanelManager
-battleEngine.cardEffectManager: CardEffectManager
+battleEngine.performanceManager: PerformanceManager ⭐新規追加
+battleEngine.cardEffectManager: ScalableCardEffectManager ⭐更新（新システム）
 ```
 
 #### メソッド
@@ -125,16 +125,46 @@ stateManager.loadState(): GameState | null
 
 ### PhaseController
 
+#### プロパティ
+```javascript
+// フェーズ定数（2024年8月更新）
+phaseController.PHASES: {
+    PREPARATION: -1,
+    RESET: 0,
+    DRAW: 1,
+    CHEER: 2,
+    MAIN: 3,
+    PERFORMANCE: 4,
+    END: 5
+}
+
+// フェーズ制御フラグ
+phaseController.phaseInProgress: boolean
+phaseController.endStepInProgress: boolean
+```
+
 #### メソッド
 ```javascript
 // 次フェーズへ進行
-phaseController.nextPhase(): boolean
+phaseController.nextPhase(): boolean ⭐戻り値追加
 
 // フェーズ名取得
 phaseController.getPhaseNameByIndex(phaseIndex: number): string
 
-// フェーズ進行可能判定
+// フェーズ進行可能判定 ⭐新規追加
 phaseController.canAdvancePhase(): boolean
+
+// 指定フェーズに設定 ⭐新規追加
+phaseController.setPhase(phase: number): void
+
+// 現在フェーズ取得 ⭐新規追加
+phaseController.getCurrentPhase(): number
+
+// フェーズ遷移処理 ⭐新規追加
+phaseController.handlePhaseTransition(fromPhase: number, toPhase: number): void
+
+// フェーズアクション検証 ⭐新規追加
+phaseController.validatePhaseAction(action: string): boolean
 ```
 
 #### フェーズ定数
@@ -220,7 +250,7 @@ handManager.getHandSize(playerId: number): number
 
 #### メソッド
 ```javascript
-// 全カードエリア更新（デバウンス対応）
+// 全カードエリア更新（デバウンス対応） ⭐更新
 cardDisplayManager.updateCardAreas(): void
 
 // 指定エリアのカード表示
@@ -232,37 +262,149 @@ cardDisplayManager.createCardElement(card: Card, areaId: string, cardIndex: numb
 // バックスロット更新
 cardDisplayManager.updateBackSlots(playerType: string): void
 
-// 個別カード表示更新
+// 個別カード表示更新 ⭐新規追加
 cardDisplayManager.updateCardDisplay(card: Card, position: string, playerId: number): void
 
-// エールカード表示
+// コラボエリア個別カード更新 ⭐新規追加
+cardDisplayManager.updateCollabCardDisplay(card: Card, playerId: number): void
+
+// バックエリア個別カード更新 ⭐新規追加
+cardDisplayManager.updateBackCardDisplay(card: Card, position: string, playerId: number): void
+
+// エリア内イベントリスナークリーンアップ ⭐新規追加
+cardDisplayManager.cleanupAreaEventListeners(area: Element): void
+
+// エールカード表示追加
 cardDisplayManager.addYellCardsToArea(area: Element, holomenCard: Card, areaId: string, cardIndex: number): void
+
+// カードカウンター更新 ⭐新規追加
+cardDisplayManager.updateCardCounter(area: Element, count: number): void
+
+// 表示スタイル適用 ⭐新規追加
+cardDisplayManager.applyDisplayTypeStyles(cardElement: HTMLElement, areaId: string, cardIndex: number): void
+
+// 表向き表示判定 ⭐新規追加
+cardDisplayManager.shouldCardBeFaceUp(card: Card, areaId: string): boolean
+
+// フェーズハイライト更新 ⭐新規追加
+cardDisplayManager.updatePhaseHighlight(): void
+
+// カード数取得 ⭐新規追加
+cardDisplayManager.getCardCount(player: PlayerState, areaId: string): number
 ```
 
 ### CardInteractionManager
 
 #### メソッド
 ```javascript
-// カード情報表示
+// カードインタラクション初期化 ⭐新規追加
+cardInteractionManager.initializeCardInteractions(): void
+
+// カード情報表示とアクションマーク表示 ⭐更新
 cardInteractionManager.showCardInfo(card: Card, position: string): void
+
+// 右側パネルにカード詳細表示 ⭐新規追加
+cardInteractionManager.showCardDetailInPanel(card: Card): void
+
+// パネル用カード詳細HTMLフォーマット ⭐新規追加
+cardInteractionManager.formatCardDetailForPanel(card: Card): string
 
 // カード上にアクションマーク表示
 cardInteractionManager.showActionMarksOnCard(card: Card, position: string): void
 
-// カード効果発動
+// アクションマーククリア
+cardInteractionManager.clearActionMarks(): void
+
+// 利用可能アクション取得 ⭐新規追加
+cardInteractionManager.getAvailableActions(card: Card, position: string): string[]
+
+// アクション実行 ⭐新規追加
+cardInteractionManager.executeAction(actionId: string, cardId: string, position: string): void
+
+// カード効果の手動発動
 cardInteractionManager.activateCardEffect(card: Card, position: string): Promise<void>
+
+// 手動発動可能効果チェック ⭐新規追加
+cardInteractionManager.hasManualEffect(card: Card): boolean
 
 // 効果発動可能判定
 cardInteractionManager.canActivateEffect(card: Card, position: string): boolean
 
-// アクションマーククリア
-cardInteractionManager.clearActionMarks(): void
+// ブルーム効果発動可能判定 ⭐新規追加
+cardInteractionManager.canActivateBloomEffect(card: Card, position: string): boolean
+
+// コラボ効果発動可能判定 ⭐新規追加
+cardInteractionManager.canActivateCollabEffect(card: Card, position: string): boolean
+
+// ギフト効果発動可能判定 ⭐新規追加
+cardInteractionManager.canActivateGiftEffect(card: Card, position: string): boolean
+
+// 効果使用済みマーク設定 ⭐新規追加
+cardInteractionManager.markEffectAsUsed(card: Card, position: string): void
+
+// カード要素検索 ⭐新規追加
+cardInteractionManager.findCardElement(cardId: string): HTMLElement | null
+
+// カードオブジェクト検索 ⭐新規追加
+cardInteractionManager.findCard(cardId: string): Card | null
+
+// プレイヤーカード判定 ⭐新規追加
+cardInteractionManager.isPlayerCard(card: Card, position: string): boolean
+
+// メッセージ表示 ⭐新規追加
+cardInteractionManager.showMessage(message: string, type?: string): void
 ```
 
-### CardEffectManager
+### PerformanceManager ⭐新規追加
 
 #### メソッド
 ```javascript
+// パフォーマンスステップ開始
+performanceManager.startPerformanceStep(playerId: number): void
+
+// パフォーマンス実行済みチェック
+performanceManager.hasPerformedThisTurn(playerId: number): boolean
+
+// 攻撃可能なカード取得
+performanceManager.getAttackableCards(playerId: number): Card[]
+
+// 攻撃対象取得
+performanceManager.getAttackTargets(attackerCard: Card, playerId: number): Card[]
+
+// 攻撃実行
+performanceManager.executeAttack(attackerCard: Card, targetCard: Card, playerId: number): boolean
+
+// パフォーマンスステップ終了
+performanceManager.endPerformanceStep(): void
+
+// パフォーマンスメッセージ表示
+performanceManager.showPerformanceMessage(message: string, type?: string): void
+```
+
+#### メソッド
+```javascript
+### ScalableCardEffectManager ⭐更新（新システム）
+
+#### メソッド
+```javascript
+// システム初期化
+cardEffectManager.initializeSystem(): Promise<void>
+
+// デッキカード準備（軽量初期化）
+cardEffectManager.prepareDeckCards(deckData: object): Promise<void>
+
+// ゲーム開始時のカード効果初期化
+cardEffectManager.initializeDeckCards(deckData: object): Promise<void>
+
+// カード効果動的読み込み
+cardEffectManager.loadCardEffect(cardId: string): Promise<object>
+
+// カードメタデータ読み込み
+cardEffectManager.loadCardMetadata(cardId: string): Promise<object>
+
+// 効果パターン取得
+cardEffectManager.getEffectPattern(patternName: string): object
+
 // カード効果登録
 cardEffectManager.registerCardEffect(cardId: string, effectConfig: object): void
 
@@ -274,6 +416,10 @@ cardEffectManager.canActivate(card: Card, triggerType: string, context: object):
 
 // 手動効果発動
 cardEffectManager.manualTrigger(cardId: string, playerId: number): Promise<object[]>
+
+// 効果アンロード（メモリ最適化）
+cardEffectManager.unloadCardEffect(cardId: string): void
+```
 ```
 
 ## データ型定義

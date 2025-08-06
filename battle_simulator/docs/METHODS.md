@@ -1,12 +1,12 @@
-# モジュール別メソッド詳細
+# モジュール別メソッド詳細 - 2024年8月更新版
 
 ## HololiveBattleEngine (js/battle_engine.js)
 
 ### 初期化・設定系
 - `constructor()` - エンジン初期化、各モジュールのインスタンス化
 - `initializeGame()` - ゲーム初期化処理
-- `createGameStateProxy()` - ゲーム状態のプロキシオブジェクト生成
-- `createPlayersProxy()` - プレイヤー状態のプロキシオブジェクト生成
+- `createGameStateProxy()` - ゲーム状態のプロキシオブジェクト生成（StateManager互換性）
+- `createPlayersProxy()` - プレイヤー状態のプロキシオブジェクト生成（StateManager互換性）
 - `createPlayerState()` - プレイヤーの初期状態生成
 - `initializeUI()` - UI要素の初期化
 - `setupControlPanel()` - コントロールパネル設定
@@ -220,19 +220,48 @@
 - `manualTrigger(cardId, playerId)` - 手動効果発動
 - `validateEffectExecution(card, effect)` - 効果実行検証
 
-## ScalableCardEffectManager (card-effects/scalable-card-effect-manager.js)
+## PerformanceManager (performance-manager.js) ⭐新規追加
+
+### パフォーマンス制御系
+- `constructor(battleEngine)` - パフォーマンス管理初期化
+- `startPerformanceStep(playerId)` - パフォーマンスステップ開始
+- `endPerformanceStep()` - パフォーマンスステップ終了
+- `hasPerformedThisTurn(playerId)` - パフォーマンス実行済みチェック
+
+### 攻撃処理系
+- `getAttackableCards(playerId)` - 攻撃可能なカード取得
+- `getAttackTargets(attackerCard, playerId)` - 攻撃対象取得
+- `executeAttack(attackerCard, targetCard, playerId)` - 攻撃実行
+- `calculateDamage(attackerCard, targetCard)` - ダメージ計算
+- `applyDamage(targetCard, damage, playerId)` - ダメージ適用
+
+### UI・メッセージ系
+- `showPerformanceMessage(message, type)` - パフォーマンスメッセージ表示
+- `showAttackAnimation(attackerCard, targetCard)` - 攻撃アニメーション表示
+- `updatePerformanceUI()` - パフォーマンスUI更新
+
+## ScalableCardEffectManager (card-effects/scalable-card-effect-manager.js) ⭐更新
 
 ### システム管理系
 - `constructor()` - スケーラブル効果管理初期化
-- `initializeSystem()` - システム初期化
-- `loadCardMetadata()` - カードメタデータ読み込み
-- `registerEffectPatterns()` - 効果パターン登録
-- `preloadCommonCards()` - 高頻度カード事前読み込み
+- `initializeSystem()` - システム初期化、効果パターン登録
+- `prepareDeckCards(deckData)` - デッキカード軽量初期化（メタデータのみ）⭐新規追加
+- `initializeDeckCards(deckData)` - ゲーム開始時のカード効果初期化⭐新規追加
+- `registerEffectPatterns()` - 効果パターン登録⭐新規追加
 
 ### 動的読み込み系
 - `loadCardEffect(cardId)` - カード効果動的読み込み
+- `loadCardMetadata(cardId)` - カードメタデータ読み込み⭐新規追加
 - `unloadCardEffect(cardId)` - カード効果アンロード
-- `getEffectPattern(patternName)` - 効果パターン取得
+- `getEffectPattern(patternName)` - 効果パターン取得⭐新規追加
+
+### 効果実行系
+- `registerCardEffect(cardId, effectConfig)` - カード効果登録
+- `executeEffect(card, triggerType, context)` - カード効果実行
+- `canActivate(card, triggerType, context)` - 効果発動可能判定
+- `manualTrigger(cardId, playerId)` - 手動効果発動
+- `triggerEffects(triggerType, context)` - 指定タイプの効果発動⭐新規追加
+- `validateEffectExecution(card, effect)` - 効果実行検証⭐新規追加
 
 ## InfoPanelManager (info-panel-manager.js)
 
@@ -243,7 +272,43 @@
 - `hideInfoPanel()` - 情報パネル非表示
 - `formatCardInfo(card)` - カード情報フォーマット
 
+### ログ・イベント処理系⭐新規追加
+- `logStepProgress(turnCount, stepName, playerName, action)` - ステップ進行ログ
+- `logTurnStart(playerName, turnCount)` - ターン開始ログ
+- `logStepTransition(playerName, fromStep, toStep, turnCount)` - ステップ遷移ログ
+- `logGameEvent(event, details)` - ゲームイベントログ⭐新規追加
+
 ### イベント処理系
 - `handleCardHover(event, card)` - カードホバー処理
 - `handleCardLeave(event)` - カードリーブ処理
 - `bindEvents()` - イベントバインド
+
+## 追加クラス ⭐新規追加
+
+### CardLoader (card-effects/card-loader.js)
+- `loadEffectFile(cardId)` - 効果ファイル読み込み
+- `parseEffectData(effectData)` - 効果データ解析
+- `validateEffectStructure(effectConfig)` - 効果構造検証
+
+### CardMetadata (card-effects/card-metadata.js)
+- `loadMetadata(cardId)` - メタデータ読み込み
+- `getCachedMetadata(cardId)` - キャッシュされたメタデータ取得
+- `updateMetadataCache(cardId, metadata)` - メタデータキャッシュ更新
+
+### EffectPatternTemplates (card-effects/effect-pattern-templates.js)
+- `getTemplate(templateName)` - テンプレート取得
+- `registerTemplate(templateName, templateConfig)` - テンプレート登録
+- `validateTemplate(templateConfig)` - テンプレート検証
+
+### CardEffectUtils (card-effects/card-effect-utils.js)
+- `parseEffectConditions(conditions)` - 効果条件解析
+- `evaluateCondition(condition, context)` - 条件評価
+- `formatEffectResult(result)` - 効果結果フォーマット
+- `generateEffectId()` - 効果ID生成
+
+### BattleEngineIntegration (card-effects/battle-engine-integration.js)
+- `executeStateChange(stateChange, battleEngine)` - 状態変更実行
+- `validateStateChange(stateChange)` - 状態変更検証
+- `rollbackStateChange(stateChange, battleEngine)` - 状態変更ロールバック
+
+```

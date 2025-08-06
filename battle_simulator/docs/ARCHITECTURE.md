@@ -18,10 +18,13 @@ HololiveBattleEngine (メインエンジン)
 ├── CardDisplayManager (カード表示)
 ├── CardInteractionManager (カードクリック管理)
 ├── InfoPanelManager (情報パネル)
+├── PerformanceManager (パフォーマンス処理) ⭐新規追加
 └── カード効果システム
-    ├── CardEffectManager (効果実行)
-    ├── ScalableCardEffectManager (スケーラブル管理)
-    └── EffectRegistry (効果登録)
+    ├── ScalableCardEffectManager (スケーラブル管理) ⭐新システム
+    ├── CardEffectManager (効果実行) 
+    ├── EffectRegistry (効果登録)
+    ├── CardLoader (カード動的読み込み) ⭐新規追加
+    └── CardMetadata (カード メタデータ管理) ⭐新規追加
 ```
 
 ## モジュール構成
@@ -30,24 +33,29 @@ HololiveBattleEngine (メインエンジン)
 |-----------|----------|------|
 | js/battle_engine.js | HololiveBattleEngine | メインゲームエンジン、全体統括 |
 | state-manager.js | HololiveStateManager | ゲーム状態の管理と永続化 |
-| phase-controller.js | PhaseController | フェーズ進行とフェーズ間遷移 |
-| turn-manager.js | HololiveTurnManager | ターン管理と終了処理 |
-| placement-controller.js | HololivePlacementController | カード配置ロジック |
-| game-setup-manager.js | HololiveGameSetupManager | ゲーム初期化とデッキ設定 |
+| phase-controller.js | PhaseController | フェーズ進行とフェーズ間遷移、フェーズ定数管理 |
+| turn-manager.js | HololiveTurnManager | ターン管理と終了処理、マリガン処理 |
+| placement-controller.js | HololivePlacementController | カード配置ロジック、配置ルール管理 |
+| game-setup-manager.js | HololiveGameSetupManager | ゲーム初期化とデッキ設定、テストデッキ作成 |
 | cpu_logic.js | HololiveCPULogic | AI思考ロジック |
 | hand-manager.js | HandManager | 手札表示と管理 |
-| card-display-manager.js | CardDisplayManager | カード描画とUI更新 |
-| card-interaction-manager.js | CardInteractionManager | カードクリック時の動作管理 |
+| card-display-manager.js | CardDisplayManager | カード描画とUI更新、デバウンス処理 |
+| card-interaction-manager.js | CardInteractionManager | カードクリック時の動作管理、アクションマーク表示 |
 | info-panel-manager.js | InfoPanelManager | 情報パネル表示 |
+| performance-manager.js | PerformanceManager | パフォーマンスステップ処理、攻撃・スキル管理 ⭐新規追加 |
 
 ### カード効果システム
 
 | ファイル名 | クラス名 | 責務 |
 |-----------|----------|------|
-| card-effects/card-effect-manager.js | CardEffectManager | カード効果の登録と実行 |
-| card-effects/scalable-card-effect-manager.js | ScalableCardEffectManager | スケーラブルなカード効果管理 |
+| card-effects/scalable-card-effect-manager.js | ScalableCardEffectManager | スケーラブルなカード効果管理、遅延読み込み ⭐メインシステム |
+| card-effects/card-effect-manager.js | CardEffectManager | カード効果の登録と実行（レガシー互換） |
 | card-effects/effect-registry.js | - | 効果の登録システム |
-| card-effects/card-loader.js | - | カード効果の動的読み込み |
+| card-effects/card-loader.js | - | カード効果の動的読み込み ⭐新規追加 |
+| card-effects/card-metadata.js | - | カードメタデータの軽量管理 ⭐新規追加 |
+| card-effects/effect-pattern-templates.js | - | 効果パターンテンプレート ⭐新規追加 |
+| card-effects/card-effect-utils.js | - | カード効果ユーティリティ関数 ⭐新規追加 |
+| card-effects/battle-engine-integration.js | - | バトルエンジン統合ヘルパー ⭐新規追加 |
 
 ## 主要な依存関係
 
@@ -63,7 +71,8 @@ graph TD
     A --> I[CardDisplayManager]
     A --> J[InfoPanelManager]
     A --> K[CardInteractionManager]
-    A --> L[CardEffectManager]
+    A --> L[ScalableCardEffectManager]
+    A --> M[PerformanceManager]
     
     C --> B
     D --> B
@@ -74,28 +83,86 @@ graph TD
     I --> B
     K --> B
     L --> B
+    M --> B
     
     K --> I
     K --> J
     I --> K
+    
+    M --> C
+    M --> E
+    
+    F --> L
+    L --> N[CardLoader]
+    L --> O[CardMetadata]
+    L --> P[EffectPatternTemplates]
 ```
 
 ## ゲーム状態構造
 
 ```javascript
-gameState = {
-  gameStarted: boolean,
-  currentPlayer: number, // 1 or 2
-  currentPhase: string,  // 'setup', 'reset', 'draw', 'cheer', 'main', 'performance'
-  turn: number,
-  turnCount: number,
-  isGameOver: boolean,
-  winner: number,
-  p1Ready: boolean,
-  p2Ready: boolean
+// StateManagerで管理される状態構造（2024年8月更新版）
+state = {
+  // ゲーム全体の状態
+  game: {
+    started: boolean,
+    ended: boolean,
+    winner: number | null,
+    turnOrderDecided: boolean,
+    mulliganPhase: boolean,
+    debutPlacementPhase: boolean
+  },
+  
+  // ターン・フェーズ状態
+  turn: {
+    currentPlayer: number, // 1 or 2
+    currentPhase: number,  // -1: 準備, 0-5: リセット〜エンド
+    turnCount: number,
+    firstPlayer: number | null,
+    playerTurnCount: { 1: number, 2: number } // 各プレイヤーのターン回数
+  },
+  
+  // マリガン状態
+  mulligan: {
+    count: { 1: number, 2: number },
+    completed: { 1: boolean, 2: boolean }
+  },
+  
+  // プレイヤー状態
+  players: {
+    1: PlayerState,
+    2: PlayerState
+  },
+  
+  // UI状態
+  ui: {
+    selectedCard: Card | null,
+    highlightedAreas: string[],
+    modalOpen: boolean,
+    dragState: {
+      isDragging: boolean,
+      draggedCard: Card | null,
+      dragSource: string | null,
+      validDropZones: string[]
+    },
+    buttonsEnabled: {
+      startGame: boolean,
+      nextPhase: boolean,
+      endTurn: boolean,
+      resetGame: boolean
+    }
+  },
+  
+  // メタ情報
+  meta: {
+    lastUpdate: number,
+    updateCount: number,
+    version: string
+  }
 }
 
-players[1/2] = {
+// プレイヤー状態（詳細）
+PlayerState = {
   cards: {
     life: Card[],
     collab: Card | null,
@@ -104,20 +171,27 @@ players[1/2] = {
     holoPower: Card[],
     deck: Card[],
     yellDeck: Card[],
-    back1-5: Card | null,
+    back1: Card | null,
+    back2: Card | null,
+    back3: Card | null,
+    back4: Card | null,
+    back5: Card | null,
     archive: Card[],
     hand: Card[]
   },
   gameState: {
-    usedLimitedThisTurn: string[],
+    usedLimitedThisTurn: boolean,
     restHolomem: Card[],
+    performedThisTurn: boolean, // パフォーマンス実行済みフラグ ⭐新規追加
     // カード効果の状態管理
     effectStates: {
       [cardId]: {
         bloomEffectUsed: boolean,
         collabEffectUsed: boolean,
         bloomedTurn: number,
-        collabedTurn: number
+        collabedTurn: number,
+        justPlayed: boolean, // このターンに配置されたカード ⭐新規追加
+        collabLocked: boolean // コラボロック状態 ⭐新規追加
       }
     }
   },
@@ -263,6 +337,31 @@ sequenceDiagram
 - カード配置はルール検証を必須とする
 - エラーハンドリングは各層で適切に実装
 - ログ出力は統一された形式を使用
+
+## 更新履歴 ⭐新規追加
+
+### 2024年8月更新
+- **PerformanceManager**: パフォーマンスステップ専用管理クラス追加
+- **ScalableCardEffectManager**: 大規模カード効果管理システムに更新、遅延読み込み対応
+- **StateManager**: 包括的な状態管理システムに更新、プロキシベースの互換性レイヤー追加
+- **PhaseController**: フェーズ定数、フェーズ検証、イベント発行機能追加
+- **CardInteractionManager**: アクションマーク表示、効果発動UI統合
+- **CardDisplayManager**: デバウンス処理、個別更新機能、メモリ最適化
+- **新しいカード効果サブシステム**:
+  - CardLoader: 動的読み込み
+  - CardMetadata: メタデータ管理
+  - EffectPatternTemplates: テンプレートシステム
+  - CardEffectUtils: ユーティリティ関数
+  - BattleEngineIntegration: エンジン統合ヘルパー
+
+### アーキテクチャの改善点
+- モジュラー設計の強化
+- パフォーマンス最適化（遅延読み込み、キャッシュ）
+- メモリ管理の改善
+- エラーハンドリングの強化
+- デバッグ・ログ機能の統合
+- 状態管理の一元化
+- イベント駆動アーキテクチャの導入
 
 ## 今後の拡張ポイント
 
