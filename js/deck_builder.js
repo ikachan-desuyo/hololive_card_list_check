@@ -26,10 +26,7 @@
           });
         }
 
-        function toggleDarkMode() {
-            const isDark = document.body.classList.toggle("dark");
-            localStorage.setItem("darkMode", isDark ? "true" : "false");
-        }
+        // toggleDarkMode は utils.js で定義されているグローバル関数を使用
 
         function createDeck() {
           const name = prompt("新しいデッキ名を入力してください");
@@ -794,11 +791,13 @@ function addCardToDeck(cardId) {
         updateDeckUI();
 
         // データ読み込み成功をコンソールに記録
+        console.log('デッキビルダー初期化完了:', {
             cardCount: cards.length,
             dataSource: navigator.onLine && !isCacheValid ? 'オンライン' : 'キャッシュ',
             cacheAge: cacheTime ? `${Math.round((Date.now() - parseInt(cacheTime)) / (60 * 60 * 1000))}時間` : '新規'
         });
     } catch (err) {
+        console.error('デッキビルダー初期化エラー:', err);
         alert("カードデータの読み込みに失敗しました！オフライン時は過去にアクセスした際のデータが必要です。");
     }
 

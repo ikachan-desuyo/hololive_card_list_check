@@ -74,6 +74,18 @@ window.initializeDarkMode = function() {
 };
 
 /**
+ * ホーム画面への遷移関数
+ * 全ページで使用される共通ナビゲーション
+ */
+window.goHome = function() {
+  if (typeof window.navigateToPage === 'function') {
+    window.navigateToPage('index.html');
+  } else {
+    window.location.href = 'index.html';
+  }
+};
+
+/**
  * チップ操作の共通関数群
  * フィルタUIで使用されるチップ操作を統一
  */
