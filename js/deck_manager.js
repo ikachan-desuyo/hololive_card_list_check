@@ -539,45 +539,27 @@ class DeckSelectionUI {
   }
 
   /**
-   * デッキ選択時の軽量カード情報準備（新システム）
+   * デッキ選択時の処理（軽量化版）
    * @param {Object} deck - デッキオブジェクト
    */
   async loadCardEffects(deck) {
     try {
-      // 新システム（ScalableCardEffectManager）が利用可能かチェック
-      if (!this.battleEngine?.cardEffectManager) {
-        console.warn('🔮 [Card Effects] ScalableCardEffectManager not available, skipping effect loading');
-        return;
-      }
-
-      console.log(`🔮 [Card Effects] デッキカード情報を準備中...`);
+      console.log(`🔮 [Card Effects] デッキ選択完了 - カード効果読み込みはゲーム開始時に延期`);
       
-      // 全カードを配列にまとめる
-      const allCards = [
+      // メタデータ読み込みは削除 - ページ読み込み時とゲーム開始時のみ実行
+      // パフォーマンス向上のため、デッキ選択時は何も読み込まない
+      
+      const cardCount = [
         ...(deck.holomen || []),
         ...(deck.support || []),
         ...(deck.yell || []),
         ...(deck.oshi ? [deck.oshi] : [])
-      ];
-
-      // デッキデータを変換（新システム用）
-      const deckData = {};
-      allCards.forEach(card => {
-        const cardId = card.id || card.number;
-        if (cardId) {
-          deckData[cardId] = card;
-        }
-      });
-
-      console.log(`🔮 [Card Effects] ${Object.keys(deckData).length}種類のカード情報を準備対象`);
-
-      // 軽量メタデータ準備（デッキ選択時）
-      await this.battleEngine.cardEffectManager.prepareDeckCards(deckData);
+      ].length;
       
-      console.log(`🔮 [Card Effects] カード情報の準備完了`);
+      console.log(`🔮 [Card Effects] デッキカード ${cardCount}種類 - ゲーム開始時に読み込み予定`);
 
     } catch (error) {
-      console.error('🔮 [Card Effects] カード情報準備中にエラーが発生:', error);
+      console.error('🔮 [Card Effects] デッキ選択処理中にエラーが発生:', error);
       // エラーが発生してもデッキ選択は続行
     }
   }

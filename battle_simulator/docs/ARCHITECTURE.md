@@ -2,29 +2,37 @@
 
 ## 概要
 
-ホロライブTCGバトルシミュレーターは、ホロライブカードゲームの対戦をブラウザ上で再現するアプリケーションです。
+ホロライブTCGバトルシミュレーターは、ホロライブカードゲームの対戦をブラウザ上で再現するWebアプリケーションです。
+1000枚以上のカード効果に対応した拡張可能なアーキテクチャで設計されています。
 
 ## アーキテクチャ概要
 
 ```
 HololiveBattleEngine (メインエンジン)
-├── HololiveStateManager (状態管理)
-├── PhaseController (フェーズ制御)
-├── HololiveTurnManager (ターン管理)
-├── HololivePlacementController (配置制御)
-├── HololiveGameSetupManager (ゲーム設定)
-├── HololiveCPULogic (CPU思考)
-├── HandManager (手札管理)
-├── CardDisplayManager (カード表示)
-├── CardInteractionManager (カードクリック管理)
-├── InfoPanelManager (情報パネル)
-├── PerformanceManager (パフォーマンス処理) ⭐新規追加
-└── カード効果システム
-    ├── ScalableCardEffectManager (スケーラブル管理) ⭐新システム
-    ├── CardEffectManager (効果実行) 
-    ├── EffectRegistry (効果登録)
-    ├── CardLoader (カード動的読み込み) ⭐新規追加
-    └── CardMetadata (カード メタデータ管理) ⭐新規追加
+├── 🔄 状態管理レイヤー
+│   └── HololiveStateManager (状態管理)
+├── 🎮 ゲーム制御レイヤー  
+│   ├── PhaseController (フェーズ制御)
+│   ├── HololiveTurnManager (ターン管理)
+│   ├── HololivePlacementController (配置制御)
+│   └── HololiveGameSetupManager (ゲーム設定)
+├── 🤖 AI制御レイヤー
+│   └── HololiveCPULogic (CPU思考)
+├── 🎨 UI管理レイヤー
+│   ├── HandManager (手札管理)
+│   ├── CardDisplayManager (カード表示・デバウンス処理)
+│   ├── CardInteractionManager (カードインタラクション・アクションマーク)
+│   └── InfoPanelManager (情報パネル)
+├── ⚔️ バトル処理レイヤー
+│   └── PerformanceManager (パフォーマンス・攻撃・スキル管理) ⭐主要機能
+└── 🃏 カード効果システム（新アーキテクチャ）
+    ├── ScalableCardEffectManager (メイン管理・遅延読み込み) ⭐新システム
+    ├── CardEffectManager (レガシー互換・効果実行)
+    ├── CardMetadata (軽量メタデータ管理) ⭐新規追加
+    ├── CardLoader (動的読み込み制御) ⭐新規追加
+    ├── EffectPatternTemplates (効果パターン) ⭐新規追加
+    ├── CardEffectUtils (ユーティリティ関数) ⭐新規追加
+    └── BattleEngineIntegration (エンジン統合) ⭐新規追加
 ```
 
 ## モジュール構成
@@ -341,27 +349,64 @@ sequenceDiagram
 ## 更新履歴 ⭐新規追加
 
 ### 2024年8月更新
-- **PerformanceManager**: パフォーマンスステップ専用管理クラス追加
-- **ScalableCardEffectManager**: 大規模カード効果管理システムに更新、遅延読み込み対応
-- **StateManager**: 包括的な状態管理システムに更新、プロキシベースの互換性レイヤー追加
-- **PhaseController**: フェーズ定数、フェーズ検証、イベント発行機能追加
-- **CardInteractionManager**: アクションマーク表示、効果発動UI統合
-- **CardDisplayManager**: デバウンス処理、個別更新機能、メモリ最適化
+- **PerformanceManager**: パフォーマンスステップ専用管理クラス - 攻撃・スキル・ダメージ処理・ライフカード処理を統合管理
+- **ScalableCardEffectManager**: 1000枚以上対応の大規模カード効果管理システム - 遅延読み込み・キャッシュ・メタデータ最適化・UI読み込み表示
+- **StateManager**: 包括的な状態管理システム - プロキシベースの互換性レイヤー・リアルタイム状態追跡
+- **PhaseController**: フェーズ定数・フェーズ検証・イベント発行機能を強化
+- **CardInteractionManager**: アクションマーク表示・効果発動UI・カード詳細表示を統合
+- **CardDisplayManager**: デバウンス処理・個別更新機能・メモリ最適化・差分更新
 - **新しいカード効果サブシステム**:
-  - CardLoader: 動的読み込み
-  - CardMetadata: メタデータ管理
-  - EffectPatternTemplates: テンプレートシステム
-  - CardEffectUtils: ユーティリティ関数
-  - BattleEngineIntegration: エンジン統合ヘルパー
+  - **CardLoader**: カード効果の動的読み込み・バッチ処理・優先度制御
+  - **CardMetadata**: 軽量メタデータ管理・効果パターン検出・パフォーマンス最適化
+  - **EffectPatternTemplates**: 汎用効果テンプレートシステム・パターンマッチング
+  - **CardEffectUtils**: カード効果共通ユーティリティ・ヘルパー関数群
+  - **BattleEngineIntegration**: エンジン統合ヘルパー・状態管理連携
+  - **CommonCards**: 高頻度採用カードの事前読み込みシステム ⭐新規追加
+
+### カード効果読み込み最適化（2024年8月）⭐新規追加
+
+#### 🚀 読み込みタイミングの最適化
+- **ページ読み込み時**: 基本メタデータ + 高頻度カードの効果読み込み
+- **ゲーム開始時**: デッキ固有のカード効果読み込み
+- **デッキ選択時**: 読み込み処理なし（軽量化）
+
+#### 📊 高頻度カード事前読み込み
+- `common-cards.js`: よく採用されるカードの効果を事前定義
+- エールカード、汎用サポート、人気推しホロメンを優先読み込み
+- デッキ構築時の体感速度向上
+
+#### 🎨 UI読み込み表示
+- プログレス付きローディングオーバーレイ
+- 読み込み状況のリアルタイム表示
+- ユーザビリティの向上
 
 ### アーキテクチャの改善点
-- モジュラー設計の強化
-- パフォーマンス最適化（遅延読み込み、キャッシュ）
-- メモリ管理の改善
-- エラーハンドリングの強化
-- デバッグ・ログ機能の統合
-- 状態管理の一元化
-- イベント駆動アーキテクチャの導入
+
+#### 🔄 状態管理の一元化
+- 全状態をStateManagerで一元管理
+- プロキシベースの自動更新・通知システム
+- 変更履歴の追跡とデバッグ支援
+
+#### ⚡ パフォーマンス最適化
+- カード効果の遅延読み込み（必要時のみ）
+- メタデータによる軽量化（重い処理の分離）
+- UI更新のデバウンス処理
+- バッチ処理による効率化
+
+#### 🎯 モジュラー設計の強化
+- 責務の明確な分離（表示・処理・状態）
+- プラグイン形式のカード効果システム
+- 疎結合なイベント駆動アーキテクチャ
+
+#### 🛡️ エラーハンドリング・デバッグ強化
+- 段階的フォールバック処理
+- 詳細なログ・デバッグ情報
+- リアルタイム状態監視
+
+#### 📈 拡張性・保守性
+- 新カード追加の簡易化（ファイル追加のみ）
+- 効果パターンの再利用可能化
+- テスト・デバッグの容易化
 
 ## 今後の拡張ポイント
 

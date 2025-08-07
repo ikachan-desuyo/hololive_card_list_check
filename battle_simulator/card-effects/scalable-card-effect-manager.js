@@ -7,9 +7,10 @@ class ScalableCardEffectManager {
   constructor(battleEngine) {
     this.battleEngine = battleEngine;
     this.effectRegistry = new Map();
-    this.loadedEffects = new Set(); // 読み込み済み効果
+    this.loadedEffects = new Map(); // 読み込み済み効果（Setから変更）
     this.effectPatterns = new Map(); // 効果パターンのテンプレート
     this.cardMetadata = new Map(); // カードメタデータ（軽量）
+    this.cachedCardData = null; // キャッシュされたcard_data.json
     
     // パフォーマンス最適化
     this.batchSize = 50; // 一度に読み込むカード数
@@ -19,14 +20,77 @@ class ScalableCardEffectManager {
   }
 
   /**
-   * システム初期化
+   * システム初期化（ページ読み込み時）
    */
   async initializeSystem() {
-    // 1. 効果パターンの登録
-    this.registerEffectPatterns();
+    console.log('🔧 ScalableCardEffectManager: システム初期化中...');
     
-    // 2. カードメタデータは必要時のみ読み込み（デッキ選択時）
-    // loadCardMetadata() は削除 - デッキベースで読み込み
+    try {
+      // 1. 効果パターンの登録
+      this.registerEffectPatterns();
+      
+      // 2. 高頻度カードの事前読み込み
+      await this.preloadCommonCards();
+      
+      // 3. 基本メタデータの読み込み
+      await this.loadBasicMetadata();
+      
+    } catch (error) {
+      console.warn('⚠️ システム初期化中にエラーが発生しましたが、処理を継続します:', error);
+    }
+    
+    console.log('✅ ScalableCardEffectManager: システム初期化完了');
+  }
+
+  /**
+   * 基本メタデータの読み込み（ページ読み込み時）
+   */
+  async loadBasicMetadata() {
+    this.showLoadingUI('基本カード情報を読み込み中...');
+    
+    try {
+      // card_data.jsonを一度だけ読み込み
+      const response = await fetch('/json_file/card_data.json');
+      this.cachedCardData = await response.json();
+      
+      console.log('📋 基本カードデータを読み込みました');
+      
+    } catch (error) {
+      console.error('❌ 基本メタデータの読み込みに失敗:', error);
+    } finally {
+      this.hideLoadingUI();
+    }
+  }
+
+  /**
+   * 高頻度カードの事前読み込み（ページ読み込み時）
+   */
+  async preloadCommonCards() {
+    this.showLoadingUI('よく使われるカードを準備中...');
+    
+    try {
+      // 高頻度カードファイルが読み込まれているかチェック
+      if (typeof window !== 'undefined' && window.COMMON_CARD_EFFECTS) {
+        console.log('🔄 高頻度カードを事前読み込み中...');
+        
+        // 高頻度カードのメタデータを設定
+        Object.entries(window.COMMON_CARD_METADATA).forEach(([cardId, metadata]) => {
+          this.cardMetadata.set(cardId, metadata);
+        });
+        
+        // 高頻度カードの効果を事前読み込み
+        Object.entries(window.COMMON_CARD_EFFECTS).forEach(([cardId, effect]) => {
+          this.loadedEffects.set(cardId, effect);
+        });
+        
+        console.log(`✅ 高頻度カード ${Object.keys(window.COMMON_CARD_EFFECTS).length}種類を事前読み込み完了`);
+      }
+      
+    } catch (error) {
+      console.warn('⚠️ 高頻度カードの事前読み込み中にエラー:', error);
+    } finally {
+      this.hideLoadingUI();
+    }
   }
 
   /**
@@ -52,31 +116,75 @@ class ScalableCardEffectManager {
     const cardIds = Object.keys(deckData);
     
     console.log(`🃏 ゲーム開始 - カード効果を初期化中... (${cardIds.length}枚)`);
+    this.showLoadingUI(`デッキカードを準備中... (${cardIds.length}枚)`);
     
-    // メタデータが未読み込みの場合は読み込み
-    for (const cardId of cardIds) {
-      if (!this.cardMetadata.has(cardId)) {
-        await this.loadCardMetadata(cardId);
-      }
+    try {
+      // キャッシュされたデータを使用してメタデータを一括読み込み
+      await this.loadDeckMetadataFromCache(cardIds);
+      
+      // 高優先度カードを事前読み込み
+      await this.preloadDeckCards(cardIds);
+      
+      console.log(`✅ カード効果の初期化完了`);
+      
+    } catch (error) {
+      console.error('❌ カード効果初期化中にエラー:', error);
+    } finally {
+      this.hideLoadingUI();
     }
-    
-    // 高優先度カードを事前読み込み
-    await this.preloadDeckCards(cardIds);
-    
-    console.log(`✅ カード効果の初期化完了`);
   }
 
   /**
-   * 単一カードのメタデータを読み込み
+   * キャッシュからデッキメタデータを読み込み
+   */
+  async loadDeckMetadataFromCache(cardIds) {
+    if (!this.cachedCardData) {
+      console.warn('⚠️ キャッシュされたカードデータがありません');
+      return;
+    }
+    
+    let processedCount = 0;
+    for (const cardId of cardIds) {
+      if (!this.cardMetadata.has(cardId)) {
+        const card = this.cachedCardData[cardId];
+        if (card) {
+          this.cardMetadata.set(cardId, {
+            id: cardId,
+            name: card.name,
+            cardType: card.card_type,
+            rarity: card.rarity,
+            hasCustomEffect: await this.detectCustomEffect(card),
+            effectPattern: this.detectEffectPattern(card),
+            loadPriority: this.calculateLoadPriority(card)
+          });
+        }
+      }
+      processedCount++;
+      
+      // プログレス表示更新
+      if (processedCount % 10 === 0) {
+        this.updateLoadingProgress(processedCount, cardIds.length);
+      }
+    }
+  }
+
+  /**
+   * 単一カードのメタデータを読み込み（レガシー互換・使用非推奨）
    */
   async loadCardMetadata(cardId) {
     if (this.cardMetadata.has(cardId)) return;
     
     try {
-      // card_data.jsonから該当カードの情報を取得
-      const response = await fetch('/json_file/card_data.json');
-      const cardData = await response.json();
-      const card = cardData[cardId];
+      // キャッシュされたデータを優先使用
+      let card;
+      if (this.cachedCardData && this.cachedCardData[cardId]) {
+        card = this.cachedCardData[cardId];
+      } else {
+        // フォールバック: 個別読み込み
+        const response = await fetch('/json_file/card_data.json');
+        const cardData = await response.json();
+        card = cardData[cardId];
+      }
       
       if (!card) return;
       
@@ -465,6 +573,148 @@ class ScalableCardEffectManager {
       patternEffects: Array.from(this.cardMetadata.values())
         .filter(meta => !meta.hasCustomEffect && meta.effectPattern !== 'none').length
     };
+  }
+
+  // =========================================
+  // UI読み込み表示関連メソッド
+  // =========================================
+
+  /**
+   * 読み込みUIを表示
+   */
+  showLoadingUI(message = 'カード情報を読み込み中...') {
+    // 既存のローディング表示があれば削除
+    this.hideLoadingUI();
+    
+    const loadingOverlay = document.createElement('div');
+    loadingOverlay.id = 'card-effect-loading';
+    loadingOverlay.innerHTML = `
+      <div class="loading-backdrop">
+        <div class="loading-content">
+          <div class="loading-spinner"></div>
+          <div class="loading-message">${message}</div>
+          <div class="loading-progress">
+            <div class="progress-bar" id="card-loading-progress"></div>
+          </div>
+        </div>
+      </div>
+    `;
+    
+    // スタイルを追加
+    const style = document.createElement('style');
+    style.textContent = `
+      #card-effect-loading {
+        position: fixed;
+        top: 0;
+        left: 0;
+        width: 100%;
+        height: 100%;
+        z-index: 9999;
+      }
+      
+      .loading-backdrop {
+        background: rgba(0, 0, 0, 0.7);
+        width: 100%;
+        height: 100%;
+        display: flex;
+        justify-content: center;
+        align-items: center;
+      }
+      
+      .loading-content {
+        background: white;
+        padding: 30px;
+        border-radius: 10px;
+        text-align: center;
+        min-width: 300px;
+        box-shadow: 0 4px 20px rgba(0, 0, 0, 0.3);
+      }
+      
+      .loading-spinner {
+        width: 50px;
+        height: 50px;
+        border: 4px solid #f3f3f3;
+        border-top: 4px solid #667eea;
+        border-radius: 50%;
+        animation: spin 1s linear infinite;
+        margin: 0 auto 20px;
+      }
+      
+      @keyframes spin {
+        0% { transform: rotate(0deg); }
+        100% { transform: rotate(360deg); }
+      }
+      
+      .loading-message {
+        font-size: 16px;
+        margin-bottom: 20px;
+        color: #333;
+      }
+      
+      .loading-progress {
+        width: 100%;
+        height: 6px;
+        background: #f0f0f0;
+        border-radius: 3px;
+        overflow: hidden;
+      }
+      
+      .progress-bar {
+        height: 100%;
+        background: linear-gradient(90deg, #667eea, #764ba2);
+        width: 0%;
+        transition: width 0.3s ease;
+        border-radius: 3px;
+      }
+    `;
+    
+    document.head.appendChild(style);
+    document.body.appendChild(loadingOverlay);
+  }
+
+  /**
+   * 読み込みプログレスを更新
+   */
+  updateLoadingProgress(current, total) {
+    const progressBar = document.getElementById('card-loading-progress');
+    if (progressBar) {
+      const percentage = Math.round((current / total) * 100);
+      progressBar.style.width = `${percentage}%`;
+      
+      // メッセージも更新
+      const messageElement = document.querySelector('#card-effect-loading .loading-message');
+      if (messageElement) {
+        messageElement.textContent = `カード情報を処理中... (${current}/${total})`;
+      }
+    }
+  }
+
+  /**
+   * 読み込みメッセージを更新
+   */
+  updateLoadingMessage(message) {
+    const messageElement = document.querySelector('#card-effect-loading .loading-message');
+    if (messageElement) {
+      messageElement.textContent = message;
+    }
+  }
+
+  /**
+   * 読み込みUIを非表示
+   */
+  hideLoadingUI() {
+    const loadingElement = document.getElementById('card-effect-loading');
+    if (loadingElement) {
+      loadingElement.remove();
+    }
+    
+    // スタイルも削除
+    const styles = document.querySelectorAll('style');
+    styles.forEach(style => {
+      if (style.textContent.includes('#card-effect-loading')) {
+        style.remove();
+      }
+    });
   }
 }
 

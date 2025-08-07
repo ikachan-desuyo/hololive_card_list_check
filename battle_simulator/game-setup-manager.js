@@ -418,60 +418,48 @@ class HololiveGameSetupManager {
   }
 
   /**
-   * デッキに含まれるカードの効果を事前読み込み
+   * デッキに含まれるカードの効果を事前読み込み（ゲーム開始時）
    */
   async preloadDeckCardEffects() {
     if (!this.engine.cardEffectManager) {
       return;
     }
 
+    console.log('🎮 ゲーム開始 - デッキカード効果を初期化中...');
     
-    let totalLoaded = 0;
-    const uniqueCardIds = new Set();
-
-    // 全プレイヤーのデッキからユニークなカードIDを収集
+    // 全プレイヤーのデッキデータを収集
+    const allDeckData = {};
+    
     for (let playerId of [1, 2]) {
       const player = this.players[playerId];
       
       // メインデッキ
       if (player.deck) {
         player.deck.forEach(card => {
-          if (card.id) uniqueCardIds.add(card.id);
+          if (card.id) allDeckData[card.id] = card;
         });
       }
       
       // エールデッキ
       if (player.yellDeck) {
         player.yellDeck.forEach(card => {
-          if (card.id) uniqueCardIds.add(card.id);
+          if (card.id) allDeckData[card.id] = card;
         });
       }
       
       // 推しホロメン
       if (player.oshi && player.oshi.id) {
-        uniqueCardIds.add(player.oshi.id);
+        allDeckData[player.oshi.id] = player.oshi;
       }
     }
 
-
-    let effectFilesFound = 0;
-    let effectFilesNotFound = 0;
-
-    // 効果を順次読み込み
-    for (const cardId of uniqueCardIds) {
-      try {
-        const effect = await this.engine.cardEffectManager.loadCardEffect(cardId);
-        if (effect) {
-          totalLoaded++;
-          effectFilesFound++;
-        } else {
-          effectFilesNotFound++;
-        }
-      } catch (error) {
-        effectFilesNotFound++;
-      }
+    // ScalableCardEffectManagerの新システムを使用
+    try {
+      await this.engine.cardEffectManager.initializeDeckCards(allDeckData);
+      console.log('✅ デッキカード効果の初期化が完了しました');
+    } catch (error) {
+      console.error('❌ デッキカード効果の初期化中にエラー:', error);
     }
-
   }
 
   /**
