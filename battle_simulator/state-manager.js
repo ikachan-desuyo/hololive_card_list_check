@@ -100,6 +100,9 @@ class HololiveStateManager {
         hand: []
       },
       
+      // カードHP管理（カードIDをキーとして現在HPを保存）
+      cardHP: new Map(),
+      
       // ゲーム状態
       gameState: {
         usedLimitedThisTurn: false, // LIMITED効果使用済みフラグ（boolean型）
@@ -2571,6 +2574,158 @@ class HololiveStateManager {
           player.cards.archive.push(removedCard);
         }
       }
+    }
+  }
+
+  // ==================== HP管理メソッド ====================
+
+  /**
+   * カードの最大HPを取得
+   * @param {Object} card - カード情報
+   * @returns {number} 最大HP
+   */
+  getMaxHP(card) {
+    if (!card || !card.hp) return 0;
+    return parseInt(card.hp) || 0;
+  }
+
+  /**
+   * カードの現在HPを取得
+   * @param {Object} card - カード情報
+   * @param {number} playerId - プレイヤーID
+   * @returns {number} 現在HP
+   */
+  getCurrentHP(card, playerId) {
+    if (!card || !card.hp) return 0;
+    
+    const player = this.state.players[playerId];
+    if (!player || !player.cardHP) return this.getMaxHP(card);
+    
+    const currentHP = player.cardHP.get(card.id);
+    return currentHP !== undefined ? currentHP : this.getMaxHP(card);
+  }
+
+  /**
+   * カードの現在HPを設定
+   * @param {Object} card - カード情報
+   * @param {number} playerId - プレイヤーID
+   * @param {number} newHP - 新しいHP値
+   */
+  setCurrentHP(card, playerId, newHP) {
+    if (!card || !card.hp) return;
+    
+    const player = this.state.players[playerId];
+    if (!player) return;
+    
+    if (!player.cardHP) {
+      player.cardHP = new Map();
+    }
+    
+    const maxHP = this.getMaxHP(card);
+    const validHP = Math.max(0, Math.min(newHP, maxHP));
+    
+    player.cardHP.set(card.id, validHP);
+    
+    // ダメージイベントを発火
+    this.emit('cardDamaged', {
+      playerId,
+      card,
+      currentHP: validHP,
+      maxHP,
+      isKnockOut: validHP === 0
+    });
+  }
+
+  /**
+   * カードにダメージを与える
+   * @param {Object} card - カード情報
+   * @param {number} playerId - プレイヤーID
+   * @param {number} damage - ダメージ量
+   * @returns {Object} ダメージ結果
+   */
+  dealDamage(card, playerId, damage) {
+    if (!card || !card.hp || damage <= 0) {
+      return { success: false, reason: 'Invalid parameters' };
+    }
+    
+    const currentHP = this.getCurrentHP(card, playerId);
+    const newHP = Math.max(0, currentHP - damage);
+    
+    this.setCurrentHP(card, playerId, newHP);
+    
+    return {
+      success: true,
+      previousHP: currentHP,
+      currentHP: newHP,
+      damage: damage,
+      isKnockOut: newHP === 0
+    };
+  }
+
+  /**
+   * カードのHPを回復する
+   * @param {Object} card - カード情報
+   * @param {number} playerId - プレイヤーID
+   * @param {number} healAmount - 回復量
+   * @returns {Object} 回復結果
+   */
+  healCard(card, playerId, healAmount) {
+    if (!card || !card.hp || healAmount <= 0) {
+      return { success: false, reason: 'Invalid parameters' };
+    }
+    
+    const currentHP = this.getCurrentHP(card, playerId);
+    const maxHP = this.getMaxHP(card);
+    const newHP = Math.min(maxHP, currentHP + healAmount);
+    
+    this.setCurrentHP(card, playerId, newHP);
+    
+    return {
+      success: true,
+      previousHP: currentHP,
+      currentHP: newHP,
+      healAmount: Math.min(healAmount, newHP - currentHP)
+    };
+  }
+
+  /**
+   * カードのHPを完全回復する
+   * @param {Object} card - カード情報
+   * @param {number} playerId - プレイヤーID
+   */
+  fullHealCard(card, playerId) {
+    if (!card || !card.hp) return;
+    
+    const maxHP = this.getMaxHP(card);
+    this.setCurrentHP(card, playerId, maxHP);
+  }
+
+  /**
+   * プレイヤーの全カードのHPを初期化
+   * @param {number} playerId - プレイヤーID
+   */
+  initializeAllCardHP(playerId) {
+    const player = this.state.players[playerId];
+    if (!player) return;
+    
+    player.cardHP = new Map();
+    
+    // 全エリアのカードを確認してHPを初期化
+    const areas = ['center', 'collab', 'back1', 'back2', 'back3', 'back4', 'back5'];
+    areas.forEach(area => {
+      const card = player.cards[area];
+      if (card && card.hp) {
+        this.setCurrentHP(card, playerId, this.getMaxHP(card));
+      }
+    });
+    
+    // ライフエリアも確認
+    if (player.cards.life && Array.isArray(player.cards.life)) {
+      player.cards.life.forEach(card => {
+        if (card && card.hp) {
+          this.setCurrentHP(card, playerId, this.getMaxHP(card));
+        }
+      });
     }
   }
 }

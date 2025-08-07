@@ -2471,6 +2471,13 @@ class HololiveBattleEngine {
         player[backPositions[zone.index]] = card;
         break;
     }
+
+    // HPがあるホロメンカードの場合、HP初期化
+    if (card && card.hp && card.card_type && card.card_type.includes('ホロメン')) {
+      const playerId = player === this.players[1] ? 1 : 2;
+      this.stateManager.setCurrentHP(card, playerId, this.stateManager.getMaxHP(card));
+      console.log(`💚 [HP初期化] ${card.name}: ${card.hp}HP`);
+    }
   }
 
   // エリアIDからゾーンタイプを取得

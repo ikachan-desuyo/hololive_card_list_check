@@ -275,6 +275,11 @@ class CardDisplayManager {
           </div>
         `;
       }
+
+      // HP表示を追加（ホロメンカードでHPがある場合）
+      if (card.hp && card.card_type && card.card_type.includes('ホロメン')) {
+        this.addHPDisplay(cardElement, card, isPlayerCard);
+      }
     } else {
       // 裏向きカード
       cardElement.style.backgroundImage = 'url(images/card_sleeve.jpg)';
@@ -1155,6 +1160,117 @@ class CardDisplayManager {
     } catch (error) {
       console.error('🚨 [効果発動] Effect activation error:', error);
       alert('効果の発動中にエラーが発生しました: ' + error.message);
+    }
+  }
+
+  /**
+   * カードにHP表示を追加
+   * @param {Element} cardElement - カード要素
+   * @param {Object} card - カード情報
+   * @param {boolean} isPlayerCard - プレイヤーカードかどうか
+   */
+  addHPDisplay(cardElement, card, isPlayerCard = true) {
+    // 既存のHP表示があれば削除
+    const existingHP = cardElement.querySelector('.hp-display');
+    if (existingHP) {
+      existingHP.remove();
+    }
+
+    const playerId = isPlayerCard ? 1 : 2;
+    const stateManager = this.battleEngine.stateManager;
+    
+    if (!stateManager) {
+      console.warn('StateManager not found for HP display');
+      return;
+    }
+
+    const maxHP = stateManager.getMaxHP(card);
+    const currentHP = stateManager.getCurrentHP(card, playerId);
+
+    // HP表示要素を作成
+    const hpDisplay = document.createElement('div');
+    hpDisplay.className = 'hp-display';
+    
+    // HP値によって色を変更
+    let hpClass = 'hp-full';
+    const hpPercentage = currentHP / maxHP;
+    if (hpPercentage <= 0.25) {
+      hpClass = 'hp-critical';
+    } else if (hpPercentage <= 0.5) {
+      hpClass = 'hp-low';
+    } else if (hpPercentage <= 0.75) {
+      hpClass = 'hp-medium';
+    }
+
+    hpDisplay.classList.add(hpClass);
+    hpDisplay.innerHTML = `
+      <div class="hp-bar">
+        <div class="hp-fill" style="width: ${(currentHP / maxHP) * 100}%"></div>
+        <div class="hp-text">${currentHP}/${maxHP}</div>
+      </div>
+    `;
+
+    // カード要素に追加
+    cardElement.appendChild(hpDisplay);
+    
+    // ダメージ処理のイベントリスナーを追加
+    hpDisplay.addEventListener('click', (e) => {
+      e.stopPropagation();
+      this.showDamageDialog(card, playerId);
+    });
+  }
+
+  /**
+   * ダメージ入力ダイアログを表示
+   * @param {Object} card - カード情報
+   * @param {number} playerId - プレイヤーID
+   */
+  showDamageDialog(card, playerId) {
+    const stateManager = this.battleEngine.stateManager;
+    const currentHP = stateManager.getCurrentHP(card, playerId);
+    const maxHP = stateManager.getMaxHP(card);
+
+    const damage = prompt(`${card.name}にダメージを与える\n現在のHP: ${currentHP}/${maxHP}\n\nダメージ量を入力してください（負の値で回復）:`);
+    
+    if (damage === null) return; // キャンセル
+    
+    const damageAmount = parseInt(damage);
+    if (isNaN(damageAmount)) {
+      alert('有効な数値を入力してください');
+      return;
+    }
+
+    if (damageAmount > 0) {
+      // ダメージを与える
+      const result = stateManager.dealDamage(card, playerId, damageAmount);
+      if (result.success) {
+        console.log(`💥 ${card.name}に${damageAmount}ダメージ: ${result.previousHP} → ${result.currentHP}`);
+        if (result.isKnockOut) {
+          alert(`${card.name}は気絶しました！`);
+        }
+      }
+    } else if (damageAmount < 0) {
+      // 回復
+      const healAmount = Math.abs(damageAmount);
+      const result = stateManager.healCard(card, playerId, healAmount);
+      if (result.success) {
+        console.log(`💚 ${card.name}を${result.healAmount}回復: ${result.previousHP} → ${result.currentHP}`);
+      }
+    }
+
+    // 表示を更新
+    this.updateCardAreas();
+  }
+
+  /**
+   * 特定のカードのHP表示を更新
+   * @param {Object} card - カード情報
+   * @param {number} playerId - プレイヤーID
+   */
+  updateCardHPDisplay(card, playerId) {
+    const cardElement = document.querySelector(`[data-card-id="${card.id}"]`);
+    if (cardElement) {
+      this.addHPDisplay(cardElement, card, playerId === 1);
     }
   }
 }
