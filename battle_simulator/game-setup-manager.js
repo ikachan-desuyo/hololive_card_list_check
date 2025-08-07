@@ -104,11 +104,11 @@ class HololiveGameSetupManager {
       }
     }
     
-    // ゲーム状態の初期化
-    this.gameState.gameStarted = true;
-    this.gameState.currentPlayer = 1;
-    this.gameState.currentPhase = -1; // 準備ステップから開始（マリガンフェーズ）
-    this.gameState.turnCount = 1;
+    // ゲーム状態の初期化 - State Manager経由
+    this.engine.stateManager.updateState('GAME_START', {});
+    this.engine.stateManager.updateState('PLAYER_CHANGE', { player: 1 });
+    this.engine.stateManager.updateState('PHASE_CHANGE', { phase: -1 }); // 準備ステップから開始（マリガンフェーズ）
+    this.engine.stateManager.updateState('TURN_COUNT_CHANGE', { count: 1 });
     
     // カード効果システムの本格初期化（ゲーム開始時）
     this.initializeDeckEffects();
@@ -393,9 +393,9 @@ class HololiveGameSetupManager {
    * 先行プレイヤーを設定
    */
   setFirstPlayer(playerId, isManual) {
-    this.gameState.firstPlayer = playerId;
-    this.gameState.currentPlayer = playerId;
-    this.gameState.turnOrderDecided = true;
+    // State Manager経由で先行プレイヤーを設定
+    this.engine.stateManager.updateState('SET_FIRST_PLAYER', { player: playerId });
+    this.engine.stateManager.updateState('PLAYER_CHANGE', { player: playerId });
     
     // プレイヤーに先行・後攻フラグを設定
     this.engine.players[1].isFirstPlayer = (playerId === 1); // プレイヤー1が先行かどうか

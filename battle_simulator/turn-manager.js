@@ -28,9 +28,10 @@ class HololiveTurnManager {
       player: currentPlayer
     });
     
-    // ターン終了
-    this.gameState.currentPlayer = this.gameState.currentPlayer === 1 ? 2 : 1;
-    this.gameState.currentPhase = 0;
+    // ターン終了 - State Manager経由で安全に更新
+    const nextPlayer = this.gameState.currentPlayer === 1 ? 2 : 1;
+    this.engine.stateManager.updateState('PLAYER_CHANGE', { player: nextPlayer });
+    this.engine.stateManager.updateState('PHASE_CHANGE', { phase: 0 });
     
     // プレイヤー別ターン数を更新（新しいプレイヤーのターン開始時に増加）
     const newPlayer = this.gameState.currentPlayer;
@@ -51,7 +52,9 @@ class HololiveTurnManager {
       const player1TurnCount = newPlayerTurnCount; // 上で更新済み
       if (player1TurnCount > 1) {
         // プレイヤー1が既に2回以上ターンを実行している場合のみ増加（初回を除く）
-        this.gameState.turnCount++;
+        this.engine.stateManager.updateState('TURN_COUNT_CHANGE', { 
+          count: this.gameState.turnCount + 1 
+        });
       } else {
       }
     }
@@ -140,7 +143,8 @@ class HololiveTurnManager {
       }
     }
     
-    this.gameState.mulliganPhase = true;
+    // マリガンフェーズ開始 - State Manager経由
+    this.engine.stateManager.updateState('MULLIGAN_START', {});
     
     // 先行プレイヤーから順番にマリガンチェック
     this.checkMulligan(this.gameState.firstPlayer);
@@ -451,19 +455,20 @@ class HololiveTurnManager {
    * マリガン状態をリセット
    */
   resetMulliganState() {
-    this.gameState.mulliganPhase = false;
-    this.gameState.mulliganCount = { 1: 0, 2: 0 };
-    this.gameState.mulliganCompleted = { 1: false, 2: false };
+    // State Manager経由でマリガン状態をリセット
+    this.engine.stateManager.updateState('MULLIGAN_END', {});
+    this.engine.stateManager.updateState('SET_MULLIGAN_COUNT', { counts: { 1: 0, 2: 0 } });
+    this.engine.stateManager.updateState('SET_MULLIGAN_COMPLETED', { completed: { 1: false, 2: false } });
   }
 
   /**
    * ターン関連の状態をリセット
    */
   resetTurnState() {
-    this.gameState.currentPlayer = 1;
-    this.gameState.currentPhase = -1;
-    this.gameState.turnCount = 0; // 初期値は0、ゲーム開始時に1になる
-    this.gameState.turnOrderDecided = false;
+    this.engine.stateManager.updateState('PLAYER_CHANGE', { player: 1 });
+    this.engine.stateManager.updateState('PHASE_CHANGE', { phase: -1 });
+    this.engine.stateManager.updateState('TURN_COUNT_CHANGE', { count: 0 }); // 初期値は0、ゲーム開始時に1になる
+    this.engine.stateManager.updateState('RESET_TURN_ORDER', {});
   }
 }
 

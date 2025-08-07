@@ -528,7 +528,11 @@ class PhaseController {
     }
     
     // ターン終了時の処理（LIMITED効果の使用回数をリセット）
-    this.battleEngine.players[playerId].usedLimitedThisTurn = false;
+    this.battleEngine.stateManager.updateState('UPDATE_PLAYER_GAME_STATE', {
+      player: playerId,
+      property: 'usedLimitedThisTurn',
+      value: false
+    });
     
     // エンドステップは自動で完了し、相手のターンに移行（プレイヤー・CPU共通）
     setTimeout(() => {
