@@ -866,16 +866,31 @@ class PerformanceManager {
     const player = this.battleEngine.players[playerId];
     const stateManager = this.battleEngine.stateManager;
 
+    // 撃破されたカードに付いていたエールをアーカイブに送る
+    if (card.yellCards && card.yellCards.length > 0) {
+      console.log(`🎯 [Performance] 撃破エール処理: ${card.name}から${card.yellCards.length}枚のエールをアーカイブ`);
+      
+      player.archive = player.archive || [];
+      card.yellCards.forEach(yellCard => {
+        player.archive.push(yellCard);
+        console.log(`📁 [Performance] エールアーカイブ: ${yellCard.name}`);
+      });
+      
+      // エール情報をクリア
+      card.yellCards = [];
+    }
+
     // カードをアーカイブに移動
     player.archive = player.archive || [];
     player.archive.push(card);
     player[position] = null;
 
-    // StateManagerからもHP情報を削除
-    if (stateManager && card.id) {
-      if (player.cardHP && player.cardHP[card.id] !== undefined) {
-        delete player.cardHP[card.id];
-        console.log(`🗑️ [Performance] HP情報削除: ${card.name}`);
+    // StateManagerからもHP情報を削除（uniqueIdベース対応）
+    if (stateManager && card) {
+      const cardKey = (card.cardState && card.cardState.uniqueId) ? card.cardState.uniqueId : card.id;
+      if (player.cardHP && player.cardHP[cardKey] !== undefined) {
+        delete player.cardHP[cardKey];
+        console.log(`🗑️ [Performance] HP情報削除: ${card.name} [${cardKey}]`);
       }
     }
 
@@ -1022,13 +1037,39 @@ class PerformanceManager {
    * @param {number} playerId - プレイヤーID
    */
   placeYellFromLife(lifeCard, targetCard, position, playerId) {
-    console.log(`🌟 [Performance] エール配置: ${lifeCard.name} → ${targetCard.name}`);
+    console.log(`🌟 [Performance] エール配置: ${lifeCard.name} → ${targetCard.name} (${position})`);
 
     // エールカードとして配置
     if (!targetCard.yellCards) {
       targetCard.yellCards = [];
     }
-    targetCard.yellCards.push(lifeCard);
+    
+    // ライフカードにエール情報を設定（色情報など）
+    const yellCard = {
+      ...lifeCard,
+      card_type: 'エール' // エールカードとしてマーク
+    };
+    
+    targetCard.yellCards.push(yellCard);
+    
+    console.log(`✅ [Performance] エール配置完了: ${targetCard.name}に${targetCard.yellCards.length}枚目のエール`);
+    console.log(`🎨 [Performance] エール詳細:`, yellCard);
+
+    // StateManagerでカード状態を更新
+    if (this.battleEngine.stateManager) {
+      try {
+        this.battleEngine.stateManager.updateState('UPDATE_CARD_STATE', {
+          playerId: playerId,
+          position: position,
+          card: targetCard,
+          stateInfo: {
+            yellCards: [...targetCard.yellCards]
+          }
+        });
+      } catch (error) {
+        console.warn(`⚠️ [Performance] StateManager更新失敗:`, error);
+      }
+    }
 
     // UI更新
     this.battleEngine.updateUI();
