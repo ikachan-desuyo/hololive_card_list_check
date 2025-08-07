@@ -65,13 +65,14 @@
 
     // 初期化
     document.addEventListener('DOMContentLoaded', async function() {
+      console.log('🎴 コレクションバインダー初期化開始');
 
       // URLパラメータからバインダーIDを取得
       const urlParams = new URLSearchParams(window.location.search);
       binderState.binderId = urlParams.get('binderId');
 
-
       if (!binderState.binderId) {
+        console.log('🚨 バインダーIDが指定されていません');
 
         // 既存のバインダーをチェック
         const saved = localStorage.getItem('binderCollection');
@@ -80,6 +81,7 @@
           if (collection.binders && collection.binders.length > 0) {
             // 最初のバインダーにリダイレクト
             const firstBinder = collection.binders[0];
+            console.log(`🔄 最初のバインダーにリダイレクト: ${firstBinder.id}`);
             window.location.href = `collection_binder.html?binderId=${firstBinder.id}`;
             return;
           }
@@ -91,29 +93,38 @@
         return;
       }
 
-      // 非同期でカードデータを読み込み、完了を待つ
-      await loadCardData();
-      loadUserCollection(); // カードデータ読み込み後にユーザーコレクションを読み込み
-      loadBinderCollection();
-      initializeBinder();
-      updateStats();
-      initializeMobileFeatures();
+      console.log(`🎯 バインダーID: ${binderState.binderId}`);
 
-      // ViewModeボタンの状態を確実に設定
-      setTimeout(() => {
-        updateViewModeButton();
-      }, 100);
+      try {
+        // 段階的に初期化を実行
+        await loadCardData();
+        console.log('✅ カードデータ読み込み完了');
+        
+        loadUserCollection();
+        console.log('✅ ユーザーコレクション読み込み完了');
+        
+        loadBinderCollection();
+        console.log('✅ バインダーコレクション読み込み完了');
+        
+        initializeBinder();
+        console.log('✅ バインダー初期化完了');
+        
+        updateStats();
+        initializeMobileFeatures();
 
-      // バインダー更新通知のリスナーを設定
-      setupBinderUpdateListener();
+        // ViewModeボタンの状態を確実に設定
+        setTimeout(() => {
+          updateViewModeButton();
+        }, 100);
 
-
-      // デバッグ用: 強制的にクリックテスト
-      setTimeout(() => {
-        const slots = document.querySelectorAll('.card-slot');
-        slots.forEach((slot, index) => {
-        });
-      }, 1000);
+        // バインダー更新通知のリスナーを設定
+        setupBinderUpdateListener();
+        
+        console.log('🎉 コレクションバインダー初期化完了');
+      } catch (error) {
+        console.error('❌ 初期化中にエラーが発生:', error);
+        alert('初期化中にエラーが発生しました。ページを再読み込みしてください。');
+      }
     });
 
     // カードデータの読み込み
@@ -445,12 +456,6 @@
       // レイアウト情報を取得
       const layout = binderState.binderData?.layout || { type: '3x3', cols: 3, slotsPerPage: 9 };
       const slotsPerPage = layout.slotsPerPage;
-
-        binderData: binderState.binderData,
-        layout: layout,
-        slotsPerPage: slotsPerPage,
-        currentSlots: currentPageData.slots.length
-      });
 
       // デスクトップかモバイルかを判定
       const isDesktop = window.innerWidth >= 1200;
@@ -963,13 +968,6 @@
 
     // 選択されたカードを配置
     function placeSelectedCard() {
-        selectedCardId,
-        currentSlotIndex,
-        typeOfSelectedCardId: typeof selectedCardId,
-        typeOfCurrentSlotIndex: typeof currentSlotIndex,
-        hasValidData: selectedCardId && currentSlotIndex !== null
-      });
-
       if (selectedCardId && currentSlotIndex !== null) {
 
         // カード名を取得して表示
@@ -1350,12 +1348,6 @@
       // 現在のバインダーのレイアウトから正しいスロット数を取得
       const totalSlots = binderState.binderData?.layout?.slotsPerPage || 9;
 
-        binderData: binderState.binderData,
-        layout: binderState.binderData?.layout,
-        totalSlots: totalSlots,
-        filledSlots: filledSlots
-      });
-
       // ページ情報をページヘッダーに反映
       const pageInfo = document.querySelector('.page-info');
       if (pageInfo) {
@@ -1505,12 +1497,6 @@
     function handleDrop(e, slotIndex, targetPageIndex = null) {
       e.preventDefault();
       e.currentTarget.classList.remove('drag-over');
-
-        slotIndex,
-        targetPageIndex,
-        currentPage: binderState.currentPage,
-        draggedCardData
-      });
 
       if (!draggedCardData) {
         return;
@@ -1995,12 +1981,6 @@
         arrow.style.opacity = hasNext ? '1' : '0.3';
         arrow.style.pointerEvents = hasNext ? 'auto' : 'none';
       });
-      
-        currentIndex: currentCardIndex,
-        totalCards: allBinderCards.length,
-        hasPrevious,
-        hasNext
-      });
     }
 
     function closeImageModal() {
@@ -2045,19 +2025,10 @@
           }
         });
       }
-      
-        currentPageCards: currentPageCards.length,
-        allBinderCards: allBinderCards.length,
-        currentPage: binderState.currentPage
-      });
     }
 
     function previousCardDetail() {
       if (!currentModalCard || allBinderCards.length === 0 || currentCardIndex <= 0) {
-          hasCurrentCard: !!currentModalCard,
-          totalCards: allBinderCards.length,
-          currentIndex: currentCardIndex
-        });
         return;
       }
       
@@ -2091,11 +2062,6 @@
 
     function nextCardDetail() {
       if (!currentModalCard || allBinderCards.length === 0 || currentCardIndex >= allBinderCards.length - 1) {
-          hasCurrentCard: !!currentModalCard,
-          totalCards: allBinderCards.length,
-          currentIndex: currentCardIndex,
-          maxIndex: allBinderCards.length - 1
-        });
         return;
       }
       

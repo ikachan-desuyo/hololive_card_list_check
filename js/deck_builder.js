@@ -637,8 +637,26 @@ function addCardToDeck(cardId) {
           return typeCounts;
         }
 
-  // ✅ 起動時：JSON読み込み＋フィルター初期化
-  window.onload = async () => {
+    // 🌙 ダークモード
+    if (localStorage.getItem("darkMode") === "true") {
+        document.body.classList.add("dark");
+    }
+
+    // 📱 モバイル判定
+    if (window.innerWidth <= 600) {
+        document.body.classList.add("mobile-layout");
+    }
+
+    // 💾 保存されたデッキ読み込み
+    const savedDecks = localStorage.getItem("deckData");
+    if (savedDecks) {
+        try {
+        decks = JSON.parse(savedDecks);
+        currentDeck = Object.keys(decks)[0] ?? null;
+        } catch {
+        }
+    }
+
     try {
       // Try to load from localStorage first (for offline use)
       const cachedCardData = localStorage.getItem('cardData');
@@ -689,112 +707,12 @@ function addCardToDeck(cardId) {
 
       setupFilterChips();
       updateDeckUI();
-    } catch (err) {
-      alert("カードデータの読み込みに失敗しました！");
-    }
-  };
-
-  window.onload = async () => {
-    // 🌙 ダークモード
-    if (localStorage.getItem("darkMode") === "true") {
-        document.body.classList.add("dark");
-    }
-
-    // 📱 モバイル判定
-    if (window.innerWidth <= 600) {
-        document.body.classList.add("mobile-layout");
-    }
-
-    // 💾 保存されたデッキ読み込み
-    const savedDecks = localStorage.getItem("deckData");
-    if (savedDecks) {
-        try {
-        decks = JSON.parse(savedDecks);
-        currentDeck = Object.keys(decks)[0] ?? null;
-        } catch {
-        }
-    }
-    // 🎴 カードデータ読み込み (オフライン対応)
-    try {
-        let rawData, releaseMapData;
-
-        // オフライン時のためにlocalStorageから読み込み試行
-        const cachedCardData = localStorage.getItem('cached_card_data');
-        const cachedReleaseData = localStorage.getItem('cached_release_data');
-        const cacheTime = localStorage.getItem('cache_timestamp');
-
-        // キャッシュが24時間以内なら使用、そうでなければ新しいデータを取得
-        const isCacheValid = cacheTime && (Date.now() - parseInt(cacheTime) < 24 * 60 * 60 * 1000);
-
-        if (navigator.onLine && !isCacheValid) {
-            // オンライン時は最新データを取得してキャッシュ
-            try {
-                const [cardRes, releaseRes] = await Promise.all([
-                    fetch("json_file/card_data.json"),
-                    fetch("json_file/release_dates.json")
-                ]);
-
-                rawData = await cardRes.json();
-                releaseMapData = await releaseRes.json();
-
-                // データをキャッシュに保存
-                localStorage.setItem('cached_card_data', JSON.stringify(rawData));
-                localStorage.setItem('cached_release_data', JSON.stringify(releaseMapData));
-                localStorage.setItem('cache_timestamp', Date.now().toString());
-            } catch (fetchError) {
-                // フェッチに失敗した場合はキャッシュデータにフォールバック
-                if (cachedCardData && cachedReleaseData) {
-                    rawData = JSON.parse(cachedCardData);
-                    releaseMapData = JSON.parse(cachedReleaseData);
-                } else {
-                    throw new Error('データの取得に失敗し、キャッシュも利用できません');
-                }
-            }
-        } else if (cachedCardData && cachedReleaseData) {
-            // キャッシュからデータを読み込み
-            rawData = JSON.parse(cachedCardData);
-            releaseMapData = JSON.parse(cachedReleaseData);
-        } else {
-            // キャッシュがない場合は強制的にフェッチ
-            const [cardRes, releaseRes] = await Promise.all([
-                fetch("json_file/card_data.json"),
-                fetch("json_file/release_dates.json")
-            ]);
-
-            rawData = await cardRes.json();
-            releaseMapData = await releaseRes.json();
-
-            // 初回キャッシュ保存
-            localStorage.setItem('cached_card_data', JSON.stringify(rawData));
-            localStorage.setItem('cached_release_data', JSON.stringify(releaseMapData));
-            localStorage.setItem('cache_timestamp', Date.now().toString());
-        }
-
-        releaseMap = releaseMapData;
-        cards = Object.entries(rawData).map(([key, card]) => ({
-        id: key,
-        name: card.name,
-        rarity: card.rarity ?? "-",
-        color: card.color ?? "-",
-        bloom: card.bloom_level ?? "-",
-        hp: card.hp ?? null,
-        life: card.life ?? null,
-        product: card.product ?? "-",
-        tags: card.tags ?? [],
-        skills: card.skills ?? [],
-        image: card.image_url || `images/${key}.png`,
-        owned: parseInt(localStorage.getItem("count_" + key) ?? "0"),
-        card_type: card.card_type ?? "-"
-        }));
-
-        setupFilterChips();
-        updateDeckUI();
 
         // データ読み込み成功をコンソールに記録
         console.log('デッキビルダー初期化完了:', {
             cardCount: cards.length,
-            dataSource: navigator.onLine && !isCacheValid ? 'オンライン' : 'キャッシュ',
-            cacheAge: cacheTime ? `${Math.round((Date.now() - parseInt(cacheTime)) / (60 * 60 * 1000))}時間` : '新規'
+            dataSource: navigator.onLine && (cacheAge >= maxCacheAge) ? 'オンライン' : 'キャッシュ',
+            cacheAge: cacheTimestamp ? `${Math.round(cacheAge / (60 * 60 * 1000))}時間` : '新規'
         });
     } catch (err) {
         console.error('デッキビルダー初期化エラー:', err);
@@ -852,8 +770,7 @@ function addCardToDeck(cardId) {
     window.addEventListener('online', updateOnlineStatus);
     window.addEventListener('offline', updateOnlineStatus);
     window.addEventListener('load', updateOnlineStatus);
-  };
-// ✅ Service Worker との通信機能
+
 async function sendMessageToSW(type, data) {
   if (!('serviceWorker' in navigator) || !navigator.serviceWorker.controller) {
     throw new Error('Service Worker not available');
