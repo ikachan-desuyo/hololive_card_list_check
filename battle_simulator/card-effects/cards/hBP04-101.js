@@ -1,6 +1,6 @@
 /**
  * hBP04-101 - カード効果定義
- * サポートカード
+ * だいふく (サポート・マスコット)
  */
 
 // カード効果の定義
@@ -8,71 +8,104 @@ const cardEffect_hBP04_101 = {
   // カード基本情報
   cardId: 'hBP04-101',
   cardName: 'だいふく',
-  cardType: 'サポート',
+  cardType: 'サポート・マスコット',
+  rarity: 'C',
   
   // 効果定義
   effects: {
-    // エール強化サポート
-    yellSupportEffect: {
-      type: 'support',
-      timing: 'manual',
-      name: 'エール強化',
-      description: 'エールを強化するサポート効果',
+    // マスコット効果
+    mascotEffect: {
+      type: 'mascot',
+      name: 'だいふく',
+      description: 'このマスコットが付いているホロメンのアーツ+10。◆〈雪花ラミィ〉に付いていたら能力追加：このマスコットが付いているホロメンのHP+20。',
+      timing: 'permanent',
       condition: (card, gameState, battleEngine) => {
-        // メインステップで手札にある時のみ
-        const currentPhase = battleEngine.gameState.currentPhase;
-        return currentPhase === 3; // メインステップ
+        // マスコットとして付いている時のみ
+        return card.attachedTo && card.attachedTo.position;
       },
       effect: (card, battleEngine) => {
-        console.log(`💫 [エール強化] ${card.name || 'hBP04-101'}の効果が発動！`);
+        const attachedHolomem = card.attachedTo;
+        if (!attachedHolomem) return { success: false, message: 'ホロメンに付いていません' };
         
+        // 基本効果：アーツ+10
+        const artBonus = 10;
+        
+        // 雪花ラミィに付いている場合：HP+20
+        let hpBonus = 0;
+        if (attachedHolomem.card.name && attachedHolomem.card.name.includes('雪花ラミィ')) {
+          hpBonus = 20;
+        }
+        
+        return {
+          success: true,
+          message: `だいふくの効果でアーツ+${artBonus}${hpBonus > 0 ? `、HP+${hpBonus}` : ''}`,
+          artBonus: artBonus,
+          hpBonus: hpBonus,
+          permanent: true
+        };
+      }
+    },
+    
+    // サポート使用効果（手札から使用する場合）
+    supportPlayEffect: {
+      type: 'support',
+      name: 'マスコット装着',
+      description: 'ホロメン1人にマスコットとして付ける',
+      timing: 'manual',
+      condition: (card, gameState, battleEngine) => {
         const currentPlayer = battleEngine.gameState.currentPlayer;
-        const player = battleEngine.players[currentPlayer];
         const utils = new CardEffectUtils(battleEngine);
         
-        // エールデッキから2枚をセンターに付ける
-        if (!player.yellDeck || player.yellDeck.length < 2) {
-          return {
-            success: false,
-            message: 'エールデッキに2枚以上のカードがありません'
-          };
+        // 手札にある時かつメインステップ
+        const phase = battleEngine.gameState.currentPhase;
+        return phase === 3; // メインステップ
+      },
+      effect: async (card, battleEngine) => {
+        console.log(`🎀 [サポート] ${card.name || 'hBP04-101'}をマスコットとして装着！`);
+        
+        const currentPlayer = battleEngine.gameState.currentPlayer;
+        const utils = new CardEffectUtils(battleEngine);
+        
+        // ホロメン選択
+        const stageHolomens = utils.getStageHolomens(currentPlayer);
+        if (stageHolomens.length === 0) {
+          return { success: false, message: 'ステージにホロメンがいません' };
         }
         
-        const centerCard = player.center;
-        if (!centerCard) {
-          return {
-            success: false,
-            message: 'センターにカードがありません'
-          };
+        // 装備可能なホロメンをフィルタ
+        const availableHolomens = stageHolomens.filter(h => {
+          if (!h.card.equipment) h.card.equipment = { fans: [], mascots: [], tools: [] };
+          return h.card.equipment.mascots.length === 0; // マスコットは1枚制限
+        });
+        
+        if (availableHolomens.length === 0) {
+          return { success: false, message: '全てのホロメンに既にマスコットが装備されています' };
         }
         
-        const yellCards = [
-          player.yellDeck.shift(),
-          player.yellDeck.shift()
-        ];
+        // ホロメン選択UI（簡易実装）
+        const targetHolomem = availableHolomens[0].card; // 仮で最初のホロメン
         
-        const attachResult = utils.attachYell(currentPlayer, 'center', yellCards);
+        // 装備実行
+        const equipResult = utils.attachSupportCard(currentPlayer, targetHolomem, card);
         
-        if (attachResult.success) {
-          // このサポートカードをアーカイブ
+        if (equipResult.success) {
+          // 手札からカードを削除（装備として移動）
+          const player = battleEngine.players[currentPlayer];
           const handIndex = player.hand.indexOf(card);
           if (handIndex !== -1) {
             player.hand.splice(handIndex, 1);
-            player.archive.push(card);
           }
           
+          // UI更新
           utils.updateDisplay();
           
           return {
             success: true,
-            message: `${card.name || 'hBP04-101'}の効果でセンターにエール2枚を付けました`,
-            yellAttached: 2
+            message: `${targetHolomem.name}に「だいふく」を装備しました`,
+            target: targetHolomem
           };
         } else {
-          return {
-            success: false,
-            message: attachResult.reason
-          };
+          return equipResult;
         }
       }
     }

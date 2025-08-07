@@ -1,6 +1,6 @@
 /**
  * hBP01-104 - カード効果定義
- * エールカード
+ * サポート・アイテムカード
  */
 
 // カード効果の定義
@@ -8,59 +8,107 @@ const cardEffect_hBP01_104 = {
   // カード基本情報
   cardId: 'hBP01-104',
   cardName: 'ふつうのパソコン',
-  cardType: 'エール',
+  cardType: 'サポート・アイテム',
   
   // 効果定義
   effects: {
-    // エール効果
-    yellEffect: {
-      type: 'yell',
-      timing: 'attached',
-      name: 'エール効果',
-      description: 'このエールが付いている間の効果',
-      condition: (card, gameState, battleEngine) => {
-        // エールとして付いている時のみ
-        return true;
-      },
-      effect: (card, battleEngine) => {
-        console.log(`🎶 [エール効果] ${card.name || 'hBP01-104'}のエール効果が適用中`);
-        
-        // エールによる能力値上昇
-        return {
-          success: true,
-          message: 'エール効果が適用されています',
-          statBonus: {
-            attack: 20,
-            hp: 0
-          }
-        };
-      }
-    },
-    
-    // 特殊エール効果
-    specialYellEffect: {
-      type: 'special',
+    // サポート効果
+    supportEffect: {
+      type: 'support',
       timing: 'manual',
-      name: '特殊エール効果',
-      description: 'エールとして付いている時に発動できる特殊効果',
+      name: 'サポート効果',
+      description: '自分のデッキから、Debutホロメン１枚を公開し、ステージに出す。そしてデッキをシャッフルする。',
       condition: (card, gameState, battleEngine) => {
-        // 特定の条件下でのみ発動可能
-        return true;
+        // サポート・アイテムとして使用時
+        const currentPlayer = battleEngine.gameState.currentPlayer;
+        const player = battleEngine.players[currentPlayer];
+        
+        // デッキにDebutホロメンがいるかチェック
+        const hasDebutHolomen = player.deck.some(deckCard => 
+          deckCard.card_type?.includes('ホロメン') && 
+          deckCard.bloom_level === 'Debut'
+        );
+        
+        return hasDebutHolomen;
       },
-      effect: (card, battleEngine) => {
-        console.log(`⭐ [特殊エール効果] ${card.name || 'hBP01-104'}の特殊効果が発動！`);
+      effect: async (card, battleEngine) => {
+        console.log(`🖥️ [サポート効果] ${card.name || 'hBP01-104'}のサポート効果が発動！`);
         
         const currentPlayer = battleEngine.gameState.currentPlayer;
         const utils = new CardEffectUtils(battleEngine);
         
-        // このエールが付いているホロメンの攻撃力を一時的に大幅上昇
-        return {
-          success: true,
-          message: 'ホロメンの攻撃力が大幅上昇しました！',
-          temporaryBonus: {
-            attack: 50
+        try {
+          // デッキからDebutホロメンを選択
+          const selectionResult = await utils.selectCardsFromDeck(currentPlayer, {
+            count: 1,
+            types: ['ホロメン'],
+            bloomLevel: 'Debut',
+            description: 'Debutホロメンを選択してください',
+            mandatory: true,
+            allowLess: false
+          });
+
+          if (!selectionResult.success || selectionResult.cards.length === 0) {
+            return {
+              success: false,
+              message: 'Debutホロメンの選択に失敗しました'
+            };
           }
-        };
+
+          const selectedHolomen = selectionResult.cards[0];
+          
+          // カードを公開（ログに表示）
+          console.log(`📢 [カード公開] ${selectedHolomen.name || selectedHolomen.card_name} を公開しました`);
+          
+          // ステージに出す場所を選択（空いているエリア）
+          const player = battleEngine.players[currentPlayer];
+          const availablePositions = [];
+          
+          if (!player.center) availablePositions.push('center');
+          if (!player.collab) availablePositions.push('collab');
+          for (let i = 1; i <= 5; i++) {
+            if (!player[`back${i}`]) availablePositions.push(`back${i}`);
+          }
+          
+          if (availablePositions.length === 0) {
+            return {
+              success: false,
+              message: 'ステージに空きがありません'
+            };
+          }
+          
+          // 最初の空いている位置に配置
+          const targetPosition = availablePositions[0];
+          
+          // デッキからカードを除去
+          const deckIndex = player.deck.indexOf(selectedHolomen);
+          if (deckIndex !== -1) {
+            player.deck.splice(deckIndex, 1);
+          }
+          
+          // ステージに配置
+          player[targetPosition] = selectedHolomen;
+          
+          // デッキをシャッフル
+          utils.shuffleDeck(currentPlayer);
+          
+          // UI更新
+          utils.updateDisplay();
+          
+          return {
+            success: true,
+            message: `${selectedHolomen.name || selectedHolomen.card_name}を${targetPosition}に配置しました`,
+            placedCard: selectedHolomen,
+            position: targetPosition
+          };
+          
+        } catch (error) {
+          console.error('hBP01-104 効果実行エラー:', error);
+          return {
+            success: false,
+            message: '効果の実行中にエラーが発生しました'
+          };
+        }
       }
     }
   }

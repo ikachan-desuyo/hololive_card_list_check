@@ -1,68 +1,72 @@
 /**
  * hBP04-046 - カード効果定義
- * ホロメンカード
+ * 雪花ラミィ (1stホロメン)
  */
 
 // カード効果の定義
 const cardEffect_hBP04_046 = {
-    // カード基本情報
+  // カード基本情報
   cardId: 'hBP04-046',
   cardName: '雪花ラミィ',
   cardType: 'ホロメン',
+  color: '青',
+  bloomLevel: '1st',
+  hp: 130,
   
   // 効果定義
   effects: {
-    // エール操作効果
-    yellEffect: {
-      type: 'yell',
+    // アーツ: いっぱい頑張るよ！
+    art1: {
+      type: 'art',
+      name: 'いっぱい頑張るよ！',
+      description: '自分のファンが付いているホロメンがいる時、相手のホロメン1人に特殊ダメージ10を与える。',
+      cost: { any: 1 },
+      damage: 30, // 基本ダメージ
       timing: 'manual',
-      name: 'エール操作',
-      description: 'エールを操作する効果',
       condition: (card, gameState, battleEngine) => {
-        // メインステップでステージにいる時のみ
-        const currentPhase = battleEngine.gameState.currentPhase;
-        return currentPhase === 3; // メインステップ
+        // any色1個のエール必要
+        const totalYells = card.yellCards ? card.yellCards.length : 0;
+        return totalYells >= 1;
       },
       effect: (card, battleEngine) => {
-        console.log(`✨ [エール操作] ${card.name || 'hBP04-046'}の効果が発動！`);
+        console.log(`🎨 [アーツ] ${card.name || 'hBP04-046'}の「いっぱい頑張るよ！」が発動！`);
         
         const currentPlayer = battleEngine.gameState.currentPlayer;
-        const player = battleEngine.players[currentPlayer];
+        const opponentPlayer = currentPlayer === 0 ? 1 : 0;
         const utils = new CardEffectUtils(battleEngine);
         
-        // エールデッキから1枚取ってセンターに付ける
-        if (!player.yellDeck || player.yellDeck.length === 0) {
-          return {
-            success: false,
-            message: 'エールデッキにカードがありません'
-          };
+        // 基本30ダメージを相手に与える
+        const damageResult = utils.dealDamage(opponentPlayer, 30, {
+          source: card,
+          type: 'art',
+          artName: 'いっぱい頑張るよ！'
+        });
+        
+        // 自分のファンが付いているホロメンがいるかチェック
+        const stageHolomens = utils.getStageHolomens(currentPlayer);
+        const hasHolomenWithFan = stageHolomens.some(h => {
+          // TODO: ファンシステムの実装に合わせて調整
+          return h.card.fanCards && h.card.fanCards.length > 0;
+        });
+        
+        let additionalMessage = '';
+        if (hasHolomenWithFan) {
+          // 相手のホロメン1人に特殊ダメージ10
+          // TODO: 特殊ダメージシステムの実装
+          console.log(`⚡ [特殊ダメージ] 相手のホロメンに特殊ダメージ10`);
+          additionalMessage = '、さらに特殊ダメージ10！';
         }
         
-        const centerCard = player.center;
-        if (!centerCard) {
-          return {
-            success: false,
-            message: 'センターにカードがありません'
-          };
-        }
+        // UI更新
+        utils.updateDisplay();
         
-        const yellCard = player.yellDeck.shift();
-        const attachResult = utils.attachYell(currentPlayer, 'center', [yellCard]);
-        
-        if (attachResult.success) {
-          utils.updateDisplay();
-          
-          return {
-            success: true,
-            message: `${card.name || 'hBP04-046'}の効果でセンターにエールを付けました`,
-            yellAttached: 1
-          };
-        } else {
-          return {
-            success: false,
-            message: attachResult.reason
-          };
-        }
+        return {
+          success: true,
+          message: `${card.name || 'hBP04-046'}の「いっぱい頑張るよ！」で30ダメージ${additionalMessage}`,
+          damage: 30,
+          specialDamage: hasHolomenWithFan ? 10 : 0,
+          target: 'opponent'
+        };
       }
     }
   }

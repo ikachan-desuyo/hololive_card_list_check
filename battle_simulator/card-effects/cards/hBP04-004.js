@@ -1,6 +1,6 @@
 /**
  * hBP04-004 - カード効果定義
- * 推しホロメン
+ * 雪花ラミィ (推しホロメン)
  */
 
 // カード効果の定義
@@ -9,43 +9,53 @@ const cardEffect_hBP04_004 = {
   cardId: 'hBP04-004',
   cardName: '雪花ラミィ',
   cardType: '推しホロメン',
+  color: '青',
+  life: 5,
+  rarity: 'OSR',
   
   // 効果定義
   effects: {
     // 推しスキル：愛してる
-    oshiSkill_aishteru: {
+    oshiSkill: {
       type: 'oshi_skill',
-      timing: 'reactive',
       name: '愛してる',
-      description: '[ホロパワー：-1]相手のターンで、自分のホロメンがダウンした時に使える：そのホロメンに付いているファン1枚を手札に戻す',
+      description: '[ホロパワー：-1]相手のターンで、自分のホロメンがダウンした時に使える：そのホロメンに付いているファン1枚を手札に戻す。',
       holoPowerCost: 1,
       turnLimit: 1,
-      condition: (card, gameState) => {
+      timing: 'reactive',
+      condition: (card, gameState, battleEngine) => {
+        const currentPlayer = battleEngine.gameState.currentPlayer;
+        const utils = new CardEffectUtils(battleEngine);
+        
         // 相手のターン中で自分のホロメンがダウンした時
-        return !gameState.isMyTurn && gameState.lastDownedHolomem;
+        return !battleEngine.gameState.isMyTurn && battleEngine.gameState.lastDownedHolomem;
       },
       effect: (card, battleEngine) => {
-        console.log(`💙 [愛してる] ${card.name || '雪花ラミィ'}の推しスキルが発動！`);
+        console.log(`💙 [推しスキル] ${card.name || 'hBP04-004'}の「愛してる」が発動！`);
         
+        const currentPlayer = battleEngine.gameState.currentPlayer;
         const utils = new CardEffectUtils(battleEngine);
-        const gameState = battleEngine.gameState;
         
         // ダウンしたホロメンに付いているファンを手札に戻す
-        const downedHolomem = gameState.lastDownedHolomem;
-        if (downedHolomem && downedHolomem.attachedFans && downedHolomem.attachedFans.length > 0) {
-          const fan = downedHolomem.attachedFans.pop();
+        const downedHolomem = battleEngine.gameState.lastDownedHolomem;
+        if (downedHolomem && downedHolomem.fans && downedHolomem.fans.length > 0) {
+          const fan = downedHolomem.fans.pop();
           
-          const currentPlayer = gameState.currentPlayer;
-          const player = battleEngine.players[currentPlayer];
-          player.hand.push(fan);
+          // 手札に戻す
+          const addResult = utils.addCardsToHand(currentPlayer, [fan.card]);
           
-          utils.updateDisplay();
-          
-          return {
-            success: true,
-            message: `${card.name || '雪花ラミィ'}の推しスキルでファン「${fan.name}」を手札に戻しました`,
-            fanReturned: fan
-          };
+          if (addResult.success) {
+            // UI更新
+            utils.updateDisplay();
+            
+            return {
+              success: true,
+              message: `${card.name || 'hBP04-004'}の推しスキル「愛してる」でファン「${fan.card.name}」を手札に戻しました`,
+              fanReturned: fan.card
+            };
+          } else {
+            return { success: false, message: addResult.reason };
+          }
         } else {
           return {
             success: false,
@@ -56,47 +66,59 @@ const cardEffect_hBP04_004 = {
     },
 
     // SP推しスキル：ぶーん、バリバリバリバリ
-    spOshiSkill_baribaribari: {
+    spOshiSkill: {
       type: 'sp_oshi_skill',
-      timing: 'manual',
       name: 'ぶーん、バリバリバリバリ',
-      description: '[ホロパワー：-3]自分の〈雪花ラミィ〉1人を選ぶ。このターンの間、選んだホロメンが、相手のホロメン1人に与える特殊ダメージ+100し、選んだホロメンが相手のホロメンをダウンさせた時、自分のデッキを2枚引く',
+      description: '[ホロパワー：-3]自分の〈雪花ラミィ〉1人を選ぶ。このターンの間、選んだホロメンが、相手のホロメン1人に与える特殊ダメージ+100し、選んだホロメンが相手のホロメンをダウンさせた時、自分のデッキを2枚引く。',
       holoPowerCost: 3,
       gameLimit: 1,
-      condition: (card, gameState) => {
+      timing: 'manual',
+      condition: (card, gameState, battleEngine) => {
+        const currentPlayer = battleEngine.gameState.currentPlayer;
+        const utils = new CardEffectUtils(battleEngine);
+        
         // 自分のターン中で雪花ラミィがステージにいる
-        return gameState.isMyTurn && gameState.stage.some(holomem => holomem.name?.includes('雪花ラミィ'));
+        if (!battleEngine.gameState.isMyTurn) return false;
+        
+        const stageHolomens = utils.getStageHolomens(currentPlayer);
+        return stageHolomens.some(h => h.card.name && h.card.name.includes('雪花ラミィ'));
       },
       effect: (card, battleEngine) => {
-        console.log(`⚡ [ぶーん、バリバリバリバリ] ${card.name || '雪花ラミィ'}のSP推しスキルが発動！`);
+        console.log(`⚡ [SP推しスキル] ${card.name || 'hBP04-004'}の「ぶーん、バリバリバリバリ」が発動！`);
         
+        const currentPlayer = battleEngine.gameState.currentPlayer;
         const utils = new CardEffectUtils(battleEngine);
-        const gameState = battleEngine.gameState;
         
-        // 雪花ラミィを選択（簡易実装）
-        const lamiis = gameState.stage.filter(holomem => holomem.name?.includes('雪花ラミィ'));
-        if (lamiis.length > 0) {
-          const selectedLamii = lamiis[0]; // 最初の雪花ラミィを選択
-          
-          // このターンの間、特殊ダメージ+100のバフを付与（相手のホロメン1人に対して）
-          selectedLamii.tempBuffs = selectedLamii.tempBuffs || {};
-          selectedLamii.tempBuffs.specialDamageBonus = 100;
-          selectedLamii.tempBuffs.drawOnDownByThis = 2; // この選んだホロメンがダウンさせた時のみ
-          selectedLamii.tempBuffs.spOshiSkillActive = true; // SP推しスキル効果中フラグ
-          
-          utils.updateDisplay();
-          
-          return {
-            success: true,
-            message: `${card.name || '雪花ラミィ'}のSP推しスキルで「${selectedLamii.name}」に特殊ダメージ+100とダウン時ドロー効果を付与しました`,
-            selectedHolomem: selectedLamii
-          };
-        } else {
-          return {
-            success: false,
-            message: 'ステージに雪花ラミィがいません'
-          };
+        // 雪花ラミィを選択
+        const stageHolomens = utils.getStageHolomens(currentPlayer);
+        const lamiis = stageHolomens.filter(h => 
+          h.card.name && h.card.name.includes('雪花ラミィ')
+        );
+        
+        if (lamiis.length === 0) {
+          return { success: false, message: 'ステージに雪花ラミィがいません' };
         }
+        
+        // TODO: 複数の雪花ラミィがいる場合の選択UIの実装
+        const selectedLamii = lamiis[0]; // 仮で最初の雪花ラミィを選択
+        
+        // このターンの間、特殊ダメージ+100のバフを付与
+        if (!selectedLamii.card.tempBuffs) {
+          selectedLamii.card.tempBuffs = {};
+        }
+        selectedLamii.card.tempBuffs.specialDamageBonus = 100;
+        selectedLamii.card.tempBuffs.drawOnDownByThis = 2;
+        selectedLamii.card.tempBuffs.spOshiSkillActive = true;
+        selectedLamii.card.tempBuffs.turnExpire = battleEngine.gameState.turn;
+        
+        // UI更新
+        utils.updateDisplay();
+        
+        return {
+          success: true,
+          message: `${card.name || 'hBP04-004'}のSP推しスキル「ぶーん、バリバリバリバリ」で「${selectedLamii.card.name}」に特殊ダメージ+100とダウン時ドロー効果を付与！`,
+          selectedHolomem: selectedLamii
+        };
       }
     }
   }

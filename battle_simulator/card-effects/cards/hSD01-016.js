@@ -1,6 +1,6 @@
 /**
  * hSD01-016 - カード効果定義
- * サポート・スタッフカード - 春先のどか
+ * 春先のどか (サポート・スタッフ)
  */
 
 // カード効果の定義
@@ -13,48 +13,42 @@ const cardEffect_hSD01_016 = {
   // 効果定義
   effects: {
     // ドロー効果
-    drawEffect: {
+    supportEffect: {
       type: 'support',
+      name: '春先のどか',
+      description: '自分のデッキを３枚引く。',
       timing: 'manual',
-      name: 'ドロー効果',
-      description: '自分のデッキを３枚引く',
       limited: true, // LIMITED効果
       condition: (card, gameState, battleEngine) => {
-        // 春先のどかは特別な発動条件はなし（メインステップで手札にあれば発動可能）
-        return true;
+        // メインステップで手札にある時のみ
+        const phase = battleEngine.gameState.currentPhase;
+        return phase === 3; // メインステップ
       },
       effect: (card, battleEngine) => {
-        console.log(`📚 [ドロー効果] ${card.name || '春先のどか'}の効果が発動！`);
+        console.log(`📚 [サポート] ${card.name || 'hSD01-016'}の効果が発動！`);
         
         const currentPlayer = battleEngine.gameState.currentPlayer;
-        const player = battleEngine.players[currentPlayer];
         const utils = new CardEffectUtils(battleEngine);
         
         // デッキを3枚引く
         const drawnCards = utils.drawCards(currentPlayer, 3);
         
-        // NOTE: アーカイブ移動は CardInteractionManager で自動処理される
-        
-        if (drawnCards.length > 0) {
-          utils.updateDisplay();
-          
-          return {
-            success: true,
-            message: `${card.name || '春先のどか'}の効果でデッキを${drawnCards.length}枚引きました`,
-            drawnCards: drawnCards,
-            autoArchive: true // 自動アーカイブ移動を指示
-          };
-        } else {
-          // デッキが空でも効果は発動扱い（カードはアーカイブに移動）
-          utils.updateDisplay();
-          
-          return {
-            success: true,
-            message: `${card.name || '春先のどか'}の効果を発動しましたが、デッキにカードがありませんでした`,
-            drawnCards: [],
-            autoArchive: true // 自動アーカイブ移動を指示
-          };
+        // このサポートカードをアーカイブ
+        const player = battleEngine.players[currentPlayer];
+        const handIndex = player.hand.indexOf(card);
+        if (handIndex !== -1) {
+          player.hand.splice(handIndex, 1);
+          player.archive.push(card);
         }
+        
+        // UI更新
+        utils.updateDisplay();
+        
+        return {
+          success: true,
+          message: `${card.name || 'hSD01-016'}の効果でデッキを${drawnCards.length}枚引きました`,
+          drawnCards: drawnCards
+        };
       }
     }
   }

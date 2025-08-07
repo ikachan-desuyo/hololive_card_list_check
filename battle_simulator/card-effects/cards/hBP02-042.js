@@ -1,78 +1,64 @@
 /**
  * hBP02-042 - カード効果定義
- * ホロメンカード
+ * 紫咲シオン (Debutホロメン)
  */
 
 // カード効果の定義
 const cardEffect_hBP02_042 = {
-    // カード基本情報
+  // カード基本情報
   cardId: 'hBP02-042',
   cardName: '紫咲シオン',
   cardType: 'ホロメン',
+  color: '紫',
+  bloomLevel: 'Debut',
+  hp: 130,
   
   // 効果定義
   effects: {
-    // アーカイブ操作効果
-    archiveEffect: {
-      type: 'archive',
+    // アーツ: どうも～
+    art1: {
+      type: 'art',
+      name: 'どうも～',
+      description: 'ダメージ20',
+      cost: { any: 1 },
+      damage: 20,
       timing: 'manual',
-      name: 'アーカイブ操作',
-      description: 'アーカイブを操作する効果',
       condition: (card, gameState, battleEngine) => {
-        // メインステップでステージにいる時のみ
-        const currentPhase = battleEngine.gameState.currentPhase;
-        return currentPhase === 3; // メインステップ
-      },
-      effect: (card, battleEngine) => {
-        console.log(`📁 [アーカイブ操作] ${card.name || 'hBP02-042'}の効果が発動！`);
-        
+        // 基本的なアーツ使用条件
         const currentPlayer = battleEngine.gameState.currentPlayer;
         const player = battleEngine.players[currentPlayer];
+        
+        // エールが付いているかチェック（必要エール数分）
+        const totalYells = card.yellCards ? card.yellCards.length : 0;
+        return totalYells >= 1; // any色1個
+      },
+      effect: (card, battleEngine) => {
+        console.log(`🎨 [アーツ] ${card.name || 'hBP02-042'}の「どうも～」が発動！`);
+        
+        const currentPlayer = battleEngine.gameState.currentPlayer;
+        const opponentPlayer = currentPlayer === 0 ? 1 : 0;
         const utils = new CardEffectUtils(battleEngine);
         
-        // 手札から1枚アーカイブし、1枚ドロー
-        if (player.hand.length === 0) {
-          return {
-            success: false,
-            message: '手札にカードがありません'
-          };
-        }
+        // 20ダメージを相手に与える
+        const damageResult = utils.dealDamage(opponentPlayer, 20, {
+          source: card,
+          type: 'art',
+          artName: 'どうも～'
+        });
         
-        // 手札の最初のカードをアーカイブ（本来は選択させる）
-        const cardToArchive = player.hand[0];
-        const archiveResult = utils.archiveCards(currentPlayer, [cardToArchive], 'hand');
+        // UI更新
+        utils.updateDisplay();
         
-        if (archiveResult.success) {
-          // 1枚ドロー
-          const drawResult = utils.drawCards(currentPlayer, 1);
-          
-          if (drawResult.success) {
-            utils.updateDisplay();
-            
-            return {
-              success: true,
-              message: `${card.name || 'hBP02-042'}の効果で手札を入れ替えました`,
-              archived: archiveResult.cards.length,
-              drawn: drawResult.cards.length
-            };
-          } else {
-            return {
-              success: false,
-              message: drawResult.reason
-            };
-          }
-        } else {
-          return {
-            success: false,
-            message: archiveResult.reason
-          };
-        }
+        return {
+          success: true,
+          message: `${card.name || 'hBP02-042'}の「どうも～」で20ダメージ！`,
+          damage: 20,
+          target: 'opponent'
+        };
       }
     }
   }
-};
-
-// 効果を登録（新システム対応）
+};// 効果を登録（新システム対応）
 if (window.cardEffects) {
   window.cardEffects['hBP02-042'] = cardEffect_hBP02_042;
   console.log('🔮 [Card Effect] hBP02-042 の効果を登録しました');

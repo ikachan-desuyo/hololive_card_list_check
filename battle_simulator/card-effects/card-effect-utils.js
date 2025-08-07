@@ -380,17 +380,248 @@ class CardEffectUtils {
   }
 
   /**
-   * カード選択UIの表示（プレースホルダー）
-   * 実際のUI実装に置き換える必要があります
+   * カード選択UIの表示
+   * @param {Array} cards - 選択可能なカード配列
+   * @param {number} count - 選択枚数
+   * @param {string} description - 選択の説明文
+   * @param {boolean} mandatory - 必須選択かどうか
+   * @returns {Promise<Array>} 選択されたカード配列
    */
   async showCardSelectionUI(cards, count, description, mandatory = true) {
-    // TODO: 実際のUI実装
-    // 現在は先頭から指定枚数を自動選択
-    
     if (cards.length === 0) return [];
     
-    // 自動選択（開発用）
-    return cards.slice(0, Math.min(count, cards.length));
+    return new Promise((resolve) => {
+      // 既存のモーダルを削除
+      const existingModal = document.querySelector('.card-selection-modal');
+      if (existingModal) {
+        existingModal.remove();
+      }
+
+      // モーダル要素を作成
+      const modal = document.createElement('div');
+      modal.className = 'card-selection-modal';
+      modal.style.cssText = `
+        position: fixed;
+        top: 0;
+        left: 0;
+        width: 100%;
+        height: 100%;
+        background: rgba(0, 0, 0, 0.8);
+        display: flex;
+        justify-content: center;
+        align-items: center;
+        z-index: 10000;
+        animation: fadeIn 0.3s ease-out;
+      `;
+
+      // モーダルコンテンツ
+      const content = document.createElement('div');
+      content.style.cssText = `
+        background: linear-gradient(135deg, #1a1a2e 0%, #16213e 100%);
+        border: 2px solid #4a9eff;
+        border-radius: 15px;
+        padding: 25px;
+        max-width: 90%;
+        max-height: 80%;
+        overflow-y: auto;
+        box-shadow: 0 20px 60px rgba(74, 158, 255, 0.3);
+        animation: slideIn 0.3s ease-out;
+      `;
+
+      // タイトル
+      const title = document.createElement('h3');
+      title.textContent = description;
+      title.style.cssText = `
+        color: #4a9eff;
+        text-align: center;
+        margin: 0 0 20px 0;
+        font-size: 18px;
+        text-shadow: 0 0 10px rgba(74, 158, 255, 0.5);
+      `;
+
+      // 選択状況表示
+      const selectionInfo = document.createElement('div');
+      selectionInfo.style.cssText = `
+        color: #ffffff;
+        text-align: center;
+        margin-bottom: 15px;
+        font-size: 14px;
+      `;
+      const updateSelectionInfo = (selectedCount) => {
+        selectionInfo.textContent = `選択済み: ${selectedCount}/${count}`;
+      };
+      updateSelectionInfo(0);
+
+      // カードグリッド
+      const cardGrid = document.createElement('div');
+      cardGrid.style.cssText = `
+        display: grid;
+        grid-template-columns: repeat(auto-fill, minmax(120px, 1fr));
+        gap: 10px;
+        margin-bottom: 20px;
+        max-height: 400px;
+        overflow-y: auto;
+      `;
+
+      const selectedCards = [];
+
+      // カードを表示
+      cards.forEach((card, index) => {
+        const cardElement = document.createElement('div');
+        cardElement.style.cssText = `
+          background: linear-gradient(135deg, #2a2a4e 0%, #1e2a5e 100%);
+          border: 2px solid #666;
+          border-radius: 8px;
+          padding: 10px;
+          cursor: pointer;
+          transition: all 0.3s ease;
+          text-align: center;
+          position: relative;
+        `;
+
+        const cardName = document.createElement('div');
+        cardName.textContent = card.name || card.card_name || `カード${index + 1}`;
+        cardName.style.cssText = `
+          color: #ffffff;
+          font-size: 12px;
+          font-weight: bold;
+          margin-bottom: 5px;
+        `;
+
+        const cardType = document.createElement('div');
+        cardType.textContent = card.card_type || '';
+        cardType.style.cssText = `
+          color: #aaaaaa;
+          font-size: 10px;
+          margin-bottom: 3px;
+        `;
+
+        const cardLevel = document.createElement('div');
+        if (card.bloom_level) {
+          cardLevel.textContent = card.bloom_level;
+          cardLevel.style.cssText = `
+            color: #ffaa00;
+            font-size: 10px;
+          `;
+        }
+
+        cardElement.appendChild(cardName);
+        cardElement.appendChild(cardType);
+        cardElement.appendChild(cardLevel);
+
+        // クリックイベント
+        cardElement.addEventListener('click', () => {
+          const isSelected = selectedCards.includes(card);
+          
+          if (isSelected) {
+            // 選択解除
+            const idx = selectedCards.indexOf(card);
+            selectedCards.splice(idx, 1);
+            cardElement.style.border = '2px solid #666';
+            cardElement.style.background = 'linear-gradient(135deg, #2a2a4e 0%, #1e2a5e 100%)';
+          } else if (selectedCards.length < count) {
+            // 選択
+            selectedCards.push(card);
+            cardElement.style.border = '2px solid #4a9eff';
+            cardElement.style.background = 'linear-gradient(135deg, #4a9eff20 0%, #4a9eff10 100%)';
+          }
+          
+          updateSelectionInfo(selectedCards.length);
+          confirmButton.disabled = mandatory && selectedCards.length === 0;
+          confirmButton.style.opacity = confirmButton.disabled ? '0.5' : '1';
+        });
+
+        cardGrid.appendChild(cardElement);
+      });
+
+      // ボタンコンテナ
+      const buttonContainer = document.createElement('div');
+      buttonContainer.style.cssText = `
+        display: flex;
+        justify-content: center;
+        gap: 15px;
+      `;
+
+      // 確定ボタン
+      const confirmButton = document.createElement('button');
+      confirmButton.textContent = '確定';
+      confirmButton.disabled = mandatory;
+      confirmButton.style.cssText = `
+        background: linear-gradient(135deg, #4a9eff 0%, #357abd 100%);
+        color: white;
+        border: none;
+        padding: 10px 25px;
+        border-radius: 8px;
+        cursor: pointer;
+        font-weight: bold;
+        transition: all 0.3s ease;
+        opacity: ${mandatory ? '0.5' : '1'};
+      `;
+      
+      confirmButton.addEventListener('click', () => {
+        modal.remove();
+        resolve(selectedCards);
+      });
+
+      // キャンセルボタン（任意選択の場合のみ）
+      if (!mandatory) {
+        const cancelButton = document.createElement('button');
+        cancelButton.textContent = 'キャンセル';
+        cancelButton.style.cssText = `
+          background: linear-gradient(135deg, #666 0%, #444 100%);
+          color: white;
+          border: none;
+          padding: 10px 25px;
+          border-radius: 8px;
+          cursor: pointer;
+          font-weight: bold;
+          transition: all 0.3s ease;
+        `;
+        
+        cancelButton.addEventListener('click', () => {
+          modal.remove();
+          resolve([]);
+        });
+        
+        buttonContainer.appendChild(cancelButton);
+      }
+
+      buttonContainer.appendChild(confirmButton);
+
+      // 要素を組み立て
+      content.appendChild(title);
+      content.appendChild(selectionInfo);
+      content.appendChild(cardGrid);
+      content.appendChild(buttonContainer);
+      modal.appendChild(content);
+
+      // CSSアニメーションを追加
+      const style = document.createElement('style');
+      style.textContent = `
+        @keyframes fadeIn {
+          from { opacity: 0; }
+          to { opacity: 1; }
+        }
+        @keyframes slideIn {
+          from { transform: scale(0.8) translateY(-20px); opacity: 0; }
+          to { transform: scale(1) translateY(0); opacity: 1; }
+        }
+      `;
+      document.head.appendChild(style);
+
+      // DOMに追加
+      document.body.appendChild(modal);
+
+      // モーダル外クリックで閉じる（任意選択の場合のみ）
+      if (!mandatory) {
+        modal.addEventListener('click', (e) => {
+          if (e.target === modal) {
+            modal.remove();
+            resolve([]);
+          }
+        });
+      }
+    });
   }
 
   /**
@@ -401,6 +632,153 @@ class CardEffectUtils {
       this.battleEngine.updateDisplay();
     }
   }
+
+  /**
+   * サポートカードをホロメンに装備
+   * @param {number} playerId - プレイヤーID
+   * @param {Object} targetHolomem - 装備対象のホロメン
+   * @param {Object} supportCard - 装備するサポートカード
+   * @returns {Object} 装備結果
+   */
+  attachSupportCard(playerId, targetHolomem, supportCard) {
+    // カードタイプによる装備制限チェック
+    const cardType = supportCard.card_type || supportCard.cardType || '';
+    
+    // 装備カテゴリの決定
+    let equipCategory = null;
+    let maxCount = 1; // デフォルトは1枚制限
+    
+    if (cardType.includes('ファン')) {
+      equipCategory = 'fans';
+      // 雪民は複数枚装備可能
+      if (supportCard.name?.includes('雪民')) {
+        maxCount = Infinity;
+      }
+    } else if (cardType.includes('マスコット')) {
+      equipCategory = 'mascots';
+      maxCount = 1; // マスコットは1枚制限
+    } else if (cardType.includes('ツール')) {
+      equipCategory = 'tools';
+      maxCount = 1; // ツールは1枚制限
+    } else if (cardType.includes('スタッフ')) {
+      // スタッフは装備ではなく使い切り
+      return { success: false, reason: 'スタッフカードは装備できません' };
+    } else {
+      return { success: false, reason: '装備できないカードタイプです' };
+    }
+
+    // 装備配列の初期化
+    if (!targetHolomem.equipment) {
+      targetHolomem.equipment = {
+        fans: [],
+        mascots: [],
+        tools: []
+      };
+    }
+
+    // 装備制限チェック
+    const currentCount = targetHolomem.equipment[equipCategory].length;
+    if (currentCount >= maxCount) {
+      return { 
+        success: false, 
+        reason: `${equipCategory}は最大${maxCount}枚まで装備可能です` 
+      };
+    }
+
+    // 特定の装備制限チェック（雪民は雪花ラミィのみ）
+    if (supportCard.name?.includes('雪民') && !targetHolomem.name?.includes('雪花ラミィ')) {
+      return { 
+        success: false, 
+        reason: '雪民は雪花ラミィにのみ装備できます' 
+      };
+    }
+
+    // 装備実行
+    const equipmentData = {
+      card: supportCard,
+      category: equipCategory,
+      attachedAt: Date.now(),
+      effects: this.getEquipmentEffects(supportCard, targetHolomem)
+    };
+
+    targetHolomem.equipment[equipCategory].push(equipmentData);
+
+    // 装備効果を適用
+    this.applyEquipmentEffects(targetHolomem, equipmentData);
+
+    return { 
+      success: true, 
+      message: `${supportCard.name}を${targetHolomem.name}に装備しました`,
+      equipment: equipmentData 
+    };
+  }
+
+  /**
+   * 装備カードの効果を取得
+   */
+  getEquipmentEffects(supportCard, targetHolomem) {
+    const effects = {};
+    
+    if (supportCard.name?.includes('だいふく')) {
+      effects.artBonus = 10;
+      if (targetHolomem.name?.includes('雪花ラミィ')) {
+        effects.hpBonus = 20;
+      }
+    } else if (supportCard.name?.includes('雪民')) {
+      effects.specialDamageBonus = 10;
+      effects.targetType = 'opponent_center';
+    }
+
+    return effects;
+  }
+
+  /**
+   * 装備効果をホロメンに適用
+   */
+  applyEquipmentEffects(holomem, equipmentData) {
+    if (!holomem.equipmentEffects) {
+      holomem.equipmentEffects = {
+        artBonus: 0,
+        hpBonus: 0,
+        specialDamageBonus: 0
+      };
+    }
+
+    const effects = equipmentData.effects;
+    if (effects.artBonus) holomem.equipmentEffects.artBonus += effects.artBonus;
+    if (effects.hpBonus) holomem.equipmentEffects.hpBonus += effects.hpBonus;
+    if (effects.specialDamageBonus) holomem.equipmentEffects.specialDamageBonus += effects.specialDamageBonus;
+  }
+
+  /**
+   * ブルーム時の装備引き継ぎ
+   */
+  transferEquipmentOnBloom(fromCard, toCard) {
+    if (fromCard.equipment) {
+      toCard.equipment = JSON.parse(JSON.stringify(fromCard.equipment));
+      toCard.equipmentEffects = JSON.parse(JSON.stringify(fromCard.equipmentEffects || {}));
+      
+      console.log(`📦 [装備引き継ぎ] ${fromCard.name} → ${toCard.name}`, toCard.equipment);
+    }
+  }
+
+  /**
+   * 装備されたカードの表示順序を取得
+   * ホロメン(一番上) → ファン → マスコット → ツール → エール(一番下)
+   */
+  getCardDisplayOrder(card) {
+    if (card.cardType?.includes('ホロメン')) return 0;
+    if (card.card_type?.includes('ファン')) return 1;
+    if (card.card_type?.includes('マスコット')) return 2;
+    if (card.card_type?.includes('ツール')) return 3;
+    if (card.cardType?.includes('エール') || card.card_type?.includes('エール')) return 4;
+    return 2; // デフォルトは中間
+  }
+}
+
+// グローバルエクスポート
+if (typeof window !== 'undefined') {
+  window.CardEffectUtils = CardEffectUtils;
 }
 
 // グローバルエクスポート

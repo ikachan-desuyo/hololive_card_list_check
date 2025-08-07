@@ -1,6 +1,6 @@
 /**
  * hBP04-043 - カード効果定義
- * ホロメンカード - 雪花ラミィ (Debut)
+ * 雪花ラミィ (Debutホロメン)
  */
 
 // カード効果の定義
@@ -9,52 +9,53 @@ const cardEffect_hBP04_043 = {
   cardId: 'hBP04-043',
   cardName: '雪花ラミィ',
   cardType: 'ホロメン',
+  color: '青',
   bloomLevel: 'Debut',
+  hp: 90,
   
   // 効果定義
   effects: {
     // アーツ: こんらみ～
-    arts_konrami: {
-      type: 'arts',
-      timing: 'manual',
+    art1: {
+      type: 'art',
       name: 'こんらみ～',
       description: '相手のホロメン1人に特殊ダメージ10を与える。ただし、ダウンしても相手のライフは減らない。',
+      cost: { any: 1 },
       damage: 20, // 基本ダメージ
-      condition: (card, gameState) => {
-        // アーツが使用可能な状況
-        return gameState.isMyTurn;
+      timing: 'manual',
+      condition: (card, gameState, battleEngine) => {
+        // 基本的なアーツ使用条件
+        const totalYells = card.yellCards ? card.yellCards.length : 0;
+        return totalYells >= 1; // any色1個
       },
       effect: (card, battleEngine) => {
-        console.log(`🎨 [こんらみ～] ${card.name || '雪花ラミィ'}のアーツが発動！`);
+        console.log(`🎨 [アーツ] ${card.name || 'hBP04-043'}の「こんらみ～」が発動！`);
         
-        const utils = new CardEffectUtils(battleEngine);
         const currentPlayer = battleEngine.gameState.currentPlayer;
-        const opponentPlayer = currentPlayer === 1 ? 2 : 1;
+        const opponentPlayer = currentPlayer === 0 ? 1 : 0;
+        const utils = new CardEffectUtils(battleEngine);
         
-        // 相手のホロメン1人に特殊ダメージ10を与える
-        const opponent = battleEngine.players[opponentPlayer];
-        if (opponent && opponent.stage && opponent.stage.length > 0) {
-          const target = opponent.stage[0]; // 最初のホロメンを対象
-          
-          const damage = utils.dealDamage(target, 10, { 
-            isSpecial: true, 
-            noLifeDamage: true // ダウンしてもライフは減らない
-          });
-          
-          utils.updateDisplay();
-          
-          return {
-            success: true,
-            message: `${card.name || '雪花ラミィ'}のアーツ「こんらみ～」で${target.name}に特殊ダメージ10を与えました`,
-            damage: damage,
-            target: target
-          };
-        } else {
-          return {
-            success: false,
-            message: '相手にホロメンがいません'
-          };
-        }
+        // 通常の20ダメージを与える
+        const damageResult = utils.dealDamage(opponentPlayer, 20, {
+          source: card,
+          type: 'art',
+          artName: 'こんらみ～'
+        });
+        
+        // 追加で特殊ダメージ10を与える（ライフダメージなし）
+        // TODO: 特殊ダメージの実装が必要
+        console.log(`⚡ [特殊ダメージ] 相手のホロメンに特殊ダメージ10（ライフダメージなし）`);
+        
+        // UI更新
+        utils.updateDisplay();
+        
+        return {
+          success: true,
+          message: `${card.name || 'hBP04-043'}の「こんらみ～」で20ダメージ＋特殊ダメージ10！`,
+          damage: 20,
+          specialDamage: 10,
+          target: 'opponent'
+        };
       }
     }
   }

@@ -1357,6 +1357,250 @@ class PerformanceManager {
       messageArea.remove();
     }
   }
+
+  /**
+   * ブルームエフェクト発動確認UI表示
+   * @param {Object} card - ブルームしたカード
+   * @param {string} position - カードのポジション
+   * @param {number} playerId - プレイヤーID
+   */
+  showBloomEffectConfirmation(card, position, playerId) {
+    console.log(`🌸 [Performance] ブルームエフェクト確認UI表示: ${card.name}`);
+
+    // カード効果を確認
+    if (!window.cardEffects || !window.cardEffects[card.id]) {
+      console.log(`❌ [Performance] ブルームエフェクト定義なし: ${card.id}`);
+      return;
+    }
+
+    const cardEffect = window.cardEffects[card.id];
+    const hasBloomEffect = cardEffect.bloomEffect || 
+      (cardEffect.effects && Object.values(cardEffect.effects).some(e => e.name?.includes('ブルーム')));
+
+    if (!hasBloomEffect) {
+      console.log(`❌ [Performance] ブルームエフェクトなし: ${card.name}`);
+      return;
+    }
+
+    // プレイヤーの場合のみ確認UI表示
+    if (playerId === 1) {
+      this.showEffectConfirmationDialog(card, 'bloom', position, playerId);
+    } else {
+      // CPUの場合は自動で発動
+      this.executeBloomEffect(card, position, playerId);
+    }
+  }
+
+  /**
+   * コラボエフェクト発動確認UI表示
+   * @param {Object} card - コラボしたカード
+   * @param {string} position - カードのポジション
+   * @param {number} playerId - プレイヤーID
+   */
+  showCollabEffectConfirmation(card, position, playerId) {
+    console.log(`🤝 [Performance] コラボエフェクト確認UI表示: ${card.name}`);
+
+    // カード効果を確認
+    if (!window.cardEffects || !window.cardEffects[card.id]) {
+      console.log(`❌ [Performance] コラボエフェクト定義なし: ${card.id}`);
+      return;
+    }
+
+    const cardEffect = window.cardEffects[card.id];
+    const hasCollabEffect = cardEffect.collabEffect || 
+      (cardEffect.effects && Object.values(cardEffect.effects).some(e => e.name?.includes('コラボ')));
+
+    if (!hasCollabEffect) {
+      console.log(`❌ [Performance] コラボエフェクトなし: ${card.name}`);
+      return;
+    }
+
+    // プレイヤーの場合のみ確認UI表示
+    if (playerId === 1) {
+      this.showEffectConfirmationDialog(card, 'collab', position, playerId);
+    } else {
+      // CPUの場合は自動で発動
+      this.executeCollabEffect(card, position, playerId);
+    }
+  }
+
+  /**
+   * エフェクト発動確認ダイアログ表示
+   * @param {Object} card - カード
+   * @param {string} effectType - エフェクトタイプ ('bloom' or 'collab')
+   * @param {string} position - カードのポジション
+   * @param {number} playerId - プレイヤーID
+   */
+  showEffectConfirmationDialog(card, effectType, position, playerId) {
+    const effectName = effectType === 'bloom' ? 'ブルームエフェクト' : 'コラボエフェクト';
+    
+    // 確認ダイアログを作成
+    const confirmDialog = document.createElement('div');
+    confirmDialog.id = 'effect-confirmation-dialog';
+    confirmDialog.style.cssText = `
+      position: fixed;
+      top: 50%;
+      left: 50%;
+      transform: translate(-50%, -50%);
+      background: rgba(0, 0, 0, 0.95);
+      color: white;
+      padding: 30px;
+      border-radius: 15px;
+      z-index: 40;
+      box-shadow: 0 10px 30px rgba(0, 0, 0, 0.7);
+      max-width: 500px;
+      text-align: center;
+      border: 2px solid ${effectType === 'bloom' ? '#ff69b4' : '#4169e1'};
+    `;
+
+    // タイトル
+    const title = document.createElement('h2');
+    title.innerHTML = `${effectType === 'bloom' ? '🌸' : '🤝'} ${effectName}発動`;
+    title.style.cssText = `
+      margin: 0 0 20px 0;
+      color: ${effectType === 'bloom' ? '#ff69b4' : '#4169e1'};
+      font-size: 24px;
+    `;
+    confirmDialog.appendChild(title);
+
+    // カード名
+    const cardName = document.createElement('div');
+    cardName.textContent = `${card.name}`;
+    cardName.style.cssText = `
+      font-size: 18px;
+      font-weight: bold;
+      margin-bottom: 15px;
+      color: #ffd700;
+    `;
+    confirmDialog.appendChild(cardName);
+
+    // 説明文
+    const description = document.createElement('div');
+    description.innerHTML = `${effectName}を発動しますか？<br><small>このターンのみ有効です</small>`;
+    description.style.cssText = `
+      margin-bottom: 25px;
+      line-height: 1.6;
+      font-size: 16px;
+    `;
+    confirmDialog.appendChild(description);
+
+    // ボタンコンテナ
+    const buttonContainer = document.createElement('div');
+    buttonContainer.style.cssText = `
+      display: flex;
+      gap: 15px;
+      justify-content: center;
+    `;
+
+    // 発動ボタン
+    const activateButton = document.createElement('button');
+    activateButton.textContent = '発動する';
+    activateButton.style.cssText = `
+      padding: 12px 24px;
+      background: ${effectType === 'bloom' ? '#ff69b4' : '#4169e1'};
+      color: white;
+      border: none;
+      border-radius: 8px;
+      font-size: 16px;
+      font-weight: bold;
+      cursor: pointer;
+      transition: all 0.2s ease;
+    `;
+
+    activateButton.addEventListener('mouseenter', () => {
+      activateButton.style.transform = 'scale(1.05)';
+      activateButton.style.boxShadow = '0 4px 12px rgba(0, 0, 0, 0.3)';
+    });
+
+    activateButton.addEventListener('mouseleave', () => {
+      activateButton.style.transform = 'scale(1)';
+      activateButton.style.boxShadow = 'none';
+    });
+
+    activateButton.addEventListener('click', () => {
+      confirmDialog.remove();
+      if (effectType === 'bloom') {
+        this.executeBloomEffect(card, position, playerId);
+      } else {
+        this.executeCollabEffect(card, position, playerId);
+      }
+    });
+
+    // スキップボタン
+    const skipButton = document.createElement('button');
+    skipButton.textContent = 'スキップ';
+    skipButton.style.cssText = `
+      padding: 12px 24px;
+      background: rgba(108, 117, 125, 0.8);
+      color: white;
+      border: none;
+      border-radius: 8px;
+      font-size: 16px;
+      cursor: pointer;
+      transition: all 0.2s ease;
+    `;
+
+    skipButton.addEventListener('mouseenter', () => {
+      skipButton.style.transform = 'scale(1.05)';
+      skipButton.style.background = 'rgba(108, 117, 125, 1)';
+    });
+
+    skipButton.addEventListener('mouseleave', () => {
+      skipButton.style.transform = 'scale(1)';
+      skipButton.style.background = 'rgba(108, 117, 125, 0.8)';
+    });
+
+    skipButton.addEventListener('click', () => {
+      confirmDialog.remove();
+      console.log(`⏭️ [Performance] ${effectName}をスキップ: ${card.name}`);
+    });
+
+    buttonContainer.appendChild(activateButton);
+    buttonContainer.appendChild(skipButton);
+    confirmDialog.appendChild(buttonContainer);
+
+    document.body.appendChild(confirmDialog);
+  }
+
+  /**
+   * ブルームエフェクト実行
+   * @param {Object} card - カード
+   * @param {string} position - ポジション
+   * @param {number} playerId - プレイヤーID
+   */
+  executeBloomEffect(card, position, playerId) {
+    console.log(`🌸 [Performance] ブルームエフェクト実行: ${card.name}`);
+    
+    // ブルームエフェクト使用済みフラグを設定
+    card.bloomEffectUsed = true;
+    
+    // CardInteractionManagerでエフェクト発動
+    if (this.battleEngine.cardInteractionManager) {
+      this.battleEngine.cardInteractionManager.activateCardEffect(card, position);
+    }
+    
+    this.showPerformanceMessage(`${card.name}のブルームエフェクトを発動しました！`);
+  }
+
+  /**
+   * コラボエフェクト実行
+   * @param {Object} card - カード
+   * @param {string} position - ポジション
+   * @param {number} playerId - プレイヤーID
+   */
+  executeCollabEffect(card, position, playerId) {
+    console.log(`🤝 [Performance] コラボエフェクト実行: ${card.name}`);
+    
+    // コラボエフェクト使用済みフラグを設定
+    card.collabEffectUsed = true;
+    
+    // CardInteractionManagerでエフェクト発動
+    if (this.battleEngine.cardInteractionManager) {
+      this.battleEngine.cardInteractionManager.activateCardEffect(card, position);
+    }
+    
+    this.showPerformanceMessage(`${card.name}のコラボエフェクトを発動しました！`);
+  }
 }
 
 // CSS アニメーション追加
@@ -1370,6 +1614,15 @@ style.textContent = `
   @keyframes damageFloat {
     0% { transform: translate(-50%, -50%) scale(1); opacity: 1; }
     100% { transform: translate(-50%, -100%) scale(1.5); opacity: 0; }
+  }
+  
+  @keyframes effectDialogAppear {
+    0% { transform: translate(-50%, -50%) scale(0.8); opacity: 0; }
+    100% { transform: translate(-50%, -50%) scale(1); opacity: 1; }
+  }
+  
+  #effect-confirmation-dialog {
+    animation: effectDialogAppear 0.3s ease-out;
   }
 `;
 document.head.appendChild(style);

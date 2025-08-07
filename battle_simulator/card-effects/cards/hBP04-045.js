@@ -1,58 +1,105 @@
 /**
  * hBP04-045 - カード効果定義
- * ホロメンカード
+ * 雪花ラミィ (1stホロメン)
  */
 
 // カード効果の定義
 const cardEffect_hBP04_045 = {
-    // カード基本情報
+  // カード基本情報
   cardId: 'hBP04-045',
   cardName: '雪花ラミィ',
   cardType: 'ホロメン',
+  color: '青',
+  bloomLevel: '1st',
+  hp: 150,
   
   // 効果定義
   effects: {
-    // 条件効果
-    conditionalEffect: {
-      type: 'conditional',
+    // アーツ: おつらみ
+    art1: {
+      type: 'art',
+      name: 'おつらみ',
+      description: 'ダメージ30',
+      cost: { blue: 1 },
+      damage: 30,
       timing: 'manual',
-      name: '条件効果',
-      description: '特定の条件下で発動する効果',
       condition: (card, gameState, battleEngine) => {
-        // メインステップで、ステージに2色以上のホロメンがいる時
-        const currentPhase = battleEngine.gameState.currentPhase;
-        if (currentPhase !== 3) return false; // メインステップチェック
+        // 青色1個のエール必要
+        if (!card.yellCards) return false;
         
-        const currentPlayer = battleEngine.gameState.currentPlayer;
-        const utils = new CardEffectUtils(battleEngine);
+        const blueCount = card.yellCards.filter(yell => 
+          yell.card_color === '青' || yell.color === 'blue'
+        ).length;
         
-        return utils.checkConditions(currentPlayer, {
-          minColors: 2
-        });
+        return blueCount >= 1;
       },
       effect: (card, battleEngine) => {
-        console.log(`🌈 [条件効果] ${card.name || 'hBP04-045'}の効果が発動！`);
+        console.log(`🎨 [アーツ] ${card.name || 'hBP04-045'}の「おつらみ」が発動！`);
         
         const currentPlayer = battleEngine.gameState.currentPlayer;
+        const opponentPlayer = currentPlayer === 0 ? 1 : 0;
         const utils = new CardEffectUtils(battleEngine);
         
-        // 2枚ドロー効果
-        const drawResult = utils.drawCards(currentPlayer, 2);
+        // 30ダメージを相手に与える
+        const damageResult = utils.dealDamage(opponentPlayer, 30, {
+          source: card,
+          type: 'art',
+          artName: 'おつらみ'
+        });
         
-        if (drawResult.success) {
-          utils.updateDisplay();
-          
-          return {
-            success: true,
-            message: `${card.name || 'hBP04-045'}の効果で2枚ドローしました`,
-            cardsDrawn: drawResult.cards.length
-          };
-        } else {
-          return {
-            success: false,
-            message: drawResult.reason
-          };
-        }
+        // UI更新
+        utils.updateDisplay();
+        
+        return {
+          success: true,
+          message: `${card.name || 'hBP04-045'}の「おつらみ」で30ダメージ！`,
+          damage: 30,
+          target: 'opponent'
+        };
+      }
+    },
+    
+    // アーツ: ボスが攻略できな～い
+    art2: {
+      type: 'art',
+      name: 'ボスが攻略できな～い',
+      description: 'ダメージ50',
+      cost: { blue: 1, any: 1 },
+      damage: 50,
+      timing: 'manual',
+      condition: (card, gameState, battleEngine) => {
+        // 青色1個とany色1個のエール必要
+        if (!card.yellCards) return false;
+        
+        const blueCount = card.yellCards.filter(yell => 
+          yell.card_color === '青' || yell.color === 'blue'
+        ).length;
+        
+        return blueCount >= 1 && card.yellCards.length >= 2;
+      },
+      effect: (card, battleEngine) => {
+        console.log(`� [アーツ] ${card.name || 'hBP04-045'}の「ボスが攻略できな～い」が発動！`);
+        
+        const currentPlayer = battleEngine.gameState.currentPlayer;
+        const opponentPlayer = currentPlayer === 0 ? 1 : 0;
+        const utils = new CardEffectUtils(battleEngine);
+        
+        // 50ダメージを相手に与える
+        const damageResult = utils.dealDamage(opponentPlayer, 50, {
+          source: card,
+          type: 'art',
+          artName: 'ボスが攻略できな～い'
+        });
+        
+        // UI更新
+        utils.updateDisplay();
+        
+        return {
+          success: true,
+          message: `${card.name || 'hBP04-045'}の「ボスが攻略できな～い」で50ダメージ！`,
+          damage: 50,
+          target: 'opponent'
+        };
       }
     }
   }

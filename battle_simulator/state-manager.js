@@ -278,6 +278,11 @@ class HololiveStateManager {
             if (player[position]?.cardState) {
               player[position].cardState.bloomedThisTurn = false;
             }
+            // エフェクト使用フラグもリセット
+            if (player[position]) {
+              player[position].bloomEffectUsed = false;
+              player[position].collabEffectUsed = false;
+            }
           });
           
           // ターン制限フラグもリセット
@@ -500,6 +505,16 @@ class HololiveStateManager {
                   player.cards[payload.targetPosition].collabedTurn = this.state.turn.turnCount;
                 }
                 
+                // コラボエフェクト確認UIを表示
+                setTimeout(() => {
+                  if (this.battleEngine.performanceManager) {
+                    this.battleEngine.performanceManager.showCollabEffectConfirmation(
+                      collabCard, 
+                      payload.targetPosition, 
+                      payload.playerId
+                    );
+                  }
+                }, 500);
                 
                 // デバッグ用：現在の状態確認
                 setTimeout(() => {
