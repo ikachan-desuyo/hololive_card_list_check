@@ -1187,6 +1187,8 @@ class CardDisplayManager {
     const maxHP = stateManager.getMaxHP(card);
     const currentHP = stateManager.getCurrentHP(card, playerId);
 
+    console.log(`🩹 [HP表示] ${card.name}: ${currentHP}/${maxHP} (プレイヤー${playerId})`);
+
     // HP表示要素を作成
     const hpDisplay = document.createElement('div');
     hpDisplay.className = 'hp-display';
@@ -1258,8 +1260,13 @@ class CardDisplayManager {
       }
     }
 
-    // 表示を更新
-    this.updateCardAreas();
+    // HP表示を即座に更新
+    this.updateCardHPDisplay(card, playerId);
+    
+    // 少し遅延させて全体更新も実行
+    setTimeout(() => {
+      this.updateCardAreas();
+    }, 100);
   }
 
   /**

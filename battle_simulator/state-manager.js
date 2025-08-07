@@ -101,7 +101,7 @@ class HololiveStateManager {
       },
       
       // カードHP管理（カードIDをキーとして現在HPを保存）
-      cardHP: new Map(),
+      cardHP: {},
       
       // ゲーム状態
       gameState: {
@@ -2601,7 +2601,7 @@ class HololiveStateManager {
     const player = this.state.players[playerId];
     if (!player || !player.cardHP) return this.getMaxHP(card);
     
-    const currentHP = player.cardHP.get(card.id);
+    const currentHP = player.cardHP[card.id];
     return currentHP !== undefined ? currentHP : this.getMaxHP(card);
   }
 
@@ -2618,16 +2618,18 @@ class HololiveStateManager {
     if (!player) return;
     
     if (!player.cardHP) {
-      player.cardHP = new Map();
+      player.cardHP = {};
     }
     
     const maxHP = this.getMaxHP(card);
     const validHP = Math.max(0, Math.min(newHP, maxHP));
     
-    player.cardHP.set(card.id, validHP);
+    player.cardHP[card.id] = validHP;
     
-    // ダメージイベントを発火
-    this.emit('cardDamaged', {
+    console.log(`🩹 [HP設定] ${card.name}: ${validHP}/${maxHP} (プレイヤー${playerId})`);
+    
+    // ダメージイベントをログ出力（EventEmitter未実装のため）
+    console.log(`📡 [StateManager] cardDamaged event:`, {
       playerId,
       card,
       currentHP: validHP,
@@ -2708,7 +2710,7 @@ class HololiveStateManager {
     const player = this.state.players[playerId];
     if (!player) return;
     
-    player.cardHP = new Map();
+    player.cardHP = {};
     
     // 全エリアのカードを確認してHPを初期化
     const areas = ['center', 'collab', 'back1', 'back2', 'back3', 'back4', 'back5'];

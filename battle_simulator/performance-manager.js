@@ -700,14 +700,16 @@ class PerformanceManager {
       }
     }
 
-    // 現在HPを取得・計算
-    const currentHP = defender.current_hp || defender.hp || 0;
+    // 現在HPを取得・計算（StateManagerを使用）
+    const stateManager = this.battleEngine.stateManager;
+    const currentHP = stateManager.getCurrentHP(defender, target.playerId);
+    const maxHP = stateManager.getMaxHP(defender);
     const newHP = Math.max(0, currentHP - totalDamage);
 
     console.log(`💥 [Performance] ダメージ: ${totalDamage} (基本:${baseDamage}), HP: ${currentHP} → ${newHP}`);
 
-    // HPを更新
-    defender.current_hp = newHP;
+    // StateManagerでHPを更新
+    stateManager.setCurrentHP(defender, target.playerId, newHP);
 
     // ダメージエフェクト表示
     this.showDamageEffect(target, totalDamage);
@@ -715,6 +717,11 @@ class PerformanceManager {
     // カード撃破チェック
     if (newHP <= 0) {
       this.destroyCard(defender, target.position, target.playerId);
+    }
+
+    // HP表示を即座に更新
+    if (this.battleEngine.cardDisplayManager) {
+      this.battleEngine.cardDisplayManager.updateCardHPDisplay(defender, target.playerId);
     }
 
     // UI更新
@@ -772,11 +779,20 @@ class PerformanceManager {
     console.log(`💀 [Performance] カード撃破: ${card.name} (${position})`);
 
     const player = this.battleEngine.players[playerId];
+    const stateManager = this.battleEngine.stateManager;
 
     // カードをアーカイブに移動
     player.archive = player.archive || [];
     player.archive.push(card);
     player[position] = null;
+
+    // StateManagerからもHP情報を削除
+    if (stateManager && card.id) {
+      if (player.cardHP && player.cardHP[card.id] !== undefined) {
+        delete player.cardHP[card.id];
+        console.log(`🗑️ [Performance] HP情報削除: ${card.name}`);
+      }
+    }
 
     // ライフからエール配置処理
     this.lifeToYellPlacement(playerId);
