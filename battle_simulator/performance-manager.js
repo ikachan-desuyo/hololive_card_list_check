@@ -123,17 +123,27 @@ class PerformanceManager {
     console.log(`🔍 [Performance] センターカード:`, player.center);
     console.log(`🔍 [Performance] コラボカード:`, player.collab);
 
-    // センターとコラボをチェック（お休み状態と攻撃済み状態を確認）
+    // センターとコラボをチェック（お休み状態、攻撃済み状態、アーツ使用可能をチェック）
     if (player.center && !player.center.isResting && !this.hasCardAttackedThisTurn(playerId, 'center')) {
-      attackablePositions.push('center');
-      console.log(`✅ [Performance] センター攻撃可能: ${player.center.name}`);
+      const availableArts = this.getAvailableArts(player.center);
+      if (availableArts.length > 0) {
+        attackablePositions.push('center');
+        console.log(`✅ [Performance] センター攻撃可能: ${player.center.name} (${availableArts.length}個のアーツ)`);
+      } else {
+        console.log(`❌ [Performance] センター使用可能アーツなし: ${player.center.name}`);
+      }
     } else if (player.center && this.hasCardAttackedThisTurn(playerId, 'center')) {
       console.log(`❌ [Performance] センター攻撃済み: ${player.center.name}`);
     }
     
     if (player.collab && !player.collab.isResting && !this.hasCardAttackedThisTurn(playerId, 'collab')) {
-      attackablePositions.push('collab');
-      console.log(`✅ [Performance] コラボ攻撃可能: ${player.collab.name}`);
+      const availableArts = this.getAvailableArts(player.collab);
+      if (availableArts.length > 0) {
+        attackablePositions.push('collab');
+        console.log(`✅ [Performance] コラボ攻撃可能: ${player.collab.name} (${availableArts.length}個のアーツ)`);
+      } else {
+        console.log(`❌ [Performance] コラボ使用可能アーツなし: ${player.collab.name}`);
+      }
     } else if (player.collab && this.hasCardAttackedThisTurn(playerId, 'collab')) {
       console.log(`❌ [Performance] コラボ攻撃済み: ${player.collab.name}`);
     }
@@ -166,7 +176,16 @@ class PerformanceManager {
    */
   addAttackButton(position, playerId) {
     const sectionClass = playerId === 1 ? '.battle-player' : '.battle-opponent';
-    const cardArea = document.querySelector(`${sectionClass} .${position}`);
+    
+    // バックポジションの場合は特別な処理
+    let cardArea;
+    if (position.startsWith('back')) {
+      const backSlot = position.replace('back', ''); // back1 -> 1
+      const slotIndex = parseInt(backSlot) - 1; // 1 -> 0 (0-based index)
+      cardArea = document.querySelector(`${sectionClass} .backs .back-slot[data-slot="${slotIndex}"]`);
+    } else {
+      cardArea = document.querySelector(`${sectionClass} .${position}`);
+    }
     
     console.log(`🔧 [Performance] カードエリア検索: ${sectionClass} .${position}`, cardArea);
     
@@ -263,8 +282,232 @@ class PerformanceManager {
     // 攻撃ボタンを削除
     this.clearPerformanceButtons();
 
-    // 攻撃対象を選択
-    this.selectAttackTarget(playerId);
+    // アーツ選択を開始
+    this.selectArtsForAttack(attacker, playerId);
+  }
+
+  /**
+   * アーツ選択
+   * @param {Object} attacker - 攻撃者カード
+   * @param {number} playerId - プレイヤーID
+   */
+  selectArtsForAttack(attacker, playerId) {
+    console.log(`🎨 [Performance] アーツ選択開始: ${attacker.name}`);
+    
+    // カードのアーツを取得
+    const availableArts = this.getAvailableArts(attacker);
+    
+    if (availableArts.length === 0) {
+      console.log(`❌ [Performance] 使用可能なアーツがありません`);
+      this.showPerformanceMessage('このカードには使用可能なアーツがありません');
+      setTimeout(() => {
+        this.endPerformanceStep();
+      }, 2000);
+      return;
+    }
+
+    if (availableArts.length === 1) {
+      // アーツが1つの場合は自動選択
+      this.currentAttacker.selectedArts = availableArts[0];
+      console.log(`🎨 [Performance] アーツ自動選択: ${availableArts[0].name}`);
+      this.selectAttackTarget(playerId);
+    } else {
+      // 複数のアーツがある場合は選択UI表示
+      this.showArtsSelectionUI(availableArts, playerId);
+    }
+  }
+
+  /**
+   * 使用可能なアーツを取得
+   * @param {Object} card - カード
+   * @returns {Array} 使用可能なアーツリスト
+   */
+  getAvailableArts(card) {
+    if (!card.skills || !Array.isArray(card.skills)) {
+      return [];
+    }
+
+    const arts = card.skills.filter(skill => skill.type === 'アーツ');
+    const availableArts = [];
+
+    arts.forEach(art => {
+      if (this.canUseArts(card, art)) {
+        availableArts.push(art);
+      }
+    });
+
+    console.log(`🎨 [Performance] アーツチェック結果: ${availableArts.length}/${arts.length}個使用可能`);
+    return availableArts;
+  }
+
+  /**
+   * アーツ使用可能かチェック
+   * @param {Object} card - カード
+   * @param {Object} arts - アーツ
+   * @returns {boolean} 使用可能かどうか
+   */
+  canUseArts(card, arts) {
+    if (!arts.icons || !arts.icons.main) {
+      return false;
+    }
+
+    const requiredIcons = arts.icons.main;
+    const attachedYells = card.yellCards || [];
+    
+    console.log(`🎨 [Performance] アーツ条件チェック: ${arts.name}`);
+    console.log(`🎨 [Performance] 必要エール: ${requiredIcons.join(', ')}`);
+    console.log(`🎨 [Performance] 付いているエール: ${attachedYells.length}枚`);
+
+    // エール数チェック
+    if (attachedYells.length < requiredIcons.length) {
+      console.log(`❌ [Performance] エール不足: 必要${requiredIcons.length}枚、実際${attachedYells.length}枚`);
+      return false;
+    }
+
+    // 色条件チェック
+    const yellColors = attachedYells.map(yell => yell.color || 'colorless');
+    
+    return this.checkColorRequirements(requiredIcons, yellColors);
+  }
+
+  /**
+   * 色条件チェック
+   * @param {Array} required - 必要な色配列
+   * @param {Array} available - 利用可能な色配列
+   * @returns {boolean} 条件を満たすかどうか
+   */
+  checkColorRequirements(required, available) {
+    const availableCopy = [...available];
+    
+    for (const requiredColor of required) {
+      if (requiredColor === 'any') {
+        // 任意の色でOK
+        if (availableCopy.length > 0) {
+          availableCopy.shift(); // 1枚消費
+          continue;
+        } else {
+          return false;
+        }
+      } else {
+        // 特定の色が必要
+        const colorIndex = availableCopy.indexOf(requiredColor);
+        if (colorIndex >= 0) {
+          availableCopy.splice(colorIndex, 1); // その色を消費
+        } else {
+          // 代替として 'colorless' や 'any' エールがあるかチェック
+          const anyIndex = availableCopy.findIndex(color => color === 'colorless' || color === 'any');
+          if (anyIndex >= 0) {
+            availableCopy.splice(anyIndex, 1);
+          } else {
+            console.log(`❌ [Performance] 色条件不満足: ${requiredColor}が不足`);
+            return false;
+          }
+        }
+      }
+    }
+    
+    console.log(`✅ [Performance] 色条件満足`);
+    return true;
+  }
+
+  /**
+   * アーツ選択UI表示
+   * @param {Array} arts - 使用可能なアーツリスト
+   * @param {number} playerId - プレイヤーID
+   */
+  showArtsSelectionUI(arts, playerId) {
+    console.log(`🎨 [Performance] アーツ選択UI表示: ${arts.length}個のアーツ`);
+    
+    // アーツ選択パネルを作成
+    const selectionPanel = document.createElement('div');
+    selectionPanel.id = 'arts-selection-panel';
+    selectionPanel.style.cssText = `
+      position: fixed;
+      top: 50%;
+      left: 50%;
+      transform: translate(-50%, -50%);
+      background: rgba(0, 0, 0, 0.9);
+      color: white;
+      padding: 20px;
+      border-radius: 12px;
+      z-index: 30;
+      box-shadow: 0 8px 24px rgba(0, 0, 0, 0.5);
+      max-width: 500px;
+      text-align: center;
+    `;
+
+    const title = document.createElement('h3');
+    title.textContent = 'アーツを選択してください';
+    title.style.marginTop = '0';
+    selectionPanel.appendChild(title);
+
+    arts.forEach((art, index) => {
+      const artButton = document.createElement('button');
+      artButton.style.cssText = `
+        display: block;
+        width: 100%;
+        margin: 8px 0;
+        padding: 12px;
+        background: rgba(255, 69, 0, 0.8);
+        color: white;
+        border: none;
+        border-radius: 8px;
+        cursor: pointer;
+        font-size: 14px;
+        transition: all 0.2s ease;
+      `;
+      
+      const iconsText = art.icons?.main ? art.icons.main.join(' + ') : '';
+      const damageText = art.dmg ? `ダメージ: ${art.dmg}` : '';
+      
+      artButton.innerHTML = `
+        <div style="font-weight: bold; margin-bottom: 4px;">${art.name}</div>
+        <div style="font-size: 12px; opacity: 0.9;">必要エール: ${iconsText}</div>
+        <div style="font-size: 12px; opacity: 0.9;">${damageText}</div>
+      `;
+
+      artButton.addEventListener('mouseenter', () => {
+        artButton.style.background = 'rgba(255, 69, 0, 1)';
+        artButton.style.transform = 'scale(1.02)';
+      });
+
+      artButton.addEventListener('mouseleave', () => {
+        artButton.style.background = 'rgba(255, 69, 0, 0.8)';
+        artButton.style.transform = 'scale(1)';
+      });
+
+      artButton.addEventListener('click', () => {
+        this.selectArts(art, playerId);
+      });
+
+      selectionPanel.appendChild(artButton);
+    });
+
+    document.body.appendChild(selectionPanel);
+  }
+
+  /**
+   * アーツ選択実行
+   * @param {Object} selectedArts - 選択されたアーツ
+   * @param {number} playerId - プレイヤーID
+   */
+  selectArts(selectedArts, playerId) {
+    console.log(`🎨 [Performance] アーツ選択: ${selectedArts.name}`);
+    
+    this.currentAttacker.selectedArts = selectedArts;
+    
+    // アーツ選択パネルを削除
+    const panel = document.getElementById('arts-selection-panel');
+    if (panel) {
+      panel.remove();
+    }
+    
+    this.showPerformanceMessage(`${selectedArts.name}を選択しました`);
+    
+    // 攻撃対象選択に進む
+    setTimeout(() => {
+      this.selectAttackTarget(playerId);
+    }, 1000);
   }
 
   /**
@@ -333,7 +576,16 @@ class PerformanceManager {
    */
   addTargetButton(target) {
     const sectionClass = target.playerId === 1 ? '.battle-player' : '.battle-opponent';
-    const cardArea = document.querySelector(`${sectionClass} .${target.position}`);
+    
+    // バックポジションの場合は特別な処理
+    let cardArea;
+    if (target.position.startsWith('back')) {
+      const backSlot = target.position.replace('back', ''); // back1 -> 1
+      const slotIndex = parseInt(backSlot) - 1; // 1 -> 0 (0-based index)
+      cardArea = document.querySelector(`${sectionClass} .backs .back-slot[data-slot="${slotIndex}"]`);
+    } else {
+      cardArea = document.querySelector(`${sectionClass} .${target.position}`);
+    }
     
     console.log(`🎯 [Performance] ターゲットボタン追加: ${sectionClass} .${target.position}`, cardArea);
     
@@ -417,10 +669,17 @@ class PerformanceManager {
       return;
     }
 
+    if (!this.currentAttacker.selectedArts) {
+      console.error('🚨 [Performance] アーツが選択されていません');
+      return;
+    }
+
     const attacker = this.currentAttacker.card;
     const defender = target.card;
+    const selectedArts = this.currentAttacker.selectedArts;
 
     console.log(`⚔️ [Performance] 攻撃実行: ${attacker.name} → ${defender.name}`);
+    console.log(`🎨 [Performance] 使用アーツ: ${selectedArts.name}`);
 
     // カード攻撃済みフラグを設定
     this.markCardAttacked(this.currentAttacker.playerId, this.currentAttacker.position);
@@ -428,18 +687,30 @@ class PerformanceManager {
     // 攻撃ボタンを削除
     this.clearPerformanceButtons();
 
-    // ダメージ計算
-    const attackPower = attacker.atk || 0;
-    const currentHP = defender.current_hp || defender.hp || 0;
-    const newHP = Math.max(0, currentHP - attackPower);
+    // アーツベースのダメージ計算
+    const baseDamage = parseInt(selectedArts.dmg) || 0;
+    let totalDamage = baseDamage;
 
-    console.log(`💥 [Performance] ダメージ: ${attackPower}, HP: ${currentHP} → ${newHP}`);
+    // 特攻ダメージチェック
+    if (selectedArts.icons && selectedArts.icons.tokkou) {
+      const tokkoeDamage = this.calculateTokkoeDamage(selectedArts.icons.tokkou, defender);
+      totalDamage += tokkoeDamage;
+      if (tokkoeDamage > 0) {
+        console.log(`💥 [Performance] 特攻ダメージ: +${tokkoeDamage}`);
+      }
+    }
+
+    // 現在HPを取得・計算
+    const currentHP = defender.current_hp || defender.hp || 0;
+    const newHP = Math.max(0, currentHP - totalDamage);
+
+    console.log(`💥 [Performance] ダメージ: ${totalDamage} (基本:${baseDamage}), HP: ${currentHP} → ${newHP}`);
 
     // HPを更新
     defender.current_hp = newHP;
 
     // ダメージエフェクト表示
-    this.showDamageEffect(target, attackPower);
+    this.showDamageEffect(target, totalDamage);
 
     // カード撃破チェック
     if (newHP <= 0) {
@@ -450,7 +721,7 @@ class PerformanceManager {
     this.battleEngine.updateUI();
 
     // 攻撃完了メッセージ
-    this.showPerformanceMessage(`${attacker.name}が${defender.name}に${attackPower}ダメージ！`);
+    this.showPerformanceMessage(`${attacker.name}の${selectedArts.name}で${defender.name}に${totalDamage}ダメージ！`);
 
     // 勝利条件チェック
     this.battleEngine.checkVictoryConditions();
@@ -462,6 +733,33 @@ class PerformanceManager {
       this.currentAttacker = null;
       this.continuePerformanceStep(); // 他にも攻撃可能なカードがあるかチェック
     }, 2000);
+  }
+
+  /**
+   * 特攻ダメージ計算
+   * @param {Array} tokkoeTags - 特攻タグ配列
+   * @param {Object} target - 攻撃対象
+   * @returns {number} 追加ダメージ
+   */
+  calculateTokkoeDamage(tokkoeTags, target) {
+    let extraDamage = 0;
+
+    tokkoeTags.forEach(tag => {
+      // 特攻タグの解析 (例: "赤+50", "青+30")
+      const match = tag.match(/^(.+)\+(\d+)$/);
+      if (match) {
+        const targetColor = match[1];
+        const damage = parseInt(match[2]);
+        
+        // 対象カードの色チェック
+        if (target.color === targetColor) {
+          extraDamage += damage;
+          console.log(`🎯 [Performance] 特攻発動: ${targetColor}色に対して+${damage}ダメージ`);
+        }
+      }
+    });
+
+    return extraDamage;
   }
 
   /**
@@ -571,7 +869,16 @@ class PerformanceManager {
    */
   addYellPlacementButton(lifeCard, target, playerId) {
     const sectionClass = playerId === 1 ? '.battle-player' : '.battle-opponent';
-    const cardArea = document.querySelector(`${sectionClass} .${target.position}`);
+    
+    // バックポジションの場合は特別な処理
+    let cardArea;
+    if (target.position.startsWith('back')) {
+      const backSlot = target.position.replace('back', ''); // back1 -> 1
+      const slotIndex = parseInt(backSlot) - 1; // 1 -> 0 (0-based index)
+      cardArea = document.querySelector(`${sectionClass} .backs .back-slot[data-slot="${slotIndex}"]`);
+    } else {
+      cardArea = document.querySelector(`${sectionClass} .${target.position}`);
+    }
     
     if (!cardArea) return;
 
@@ -638,7 +945,16 @@ class PerformanceManager {
    */
   showDamageEffect(target, damage) {
     const sectionClass = target.playerId === 1 ? '.battle-player' : '.battle-opponent';
-    const cardArea = document.querySelector(`${sectionClass} .${target.position}`);
+    
+    // バックポジションの場合は特別な処理
+    let cardArea;
+    if (target.position.startsWith('back')) {
+      const backSlot = target.position.replace('back', ''); // back1 -> 1
+      const slotIndex = parseInt(backSlot) - 1; // 1 -> 0 (0-based index)
+      cardArea = document.querySelector(`${sectionClass} .backs .back-slot[data-slot="${slotIndex}"]`);
+    } else {
+      cardArea = document.querySelector(`${sectionClass} .${target.position}`);
+    }
     
     if (!cardArea) return;
 
@@ -747,21 +1063,29 @@ class PerformanceManager {
 
     // センターで攻撃
     if (player.center && !player.center.isResting && !this.hasCardAttackedThisTurn(playerId, 'center')) {
-      const target = this.selectCPUTarget(playerId === 1 ? 2 : 1);
-      if (target) {
-        this.executeCPUAttack(player.center, 'center', playerId, target);
-        this.markCardAttacked(playerId, 'center');
-        attackCount++;
+      const availableArts = this.getAvailableArts(player.center);
+      if (availableArts.length > 0) {
+        const target = this.selectCPUTarget(playerId === 1 ? 2 : 1);
+        if (target) {
+          const selectedArts = availableArts[0]; // 最初のアーツを選択
+          this.executeCPUAttack(player.center, 'center', playerId, target, selectedArts);
+          this.markCardAttacked(playerId, 'center');
+          attackCount++;
+        }
       }
     }
 
     // コラボで攻撃
     if (player.collab && !player.collab.isResting && !this.hasCardAttackedThisTurn(playerId, 'collab')) {
-      const target = this.selectCPUTarget(playerId === 1 ? 2 : 1);
-      if (target) {
-        this.executeCPUAttack(player.collab, 'collab', playerId, target);
-        this.markCardAttacked(playerId, 'collab');
-        attackCount++;
+      const availableArts = this.getAvailableArts(player.collab);
+      if (availableArts.length > 0) {
+        const target = this.selectCPUTarget(playerId === 1 ? 2 : 1);
+        if (target) {
+          const selectedArts = availableArts[0]; // 最初のアーツを選択
+          this.executeCPUAttack(player.collab, 'collab', playerId, target, selectedArts);
+          this.markCardAttacked(playerId, 'collab');
+          attackCount++;
+        }
       }
     }
 
@@ -802,13 +1126,24 @@ class PerformanceManager {
    * @param {string} attackerPosition - 攻撃者ポジション
    * @param {number} attackerPlayerId - 攻撃者プレイヤーID
    * @param {Object} target - 攻撃対象
+   * @param {Object} selectedArts - 選択されたアーツ
    */
-  executeCPUAttack(attacker, attackerPosition, attackerPlayerId, target) {
+  executeCPUAttack(attacker, attackerPosition, attackerPlayerId, target, selectedArts) {
     console.log(`🤖 [Performance] CPU攻撃: ${attacker.name} → ${target.card.name}`);
+    console.log(`🎨 [Performance] CPU使用アーツ: ${selectedArts.name}`);
 
-    const attackPower = attacker.atk || 0;
+    // アーツベースのダメージ計算
+    const baseDamage = parseInt(selectedArts.dmg) || 0;
+    let totalDamage = baseDamage;
+
+    // 特攻ダメージチェック
+    if (selectedArts.icons && selectedArts.icons.tokkou) {
+      const tokkoeDamage = this.calculateTokkoeDamage(selectedArts.icons.tokkou, target.card);
+      totalDamage += tokkoeDamage;
+    }
+
     const currentHP = target.card.current_hp || target.card.hp || 0;
-    const newHP = Math.max(0, currentHP - attackPower);
+    const newHP = Math.max(0, currentHP - totalDamage);
 
     target.card.current_hp = newHP;
 
@@ -827,6 +1162,12 @@ class PerformanceManager {
     document.querySelectorAll('.performance-attack-button').forEach(btn => btn.remove());
     document.querySelectorAll('.performance-target-button').forEach(btn => btn.remove());
     document.querySelectorAll('.performance-pass-button').forEach(btn => btn.remove());
+    
+    // アーツ選択パネルもクリア
+    const artsPanel = document.getElementById('arts-selection-panel');
+    if (artsPanel) {
+      artsPanel.remove();
+    }
   }
 
   /**
