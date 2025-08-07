@@ -918,7 +918,7 @@ class HololiveBattleEngine {
       
       if (this.infoPanelManager) {
         // Info Panel Managerの状態リセット
-        this.infoPanelManager.updateStepInfo('ゲーム開始準備', '準備フェーズ', 0);
+        this.infoPanelManager.updateStepInfo('ゲーム開始準備', '準備フェーズ', 0, 'player', this);
         this.infoPanelManager.clearCardDetail();
         this.infoPanelManager.addLogEntry('system', 'ゲームがリセットされました');
         console.log('Info Panel Manager状態をリセット');

@@ -28,6 +28,9 @@ class HololiveTurnManager {
       player: currentPlayer
     });
     
+    // 推しスキル使用回数リセット
+    this.resetOshiSkillUsage(currentPlayer);
+    
     // ターン終了 - State Manager経由で安全に更新
     const nextPlayer = this.gameState.currentPlayer === 1 ? 2 : 1;
     this.engine.stateManager.updateState('PLAYER_CHANGE', { player: nextPlayer });
@@ -85,6 +88,17 @@ class HololiveTurnManager {
     setTimeout(() => {
       this.engine.executeResetStep(this.gameState.currentPlayer);
     }, 1000);
+  }
+
+  /**
+   * 推しスキル使用回数リセット
+   */
+  resetOshiSkillUsage(playerId) {
+    const player = this.players[playerId];
+    if (player && player.gameState) {
+      player.gameState.usedOshiSkillsThisTurn = 0;
+      console.log(`🔄 [推しスキル] プレイヤー${playerId}の推しスキル使用回数をリセット`);
+    }
   }
 
   /**

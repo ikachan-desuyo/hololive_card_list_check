@@ -25,10 +25,18 @@ const cardEffect_hBP04_004 = {
       timing: 'reactive',
       condition: (card, gameState, battleEngine) => {
         const currentPlayer = battleEngine.gameState.currentPlayer;
-        const utils = new CardEffectUtils(battleEngine);
+        const myPlayerId = 1; // 推しホロメンは常にプレイヤー1のもの
         
-        // 相手のターン中で自分のホロメンがダウンした時
-        return !battleEngine.gameState.isMyTurn && battleEngine.gameState.lastDownedHolomem;
+        // この推しスキルは相手のターン中の反応的効果なので、相手ターン中のみ
+        const isOpponentTurn = currentPlayer !== myPlayerId;
+        
+        // 自分のホロメンがダウンした時かチェック
+        const holomenDownedThisTurn = battleEngine.gameState.lastDownedHolomem && 
+          battleEngine.gameState.lastDownedHolomem.playerId === myPlayerId;
+        
+        console.log(`🔍 [推しスキル条件] 相手ターン: ${isOpponentTurn}, ホロメンダウン: ${holomenDownedThisTurn}`);
+        
+        return isOpponentTurn && holomenDownedThisTurn;
       },
       effect: (card, battleEngine) => {
         console.log(`💙 [推しスキル] ${card.name || 'hBP04-004'}の「愛してる」が発動！`);
@@ -71,15 +79,21 @@ const cardEffect_hBP04_004 = {
       name: 'ぶーん、バリバリバリバリ',
       description: '[ホロパワー：-3]自分の〈雪花ラミィ〉1人を選ぶ。このターンの間、選んだホロメンが、相手のホロメン1人に与える特殊ダメージ+100し、選んだホロメンが相手のホロメンをダウンさせた時、自分のデッキを2枚引く。',
       holoPowerCost: 3,
+      turnLimit: 1,
       gameLimit: 1,
       timing: 'manual',
       condition: (card, gameState, battleEngine) => {
         const currentPlayer = battleEngine.gameState.currentPlayer;
+        const currentPhase = battleEngine.gameState.currentPhase;
+        const myPlayerId = 1;
         const utils = new CardEffectUtils(battleEngine);
         
-        // 自分のターン中で雪花ラミィがステージにいる
-        if (!battleEngine.gameState.isMyTurn) return false;
+        // 自分のメインステップでのみ使用可能
+        if (currentPlayer !== myPlayerId || currentPhase !== 3) {
+          return false;
+        }
         
+        // 自分のターン中で雪花ラミィがステージにいる
         const stageHolomens = utils.getStageHolomens(currentPlayer);
         return stageHolomens.some(h => h.card.name && h.card.name.includes('雪花ラミィ'));
       },

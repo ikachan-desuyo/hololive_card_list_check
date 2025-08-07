@@ -128,7 +128,7 @@ class InfoPanelManager {
    * @param {number} turn - ターン数
    * @param {string} player - 現在のプレイヤー（'player' または 'opponent'）
    */
-  updateStepInfo(stepName, phase, turn, player = 'player') {
+  updateStepInfo(stepName, phase, turn, player = 'player', battleEngine = null) {
     if (!this.stepInfoElement) return;
     
     const playerText = player === 'player' ? 'あなた' : '相手';
@@ -140,7 +140,19 @@ class InfoPanelManager {
     }
     
     if (turnElement) {
-      turnElement.textContent = `${phase} - ターン: ${turn}`;
+      let turnText = `${phase} - ターン: ${turn}`;
+      
+      // ホロパワー情報を追加
+      if (battleEngine && battleEngine.players && battleEngine.gameState) {
+        const currentPlayer = battleEngine.gameState.currentPlayer;
+        const playerData = battleEngine.players[currentPlayer];
+        if (playerData && playerData.holoPower) {
+          const holoPowerCount = playerData.holoPower.length;
+          turnText += ` | ホロパワー: ${holoPowerCount}`;
+        }
+      }
+      
+      turnElement.textContent = turnText;
     }
   }
 

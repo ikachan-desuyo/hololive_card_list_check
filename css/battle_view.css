@@ -471,9 +471,33 @@ body {
 .hand-card:hover .card-effect-button,
 .collab .card:hover .card-effect-button,
 .center .card:hover .card-effect-button,
-.back-slot .card:hover .card-effect-button {
+.back-slot .card:hover .card-effect-button,
+.oshi .card:hover .card-effect-button {
   opacity: 1;
   visibility: visible;
+}
+
+/* 推しスキルボタンのスタイル */
+.card-effect-button.oshi-skill-active {
+  background: linear-gradient(45deg, #FF6B6B, #4ECDC4);
+  color: white;
+  font-weight: bold;
+  animation: oshi-glow 2s ease-in-out infinite alternate;
+}
+
+.card-effect-button.oshi-skill-inactive {
+  background: #666;
+  color: #ccc;
+  cursor: not-allowed;
+}
+
+@keyframes oshi-glow {
+  from {
+    box-shadow: 0 0 5px rgba(255, 107, 107, 0.5);
+  }
+  to {
+    box-shadow: 0 0 15px rgba(78, 205, 196, 0.8);
+  }
 }
 
 /* アクションマーク（既存の実装を強化） */

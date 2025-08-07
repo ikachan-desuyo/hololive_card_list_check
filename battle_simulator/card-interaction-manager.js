@@ -559,8 +559,8 @@ class CardInteractionManager {
           return false;
           
         case 'oshi_holomen':
-          // 推しホロメン：専用実装（未実装）
-          return false;
+          // 推しホロメン：推しスキル発動チェック
+          return this.canActivateOshiSkill(card, position);
           
         case 'manual_trigger':
           // 汎用手動トリガー（従来の実装）
@@ -570,6 +570,134 @@ class CardInteractionManager {
     }
     
     return false;
+  }
+
+  /**
+   * 推しスキル発動可能かチェック
+   */
+  canActivateOshiSkill(card, position) {
+    // 推しホロメンカードでない場合は不可
+    if (!card.card_type?.includes('推しホロメン')) {
+      return false;
+    }
+    
+    // 推しホロメンは常にプレイヤー1のもの
+    const myPlayerId = 1;
+    const currentPlayer = this.battleEngine.gameState.currentPlayer;
+    const currentPhase = this.battleEngine.gameState.currentPhase;
+    
+    // カード効果の確認
+    if (!window.cardEffects || !window.cardEffects[card.id]) {
+      return false;
+    }
+    
+    const cardEffect = window.cardEffects[card.id];
+    
+    // 推しスキルがあるかチェック
+    if (!cardEffect.effects || !cardEffect.effects.oshiSkill) {
+      return false;
+    }
+    
+    const oshiSkill = cardEffect.effects.oshiSkill;
+    
+    // 基本的な発動タイミングチェック
+    if (currentPlayer === myPlayerId) {
+      // 自分のターン：メインステップ(3)またはパフォーマンスステップ(4)でのみ発動可能
+      if (currentPhase !== 3 && currentPhase !== 4) {
+        console.log(`❌ [推しスキル] 自分のターンではメインステップ・パフォーマンスステップでのみ使用可能 (現在フェーズ: ${currentPhase})`);
+        return false;
+      }
+    } else {
+      // 相手のターン：効果によって発動可能かチェック
+      if (oshiSkill.timing !== 'reactive') {
+        console.log(`❌ [推しスキル] 相手のターンではreactiveタイミングの効果のみ使用可能`);
+        return false;
+      }
+    }
+    
+    // コスト不足チェック
+    if (!this.canPayHoloPowerCost(oshiSkill.holoPowerCost || 0)) {
+      console.log(`❌ [推しスキル] ホロパワー不足 (必要: ${oshiSkill.holoPowerCost || 0})`);
+      return false;
+    }
+    
+    // ターン制限チェック
+    if (!this.canUseOshiSkillThisTurn(card, oshiSkill)) {
+      console.log(`❌ [推しスキル] ターン使用制限`);
+      return false;
+    }
+    
+    // ゲーム制限チェック（SP推しスキル）
+    if (!this.canUseOshiSkillThisGame(card, oshiSkill)) {
+      console.log(`❌ [推しスキル] ゲーム使用制限`);
+      return false;
+    }
+    
+    // 条件チェック（reactiveタイミングの場合）
+    if (oshiSkill.timing === 'reactive' && oshiSkill.condition) {
+      const conditionMet = oshiSkill.condition(card, this.battleEngine.gameState, this.battleEngine);
+      console.log(`🔍 [推しスキル] 条件チェック結果: ${conditionMet}`);
+      return conditionMet;
+    }
+    
+    // 手動発動スキルの場合は基本的に発動可能
+    return true;
+  }
+
+  /**
+   * ホロパワーコストを支払えるかチェック
+   */
+  canPayHoloPowerCost(cost) {
+    if (cost <= 0) return true;
+    
+    const currentPlayer = this.battleEngine.gameState.currentPlayer;
+    const player = this.battleEngine.players[currentPlayer];
+    
+    // ホロパワーエリアのカード数をチェック
+    const holoPowerCount = player.holoPower ? player.holoPower.length : 0;
+    return holoPowerCount >= cost;
+  }
+
+  /**
+   * 推しスキルをこのターンに使用可能かチェック
+   */
+  canUseOshiSkillThisTurn(card, oshiSkill) {
+    // ターン制限がない場合は使用可能
+    if (!oshiSkill.turnLimit) return true;
+    
+    const currentPlayer = this.battleEngine.gameState.currentPlayer;
+    const player = this.battleEngine.players[currentPlayer];
+    
+    // 使用履歴の確認（推しスキルは基本的にターン1制限）
+    const usedOshiSkillsThisTurn = player.gameState?.usedOshiSkillsThisTurn || 0;
+    return usedOshiSkillsThisTurn < oshiSkill.turnLimit;
+  }
+
+  /**
+   * 推しスキルをこのゲーム中に使用可能かチェック（SP推しスキル用）
+   */
+  canUseOshiSkillThisGame(card, oshiSkill) {
+    // SP推しスキルの場合はゲーム制限をチェック
+    if (oshiSkill.gameLimit) {
+      const currentPlayer = this.battleEngine.gameState.currentPlayer;
+      const player = this.battleEngine.players[currentPlayer];
+      
+      // ゲーム内使用履歴の確認
+      if (!player.gameState) {
+        player.gameState = {};
+      }
+      if (!player.gameState.usedOshiSkillsThisGame) {
+        player.gameState.usedOshiSkillsThisGame = {};
+      }
+      
+      const skillKey = `${card.id}_${oshiSkill.name}`;
+      const usedThisGame = player.gameState.usedOshiSkillsThisGame[skillKey] || 0;
+      
+      return usedThisGame < oshiSkill.gameLimit;
+    }
+    
+    // 通常の推しスキルの場合は制限なし
+    return true;
   }
 
   /**
@@ -791,6 +919,123 @@ class CardInteractionManager {
     
     console.warn(`⚠️ [自動アーカイブ] カードが見つかりません: ${card.id} in ${position}`);
     return false;
+  }
+
+  /**
+   * 推しスキル発動処理
+   */
+  async activateOshiSkill(card, cardEffect) {
+    const oshiSkill = cardEffect.effects?.oshiSkill;
+    if (!oshiSkill) {
+      return { success: false, message: '推しスキルが見つかりません' };
+    }
+    
+    // ホロパワーコストを支払う
+    if (!this.payHoloPowerCost(oshiSkill.holoPowerCost || 0)) {
+      return { success: false, message: 'ホロパワーが不足しています' };
+    }
+    
+    // ターン使用回数を記録
+    this.markOshiSkillUsed(card, oshiSkill);
+    
+    // 効果実行
+    if (oshiSkill.effect) {
+      return await oshiSkill.effect(card, this.battleEngine);
+    }
+    
+    return { success: false, message: '効果が定義されていません' };
+  }
+
+  /**
+   * ホロパワーコストを支払う
+   */
+  payHoloPowerCost(cost) {
+    if (cost <= 0) return true;
+    
+    const currentPlayer = this.battleEngine.gameState.currentPlayer;
+    const player = this.battleEngine.players[currentPlayer];
+    
+    if (!player.holoPower || player.holoPower.length < cost) {
+      return false;
+    }
+    
+    // ホロパワーエリアからカードを取り除く
+    for (let i = 0; i < cost; i++) {
+      const holoPowerCard = player.holoPower.pop();
+      if (holoPowerCard) {
+        player.archive.push(holoPowerCard);
+      }
+    }
+    
+    return true;
+  }
+
+  /**
+   * 推しスキル使用履歴を記録
+   */
+  markOshiSkillUsed(card, oshiSkill) {
+    const currentPlayer = this.battleEngine.gameState.currentPlayer;
+    const player = this.battleEngine.players[currentPlayer];
+    
+    if (!player.gameState) {
+      player.gameState = {};
+    }
+    
+    // ターン使用回数を記録
+    if (!player.gameState.usedOshiSkillsThisTurn) {
+      player.gameState.usedOshiSkillsThisTurn = 0;
+    }
+    player.gameState.usedOshiSkillsThisTurn++;
+    
+    // SP推しスキルの場合はゲーム使用回数も記録
+    if (oshiSkill.gameLimit) {
+      if (!player.gameState.usedOshiSkillsThisGame) {
+        player.gameState.usedOshiSkillsThisGame = {};
+      }
+      
+      const skillKey = `${card.id}_${oshiSkill.name}`;
+      if (!player.gameState.usedOshiSkillsThisGame[skillKey]) {
+        player.gameState.usedOshiSkillsThisGame[skillKey] = 0;
+      }
+      player.gameState.usedOshiSkillsThisGame[skillKey]++;
+      
+      console.log(`📊 [推しスキル] SP推しスキル使用記録: ${skillKey} = ${player.gameState.usedOshiSkillsThisGame[skillKey]}/${oshiSkill.gameLimit}`);
+    }
+  }
+
+  /**
+   * 推しホロメン効果発動の統合処理
+   */
+  async activateOshiHolomenEffect(card, position = 'oshi') {
+    if (!card.card_type?.includes('推しホロメン')) {
+      this.showMessage('推しホロメンカードではありません', 'error');
+      return;
+    }
+
+    if (!window.cardEffects || !window.cardEffects[card.id]) {
+      this.showMessage('推しスキルが定義されていません', 'error');
+      return;
+    }
+
+    const cardEffect = window.cardEffects[card.id];
+    
+    try {
+      // 推しスキル発動
+      const result = await this.activateOshiSkill(card, cardEffect);
+      
+      if (result && result.success) {
+        this.showMessage(result.message || '推しスキルを発動しました！', 'success');
+        
+        // UI更新
+        this.battleEngine.updateUI();
+      } else {
+        this.showMessage(result?.message || '推しスキルの発動に失敗しました', 'error');
+      }
+      
+    } catch (error) {
+      console.error('推しスキル発動エラー:', error);
+      this.showMessage('推しスキルの実行中にエラーが発生しました', 'error');
+    }
   }
 }
 

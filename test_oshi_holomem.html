@@ -1,0 +1,177 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>推しホロメン効果発動テスト</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            margin: 20px;
+        }
+        .test-area {
+            border: 1px solid #ccc;
+            padding: 20px;
+            margin: 10px 0;
+        }
+        .oshi-card {
+            width: 150px;
+            height: 200px;
+            border: 2px solid #4CAF50;
+            border-radius: 8px;
+            padding: 10px;
+            margin: 10px;
+            cursor: pointer;
+            position: relative;
+        }
+        .card-effect-button {
+            position: absolute;
+            bottom: 5px;
+            right: 5px;
+            background: #FF4444;
+            color: white;
+            border: none;
+            border-radius: 50%;
+            width: 30px;
+            height: 30px;
+            cursor: pointer;
+            font-size: 16px;
+        }
+        .holo-power-display {
+            background: #E3F2FD;
+            padding: 10px;
+            margin: 10px 0;
+            border-radius: 4px;
+        }
+        .log {
+            background: #f5f5f5;
+            padding: 10px;
+            margin: 10px 0;
+            border-radius: 4px;
+            max-height: 200px;
+            overflow-y: auto;
+        }
+    </style>
+</head>
+<body>
+    <h1>推しホロメン効果発動システム テスト</h1>
+    
+    <div class="test-area">
+        <h2>推しホロメンカード</h2>
+        <div class="oshi-card" id="oshi-card">
+            <h3>雪花ラミィ</h3>
+            <p>推しホロメン</p>
+            <p>hBP04-004</p>
+            <div class="card-effect-button" onclick="testOshiSkill()">⚡</div>
+        </div>
+    </div>
+    
+    <div class="test-area">
+        <h2>ホロパワー状況</h2>
+        <div class="holo-power-display" id="holo-power-display">
+            ホロパワー: 0枚
+        </div>
+        <button onclick="addHoloPower()">ホロパワー追加</button>
+        <button onclick="removeHoloPower()">ホロパワー消費</button>
+    </div>
+    
+    <div class="test-area">
+        <h2>推しスキル情報</h2>
+        <div id="skill-info">
+            <p><strong>愛してる</strong></p>
+            <p>コスト: ホロパワー1</p>
+            <p>条件: 相手のターンで自分のホロメンがダウンした時</p>
+            <p>効果: ダウンしたホロメンに付いているファン1枚を手札に戻す</p>
+        </div>
+    </div>
+    
+    <div class="test-area">
+        <h2>テストログ</h2>
+        <div class="log" id="test-log"></div>
+        <button onclick="clearLog()">ログクリア</button>
+    </div>
+
+    <script>
+        let holoPowerCount = 0;
+        let testDownedHolomem = null;
+        
+        function log(message) {
+            const logElement = document.getElementById('test-log');
+            const timestamp = new Date().toLocaleTimeString();
+            logElement.innerHTML += `<div>[${timestamp}] ${message}</div>`;
+            logElement.scrollTop = logElement.scrollHeight;
+        }
+        
+        function updateHoloPowerDisplay() {
+            document.getElementById('holo-power-display').textContent = `ホロパワー: ${holoPowerCount}枚`;
+        }
+        
+        function addHoloPower() {
+            holoPowerCount++;
+            updateHoloPowerDisplay();
+            log(`ホロパワー追加: ${holoPowerCount}枚`);
+        }
+        
+        function removeHoloPower() {
+            if (holoPowerCount > 0) {
+                holoPowerCount--;
+                updateHoloPowerDisplay();
+                log(`ホロパワー消費: ${holoPowerCount}枚`);
+            } else {
+                log('ホロパワーが不足しています');
+            }
+        }
+        
+        function clearLog() {
+            document.getElementById('test-log').innerHTML = '';
+        }
+        
+        // 推しスキルテスト関数
+        function testOshiSkill() {
+            log('推しスキル「愛してる」発動テスト開始');
+            
+            // コスト確認
+            if (holoPowerCount < 1) {
+                log('❌ ホロパワーが不足しています (必要: 1, 現在: ' + holoPowerCount + ')');
+                return;
+            }
+            
+            // 条件確認（テスト用に簡略化）
+            const isOpponentTurn = confirm('相手のターンですか？');
+            if (!isOpponentTurn) {
+                log('❌ 相手のターンでないため発動できません');
+                return;
+            }
+            
+            const holomenDowned = confirm('自分のホロメンがダウンしましたか？');
+            if (!holomenDowned) {
+                log('❌ ホロメンがダウンしていないため発動できません');
+                return;
+            }
+            
+            // 効果実行
+            log('✅ 推しスキル発動条件を満たしています');
+            
+            // コスト支払い
+            removeHoloPower();
+            log('💰 ホロパワー1枚を消費しました');
+            
+            // 効果実行
+            const fanReturned = confirm('ファンカードを手札に戻しますか？');
+            if (fanReturned) {
+                log('🎯 ダウンしたホロメンのファン1枚を手札に戻しました');
+                log('✨ 推しスキル「愛してる」の効果が正常に発動しました！');
+            } else {
+                log('⚠️ ファンカードがありませんでした');
+            }
+        }
+        
+        // 初期化
+        document.addEventListener('DOMContentLoaded', function() {
+            log('推しホロメン効果発動システム テスト開始');
+            log('hBP04-004 雪花ラミィの推しスキル「愛してる」をテストします');
+            updateHoloPowerDisplay();
+        });
+    </script>
+</body>
+</html>
