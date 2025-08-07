@@ -142,6 +142,9 @@ class PhaseController {
     
     const player = this.battleEngine.players[playerId];
     
+    // 0. センター空きチェックと補充処理（最優先）
+    this.checkAndFillCenterSlot(playerId);
+    
     // 1. まず、バックにお休みになっているホロメンカードを通常に戻す
     const backPositions = ['back1', 'back2', 'back3', 'back4', 'back5'];
     let resetCount = 0;
@@ -539,6 +542,73 @@ class PhaseController {
       this.endStepInProgress = false;
       this.battleEngine.endTurn();
     }, 1000);
+  }
+
+  /**
+   * センタースロットの空きチェックと補充処理
+   * @param {number} playerId - プレイヤーID
+   */
+  checkAndFillCenterSlot(playerId) {
+    const player = this.battleEngine.players[playerId];
+    
+    // センターが空でない場合は何もしない
+    if (player.center) {
+      return;
+    }
+
+    console.log(`🏠 [PhaseController] センター空き検出 - プレイヤー${playerId}`);
+
+    // 1. バックホロメンから選択して配置
+    const backPositions = ['back1', 'back2', 'back3', 'back4', 'back5'];
+    const backCards = backPositions
+      .map(pos => ({ card: player[pos], position: pos }))
+      .filter(item => item.card && item.card.card_type === 'ホロメン');
+
+    if (backCards.length > 0) {
+      // バックの最初のホロメンをセンターに移動
+      const selectedBack = backCards[0];
+      player.center = selectedBack.card;
+      player[selectedBack.position] = null;
+      
+      console.log(`⬆️ [PhaseController] バックからセンターに移動: ${selectedBack.card.name} (${selectedBack.position})`);
+      
+      // HP情報をStateManagerで保持
+      if (this.battleEngine.stateManager && selectedBack.card.id) {
+        const currentHP = this.battleEngine.stateManager.getCurrentHP(selectedBack.card, playerId);
+        this.battleEngine.stateManager.setCurrentHP(selectedBack.card, playerId, currentHP);
+      }
+      
+      // UI更新
+      this.battleEngine.updateUI();
+      return;
+    }
+
+    // 2. コラボカードをお休み状態でセンターに配置
+    if (player.collab) {
+      player.center = player.collab;
+      player.collab = null;
+      
+      // お休み状態に設定
+      player.center.isResting = true;
+      if (!player.center.cardState) {
+        player.center.cardState = {};
+      }
+      player.center.cardState.resting = true;
+      
+      console.log(`😴 [PhaseController] コラボからセンターにお休み状態で移動: ${player.center.name}`);
+      
+      // HP情報をStateManagerで保持
+      if (this.battleEngine.stateManager && player.center.id) {
+        const currentHP = this.battleEngine.stateManager.getCurrentHP(player.center, playerId);
+        this.battleEngine.stateManager.setCurrentHP(player.center, playerId, currentHP);
+      }
+      
+      // UI更新
+      this.battleEngine.updateUI();
+      return;
+    }
+
+    console.log(`❌ [PhaseController] センター補充不可 - プレイヤー${playerId}（バック・コラボとも空）`);
   }
 }
 

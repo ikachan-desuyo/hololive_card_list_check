@@ -132,8 +132,12 @@ class PerformanceManager {
       } else {
         console.log(`❌ [Performance] センター使用可能アーツなし: ${player.center.name}`);
       }
+    } else if (player.center && player.center.isResting) {
+      console.log(`😴 [Performance] センターお休み状態: ${player.center.name}`);
     } else if (player.center && this.hasCardAttackedThisTurn(playerId, 'center')) {
       console.log(`❌ [Performance] センター攻撃済み: ${player.center.name}`);
+    } else if (!player.center) {
+      console.log(`🏠 [Performance] センター空き状態`);
     }
     
     if (player.collab && !player.collab.isResting && !this.hasCardAttackedThisTurn(playerId, 'collab')) {
@@ -144,6 +148,8 @@ class PerformanceManager {
       } else {
         console.log(`❌ [Performance] コラボ使用可能アーツなし: ${player.collab.name}`);
       }
+    } else if (player.collab && player.collab.isResting) {
+      console.log(`😴 [Performance] コラボお休み状態: ${player.collab.name}`);
     } else if (player.collab && this.hasCardAttackedThisTurn(playerId, 'collab')) {
       console.log(`❌ [Performance] コラボ攻撃済み: ${player.collab.name}`);
     }
@@ -323,16 +329,29 @@ class PerformanceManager {
    * @returns {Array} 使用可能なアーツリスト
    */
   getAvailableArts(card) {
+    console.log(`🔍 [Performance] アーツチェック開始: ${card.name}`);
+    console.log(`🔍 [Performance] カードスキル:`, card.skills);
+    
     if (!card.skills || !Array.isArray(card.skills)) {
+      console.log(`❌ [Performance] スキルデータが無効: ${card.skills}`);
       return [];
     }
 
     const arts = card.skills.filter(skill => skill.type === 'アーツ');
+    console.log(`🎨 [Performance] アーツ抽出: ${arts.length}個のアーツを発見`);
+    arts.forEach((art, index) => {
+      console.log(`  アーツ${index + 1}: ${art.name} (必要: ${art.icons?.main?.join(', ') || '不明'})`);
+    });
+
     const availableArts = [];
 
-    arts.forEach(art => {
+    arts.forEach((art, index) => {
+      console.log(`🔍 [Performance] アーツ${index + 1}条件チェック: ${art.name}`);
       if (this.canUseArts(card, art)) {
         availableArts.push(art);
+        console.log(`✅ [Performance] アーツ${index + 1}使用可能: ${art.name}`);
+      } else {
+        console.log(`❌ [Performance] アーツ${index + 1}使用不可: ${art.name}`);
       }
     });
 
@@ -347,7 +366,17 @@ class PerformanceManager {
    * @returns {boolean} 使用可能かどうか
    */
   canUseArts(card, arts) {
+    console.log(`🔍 [Performance] ${arts.name}の使用条件チェック開始`);
+    
+    // お休み状態のカードはアーツ宣言できない
+    if (card.isResting || (card.cardState && card.cardState.resting)) {
+      console.log(`😴 [Performance] お休み状態のためアーツ宣言不可: ${card.name}`);
+      return false;
+    }
+
     if (!arts.icons || !arts.icons.main) {
+      console.log(`❌ [Performance] アーツアイコン情報なし: ${arts.name}`);
+      console.log(`🔍 [Performance] アーツデータ:`, arts);
       return false;
     }
 
@@ -357,6 +386,7 @@ class PerformanceManager {
     console.log(`🎨 [Performance] アーツ条件チェック: ${arts.name}`);
     console.log(`🎨 [Performance] 必要エール: ${requiredIcons.join(', ')}`);
     console.log(`🎨 [Performance] 付いているエール: ${attachedYells.length}枚`);
+    console.log(`🎨 [Performance] エール詳細:`, attachedYells);
 
     // エール数チェック
     if (attachedYells.length < requiredIcons.length) {
@@ -365,9 +395,26 @@ class PerformanceManager {
     }
 
     // 色条件チェック
-    const yellColors = attachedYells.map(yell => yell.color || 'colorless');
+    const yellColors = attachedYells.map(yell => {
+      // StateManagerの色変換メソッドを使用
+      if (this.battleEngine.stateManager && this.battleEngine.stateManager.getYellCardColor) {
+        return this.battleEngine.stateManager.getYellCardColor(yell);
+      } else {
+        // フォールバック処理
+        const color = yell.color || 'colorless';
+        const colorMap = {
+          '白': 'white', '緑': 'green', '赤': 'red', 
+          '青': 'blue', '黄': 'yellow', '紫': 'purple'
+        };
+        return colorMap[color] || color.toLowerCase();
+      }
+    });
+    console.log(`🎨 [Performance] エール色配列: [${yellColors.join(', ')}]`);
     
-    return this.checkColorRequirements(requiredIcons, yellColors);
+    const result = this.checkColorRequirements(requiredIcons, yellColors);
+    console.log(`🎨 [Performance] ${arts.name}色条件チェック結果: ${result ? '✅成功' : '❌失敗'}`);
+    
+    return result;
   }
 
   /**
@@ -377,37 +424,75 @@ class PerformanceManager {
    * @returns {boolean} 条件を満たすかどうか
    */
   checkColorRequirements(required, available) {
+    console.log(`🔍 [Color] 色条件チェック開始`);
+    console.log(`🔍 [Color] 必要色: [${required.join(', ')}]`);
+    console.log(`🔍 [Color] 利用可能色: [${available.join(', ')}]`);
+    
     const availableCopy = [...available];
     
-    for (const requiredColor of required) {
+    for (let i = 0; i < required.length; i++) {
+      const requiredColor = required[i];
+      console.log(`🔍 [Color] ステップ${i + 1}: "${requiredColor}"を検索, 残り: [${availableCopy.join(', ')}]`);
+      
       if (requiredColor === 'any') {
         // 任意の色でOK
         if (availableCopy.length > 0) {
-          availableCopy.shift(); // 1枚消費
+          const consumed = availableCopy.shift();
+          console.log(`✅ [Color] any条件: "${consumed}"を消費`);
           continue;
         } else {
+          console.log(`❌ [Color] any条件: エール不足`);
           return false;
         }
       } else {
         // 特定の色が必要
         const colorIndex = availableCopy.indexOf(requiredColor);
         if (colorIndex >= 0) {
-          availableCopy.splice(colorIndex, 1); // その色を消費
+          availableCopy.splice(colorIndex, 1);
+          console.log(`✅ [Color] 特定色条件: "${requiredColor}"を消費`);
         } else {
           // 代替として 'colorless' や 'any' エールがあるかチェック
           const anyIndex = availableCopy.findIndex(color => color === 'colorless' || color === 'any');
           if (anyIndex >= 0) {
+            const substitute = availableCopy[anyIndex];
             availableCopy.splice(anyIndex, 1);
+            console.log(`✅ [Color] 代替色使用: "${substitute}"で"${requiredColor}"を代用`);
           } else {
-            console.log(`❌ [Performance] 色条件不満足: ${requiredColor}が不足`);
+            console.log(`❌ [Color] 色条件不満足: "${requiredColor}"が不足`);
+            console.log(`❌ [Color] 探索対象: [${availableCopy.join(', ')}]`);
             return false;
           }
         }
       }
     }
     
-    console.log(`✅ [Performance] 色条件満足`);
+    console.log(`✅ [Color] 色条件満足, 残りエール: [${availableCopy.join(', ')}]`);
     return true;
+  }
+
+  /**
+   * 色条件チェックのテスト用関数（デバッグ用）
+   */
+  testColorRequirements() {
+    console.log('🧪 [Performance] エール色条件テスト開始');
+    
+    // テストケース1: ["blue", "any", "any"] vs ["blue", "red", "green"]
+    const test1 = this.checkColorRequirements(["blue", "any", "any"], ["blue", "red", "green"]);
+    console.log(`テスト1 ["blue", "any", "any"] vs ["blue", "red", "green"]: ${test1 ? '✅' : '❌'}`);
+    
+    // テストケース2: ["blue", "any", "any"] vs ["red", "green", "blue"]
+    const test2 = this.checkColorRequirements(["blue", "any", "any"], ["red", "green", "blue"]);
+    console.log(`テスト2 ["blue", "any", "any"] vs ["red", "green", "blue"]: ${test2 ? '✅' : '❌'}`);
+    
+    // テストケース3: ["blue", "any", "any"] vs ["red", "green"] (不足)
+    const test3 = this.checkColorRequirements(["blue", "any", "any"], ["red", "green"]);
+    console.log(`テスト3 ["blue", "any", "any"] vs ["red", "green"]: ${test3 ? '✅' : '❌'}`);
+    
+    // テストケース4: ["blue", "any", "any"] vs ["colorless", "red", "green"]
+    const test4 = this.checkColorRequirements(["blue", "any", "any"], ["colorless", "red", "green"]);
+    console.log(`テスト4 ["blue", "any", "any"] vs ["colorless", "red", "green"]: ${test4 ? '✅' : '❌'}`);
+    
+    console.log('🧪 [Performance] エール色条件テスト完了');
   }
 
   /**

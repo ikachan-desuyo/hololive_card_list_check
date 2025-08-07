@@ -2450,8 +2450,28 @@ class HololiveStateManager {
   getYellCardColor(yellCard) {
     // エールカードの色情報を取得（実装に応じて調整）
     if (yellCard.color) {
-      return yellCard.color.toLowerCase();
+      const colorValue = yellCard.color.toLowerCase();
+      
+      // 日本語から英語への変換
+      const colorMap = {
+        '白': 'white',
+        '緑': 'green', 
+        '赤': 'red',
+        '青': 'blue',
+        '黄': 'yellow',
+        '紫': 'purple',
+        '無色': 'colorless'
+      };
+      
+      // 日本語の場合は英語に変換
+      if (colorMap[colorValue]) {
+        return colorMap[colorValue];
+      }
+      
+      // 既に英語の場合はそのまま
+      return colorValue;
     }
+    
     // フォールバック: カード名やIDから推測
     const cardName = yellCard.name || '';
     if (cardName.includes('白') || cardName.includes('White')) return 'white';
@@ -2601,7 +2621,10 @@ class HololiveStateManager {
     const player = this.state.players[playerId];
     if (!player || !player.cardHP) return this.getMaxHP(card);
     
-    const currentHP = player.cardHP[card.id];
+    // uniqueIdがある場合はそれを使用、なければIDを使用
+    const cardKey = (card.cardState && card.cardState.uniqueId) ? card.cardState.uniqueId : card.id;
+    const currentHP = player.cardHP[cardKey];
+    
     return currentHP !== undefined ? currentHP : this.getMaxHP(card);
   }
 
@@ -2624,14 +2647,17 @@ class HololiveStateManager {
     const maxHP = this.getMaxHP(card);
     const validHP = Math.max(0, Math.min(newHP, maxHP));
     
-    player.cardHP[card.id] = validHP;
+    // uniqueIdがある場合はそれを使用、なければIDを使用
+    const cardKey = (card.cardState && card.cardState.uniqueId) ? card.cardState.uniqueId : card.id;
+    player.cardHP[cardKey] = validHP;
     
-    console.log(`🩹 [HP設定] ${card.name}: ${validHP}/${maxHP} (プレイヤー${playerId})`);
+    console.log(`🩹 [HP設定] ${card.name}: ${validHP}/${maxHP} (プレイヤー${playerId}) [${cardKey}]`);
     
     // ダメージイベントをログ出力（EventEmitter未実装のため）
     console.log(`📡 [StateManager] cardDamaged event:`, {
       playerId,
       card,
+      cardKey,
       currentHP: validHP,
       maxHP,
       isKnockOut: validHP === 0
