@@ -60,25 +60,27 @@ const cardEffect_hBP01_104 = {
           // カードを公開（ログに表示）
           console.log(`📢 [カード公開] ${selectedHolomen.name || selectedHolomen.card_name} を公開しました`);
           
-          // ステージに出す場所を選択（空いているエリア）
           const player = battleEngine.players[currentPlayer];
-          const availablePositions = [];
           
-          if (!player.center) availablePositions.push('center');
-          if (!player.collab) availablePositions.push('collab');
+          // シンプルな配置ロジック（バック優先）
+          let targetPosition = 'collab'; // デフォルト
+          
+          // バックスロットをチェック
           for (let i = 1; i <= 5; i++) {
-            if (!player[`back${i}`]) availablePositions.push(`back${i}`);
+            if (!player[`back${i}`]) {
+              targetPosition = `back${i}`;
+              break;
+            }
           }
           
-          if (availablePositions.length === 0) {
-            return {
-              success: false,
-              message: 'ステージに空きがありません'
-            };
+          // もしバックが埋まっていたら、center、collabの順でチェック
+          if (targetPosition === 'collab') {
+            if (!player.center) {
+              targetPosition = 'center';
+            } else if (!player.collab) {
+              targetPosition = 'collab';
+            }
           }
-          
-          // 最初の空いている位置に配置
-          const targetPosition = availablePositions[0];
           
           // デッキからカードを除去
           const deckIndex = player.deck.indexOf(selectedHolomen);
@@ -88,6 +90,7 @@ const cardEffect_hBP01_104 = {
           
           // ステージに配置
           player[targetPosition] = selectedHolomen;
+          console.log(`📍 [ふつうのパソコン] カード配置: ${selectedHolomen.name} → ${targetPosition}`);
           
           // デッキをシャッフル
           utils.shuffleDeck(currentPlayer);
@@ -103,10 +106,10 @@ const cardEffect_hBP01_104 = {
           };
           
         } catch (error) {
-          console.error('hBP01-104 効果実行エラー:', error);
+          console.error('🚨 [ふつうのパソコン] 効果実行エラー:', error);
           return {
             success: false,
-            message: '効果の実行中にエラーが発生しました'
+            message: '効果の実行中にエラーが発生しました: ' + error.message
           };
         }
       }
@@ -126,9 +129,6 @@ if (window.cardEffects) {
     effect: cardEffect_hBP01_104
   });
 }
-
-// グローバルに公開
-window.cardEffect_hBP01_104 = cardEffect_hBP01_104;
 
 // グローバルに公開
 window.cardEffect_hBP01_104 = cardEffect_hBP01_104;

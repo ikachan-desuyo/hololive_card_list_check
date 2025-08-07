@@ -47,25 +47,33 @@ const cardEffect_hBP02_084 = {
           // 3. サイコロの結果に応じて追加効果
           if ([3, 5, 6].includes(diceRoll)) {
             // Debutホロメンをサーチ
-            const selectionResult = await utils.selectCardsFromDeck(currentPlayer, {
-              count: 1,
-              types: ['ホロメン'],
-              bloomLevel: 'Debut',
-              description: 'Debutホロメンを選択してください',
-              mandatory: false,
-              allowLess: true
-            });
+            const player = battleEngine.players[currentPlayer];
+            const hasDebutHolomen = player.deck.some(deckCard => 
+              deckCard.card_type?.includes('ホロメン') && 
+              deckCard.bloom_level === 'Debut'
+            );
             
-            if (selectionResult.success && selectionResult.cards.length > 0) {
-              const addResult = utils.addCardsToHand(currentPlayer, selectionResult.cards, true);
-              if (addResult.success) {
-                console.log(`🔍 [みっころね24] Debutホロメン発見: ${selectionResult.cards[0].name || selectionResult.cards[0].card_name}`);
-                additionalMessage = `、Debutホロメン「${selectionResult.cards[0].name || selectionResult.cards[0].card_name}」を手札に加えました`;
-                additionalCards = selectionResult.cards;
+            if (hasDebutHolomen) {
+              const selectionResult = await utils.selectCardsFromDeck(currentPlayer, {
+                count: 1,
+                types: ['ホロメン'],
+                bloomLevel: 'Debut',
+                description: 'Debutホロメンを選択してください',
+                mandatory: true,
+                allowLess: false
+              });
+              
+              if (selectionResult.success && selectionResult.cards.length > 0) {
+                const addResult = utils.addCardsToHand(currentPlayer, selectionResult.cards, true);
+                if (addResult.success) {
+                  console.log(`🔍 [みっころね24] Debutホロメン発見: ${selectionResult.cards[0].name || selectionResult.cards[0].card_name}`);
+                  additionalMessage = `、Debutホロメン「${selectionResult.cards[0].name || selectionResult.cards[0].card_name}」を手札に加えました`;
+                  additionalCards = selectionResult.cards;
+                }
               }
             } else {
-              console.log(`❌ [みっころね24] Debutホロメンが見つかりません`);
-              additionalMessage = '、Debutホロメンが見つかりませんでした';
+              console.log(`❌ [みっころね24] デッキにDebutホロメンがありません`);
+              additionalMessage = '、デッキにDebutホロメンがありませんでした';
             }
           } else if ([2, 4].includes(diceRoll)) {
             // 追加で1枚ドロー

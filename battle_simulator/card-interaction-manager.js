@@ -287,16 +287,28 @@ class CardInteractionManager {
     const currentPlayer = this.battleEngine.gameState.currentPlayer;
     
     try {
+      console.log(`🔍 [効果発動] カード詳細:`, card);
+      console.log(`🔍 [効果発動] カードID: ${card.id}, number: ${card.number}`);
+      
       // カード効果定義を直接取得
       const cardEffect = window.cardEffects[card.id];
+      console.log(`🔍 [効果発動] 効果定義[${card.id}]:`, cardEffect);
       
-      if (!cardEffect || !cardEffect.effects) {
+      // card.idで見つからない場合は card.number で試行
+      let finalCardEffect = cardEffect;
+      if (!finalCardEffect && card.number) {
+        finalCardEffect = window.cardEffects[card.number];
+        console.log(`🔍 [効果発動] 効果定義[${card.number}]:`, finalCardEffect);
+      }
+      
+      if (!finalCardEffect || !finalCardEffect.effects) {
+        console.log(`❌ [効果発動] 効果定義が見つかりません: ${card.id} / ${card.number}`);
         this.showMessage('このカードには効果がありません', 'info');
         return;
       }
 
       // 手動発動可能な効果を検索
-      const manualEffects = Object.values(cardEffect.effects).filter(effect => 
+      const manualEffects = Object.values(finalCardEffect.effects).filter(effect => 
         effect.timing === 'manual'
       );
 
@@ -304,6 +316,8 @@ class CardInteractionManager {
         this.showMessage('手動発動可能な効果がありません', 'info');
         return;
       }
+
+      console.log(`✅ [効果発動] 手動効果見つかりました: ${manualEffects.length}個`);
 
       // 最初の手動効果を発動（複数ある場合は選択UIが必要）
       const effect = manualEffects[0];
@@ -328,8 +342,10 @@ class CardInteractionManager {
         }
       }
 
-      // 効果を実行
-      const result = effect.effect(card, this.battleEngine);
+      // 効果を実行（非同期対応）
+      console.log(`🎯 [効果実行開始] カード: ${card.name || card.id}, 効果: ${effect.name}`);
+      const result = await effect.effect(card, this.battleEngine);
+      console.log(`✅ [効果実行完了] 結果:`, result);
       
       if (result && result.success !== false) {
         // LIMITED効果の使用回数をカウント
@@ -337,8 +353,9 @@ class CardInteractionManager {
           this.recordLimitedEffectUsage();
         }
         
-        // 自動アーカイブ処理（サポートカード・イベント・LIMITED等）
-        if (result.autoArchive && this.isArchivableCard(card, position)) {
+        // サポートカードの自動アーカイブ処理
+        if (position === 'hand' && card.card_type?.includes('サポート')) {
+          console.log(`🗄️ [自動アーカイブ] サポートカード ${card.name} をアーカイブに移動`);
           this.moveCardToArchive(card, position);
         }
         

@@ -111,6 +111,7 @@ class CardEffectUtils {
 
       return { success: true, reason: '選択完了', cards: selectedCards };
     } catch (error) {
+      console.error(`🚨 [selectCardsFromDeck] エラー:`, error);
       return { success: false, reason: 'エラーが発生しました', cards: [], error };
     }
   }
@@ -122,26 +123,47 @@ class CardEffectUtils {
    * @param {boolean} shuffle - 追加後にデッキをシャッフルするか
    */
   addCardsToHand(playerId, cards, shuffle = true) {
+    console.log(`🃏 [addCardsToHand] 開始: プレイヤー${playerId}, ${cards.length}枚のカードを手札に追加`);
+    console.log(`🃏 [addCardsToHand] 追加対象カード:`, cards.map(c => c.name || c.id));
+    
     const player = this.battleEngine.players[playerId];
-    if (!player) return { success: false, reason: 'プレイヤーが見つかりません' };
+    if (!player) {
+      console.error(`❌ [addCardsToHand] プレイヤー${playerId}が見つかりません`);
+      return { success: false, reason: 'プレイヤーが見つかりません' };
+    }
+
+    console.log(`🃏 [addCardsToHand] 手札追加前: ${player.hand.length}枚`);
+    console.log(`🃏 [addCardsToHand] デッキ枚数: ${player.deck.length}枚`);
 
     const addedCards = [];
 
     for (const card of cards) {
+      console.log(`🃏 [addCardsToHand] カード処理中: ${card.name || card.id}`);
+      
       // デッキから除去
       const deckIndex = player.deck.indexOf(card);
       if (deckIndex !== -1) {
         player.deck.splice(deckIndex, 1);
         player.hand.push(card);
         addedCards.push(card);
+        console.log(`✅ [addCardsToHand] ${card.name || card.id} を手札に追加完了`);
+        console.log(`✅ [addCardsToHand] 手札枚数: ${player.hand.length}枚 (+1)`);
+      } else {
+        console.warn(`⚠️ [addCardsToHand] ${card.name || card.id} がデッキに見つかりません`);
+        console.warn(`⚠️ [addCardsToHand] デッキ内容:`, player.deck.map(c => c.name || c.id));
       }
     }
 
     // デッキシャッフル
     if (shuffle && addedCards.length > 0) {
+      console.log(`🔀 [addCardsToHand] デッキをシャッフル`);
       this.shuffleDeck(playerId);
     }
 
+    console.log(`✅ [addCardsToHand] 完了: ${addedCards.length}枚を手札に追加`);
+    console.log(`✅ [addCardsToHand] 最終手札枚数: ${player.hand.length}枚`);
+    console.log(`✅ [addCardsToHand] 最終デッキ枚数: ${player.deck.length}枚`);
+    
     return { 
       success: true, 
       reason: `${addedCards.length}枚を手札に加えました`,
@@ -559,6 +581,8 @@ class CardEffectUtils {
       `;
       
       confirmButton.addEventListener('click', () => {
+        console.log(`🎯 [showCardSelectionUI] 確定ボタンクリック: ${selectedCards.length}枚選択`);
+        console.log(`🎯 [showCardSelectionUI] 選択されたカード:`, selectedCards.map(c => c.name || c.id));
         modal.remove();
         resolve(selectedCards);
       });

@@ -978,6 +978,12 @@ class CardDisplayManager {
       return;
     }
     
+    // アーカイブエリアのカードには効果ボタンを表示しない
+    if (areaId === 'archive') {
+      console.log(`❌ [効果ボタン] アーカイブエリアは効果発動不可`);
+      return;
+    }
+    
     // フェーズ判定の詳細ログ
     const currentPhase = this.battleEngine.gameState?.currentPhase;
     const gameState = this.battleEngine.gameState;
@@ -998,8 +1004,8 @@ class CardDisplayManager {
     
     console.log(`✅ [効果ボタン] メインステップ確認OK (フェーズ: ${currentPhase})`);
     
-    // 効果発動可能なエリアを定義
-    const validAreas = ['hand', 'center', 'collab', 'back1', 'back2', 'back3', 'back4', 'back5', 'backs', 'oshi', 'life', 'holo', 'archive'];
+    // 効果発動可能なエリアを定義（archiveは明示的に除外）
+    const validAreas = ['hand', 'center', 'collab', 'back1', 'back2', 'back3', 'back4', 'back5', 'backs', 'oshi'];
     if (!validAreas.includes(areaId)) {
       console.log(`❌ [効果ボタン] 無効なエリア: ${areaId}`);
       return;
@@ -1054,6 +1060,13 @@ class CardDisplayManager {
     }
     
     console.log(`✅ [効果ボタン] 効果ボタンを作成中...`);
+    
+    // 既存の効果ボタンを削除（重複防止）
+    const existingButtons = cardElement.querySelectorAll('.card-effect-button');
+    existingButtons.forEach(button => {
+      console.log(`🗑️ [効果ボタン] 既存ボタンを削除: ${card.name || card.id}`);
+      button.remove();
+    });
     
     const effectButton = document.createElement('div');
     effectButton.className = 'card-effect-button';
