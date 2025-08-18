@@ -6,6 +6,34 @@
 class DeckManager {
   constructor() {
     this.savedDecks = this.loadSavedDecks();
+    this.cardDatabase = null; // 独自のカードデータベースキャッシュ
+  }
+
+  // カードデータベースを取得（バトルエンジンがあれば利用、なければ独自読み込み）
+  async getCardDatabase() {
+    // バトルエンジンが利用可能な場合はそれを使用
+    if (window.battleEngine && window.battleEngine.cardDatabase) {
+      console.log('📁 [Deck Manager] バトルエンジンのカードDBを使用');
+      return window.battleEngine.cardDatabase;
+    }
+
+    // 独自にカードデータを読み込み（キャッシュあり）
+    if (!this.cardDatabase) {
+      try {
+        console.log('📁 [Deck Manager] 独自にカードデータを読み込み中...');
+        const response = await fetch('./json_file/card_data.json');
+        if (!response.ok) {
+          throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+        }
+        this.cardDatabase = await response.json();
+        console.log('📁 [Deck Manager] カードデータ読み込み成功:', Object.keys(this.cardDatabase).length, '枚');
+      } catch (error) {
+        console.error('❌ [Deck Manager] カードデータの読み込みに失敗:', error);
+        return null;
+      }
+    }
+
+    return this.cardDatabase;
   }
 
   // 保存されたデッキを読み込み
@@ -30,11 +58,11 @@ class DeckManager {
 
   // デッキをカードオブジェクトに変換
   async convertDeckToCards(deckCardIds) {
-    if (!window.battleEngine || !window.battleEngine.cardDatabase) {
+    // カードデータベースを取得（バトルエンジンまたは独自読み込み）
+    const cardDatabase = await this.getCardDatabase();
+    if (!cardDatabase) {
       return { holomen: [], support: [], yell: [], oshi: null };
     }
-
-    const cardDatabase = window.battleEngine.cardDatabase;
     const deck = {
       holomen: [],
       support: [],
@@ -125,13 +153,28 @@ class DeckSelectionUI {
     this.playerId = playerId;
     this.deckManager = new DeckManager();
     this.selectedDeck = null;
+    this.instanceId = Math.random().toString(36).substr(2, 9); // デバッグ用ID
+    console.log(`🆔 [Deck Selection] インスタンス作成: ${this.instanceId}, Player ${playerId}`);
   }
 
   // デッキ選択モーダルを表示
   showDeckSelectionModal() {
+    console.log(`🚀 [Deck Selection] showDeckSelectionModal開始 - インスタンス: ${this.instanceId}`);
+    
+    // 既存のモーダルがあれば削除
+    const existingModal = document.getElementById('deck-selection-modal');
+    if (existingModal) {
+      console.log('🔄 [Deck Selection] 既存のモーダルを削除');
+      existingModal.remove();
+    }
+    
     const modal = this.createDeckSelectionModal();
     document.body.appendChild(modal);
-    this.populateDeckList();
+    
+    // DOM追加後、次のフレームでデッキリストを読み込み
+    requestAnimationFrame(() => {
+      this.populateDeckList();
+    });
   }
 
   createDeckSelectionModal() {
@@ -177,7 +220,10 @@ class DeckSelectionUI {
     this.addModalStyles();
 
     // イベントリスナーを設定
-    modal.querySelector('#confirm-deck-selection').addEventListener('click', () => {
+    const confirmButton = modal.querySelector('#confirm-deck-selection');
+    confirmButton.addEventListener('click', () => {
+      console.log(`🎯 [Deck Selection] 確認ボタンがクリックされました - インスタンス: ${this.instanceId}`);
+      console.log('🎯 [Deck Selection] this.selectedDeck:', this.selectedDeck);
       this.confirmDeckSelection();
     });
 
@@ -391,10 +437,19 @@ class DeckSelectionUI {
   }
 
   populateDeckList() {
+    console.log('📋 [Deck Selection] デッキリスト読み込み開始');
+    
     const deckList = document.getElementById('saved-deck-list');
+    if (!deckList) {
+      console.error('❌ [Deck Selection] saved-deck-list要素が見つかりません');
+      return;
+    }
+    
     const deckNames = this.deckManager.getDeckNames();
+    console.log(`📋 [Deck Selection] 保存されたデッキ数: ${deckNames.length}`);
 
     if (deckNames.length === 0) {
+      console.log('📋 [Deck Selection] デッキが存在しないため、作成メッセージを表示');
       deckList.innerHTML = `
         <div style="text-align: center; padding: 20px; color: #666;">
           <p>保存されたデッキがありません</p>
@@ -407,6 +462,7 @@ class DeckSelectionUI {
     }
 
     deckList.innerHTML = '';
+    console.log(`📋 [Deck Selection] デッキリスト作成中: ${deckNames.join(', ')}`);
 
     deckNames.forEach(deckName => {
       const deckCardIds = this.deckManager.getDeck(deckName);
@@ -418,14 +474,19 @@ class DeckSelectionUI {
       `;
 
       deckItem.addEventListener('click', () => {
+        console.log(`🎯 [Deck Selection] デッキ選択: ${deckName}`);
         this.selectDeck(deckName, deckItem);
       });
 
       deckList.appendChild(deckItem);
     });
+    
+    console.log('✅ [Deck Selection] デッキリスト表示完了');
   }
 
   async selectDeck(deckName, deckElement) {
+    console.log(`🎯 [Deck Selection] selectDeck呼び出し: ${deckName} - インスタンス: ${this.instanceId}`);
+    
     // 前の選択を解除
     document.querySelectorAll('.deck-item.selected').forEach(item => {
       item.classList.remove('selected');
@@ -434,12 +495,19 @@ class DeckSelectionUI {
     // 新しい選択をマーク
     deckElement.classList.add('selected');
     this.selectedDeck = deckName;
+    console.log(`✅ [Deck Selection] this.selectedDeck設定完了: ${this.selectedDeck}`);
 
     // デッキプレビューを更新
     await this.updateDeckPreview(deckName);
 
     // 確認ボタンを有効化
-    document.getElementById('confirm-deck-selection').disabled = false;
+    const confirmButton = document.getElementById('confirm-deck-selection');
+    if (confirmButton) {
+      confirmButton.disabled = false;
+      console.log('✅ [Deck Selection] 確認ボタンを有効化しました');
+    } else {
+      console.error('❌ [Deck Selection] 確認ボタンが見つかりません');
+    }
   }
 
   async updateDeckPreview(deckName) {
@@ -508,7 +576,13 @@ class DeckSelectionUI {
   }
 
   async confirmDeckSelection() {
-    if (!this.selectedDeck) return;
+    console.log(`🎯 [Deck Selection] confirmDeckSelection開始 - インスタンス: ${this.instanceId}`);
+    console.log('選択されたデッキ:', this.selectedDeck);
+    
+    if (!this.selectedDeck) {
+      console.warn('⚠️ [Deck Selection] デッキが選択されていません');
+      return;
+    }
 
     try {
       const deckCardIds = this.deckManager.getDeck(this.selectedDeck);
@@ -528,12 +602,18 @@ class DeckSelectionUI {
       this.applyDeckToBattle(deck);
 
       // モーダルを閉じる
-      document.getElementById('deck-selection-modal').remove();
+      const modal = document.getElementById('deck-selection-modal');
+      if (modal) {
+        modal.remove();
+        console.log('✅ [Deck Selection] モーダルを閉じました');
+      }
 
       const playerName = this.playerId === 1 ? 'プレイヤー' : '相手';
+      console.log(`✅ [Deck Selection] デッキ適用完了: ${this.selectedDeck} → ${playerName}`);
       alert(`デッキ「${this.selectedDeck}」が${playerName}用に適用されました！`);
 
     } catch (error) {
+      console.error('❌ [Deck Selection] デッキ適用エラー:', error);
       alert("デッキの適用に失敗しました");
     }
   }

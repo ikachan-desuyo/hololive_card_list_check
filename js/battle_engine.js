@@ -15,6 +15,7 @@ class HololiveBattleEngine {
     this.cardDatabase = null;
     this.stageData = null;
     this.modalUI = new ModalUI(); // モーダルUI追加
+    this.gameStarted = false; // ゲーム開始状態の管理
     
     // フェーズ管理をPhaseControllerに移譲
     // this.phaseInProgress と this.phaseNames は PhaseController で管理
@@ -432,9 +433,16 @@ class HololiveBattleEngine {
 
   async initializeGame() {
     try {
+      console.log('🔧 [Battle Engine] 初期化開始');
+      
       // カードデータとステージデータの読み込み
+      console.log('📁 [Battle Engine] カードデータ読み込み開始');
       await this.loadCardData();
+      console.log('📁 [Battle Engine] カードデータ読み込み完了');
+      
+      console.log('🎭 [Battle Engine] ステージデータ読み込み開始');
       await this.loadStageData();
+      console.log('🎭 [Battle Engine] ステージデータ読み込み完了');
       
       // テスト用デッキが存在しない場合は作成
       this.createTestDeckIfNeeded();
@@ -442,6 +450,7 @@ class HololiveBattleEngine {
       // UI要素の初期化
       this.initializeUI();
       
+      console.log('✅ [Battle Engine] 初期化完了');
       // 初期化完了
     } catch (error) {
       window.errorLog('バトルエンジン初期化エラー:', error);
@@ -460,10 +469,16 @@ class HololiveBattleEngine {
 
   async loadCardData() {
     try {
+      console.log('📁 [Battle Engine] カードデータ取得中: ./json_file/card_data.json');
       const response = await fetch('./json_file/card_data.json');
+      if (!response.ok) {
+        throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+      }
       this.cardDatabase = await response.json();
+      console.log('📁 [Battle Engine] カードデータ読み込み成功:', Object.keys(this.cardDatabase).length, '枚');
       // カードデータ読み込み完了
     } catch (error) {
+      console.error('❌ [Battle Engine] カードデータ読み込みエラー:', error);
       window.errorLog('カードデータ読み込みエラー:', error);
     }
   }
@@ -528,6 +543,8 @@ class HololiveBattleEngine {
 
   // 後方互換性のため
   createLegacyControlPanel() {
+    console.log('🔧 [Battle Engine] createLegacyControlPanel開始');
+    
     const controlPanel = document.createElement('div');
     controlPanel.className = 'control-panel';
     controlPanel.innerHTML = `
@@ -546,14 +563,20 @@ class HololiveBattleEngine {
     `;
     
     document.body.appendChild(controlPanel);
+    console.log('✅ [Battle Engine] レガシーコントロールパネル作成完了');
 
     // イベントリスナーの設定（レガシー版）
     document.getElementById('select-player-deck').addEventListener('click', () => this.showDeckSelection(1));
     document.getElementById('select-opponent-deck').addEventListener('click', () => this.showDeckSelection(2));
-    document.getElementById('start-game').addEventListener('click', () => this.startGame());
+    document.getElementById('start-game').addEventListener('click', () => {
+      console.log('🚀 [Battle Engine] レガシーstartGameボタンクリック');
+      this.startGame();
+    });
     document.getElementById('next-phase').addEventListener('click', () => this.nextPhase());
     document.getElementById('end-turn').addEventListener('click', () => this.endTurn());
     document.getElementById('reset-game').addEventListener('click', () => this.resetGame());
+    
+    console.log('✅ [Battle Engine] レガシーイベントリスナー設定完了');
     
     // 初期状態の更新
     this.updateGameStatus();
@@ -648,18 +671,47 @@ class HololiveBattleEngine {
   }
 
   showDeckSelection(playerId = 1) {
+    console.log(`🎯 [Deck Selection] デッキ選択開始 - Player ${playerId}`);
+    
     if (!window.DeckSelectionUI) {
+      console.error('❌ [Deck Selection] DeckSelectionUIが利用できません');
       alert('デッキ管理システムが読み込まれていません');
       return;
     }
+    
+    console.log('✅ [Deck Selection] DeckSelectionUI利用可能');
 
-    const deckSelectionUI = new window.DeckSelectionUI(this, playerId);
-    deckSelectionUI.showDeckSelectionModal();
+    try {
+      const deckSelectionUI = new window.DeckSelectionUI(this, playerId);
+      console.log('✅ [Deck Selection] DeckSelectionUIインスタンス作成完了');
+      deckSelectionUI.showDeckSelectionModal();
+      console.log('✅ [Deck Selection] モーダル表示指示送信完了');
+    } catch (error) {
+      console.error('❌ [Deck Selection] エラー発生:', error);
+      console.error('スタックトレース:', error.stack);
+      alert(`デッキ選択でエラーが発生しました: ${error.message}`);
+    }
   }
 
   startGame() {
+    console.log('🚀 [Battle Engine] startGame開始');
+    
+    // 既にゲームが開始されている場合は重複実行を防ぐ
+    if (this.gameStarted) {
+      console.log('⚠️ [Battle Engine] ゲーム既に開始済み、重複実行を防止');
+      return;
+    }
+    
     // Game Setup Managerに委譲
-    return this.setupManager.startGame();
+    const result = this.setupManager.startGame();
+    
+    // ゲーム開始成功時にフラグを設定
+    if (result !== false) {
+      this.gameStarted = true;
+      console.log('✅ [Battle Engine] ゲーム開始フラグ設定完了');
+    }
+    
+    return result;
   }
 
   validateGameSetup() {
@@ -3024,9 +3076,53 @@ class HololiveBattleEngine {
 
 // グローバルインスタンス
 let battleEngine = null;
+let battleEngineInitialized = false; // 初期化状態の管理
 
 // ページ読み込み完了時にバトルエンジンを初期化
-document.addEventListener('DOMContentLoaded', () => {
-  battleEngine = new HololiveBattleEngine();
-  window.battleEngine = battleEngine; // グローバルアクセス用
+document.addEventListener('DOMContentLoaded', async () => {
+  if (battleEngineInitialized) {
+    console.log('⚠️ [Battle Engine] 既に初期化済みのため、スキップ');
+    return;
+  }
+  
+  try {
+    console.log('🚀 [Battle Engine] DOMContentLoaded イベント発生');
+    battleEngine = new HololiveBattleEngine();
+    window.battleEngine = battleEngine; // グローバルアクセス用
+    console.log('🚀 [Battle Engine] インスタンス作成完了');
+    
+    // ゲームを初期化（カードデータ読み込み含む）
+    await battleEngine.initializeGame();
+    
+    battleEngineInitialized = true; // 初期化完了フラグ
+    
+    // デバッグ用の状態確認関数を追加
+    window.debugBattleEngine = () => {
+      console.log('🔍 [Debug] バトルエンジン状態確認:');
+      console.log('  - battleEngine:', !!window.battleEngine);
+      console.log('  - cardDatabase:', !!window.battleEngine?.cardDatabase);
+      console.log('  - DeckManager:', !!window.DeckManager);
+      console.log('  - DeckSelectionUI:', !!window.DeckSelectionUI);
+      if (window.battleEngine?.cardDatabase) {
+        console.log('  - カード数:', Object.keys(window.battleEngine.cardDatabase).length);
+      }
+    };
+    
+    console.log('🚀 [Battle Engine] 初期化プロセス完了');
+    window.debugBattleEngine();
+  } catch (error) {
+    console.error('💥 [Battle Engine] 初期化中に致命的エラー:', error);
+    console.error('スタックトレース:', error.stack);
+    
+    // エラーが発生してもバトルエンジンインスタンスは作成しておく
+    if (!window.battleEngine) {
+      try {
+        battleEngine = new HololiveBattleEngine();
+        window.battleEngine = battleEngine;
+        console.log('🔧 [Battle Engine] エラー後に最小限のインスタンス作成');
+      } catch (e) {
+        console.error('💥 [Battle Engine] インスタンス作成も失敗:', e);
+      }
+    }
+  }
 });
