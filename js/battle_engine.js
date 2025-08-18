@@ -1093,29 +1093,49 @@ class HololiveBattleEngine {
     const area = event.currentTarget;
     const areaId = area.className.split(' ')[0];
     
+    // エリアがどちらのプレイヤーかを判定
+    const isOpponentArea = area.closest('.battle-opponent') !== null;
+    const isPlayerArea = area.closest('.battle-player') !== null;
+    
+    // プレイヤーIDを決定
+    let targetPlayerId;
+    if (isPlayerArea) {
+      targetPlayerId = 1; // プレイヤー1（自分）
+    } else if (isOpponentArea) {
+      targetPlayerId = 2; // プレイヤー2（相手）
+    } else {
+      targetPlayerId = this.gameState.currentPlayer; // デフォルト
+    }
+    
     // エリアに応じた処理
-    this.handleAreaInteraction(areaId);
+    this.handleAreaInteraction(areaId, targetPlayerId);
   }
 
-  handleAreaInteraction(areaId) {
+  handleAreaInteraction(areaId, targetPlayerId = null) {
     const currentPlayer = this.gameState.currentPlayer;
-    const player = this.players[currentPlayer];
+    const playerId = targetPlayerId || currentPlayer;
+    const player = this.players[playerId];
     
     switch (areaId) {
       case 'deck':
-        // デッキクリック時の処理
-        if (this.gameState.currentPhase === 1) { // 手札ステップ
+        // デッキクリック時の処理（自分のターンのみ）
+        if (playerId === currentPlayer && this.gameState.currentPhase === 1) { // 手札ステップ
           this.drawCard(currentPlayer);
           this.updateUI();
         }
         break;
         
       case 'yell-deck':
-        // エールデッキクリック時の処理
-        if (this.gameState.currentPhase === 2) { // エールステップ
+        // エールデッキクリック時の処理（自分のターンのみ）
+        if (playerId === currentPlayer && this.gameState.currentPhase === 2) { // エールステップ
           this.executeYellStep(currentPlayer);
           this.updateUI();
         }
+        break;
+        
+      case 'archive':
+        // アーカイブクリック時の処理（どちらのプレイヤーも表示可能）
+        this.showArchiveModal(playerId);
         break;
         
       default:
@@ -3072,7 +3092,105 @@ class HololiveBattleEngine {
     
     return selected;
   }
+  
+  /**
+   * アーカイブモーダルを表示
+   * @param {number} playerId - プレイヤーID
+   */
+  showArchiveModal(playerId) {
+    const player = this.players[playerId];
+    if (!player) {
+      console.warn('⚠️ [showArchiveModal] プレイヤーが見つかりません:', playerId);
+      return;
+    }
+    
+    const modal = document.getElementById('archiveModal');
+    const title = document.getElementById('archiveModalTitle');
+    const cardGrid = document.getElementById('archiveCardGrid');
+    const emptyMessage = document.getElementById('archiveEmptyMessage');
+    
+    // プレイヤー名を設定
+    const playerName = playerId === 1 ? 'あなた' : '相手';
+    title.textContent = `${playerName}のアーカイブ`;
+    
+    // アーカイブカードを取得
+    const archiveCards = player.archive || [];
+    
+    if (archiveCards.length === 0) {
+      // カードがない場合
+      cardGrid.style.display = 'none';
+      emptyMessage.style.display = 'block';
+    } else {
+      // カードがある場合
+      cardGrid.style.display = 'grid';
+      emptyMessage.style.display = 'none';
+      
+      // カードグリッドをクリア
+      cardGrid.innerHTML = '';
+      
+      // 各カードを表示
+      archiveCards.forEach((card, index) => {
+        const cardElement = this.createArchiveCardElement(card, index);
+        cardGrid.appendChild(cardElement);
+      });
+    }
+    
+    // モーダルを表示
+    modal.style.display = 'flex';
+    
+    console.log(`📁 [showArchiveModal] ${playerName}のアーカイブを表示: ${archiveCards.length}枚`);
+  }
+  
+  /**
+   * アーカイブカード要素を作成
+   * @param {Object} card - カード情報
+   * @param {number} index - インデックス
+   * @returns {HTMLElement} カード要素
+   */
+  createArchiveCardElement(card, index) {
+    const cardElement = document.createElement('div');
+    cardElement.className = 'archive-card-item';
+    
+    // カード画像を背景として設定
+    if (card.image_url) {
+      cardElement.style.backgroundImage = `url(${card.image_url})`;
+      cardElement.style.backgroundSize = 'contain';
+      cardElement.style.backgroundRepeat = 'no-repeat';
+      cardElement.style.backgroundPosition = 'center';
+    } else {
+      // 画像がない場合はプレースホルダーを使用
+      cardElement.style.backgroundImage = 'url(images/placeholder.png)';
+      cardElement.style.backgroundSize = 'contain';
+      cardElement.style.backgroundRepeat = 'no-repeat';
+      cardElement.style.backgroundPosition = 'center';
+    }
+    
+    // カード名を画像の下部に小さく表示（オプション）
+    const cardName = document.createElement('div');
+    cardName.className = 'archive-card-name-overlay';
+    cardName.textContent = card.name || card.card_name || `カード${index + 1}`;
+    cardElement.appendChild(cardName);
+    
+    // クリックイベント（カード詳細表示）
+    cardElement.addEventListener('click', () => {
+      if (this.cardInteractionManager) {
+        this.cardInteractionManager.showCardInfo(card, 'archive');
+      } else {
+        console.log('📋 [Archive] カード詳細:', card);
+      }
+    });
+    
+    return cardElement;
+  }
 }
+
+// グローバル関数としてアーカイブモーダルの閉じる機能を追加
+window.closeArchiveModal = function() {
+  const modal = document.getElementById('archiveModal');
+  if (modal) {
+    modal.style.display = 'none';
+  }
+};
 
 // グローバルインスタンス
 let battleEngine = null;

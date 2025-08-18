@@ -60,6 +60,23 @@
 
   <!-- 手札エリアはJavaScriptで動的作成される -->
 
+  <!-- アーカイブカード一覧モーダル -->
+  <div id="archiveModal" class="archive-modal" style="display: none;">
+    <div class="archive-modal-backdrop" onclick="closeArchiveModal()"></div>
+    <div class="archive-modal-content">
+      <div class="archive-modal-header">
+        <h3 id="archiveModalTitle">アーカイブ</h3>
+        <button class="archive-modal-close" onclick="closeArchiveModal()">×</button>
+      </div>
+      <div class="archive-modal-body">
+        <div id="archiveCardGrid" class="archive-card-grid"></div>
+        <div id="archiveEmptyMessage" class="archive-empty-message" style="display: none;">
+          <p>アーカイブにカードがありません</p>
+        </div>
+      </div>
+    </div>
+  </div>
+
   <script src="js/utils.js"></script>
   <script src="js/modal-ui.js"></script>
   <script src="js/deck_manager.js"></script>

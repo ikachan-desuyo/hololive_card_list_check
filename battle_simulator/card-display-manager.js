@@ -323,15 +323,26 @@ class CardDisplayManager {
     // カードクリック処理の追加
     if (areaId !== 'deck' && areaId !== 'yell-deck') {
       const clickHandler = (e) => {
-        // CardInteractionManagerを使用してカード詳細をinfo-panelに表示
-        if (this.battleEngine.cardInteractionManager) {
-          this.battleEngine.cardInteractionManager.showCardInfo(card, areaId);
-        } else if (typeof this.battleEngine.showCardModal === 'function') {
-          this.battleEngine.showCardModal(card, areaId);
-        } else {
-          console.log('カード情報:', card);
-        }
         e.stopPropagation();
+        
+        if (areaId === 'archive') {
+          // アーカイブエリアのカードクリック時：そのプレイヤーのアーカイブモーダルを表示
+          const targetPlayerId = isPlayerCard ? 1 : 2;
+          if (this.battleEngine.showArchiveModal) {
+            this.battleEngine.showArchiveModal(targetPlayerId);
+          } else {
+            console.log('アーカイブモーダル機能が利用できません');
+          }
+        } else {
+          // その他のエリア：通常のカード詳細表示
+          if (this.battleEngine.cardInteractionManager) {
+            this.battleEngine.cardInteractionManager.showCardInfo(card, areaId);
+          } else if (typeof this.battleEngine.showCardModal === 'function') {
+            this.battleEngine.showCardModal(card, areaId);
+          } else {
+            console.log('カード情報:', card);
+          }
+        }
       };
       
       cardElement.addEventListener('click', clickHandler);
