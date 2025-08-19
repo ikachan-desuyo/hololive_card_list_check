@@ -491,12 +491,8 @@ class HololiveStateManager {
             
             // 🔒 コラボ移動の場合は、コラボロック状態を確実に設定
             if (isCollabMove) {
-              console.log(`🤝 [StateManager] コラボ移動処理開始`);
-              
               const collabCard = battleEnginePlayer[payload.targetPosition];
               if (collabCard) {
-                console.log(`🤝 [StateManager] コラボカード確認: ${collabCard.name}`);
-                
                 // cardStateが存在しない場合は初期化
                 if (!collabCard.cardState) {
                   collabCard.cardState = {};
@@ -507,7 +503,6 @@ class HololiveStateManager {
                 
                 // コラボしたターンを記録
                 collabCard.collabedTurn = this.state.turn.turnCount;
-                console.log(`🤝 [StateManager] コラボターン設定: ${collabCard.collabedTurn}`);
                 
                 // State Manager側でも同期
                 if (player.cards[payload.targetPosition]) {
@@ -538,11 +533,6 @@ class HololiveStateManager {
                     console.error(`❌ [StateManager] PerformanceManager が見つかりません`);
                   }
                 }, 500);
-                
-                // デバッグ用：現在の状態確認
-                setTimeout(() => {
-                  const finalCard = battleEnginePlayer[payload.targetPosition];
-                }, 10);
               }
             }
           }
@@ -604,12 +594,16 @@ class HololiveStateManager {
                 
                 // ブルーム効果チェック（center配置時）
                 setTimeout(() => {
-                  if (this.battleEngine.handManager) {
+                  console.log(`🌸 [StateManager] ブルーム効果チェック開始: handManager=${!!this.battleEngine.handManager}`);
+                  if (this.battleEngine.handManager && this.battleEngine.handManager.checkAndTriggerBloomEffects) {
+                    console.log(`🌸 [StateManager] ブルーム効果チェック実行中...`);
                     this.battleEngine.handManager.checkAndTriggerBloomEffects(
                       newCard, 
                       payload.player, 
                       payload.position
                     );
+                  } else {
+                    console.warn(`❌ [StateManager] handManagerまたはcheckAndTriggerBloomEffectsが存在しません`);
                   }
                 }, 500);
               } else {
@@ -665,12 +659,17 @@ class HololiveStateManager {
                 
                 // ブルーム効果チェック（center配置時）
                 setTimeout(() => {
-                  if (this.battleEngine.handManager) {
+                  console.log(`🌸 [StateManager] センターブルーム効果チェック開始: handManager=${!!this.battleEngine.handManager}`);
+                  if (this.battleEngine.handManager && this.battleEngine.handManager.checkAndTriggerBloomEffects) {
+                    console.log(`🌸 [StateManager] センターブルーム効果チェック実行中...`);
+                    // ブルーム効果チェックには新しく配置されたカード（上に重ねられたカード）を渡す
                     this.battleEngine.handManager.checkAndTriggerBloomEffects(
                       newCard, 
                       payload.player, 
                       'center'
                     );
+                  } else {
+                    console.warn(`❌ [StateManager] handManagerまたはcheckAndTriggerBloomEffectsが存在しません`);
                   }
                 }, 500);
               } else {
@@ -796,12 +795,16 @@ class HololiveStateManager {
               
               // ブルームエフェクト自動モーダル表示（ブルーム直後）
               setTimeout(() => {
-                if (this.battleEngine.handManager) {
+                console.log(`🌸 [StateManager] バックポジションブルーム効果チェック開始: handManager=${!!this.battleEngine.handManager}`);
+                if (this.battleEngine.handManager && this.battleEngine.handManager.checkAndTriggerBloomEffects) {
+                  console.log(`🌸 [StateManager] バックポジションブルーム効果チェック実行中...`);
                   this.battleEngine.handManager.checkAndTriggerBloomEffects(
                     card, 
                     payload.player, 
                     payload.position
                   );
+                } else {
+                  console.warn(`❌ [StateManager] handManagerまたはcheckAndTriggerBloomEffectsが存在しません`);
                 }
               }, 500);
             }

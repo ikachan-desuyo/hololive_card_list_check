@@ -990,39 +990,24 @@ class HandManager {
    */
   checkAndTriggerCollabEffects(playerId, position) {
     try {
-      console.log(`🎯 [コラボ効果チェック] 開始: プレイヤー${playerId}, 位置: ${position}`);
-      
       const card = this.battleEngine.players[playerId][position];
       if (!card) {
-        console.log(`⚠️ [コラボ効果チェック] カードが見つかりません: ${position}`);
         return;
       }
-      
-      console.log(`🔍 [コラボ効果チェック] カード確認: ${card.name || card.id}`);
       
       // カード効果定義を取得
       const cardEffects = window.cardEffects?.[card.id || card.cardId];
       if (!cardEffects?.effects) {
-        console.log(`📝 [コラボ効果チェック] カード効果定義なし: ${card.name || card.id}`);
         return;
       }
       
       // コラボ効果をチェック
       const collabEffect = cardEffects.effects.collabEffect;
-      if (!collabEffect) {
-        console.log(`📝 [コラボ効果チェック] コラボ効果なし: ${card.name || card.id}`);
+      if (!collabEffect || collabEffect.auto_trigger !== 'on_collab') {
         return;
       }
       
-      // auto_trigger が on_collab のもののみ対象
-      if (collabEffect.auto_trigger !== 'on_collab') {
-        console.log(`📝 [コラボ効果チェック] 自動発動対象外: ${collabEffect.auto_trigger}`);
-        return;
-      }
-      
-      console.log(`✨ [コラボ効果チェック] コラボ効果発見: ${collabEffect.name}`);
-      
-      // コラボ効果発動モーダルを表示
+      console.log(`🤝 [コラボ効果] ${collabEffect.name} 発動`);
       this.showCollabEffectModal(card, collabEffect, playerId, position);
       
     } catch (error) {
@@ -1039,8 +1024,6 @@ class HandManager {
    */
   showCollabEffectModal(card, collabEffect, playerId, position) {
     try {
-      console.log(`🎭 [コラボ効果モーダル] 表示開始: ${collabEffect.name}`);
-      
       // 既存のモーダルを除去
       const existingModal = document.querySelector('.collab-effect-modal');
       if (existingModal) {
@@ -1228,13 +1211,10 @@ class HandManager {
    */
   async executeCollabEffect(card, collabEffect, playerId, position) {
     try {
-      console.log(`🚀 [コラボ効果実行] 開始: ${collabEffect.name}`);
-      
       // 条件チェック
       if (collabEffect.condition) {
         const conditionMet = collabEffect.condition(card, this.battleEngine.gameState, this.battleEngine);
         if (!conditionMet) {
-          console.log(`❌ [コラボ効果実行] 条件不適合: ${collabEffect.name}`);
           alert('この効果の発動条件を満たしていません。');
           return;
         }
@@ -1245,7 +1225,6 @@ class HandManager {
         const result = await collabEffect.effect(card, this.battleEngine);
         
         if (result?.success) {
-          console.log(`✅ [コラボ効果実行] 成功: ${collabEffect.name}`, result);
           if (result.message) {
             // 成功メッセージを表示（簡易版）
             setTimeout(() => {
@@ -1253,7 +1232,6 @@ class HandManager {
             }, 100);
           }
         } else {
-          console.log(`❌ [コラボ効果実行] 失敗: ${collabEffect.name}`, result);
           if (result?.message) {
             alert(`効果発動失敗:\n${result.message}`);
           }
@@ -1277,12 +1255,9 @@ class HandManager {
    */
   checkAndTriggerArtsEffects(card, artName, playerId, position) {
     try {
-      console.log(`🎯 [アーツ効果チェック] 開始: ${card.name || card.id}, アーツ: ${artName}`);
-      
       // カード効果定義を取得
       const cardEffects = window.cardEffects?.[card.id || card.cardId];
       if (!cardEffects?.effects) {
-        console.log(`📝 [アーツ効果チェック] カード効果定義なし: ${card.name || card.id}`);
         return;
       }
       
@@ -1291,24 +1266,15 @@ class HandManager {
         effect.type === 'art' && effect.name === artName
       );
       
-      if (!artsEffect) {
-        console.log(`📝 [アーツ効果チェック] アーツ効果なし: ${artName}`);
+      if (!artsEffect || artsEffect.auto_trigger !== 'arts') {
         return;
       }
       
-      // auto_trigger が arts のもののみ対象
-      if (artsEffect.auto_trigger !== 'arts') {
-        console.log(`📝 [アーツ効果チェック] 自動発動対象外: ${artsEffect.auto_trigger}`);
-        return;
-      }
-      
-      console.log(`✨ [アーツ效果チェック] アーツ効果発見: ${artsEffect.name}`);
-      
-      // アーツ効果発動モーダルを表示
+      console.log(`🎨 [アーツ効果] ${artsEffect.name} 発動`);
       this.showArtsEffectModal(card, artsEffect, playerId, position);
       
     } catch (error) {
-      console.error('🚨 [アーツ效果チェック] エラー:', error);
+      console.error('🚨 [アーツ効果チェック] エラー:', error);
     }
   }
 
@@ -1321,8 +1287,6 @@ class HandManager {
    */
   showArtsEffectModal(card, artsEffect, playerId, position) {
     try {
-      console.log(`🎭 [アーツ效果モーダル] 表示開始: ${artsEffect.name}`);
-      
       // 既存のモーダルを除去
       const existingModal = document.querySelector('.arts-effect-modal');
       if (existingModal) {
@@ -1510,13 +1474,10 @@ class HandManager {
    */
   async executeArtsEffect(card, artsEffect, playerId, position) {
     try {
-      console.log(`🚀 [アーツ效果実行] 開始: ${artsEffect.name}`);
-      
       // 条件チェック
       if (artsEffect.condition) {
         const conditionMet = artsEffect.condition(card, this.battleEngine.gameState, this.battleEngine);
         if (!conditionMet) {
-          console.log(`❌ [アーツ效果実行] 条件不適合: ${artsEffect.name}`);
           alert('このアーツの発動条件を満たしていません。');
           return;
         }
@@ -1527,7 +1488,6 @@ class HandManager {
         const result = await artsEffect.effect(card, this.battleEngine);
         
         if (result?.success) {
-          console.log(`✅ [アーツ效果実行] 成功: ${artsEffect.name}`, result);
           if (result.message) {
             // 成功メッセージを表示（簡易版）
             setTimeout(() => {
@@ -1535,17 +1495,16 @@ class HandManager {
             }, 100);
           }
         } else {
-          console.log(`❌ [アーツ效果実行] 失敗: ${artsEffect.name}`, result);
           if (result?.message) {
             alert(`アーツ効果発動失敗:\n${result.message}`);
           }
         }
       } else {
-        console.warn(`⚠️ [アーツ效果実行] 効果関数未定義: ${artsEffect.name}`);
+        console.warn(`⚠️ [アーツ効果実行] 効果関数未定義: ${artsEffect.name}`);
       }
       
     } catch (error) {
-      console.error('🚨 [アーツ效果実行] エラー:', error);
+      console.error('🚨 [アーツ効果実行] エラー:', error);
       alert('アーツ効果の実行中にエラーが発生しました。');
     }
   }
@@ -1557,15 +1516,16 @@ class HandManager {
    * @param {string} position - カード位置
    */
   checkAndTriggerBloomEffects(card, playerId, position) {
+    console.log(`🌸 [ブルーム効果チェック] 開始: ${card.name || card.id}, プレイヤー${playerId}, ポジション${position}`);
+    console.log(`🔍 [ブルーム効果チェック] カードオブジェクト:`, card);
     try {
-      console.log(`🌸 [ブルーム効果チェック] 開始: ${card.name || card.id}`);
-      
       // カード効果定義を取得
       const cardId = card.id || card.cardId || card.number;
       const cardEffects = window.cardEffects?.[cardId];
+      console.log(`🔍 [ブルーム効果チェック] カードID: ${cardId}, 効果定義: ${!!cardEffects}`);
       
       if (!cardEffects?.effects) {
-        console.log(`📝 [ブルーム効果チェック] カード効果定義なし: ${card.name || card.id}`);
+        console.log(`❌ [ブルーム効果チェック] カード${cardId}に効果定義なし`);
         return;
       }
       
@@ -1573,24 +1533,35 @@ class HandManager {
       const bloomEffects = Object.values(cardEffects.effects).filter(effect => 
         effect.type === 'bloom' && effect.auto_trigger === 'on_bloom'
       );
+      console.log(`🔍 [ブルーム効果チェック] ブルーム効果数: ${bloomEffects.length}`);
       
       if (bloomEffects.length === 0) {
-        console.log(`📝 [ブルーム効果チェック] 自動発動ブルーム効果なし: ${card.name || card.id}`);
+        console.log(`❌ [ブルーム効果チェック] カード${cardId}にブルーム効果なし`);
         return;
       }
       
       // 各ブルーム効果をチェック
-      bloomEffects.forEach(bloomEffect => {
-        // 条件チェック
-        const conditionMet = bloomEffect.condition ? 
-          bloomEffect.condition(card, this.battleEngine.gameState, this.battleEngine) : true;
+      bloomEffects.forEach((bloomEffect, index) => {
+        console.log(`🔍 [ブルーム効果チェック] 効果${index + 1}: ${bloomEffect.name}, タイミング: ${bloomEffect.timing}, トリガー: ${bloomEffect.auto_trigger}`);
         
-        if (conditionMet) {
-          console.log(`✨ [ブルーム効果発動] ${bloomEffect.name || 'ブルーム効果'} 条件満足`);
-          this.showBloomEffectModal(card, bloomEffect, playerId, position);
-        } else {
-          console.log(`❌ [ブルーム効果] ${bloomEffect.name || 'ブルーム効果'} 条件不満足`);
+        // 条件チェック
+        let conditionMet = true;
+        try {
+          if (bloomEffect.condition) {
+            console.log(`🔍 [ブルーム効果チェック] 条件関数実行中...`);
+            conditionMet = bloomEffect.condition(card, this.battleEngine.gameState, this.battleEngine);
+            console.log(`🔍 [ブルーム効果チェック] 条件チェック結果: ${conditionMet}`);
+          } else {
+            console.log(`🔍 [ブルーム効果チェック] 条件なし（常に発動可能）`);
+          }
+        } catch (error) {
+          console.error(`🚨 [ブルーム効果チェック] 条件チェックエラー:`, error);
+          conditionMet = false;
         }
+        
+        // 条件に関係なくモーダルを表示（条件状態を渡す）
+        console.log(`🌸 [ブルーム効果] ${bloomEffect.name} モーダル表示開始 (条件満足: ${conditionMet})`);
+        this.showBloomEffectModal(card, bloomEffect, playerId, position, conditionMet);
       });
       
     } catch (error) {
@@ -1604,11 +1575,11 @@ class HandManager {
    * @param {Object} bloomEffect - ブルーム効果定義
    * @param {number} playerId - プレイヤーID
    * @param {string} position - カード位置
+   * @param {boolean} conditionMet - 発動条件が満たされているか
    */
-  showBloomEffectModal(card, bloomEffect, playerId, position) {
+  showBloomEffectModal(card, bloomEffect, playerId, position, conditionMet = true) {
+    console.log(`🌸 [ブルームモーダル] 表示開始: ${bloomEffect.name}, カード: ${card.name}, プレイヤー: ${playerId}, ポジション: ${position}, 条件満足: ${conditionMet}`);
     try {
-      console.log(`🌸 [ブルームモーダル] 表示開始: ${bloomEffect.name}`);
-      
       // 既存のモーダルを閉じる
       const existingModal = document.getElementById('bloom-effect-modal');
       if (existingModal) {
@@ -1648,11 +1619,15 @@ class HandManager {
       `;
       
       // アイコンとタイトル
+      const titleText = conditionMet ? 'ブルーム効果発動！' : 'ブルーム効果（条件未満足）';
+      const titleColor = conditionMet ? '#E65100' : '#757575';
+      const iconColor = conditionMet ? '🌸' : '🌸💔';
+      
       content.innerHTML = `
         <div style="margin-bottom: 20px;">
-          <div style="font-size: 48px; margin-bottom: 10px;">🌸</div>
-          <h2 style="color: #E65100; margin: 0; font-size: 24px; text-shadow: 1px 1px 2px rgba(0,0,0,0.1);">
-            ブルーム効果発動！
+          <div style="font-size: 48px; margin-bottom: 10px;">${iconColor}</div>
+          <h2 style="color: ${titleColor}; margin: 0; font-size: 24px; text-shadow: 1px 1px 2px rgba(0,0,0,0.1);">
+            ${titleText}
           </h2>
         </div>
         
@@ -1663,6 +1638,13 @@ class HandManager {
           <p style="color: #5D4037; margin: 0; font-size: 16px; line-height: 1.4;">
             ${bloomEffect.description || '効果説明がありません'}
           </p>
+          ${!conditionMet ? `
+            <div style="background: #FFECB3; border: 2px solid #FFC107; border-radius: 8px; padding: 15px; margin-top: 15px;">
+              <p style="color: #E65100; margin: 0; font-weight: bold; font-size: 14px;">
+                ⚠️ この効果の発動条件が満たされていません
+              </p>
+            </div>
+          ` : ''}
         </div>
         
         <div style="margin-top: 25px; display: flex; gap: 15px; justify-content: center;">
@@ -1673,30 +1655,37 @@ class HandManager {
       
       // 発動ボタン
       const activateButton = document.createElement('button');
-      activateButton.textContent = '効果を発動';
+      activateButton.textContent = conditionMet ? '効果を発動' : '発動不可';
+      
+      const buttonBg = conditionMet ? '#FF9800' : '#BDBDBD';
+      const buttonHoverBg = conditionMet ? '#F57C00' : '#BDBDBD';
+      
       activateButton.style.cssText = `
         padding: 12px 25px;
-        background: #FF9800;
+        background: ${buttonBg};
         color: white;
         border: none;
         border-radius: 8px;
         font-size: 16px;
         font-weight: bold;
-        cursor: pointer;
+        cursor: ${conditionMet ? 'pointer' : 'not-allowed'};
         transition: all 0.3s ease;
         box-shadow: 0 4px 8px rgba(255, 152, 0, 0.3);
+        opacity: ${conditionMet ? '1' : '0.6'};
       `;
       
-      activateButton.addEventListener('mouseenter', () => {
-        activateButton.style.background = '#F57C00';
-        activateButton.style.transform = 'translateY(-2px)';
-        activateButton.style.boxShadow = '0 6px 12px rgba(255, 152, 0, 0.4)';
-      });
-      activateButton.addEventListener('mouseleave', () => {
-        activateButton.style.background = '#FF9800';
-        activateButton.style.transform = 'translateY(0)';
-        activateButton.style.boxShadow = '0 4px 8px rgba(255, 152, 0, 0.3)';
-      });
+      if (conditionMet) {
+        activateButton.addEventListener('mouseenter', () => {
+          activateButton.style.background = buttonHoverBg;
+          activateButton.style.transform = 'translateY(-2px)';
+          activateButton.style.boxShadow = '0 6px 12px rgba(255, 152, 0, 0.4)';
+        });
+        activateButton.addEventListener('mouseleave', () => {
+          activateButton.style.background = buttonBg;
+          activateButton.style.transform = 'translateY(0)';
+          activateButton.style.boxShadow = '0 4px 8px rgba(255, 152, 0, 0.3)';
+        });
+      }
       
       // キャンセルボタン
       const cancelButton = document.createElement('button');
@@ -1721,8 +1710,13 @@ class HandManager {
       
       // イベントリスナー
       activateButton.addEventListener('click', () => {
-        modal.remove();
-        this.executeBloomEffect(card, bloomEffect, playerId, position);
+        if (conditionMet) {
+          modal.remove();
+          this.executeBloomEffect(card, bloomEffect, playerId, position);
+        } else {
+          // 条件が満たされていない場合は何もしない（ボタンは無効化されているが念のため）
+          console.log(`❌ [ブルームモーダル] 発動条件未満足のため実行不可: ${bloomEffect.name}`);
+        }
       });
       
       cancelButton.addEventListener('click', () => {
@@ -1743,8 +1737,6 @@ class HandManager {
       modal.appendChild(content);
       document.body.appendChild(modal);
       
-      console.log(`✅ [ブルームモーダル] 表示完了: ${bloomEffect.name}`);
-      
     } catch (error) {
       console.error('🚨 [ブルームモーダル] エラー:', error);
     }
@@ -1759,24 +1751,18 @@ class HandManager {
    */
   executeBloomEffect(card, bloomEffect, playerId, position) {
     try {
-      console.log(`🌸 [ブルーム効果実行] 開始: ${bloomEffect.name}`);
-      
       if (bloomEffect.effect && typeof bloomEffect.effect === 'function') {
         const result = bloomEffect.effect(card, this.battleEngine, playerId, position);
         
         if (result) {
           if (result.success) {
-            console.log(`✅ [ブルーム効果実行] 成功: ${result.message || 'ブルーム効果が発動しました'}`);
             if (result.message) {
-              alert(`ブルーム効果発動成功:\n${result.message}`);
+              alert(`ブルーム効果発動:\n${result.message}`);
             }
           } else {
-            console.log(`❌ [ブルーム効果実行] 失敗: ${result.message}`);
             alert(`ブルーム効果発動失敗:\n${result.message}`);
           }
         }
-      } else {
-        console.warn(`⚠️ [ブルーム効果実行] 効果関数未定義: ${bloomEffect.name}`);
       }
       
     } catch (error) {

@@ -24,11 +24,9 @@ class CardDisplayManager {
     this.isUpdating = true;
     
     try {
-      console.log(`🔄 [Card Display] updateCardAreas開始`);
       
       // プレイヤーとCPUの両方のエリアを更新
       [1, 2].forEach(playerId => {
-        console.log(`🔄 [Card Display] プレイヤー${playerId}の更新開始`);
         // Battle Engineから直接プレイヤーデータを取得
         const player = this.battleEngine.players[playerId];
         if (!player) {
@@ -36,9 +34,6 @@ class CardDisplayManager {
           return;
         }
         
-        console.log(`🔄 [Card Display] プレイヤー${playerId}データ:`, player);
-        console.log(`🔍 [Card Display] プレイヤー${playerId}のカード例: center=${player.center?.name}, life[0]=${player.life?.[0]?.name}, oshi=${player.oshi?.name}`);
-        console.log(`🔍 [Card Display] 推しホロメン詳細: プレイヤー${playerId}`, player.oshi);
         
         const sectionClass = playerId === 1 ? '.battle-player' : '.battle-opponent';
         
@@ -62,7 +57,6 @@ class CardDisplayManager {
             return;
           }
           
-          console.log(`🔍 [Card Display] エリア処理: ${areaInfo.id}, データ:`, areaInfo.data);
           
           if (areaInfo.id === 'backs') {
             // バックスロットの特別処理
@@ -94,7 +88,6 @@ class CardDisplayManager {
         return;
       }
       
-      console.log(`🔄 [displayCardsInArea] 開始: エリア=${areaId}, プレイヤー=${playerId}, カードデータ:`, cards);
       
       // プレイヤーIDの特定（エリアのクラス名から判定）
       const isPlayerArea = area.closest('.battle-player') !== null;
@@ -140,12 +133,9 @@ class CardDisplayManager {
           displayType = 'single';
           break;
       case 'oshi':
-        console.log(`🔍 [推しホロメン処理] プレイヤー${playerId}, cardsデータ:`, cards);
         if (cards) {
           cardsToDisplay = [cards];
-          console.log(`🔍 [推しホロメン表示] カード: ${cards.name || cards.id}, プレイヤー: ${playerId}, フェーズ: ${this.battleEngine.gameState?.currentPhase}`);
         } else {
-          console.log(`⚠️ [推しホロメン表示] プレイヤー${playerId}の推しホロメンが見つかりません`);
         }
         displayType = 'single';
         break;
@@ -173,15 +163,11 @@ class CardDisplayManager {
         // プレイヤーIDに基づいて判定（現在のプレイヤーのカードのみドラッグ可能）
         const currentPlayer = this.battleEngine?.stateManager?.state?.turn?.currentPlayer || 1;
         const isPlayerCard = (playerId === currentPlayer);
-        console.log(`🔍 [Card Display] カード表示: ${card.name}, プレイヤーID: ${playerId}, isPlayerCard: ${isPlayerCard}, エリア: ${areaId}`);
         const cardElement = this.createCardElement(card, areaId, index, isPlayerCard);
         area.appendChild(cardElement);
         
         // 推しホロメンエリアの場合は追加ログ
         if (areaId === 'oshi') {
-          console.log(`✅ [推しホロメン] DOM追加完了: ${card.name}, 要素:`, cardElement);
-          console.log(`🔍 [推しホロメン] エリア状態:`, area);
-          console.log(`🔍 [推しホロメン] 子要素数: ${area.children.length}`);
         }
         
         // エールカードがある場合は追加
@@ -291,7 +277,6 @@ class CardDisplayManager {
         cardElement.style.backgroundPosition = 'center';
         cardElement.style.backgroundRepeat = 'no-repeat';
       } else {
-        console.log(`⚠️ [Card Element] 画像URLなし: ${card.name}`);
         // 画像がない場合はカード内容を表示
         cardElement.innerHTML = `
           <div class="card-content">
@@ -332,7 +317,6 @@ class CardDisplayManager {
           if (this.battleEngine.showArchiveModal) {
             this.battleEngine.showArchiveModal(targetPlayerId);
           } else {
-            console.log('アーカイブモーダル機能が利用できません');
           }
         } else {
           // その他のエリア：通常のカード詳細表示
@@ -341,7 +325,6 @@ class CardDisplayManager {
           } else if (typeof this.battleEngine.showCardModal === 'function') {
             this.battleEngine.showCardModal(card, areaId);
           } else {
-            console.log('カード情報:', card);
           }
         }
       };
@@ -359,16 +342,7 @@ class CardDisplayManager {
       cardElement.setAttribute('data-card-id', card.id);
       cardElement.setAttribute('data-area-id', areaId);
       cardElement.setAttribute('data-area-index', cardIndex);
-      
-      console.log(`[DEBUG] ドラッグ要素設定: ${card.name} in ${areaId}`, { 
-        card, 
-        areaId, 
-        cardIndex, 
-        shouldShowFaceUp, 
-        isPlayerCard,
-        isHolomenCard: this.battleEngine.isHolomenCard(card),
-        draggable: cardElement.draggable
-      });
+
       
       // バックスロットの場合は、スロットインデックスも設定
       if (areaId === 'backs') {
@@ -387,18 +361,7 @@ class CardDisplayManager {
         cardElement._dragEndHandler = dragEndHandler;
       }
     } else {
-      // ドラッグが設定されなかった理由をログ出力
-      if (card && (areaId === 'collab' || areaId === 'center' || areaId === 'backs')) {
-        console.log(`[DEBUG] ドラッグ設定されず: ${card.name} in ${areaId}`, {
-          shouldShowFaceUp,
-          isPlayerCard,
-          isHolomenCard: this.battleEngine.isHolomenCard ? this.battleEngine.isHolomenCard(card) : 'メソッドなし',
-          reason: !shouldShowFaceUp ? 'shouldShowFaceUp=false' :
-                  !isPlayerCard ? 'isPlayerCard=false' :
-                  !this.battleEngine.isHolomenCard ? 'isHolomenCardメソッドなし' :
-                  !this.battleEngine.isHolomenCard(card) ? 'ホロメンカードではない' : '不明'
-        });
-      }
+
     }
     
     // 表示タイプによる位置調整
@@ -465,7 +428,6 @@ class CardDisplayManager {
     const player = playerState.cards;
     const backPositions = ['back1', 'back2', 'back3', 'back4', 'back5'];
     
-    console.log(`updateBackSlots: プレイヤー${playerId}の状態`, { player, collab: player.collab });
     
     // センター①があるかどうかで最大使用スロット数を決定
     const maxSlots = player.collab ? 4 : 5;
@@ -498,7 +460,6 @@ class CardDisplayManager {
       if (card) {
         // カード表示処理
         if (card.cardState?.bloomedThisTurn) {
-          console.log(`🌸 このターンにブルームしたカード: ${card.name}`);
         }
         if (!card.cardState) {
           console.warn(`⚠️ バックカード${index + 1}に状態情報がありません:`, card);
@@ -849,8 +810,6 @@ class CardDisplayManager {
   updateCardDisplay(card, position, playerId) {
     if (!card || !position || !playerId) return;
     
-    console.log(`🔄 [Card Display] 個別カード更新: ${card.name} at ${position} (player ${playerId})`);
-    console.log(`🔄 [Card Display] カード状態: isResting=${card.isResting}, cardState.resting=${card.cardState?.resting}`);
     
     // バックポジションの場合の特別処理
     if (position.startsWith('back')) {
@@ -865,7 +824,6 @@ class CardDisplayManager {
     }
     
     // その他のエリアの処理（必要に応じて追加）
-    console.log(`🔄 [Card Display] ${position}エリアの個別更新は未実装`);
   }
 
   /**
@@ -894,10 +852,8 @@ class CardDisplayManager {
     // お休み状態のクラス管理
     if (card.isResting || card.cardState?.resting) {
       existingCardElement.classList.add('resting');
-      console.log(`🔄 [Card Display] コラボ restingクラス追加: ${card.name}`);
     } else {
       existingCardElement.classList.remove('resting');
-      console.log(`🔄 [Card Display] コラボ restingクラス削除: ${card.name}`);
     }
     
     // カード画像の更新
@@ -906,7 +862,6 @@ class CardDisplayManager {
       existingCardElement.style.backgroundSize = 'cover';
       existingCardElement.style.backgroundPosition = 'center';
       existingCardElement.style.backgroundRepeat = 'no-repeat';
-      console.log(`🔄 [Card Display] コラボ画像更新: ${card.image_url}`);
     }
     
     // data属性の更新
@@ -918,7 +873,6 @@ class CardDisplayManager {
     existingCardElement.offsetHeight; // リフロー強制
     existingCardElement.style.display = '';
     
-    console.log(`🔄 [Card Display] コラボ個別カード更新完了: ${card.name}`);
   }
 
   /**
@@ -952,10 +906,8 @@ class CardDisplayManager {
     // お休み状態のクラス管理（直接CSSクラスを制御）
     if (card.isResting || card.cardState?.resting) {
       existingCardElement.classList.add('resting');
-      console.log(`🔄 [Card Display] restingクラス追加: ${position} - ${card.name}`);
     } else {
       existingCardElement.classList.remove('resting');
-      console.log(`🔄 [Card Display] restingクラス削除: ${position} - ${card.name}`);
     }
     
     // カード画像の更新
@@ -976,51 +928,36 @@ class CardDisplayManager {
     existingCardElement.offsetHeight; // リフロー強制
     existingCardElement.style.display = '';
     
-    console.log(`🔄 [Card Display] バック個別カード更新完了: ${card.name} (resting: ${existingCardElement.classList.contains('resting')})`);
   }
 
   /**
    * 効果発動ボタンを必要に応じて追加
    */
   addEffectButtonIfNeeded(cardElement, card, areaId, isPlayerCard) {
-    console.log(`🔍 [効果ボタン] チェック開始: ${card.name || card.id}, エリア: ${areaId}, プレイヤーカード: ${isPlayerCard}`);
     
     // プレイヤーのカードのみ
     if (!isPlayerCard) {
-      console.log(`❌ [効果ボタン] プレイヤーカードではない`);
       return;
     }
     
     // アーカイブエリアのカードには効果ボタンを表示しない
     if (areaId === 'archive') {
-      console.log(`❌ [効果ボタン] アーカイブエリアは効果発動不可`);
       return;
     }
     
-    // フェーズ判定の詳細ログ
+    // フェーズ判定
     const currentPhase = this.battleEngine.gameState?.currentPhase;
     const gameState = this.battleEngine.gameState;
-    console.log(`🔍 [効果ボタン] フェーズ詳細:`, {
-      currentPhase: currentPhase,
-      gameStateExists: !!gameState,
-      gameState: gameState,
-      isMain1: currentPhase === 3,
-      isMain2: currentPhase === 'main',
-      typeof: typeof currentPhase
-    });
     
     // メインステップでのみ効果ボタンを表示（文字列と数値の両方に対応）
     if (currentPhase !== 3 && currentPhase !== 'main') {
-      console.log(`❌ [効果ボタン] メインステップではない (現在フェーズ: ${currentPhase})`);
       return;
     }
     
-    console.log(`✅ [効果ボタン] メインステップ確認OK (フェーズ: ${currentPhase})`);
     
     // 効果発動可能なエリアを定義（archiveは明示的に除外）
     const validAreas = ['hand', 'center', 'collab', 'back1', 'back2', 'back3', 'back4', 'back5', 'backs', 'oshi'];
     if (!validAreas.includes(areaId)) {
-      console.log(`❌ [効果ボタン] 無効なエリア: ${areaId}`);
       return;
     }
     
@@ -1029,34 +966,27 @@ class CardDisplayManager {
       // 手札：サポートカードのみ効果発動可能
       const isSupport = card.card_type?.includes('サポート');
       if (!isSupport) {
-        console.log(`❌ [効果ボタン] 手札のホロメンカードは効果発動不可: ${card.name || card.id}`);
         return;
       }
-      console.log(`✅ [効果ボタン] 手札のサポートカード: ${card.name || card.id}`);
     } else if (['center', 'collab', 'backs', 'back1', 'back2', 'back3', 'back4', 'back5'].includes(areaId)) {
       // フィールド：ホロメンカードの効果発動可能
       const isHolomen = card.card_type?.includes('ホロメン');
       if (!isHolomen) {
-        console.log(`❌ [効果ボタン] フィールドの非ホロメンカードは効果発動不可: ${card.name || card.id}`);
         return;
       }
-      console.log(`✅ [効果ボタン] フィールドのホロメンカード: ${card.name || card.id}`);
     } else if (areaId === 'oshi') {
       // 推しホロメン：カードは常に表示、効果ボタンのみ条件チェック
-      console.log(`✅ [効果ボタン] 推しホロメン: ${card.name || card.id}`);
       
       // 推しスキル発動可能性をチェック（ボタン表示用）
       let canActivateSkill = false;
       if (this.battleEngine.cardInteractionManager && this.battleEngine.cardInteractionManager.canActivateOshiSkill) {
         canActivateSkill = this.battleEngine.cardInteractionManager.canActivateOshiSkill(card, 'oshi');
-        console.log(`🔍 [効果ボタン] 推しスキル発動可能性: ${canActivateSkill}`);
       }
       
       // 推しスキルが発動できない場合でも、カードは表示し続ける
       // 効果ボタンのみ表示しない
     } else if (['life', 'holo', 'archive'].includes(areaId)) {
       // その他のエリア：通常は効果発動不可だが、特定の効果があれば可能
-      console.log(`🔍 [効果ボタン] 特殊エリア (${areaId}) のカード: ${card.name || card.id}`);
     }
     
     // デバッグ用：特定のカードは強制的にボタンを表示
@@ -1068,23 +998,18 @@ class CardDisplayManager {
         effect.timing === 'manual' || effect.timing === 'activate' || effect.timing === 'gift'
       );
     
-    console.log(`🔍 [効果ボタン] カード: ${card.name || card.id}, ID: ${card.id}, テストカード: ${isTestCard}, 手動効果あり: ${hasManualTiming}, エリア: ${areaId}`);
     
     // カードに効果があるか確認（またはテストカード）
     const hasEffect = this.cardHasActivatableEffect(card, areaId) || isTestCard;
-    console.log(`🔍 [効果ボタン] 効果チェック結果: ${hasEffect}`);
     
     if (!hasEffect) {
-      console.log(`❌ [効果ボタン] 発動可能な効果なし`);
       return;
     }
     
-    console.log(`✅ [効果ボタン] 効果ボタンを作成中...`);
     
     // 既存の効果ボタンを削除（重複防止）
     const existingButtons = cardElement.querySelectorAll('.card-effect-button');
     existingButtons.forEach(button => {
-      console.log(`🗑️ [効果ボタン] 既存ボタンを削除: ${card.name || card.id}`);
       button.remove();
     });
     
@@ -1096,19 +1021,16 @@ class CardDisplayManager {
       let canActivateSkill = false;
       if (this.battleEngine.cardInteractionManager && this.battleEngine.cardInteractionManager.canActivateOshiSkill) {
         canActivateSkill = this.battleEngine.cardInteractionManager.canActivateOshiSkill(card, 'oshi');
-        console.log(`🔍 [推しスキル効果ボタン] ${card.name}: 発動可能=${canActivateSkill}, フェーズ=${this.battleEngine.gameState.currentPhase}, プレイヤー=${this.battleEngine.gameState.currentPlayer}`);
       }
       
       if (canActivateSkill) {
         effectButton.textContent = '推しスキル';
         effectButton.classList.add('oshi-skill-active');
-        console.log(`✅ [推しスキル効果ボタン] ${card.name}: アクティブボタン作成`);
       } else {
         effectButton.textContent = '推しスキル';
         effectButton.classList.add('oshi-skill-inactive');
         effectButton.style.opacity = '0.5';
         effectButton.style.cursor = 'not-allowed';
-        console.log(`❌ [推しスキル効果ボタン] ${card.name}: 非アクティブボタン作成`);
       }
     } else {
       // 通常のカード効果ボタン
@@ -1127,16 +1049,13 @@ class CardDisplayManager {
       
       // 推しホロメンで発動不可の場合はクリックを無効化
       if (areaId === 'oshi' && effectButton.classList.contains('oshi-skill-inactive')) {
-        console.log(`❌ [効果ボタン] 推しスキル発動不可のためクリック無効: ${card.name || card.id}`);
         return;
       }
       
-      console.log(`🎯 [効果ボタン] クリック: ${card.name || card.id}`);
       this.activateCardEffect(card, areaId);
     });
     
     cardElement.appendChild(effectButton);
-    console.log(`✅ [効果ボタン] 効果ボタンを追加完了: ${card.name || card.id}`);
   }
 
   /**
@@ -1144,34 +1063,22 @@ class CardDisplayManager {
    */
   cardHasActivatableEffect(card, areaId) {
     // デバッグログ追加
-    console.log(`🔍 [効果チェック] カード: ${card.name || card.id}, エリア: ${areaId}`);
     
     // 推しホロメンの場合は特別扱い（常に効果があるとみなす）
     if (areaId === 'oshi' && card.card_type?.includes('推しホロメン')) {
-      console.log(`✅ [効果チェック] 推しホロメンのため常に効果あり`);
       return true;
     }
     
     // カード効果定義をチェック
     if (!window.cardEffects || !window.cardEffects[card.id]) {
-      console.log(`❌ [効果チェック] カード効果定義なし: ${card.id}`);
       return false;
     }
     
     const cardEffect = window.cardEffects[card.id];
-    console.log(`✅ [効果チェック] カード効果定義あり:`, cardEffect);
     
     // 新形式の効果定義をチェック
     if (cardEffect.effects) {
-      console.log(`🔍 [効果チェック] カード効果構造:`, cardEffect.effects);
       const manualEffects = Object.values(cardEffect.effects).filter(effect => {
-        console.log(`🔍 [効果チェック] 効果詳細:`, {
-          name: effect.name,
-          timing: effect.timing,
-          type: effect.type,
-          auto_trigger: effect.auto_trigger,
-          effectObject: effect
-        });
         
         // 自動効果を除外（timing: 'on_collab', 'arts', 'on_bloom' 等 または auto_trigger プロパティあり）
         const automaticTimings = ['on_collab', 'arts', 'on_bloom', 'on_center', 'on_stage'];
@@ -1185,7 +1092,6 @@ class CardDisplayManager {
         
         // 自動効果の場合は手動発動ボタンを表示しない（この効果をフィルタリング）
         if (isAutomatic || effect.auto_trigger || isSnowFlowerOrUuu) {
-          console.log(`🔍 [効果チェック] 自動効果のため手動発動不可: ${effect.name} (timing: ${effect.timing}, auto_trigger: ${effect.auto_trigger}, isSnowFlowerOrUuu: ${isSnowFlowerOrUuu})`);
           return false; // この効果のみを除外
         }
         
@@ -1197,25 +1103,20 @@ class CardDisplayManager {
             const result = effect.condition(card, this.battleEngine.gameState, this.battleEngine);
             // undefinedやnullの場合はtrueとして扱う
             conditionMet = result !== false;
-            console.log(`🔍 [効果チェック] 条件関数結果: ${effect.name} = ${result} (判定: ${conditionMet})`);
           } catch (error) {
             console.warn(`🔶 [効果チェック] 条件関数エラー: ${effect.name}`, error);
             conditionMet = false;
           }
         } else if (effect.condition === undefined) {
           // 条件が未定義の場合は常に発動可能とみなす
-          console.log(`🔍 [効果チェック] 条件未定義のため発動可能: ${effect.name}`);
           conditionMet = true;
         }
         
-        console.log(`🔍 [効果チェック] 効果: ${effect.name}, manual: ${isManual}, automatic: ${isAutomatic}, condition: ${conditionMet}, timing: ${effect.timing}`);
         return isManual && conditionMet;
       });
-      console.log(`📊 [効果チェック] 発動可能な効果数: ${manualEffects.length}`);
       return manualEffects.length > 0;
     }
     
-    console.log(`❌ [効果チェック] 効果定義の形式が不正`);
     return false;
   }
 
@@ -1258,7 +1159,6 @@ class CardDisplayManager {
     try {
       // 推しホロメンの場合は専用処理
       if (areaId === 'oshi' && card.card_type?.includes('推しホロメン')) {
-        console.log(`🔄 [効果発動] 推しホロメン専用処理呼び出し中...`);
         await this.battleEngine.cardInteractionManager.activateOshiHolomenEffect(card, areaId);
       } else {
         console.log(`🔄 [効果発動] 一般カード効果呼び出し中...`);

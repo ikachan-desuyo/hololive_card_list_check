@@ -120,7 +120,6 @@ const cardEffect_hBP01_104 = {
 // 効果を登録（新システム対応）
 if (window.cardEffects) {
   window.cardEffects['hBP01-104'] = cardEffect_hBP01_104;
-  console.log('🔮 [Card Effect] hBP01-104 の効果を登録しました');
 } else {
   console.warn('🔮 [Card Effect] cardEffects not available, deferring registration');
   window.pendingCardEffects = window.pendingCardEffects || [];

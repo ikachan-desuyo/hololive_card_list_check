@@ -53,7 +53,6 @@ const cardEffect_hY04_001 = {
 // 効果を登録（新システム対応）
 if (window.cardEffects) {
   window.cardEffects['hY04-001'] = cardEffect_hY04_001;
-  console.log('🔮 [Card Effect] hY04-001 の効果を登録しました');
 } else {
   console.warn('🔮 [Card Effect] cardEffects not available, deferring registration');
   window.pendingCardEffects = window.pendingCardEffects || [];

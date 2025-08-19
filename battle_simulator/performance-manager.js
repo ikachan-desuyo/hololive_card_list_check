@@ -21,7 +21,6 @@ class PerformanceManager {
     
     // パフォーマンス実行済みチェック
     if (this.hasPerformedThisTurn(playerId)) {
-      console.log(`❌ [Performance] このターンは既にパフォーマンスを実行済み - プレイヤー${playerId}`);
       this.showPerformanceMessage('このターンは既にパフォーマンスを実行しました');
       setTimeout(() => {
         this.endPerformanceStep();
@@ -92,7 +91,6 @@ class PerformanceManager {
       player.attackedCardsThisTurn.push(position);
     }
     
-    console.log(`🎭 [Performance] カード攻撃済みマーク設定 - プレイヤー${playerId}, ${position}, ターン${currentTurn}`, player.attackedCardsThisTurn);
   }
 
   /**
@@ -120,45 +118,23 @@ class PerformanceManager {
     const player = this.battleEngine.players[playerId];
     const attackablePositions = [];
 
-    console.log(`🔍 [Performance] センターカード:`, player.center);
-    console.log(`🔍 [Performance] コラボカード:`, player.collab);
-
     // センターとコラボをチェック（お休み状態、攻撃済み状態、アーツ使用可能をチェック）
     if (player.center && !player.center.isResting && !this.hasCardAttackedThisTurn(playerId, 'center')) {
       const availableArts = this.getAvailableArts(player.center);
       if (availableArts.length > 0) {
         attackablePositions.push('center');
-        console.log(`✅ [Performance] センター攻撃可能: ${player.center.name} (${availableArts.length}個のアーツ)`);
-      } else {
-        console.log(`❌ [Performance] センター使用可能アーツなし: ${player.center.name}`);
       }
-    } else if (player.center && player.center.isResting) {
-      console.log(`😴 [Performance] センターお休み状態: ${player.center.name}`);
-    } else if (player.center && this.hasCardAttackedThisTurn(playerId, 'center')) {
-      console.log(`❌ [Performance] センター攻撃済み: ${player.center.name}`);
-    } else if (!player.center) {
-      console.log(`🏠 [Performance] センター空き状態`);
     }
     
     if (player.collab && !player.collab.isResting && !this.hasCardAttackedThisTurn(playerId, 'collab')) {
       const availableArts = this.getAvailableArts(player.collab);
       if (availableArts.length > 0) {
         attackablePositions.push('collab');
-        console.log(`✅ [Performance] コラボ攻撃可能: ${player.collab.name} (${availableArts.length}個のアーツ)`);
-      } else {
-        console.log(`❌ [Performance] コラボ使用可能アーツなし: ${player.collab.name}`);
       }
-    } else if (player.collab && player.collab.isResting) {
-      console.log(`😴 [Performance] コラボお休み状態: ${player.collab.name}`);
-    } else if (player.collab && this.hasCardAttackedThisTurn(playerId, 'collab')) {
-      console.log(`❌ [Performance] コラボ攻撃済み: ${player.collab.name}`);
     }
-
-    console.log(`🎯 [Performance] 攻撃可能ポジション: ${attackablePositions.join(', ')}`);
 
     // 攻撃可能カードをハイライト
     attackablePositions.forEach(position => {
-      console.log(`🔧 [Performance] 攻撃ボタン追加中: ${position}`);
       this.addAttackButton(position, playerId);
     });
 
@@ -166,7 +142,6 @@ class PerformanceManager {
     this.addPassButton();
 
     if (attackablePositions.length === 0) {
-      console.log(`❌ [Performance] 攻撃可能なカードがありません`);
       this.showPerformanceMessage('攻撃可能なカードがありません。パフォーマンスステップを終了します');
       
       setTimeout(() => {
@@ -298,13 +273,10 @@ class PerformanceManager {
    * @param {number} playerId - プレイヤーID
    */
   selectArtsForAttack(attacker, playerId) {
-    console.log(`🎨 [Performance] アーツ選択開始: ${attacker.name}`);
-    
     // カードのアーツを取得
     const availableArts = this.getAvailableArts(attacker);
     
     if (availableArts.length === 0) {
-      console.log(`❌ [Performance] 使用可能なアーツがありません`);
       this.showPerformanceMessage('このカードには使用可能なアーツがありません');
       setTimeout(() => {
         this.endPerformanceStep();
@@ -315,7 +287,6 @@ class PerformanceManager {
     if (availableArts.length === 1) {
       // アーツが1つの場合は自動選択
       this.currentAttacker.selectedArts = availableArts[0];
-      console.log(`🎨 [Performance] アーツ自動選択: ${availableArts[0].name}`);
       this.selectAttackTarget(playerId);
     } else {
       // 複数のアーツがある場合は選択UI表示
@@ -329,33 +300,19 @@ class PerformanceManager {
    * @returns {Array} 使用可能なアーツリスト
    */
   getAvailableArts(card) {
-    console.log(`🔍 [Performance] アーツチェック開始: ${card.name}`);
-    console.log(`🔍 [Performance] カードスキル:`, card.skills);
-    
     if (!card.skills || !Array.isArray(card.skills)) {
-      console.log(`❌ [Performance] スキルデータが無効: ${card.skills}`);
       return [];
     }
 
     const arts = card.skills.filter(skill => skill.type === 'アーツ');
-    console.log(`🎨 [Performance] アーツ抽出: ${arts.length}個のアーツを発見`);
-    arts.forEach((art, index) => {
-      console.log(`  アーツ${index + 1}: ${art.name} (必要: ${art.icons?.main?.join(', ') || '不明'})`);
-    });
-
     const availableArts = [];
 
-    arts.forEach((art, index) => {
-      console.log(`🔍 [Performance] アーツ${index + 1}条件チェック: ${art.name}`);
+    arts.forEach((art) => {
       if (this.canUseArts(card, art)) {
         availableArts.push(art);
-        console.log(`✅ [Performance] アーツ${index + 1}使用可能: ${art.name}`);
-      } else {
-        console.log(`❌ [Performance] アーツ${index + 1}使用不可: ${art.name}`);
       }
     });
 
-    console.log(`🎨 [Performance] アーツチェック結果: ${availableArts.length}/${arts.length}個使用可能`);
     return availableArts;
   }
 
@@ -366,31 +323,20 @@ class PerformanceManager {
    * @returns {boolean} 使用可能かどうか
    */
   canUseArts(card, arts) {
-    console.log(`🔍 [Performance] ${arts.name}の使用条件チェック開始`);
-    
     // お休み状態のカードはアーツ宣言できない
     if (card.isResting || (card.cardState && card.cardState.resting)) {
-      console.log(`😴 [Performance] お休み状態のためアーツ宣言不可: ${card.name}`);
       return false;
     }
 
     if (!arts.icons || !arts.icons.main) {
-      console.log(`❌ [Performance] アーツアイコン情報なし: ${arts.name}`);
-      console.log(`🔍 [Performance] アーツデータ:`, arts);
       return false;
     }
 
     const requiredIcons = arts.icons.main;
     const attachedYells = card.yellCards || [];
-    
-    console.log(`🎨 [Performance] アーツ条件チェック: ${arts.name}`);
-    console.log(`🎨 [Performance] 必要エール: ${requiredIcons.join(', ')}`);
-    console.log(`🎨 [Performance] 付いているエール: ${attachedYells.length}枚`);
-    console.log(`🎨 [Performance] エール詳細:`, attachedYells);
 
     // エール数チェック
     if (attachedYells.length < requiredIcons.length) {
-      console.log(`❌ [Performance] エール不足: 必要${requiredIcons.length}枚、実際${attachedYells.length}枚`);
       return false;
     }
 

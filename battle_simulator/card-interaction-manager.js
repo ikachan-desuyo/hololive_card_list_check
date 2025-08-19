@@ -304,12 +304,8 @@ class CardInteractionManager {
         const isSnowFlowerOrUuu = effect.name === 'Snow flower' || effect.name === 'うぅ…';
         const isManual = !isAutomatic && !isSnowFlowerOrUuu && (effect.timing === 'manual' || effect.timing === 'activate' || effect.timing === 'gift');
         
-        console.log(`🔍 [shouldShowEffectButton] 効果: ${effect.name}, timing: ${effect.timing}, auto_trigger: ${effect.auto_trigger}, isAutomatic: ${isAutomatic}, isManual: ${isManual}, isSnowFlowerOrUuu: ${isSnowFlowerOrUuu}`);
-        
         return isManual;
       });
-      
-      console.log(`🔍 [shouldShowEffectButton] ${card.name}: 手動効果数=${manualEffects.length}, 全効果数=${Object.keys(cardEffect.effects).length}`);
       
       // 手動発動可能な効果がある場合のみ表示
       const hasManualEffects = manualEffects.length > 0;
@@ -394,7 +390,6 @@ class CardInteractionManager {
       }
 
       // 効果を実行（非同期対応）
-      console.log(`🎯 [効果実行] ${card.name || card.id}: ${effect.name}`);
       const result = await effect.effect(card, this.battleEngine);
       
       if (result && result.success !== false) {

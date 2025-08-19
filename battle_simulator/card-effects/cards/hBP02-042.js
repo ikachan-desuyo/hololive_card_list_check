@@ -62,7 +62,6 @@ const cardEffect_hBP02_042 = {
 };// 効果を登録（新システム対応）
 if (window.cardEffects) {
   window.cardEffects['hBP02-042'] = cardEffect_hBP02_042;
-  console.log('🔮 [Card Effect] hBP02-042 の効果を登録しました');
 } else {
   console.warn('🔮 [Card Effect] cardEffects not available, deferring registration');
   window.pendingCardEffects = window.pendingCardEffects || [];
