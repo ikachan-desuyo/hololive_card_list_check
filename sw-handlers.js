@@ -190,14 +190,14 @@ async function handleMessage(event) {
           if (!actualVersion) {
             mismatchReason = 'actual_version_not_found';
             needsUpdate = true;
-          } else if (compareVersions(expectedVersion, actualVersion)) {
+          } else if (expectedVersion !== actualVersion && compareVersions(expectedVersion, actualVersion)) {
             mismatchReason = 'expected_vs_actual_mismatch';
             needsUpdate = true;
-          } else if (cachedVersion && compareVersions(actualVersion, cachedVersion)) {
+          } else if (cachedVersion && actualVersion !== cachedVersion && compareVersions(actualVersion, cachedVersion)) {
             mismatchReason = 'actual_vs_cached_mismatch';
             needsUpdate = true;
           }
-          // キャッシュにバージョン情報がない場合は更新しない
+          // バージョンが同じ場合は更新不要
           
           if (needsUpdate) {
             pageInfo = {

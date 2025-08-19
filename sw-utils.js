@@ -2,18 +2,26 @@
 // Version: 4.6.0-BINDER-SETTINGS
 
 // ✅ バージョン比較機能
-function compareVersions(current, cached) {
-  if (!cached) return true; // キャッシュされていない場合は更新が必要
+function compareVersions(expected, actual) {
+  if (!actual) return true; // 実際のバージョンが取得できない場合は更新が必要
   
-  const currentParts = current.split('.').map(n => parseInt(n, 10));
-  const cachedParts = cached.split('.').map(n => parseInt(n, 10));
+  // バージョン文字列を正規化（サフィックスを除去）
+  const normalizeVersion = (version) => {
+    return version.replace(/[^\d\.]/g, '').split('.').map(n => parseInt(n, 10) || 0);
+  };
   
-  for (let i = 0; i < Math.max(currentParts.length, cachedParts.length); i++) {
-    const currentPart = currentParts[i] || 0;
-    const cachedPart = cachedParts[i] || 0;
+  const expectedParts = normalizeVersion(expected);
+  const actualParts = normalizeVersion(actual);
+  
+  // バージョンが完全に一致する場合は更新不要
+  if (expected === actual) return false;
+  
+  for (let i = 0; i < Math.max(expectedParts.length, actualParts.length); i++) {
+    const expectedPart = expectedParts[i] || 0;
+    const actualPart = actualParts[i] || 0;
     
-    if (currentPart > cachedPart) return true;
-    if (currentPart < cachedPart) return false;
+    if (expectedPart > actualPart) return true; // 期待バージョンの方が新しい
+    if (expectedPart < actualPart) return false; // 実際のバージョンの方が新しい
   }
   
   return false; // 同じバージョン
@@ -83,14 +91,14 @@ async function checkPageVersions() {
       if (!actualVersion) {
         mismatchReason = 'actual_version_not_found';
         needsUpdate = true;
-      } else if (compareVersions(expectedVersion, actualVersion)) {
+      } else if (expectedVersion !== actualVersion && compareVersions(expectedVersion, actualVersion)) {
         mismatchReason = 'expected_vs_actual_mismatch';
         needsUpdate = true;
-      } else if (cachedVersion && compareVersions(actualVersion, cachedVersion)) {
+      } else if (cachedVersion && actualVersion !== cachedVersion && compareVersions(actualVersion, cachedVersion)) {
         mismatchReason = 'actual_vs_cached_mismatch';
         needsUpdate = true;
       }
-      // キャッシュにバージョン情報がない場合は更新しない
+      // バージョンが同じ場合は更新不要
       
       if (needsUpdate) {
         outdatedPages.push({
