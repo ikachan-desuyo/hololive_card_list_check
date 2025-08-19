@@ -312,7 +312,7 @@ class HololivePlacementController {
   /**
    * 特定の位置への配置が可能かチェック
    */
-  canPlaceCard(card, position, playerId = 1) {
+  canPlaceCard(card, position, playerId = 1, sourceType = 'hand') {
     const rules = this.getCurrentPlacementRules();
     
     // ポジション名を正規化
@@ -331,6 +331,17 @@ class HololivePlacementController {
         allowed: false,
         reason: positionRule.reason
       };
+    }
+
+    // 6枚フィールド制限チェック（ホロメンのみ）
+    if (card.card_type?.includes('ホロメン')) {
+      const fieldLimitCheck = this.checkFieldCardLimit(playerId, normalizedPosition, sourceType);
+      if (!fieldLimitCheck.valid) {
+        return {
+          allowed: false,
+          reason: fieldLimitCheck.reason
+        };
+      }
     }
     
     // 条件チェック
@@ -422,7 +433,7 @@ class HololivePlacementController {
     const rules = this.getCurrentPlacementRules();
     
     for (const [position, rule] of Object.entries(rules.allowedPlacements)) {
-      const result = this.canPlaceCard(card, position, playerId);
+      const result = this.canPlaceCard(card, position, playerId, 'hand');
       if (result.allowed) {
         validZones.push({
           position,
@@ -582,6 +593,76 @@ class HololivePlacementController {
     // 例: "紫咲シオン" -> "紫咲シオン", "雪花ラミィ" -> "雪花ラミィ"
     // より複雑なパターンがある場合は、ここでロジックを拡張
     return cardName.trim();
+  }
+
+  /**
+   * フィールドカード数をカウント（推しホロメンを除く）
+   * @param {number} playerId - プレイヤーID
+   * @returns {number} フィールドカード数
+   */
+  countFieldCards(playerId) {
+    const player = this.players[playerId];
+    if (!player) return 0;
+
+    let count = 0;
+    
+    // センター、コラボ、バック1-5をチェック（推しホロメンは除外）
+    const positions = ['center', 'collab', 'back1', 'back2', 'back3', 'back4', 'back5'];
+    
+    for (const position of positions) {
+      if (player[position] && player[position].card_type?.includes('ホロメン')) {
+        count++;
+      }
+    }
+    
+    return count;
+  }
+
+  /**
+   * 6枚フィールド制限をチェック
+   * @param {number} playerId - プレイヤーID
+   * @param {string} targetPosition - 配置予定位置
+   * @param {string} sourceType - ソースタイプ ('hand' | 'field')
+   * @returns {Object} チェック結果
+   */
+  checkFieldCardLimit(playerId, targetPosition, sourceType = 'hand') {
+    const player = this.players[playerId];
+    if (!player) {
+      return { valid: false, reason: 'プレイヤーが見つかりません' };
+    }
+
+    // 推しホロメン位置は制限対象外
+    if (targetPosition === 'oshi') {
+      return { valid: true, reason: '推しホロメンは制限対象外' };
+    }
+
+    // 既存カードの移動（field→field）は制限対象外
+    if (sourceType === 'field') {
+      return { valid: true, reason: 'フィールド内移動は制限対象外' };
+    }
+
+    // コラボ移動は常に制限対象外（フィールド内移動のため）
+    if (targetPosition === 'collab') {
+      return { valid: true, reason: 'コラボ移動は制限対象外' };
+    }
+
+    // 現在のフィールドカード数を取得
+    const currentCount = this.countFieldCards(playerId);
+    
+    // 配置予定位置に既にカードがある場合は、交換なので制限対象外
+    if (player[targetPosition]) {
+      return { valid: true, reason: '既存カードとの交換は制限対象外' };
+    }
+
+    // 新規配置で6枚制限チェック
+    if (currentCount >= 6) {
+      return { 
+        valid: false, 
+        reason: `フィールドには最大6枚のホロメンまで配置できます（現在${currentCount}枚）` 
+      };
+    }
+
+    return { valid: true, reason: 'フィールド制限内' };
   }
 
   /**

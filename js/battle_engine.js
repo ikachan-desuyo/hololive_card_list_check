@@ -17,6 +17,14 @@ class HololiveBattleEngine {
     this.modalUI = new ModalUI(); // モーダルUI追加
     this.gameStarted = false; // ゲーム開始状態の管理
     
+    // 重複アラート防止機能
+    this.lastAlertTime = {};
+    this.alertCooldown = 1000; // 1秒間のクールダウン
+    
+    // 重複ドロップイベント防止機能
+    this.lastDropTime = 0;
+    this.isDropProcessing = false;
+    
     // フェーズ管理をPhaseControllerに移譲
     // this.phaseInProgress と this.phaseNames は PhaseController で管理
 
@@ -96,6 +104,19 @@ class HololiveBattleEngine {
       window.infoPanelManager = new InfoPanelManager();
     }
     this.infoPanelManager = window.infoPanelManager;
+  }
+
+  /**
+   * 重複防止付きアラート表示
+   * @param {string} message - 表示メッセージ
+   * @param {string} key - 重複チェック用のキー
+   */
+  showAlert(message, key = 'default') {
+    const now = Date.now();
+    if (!this.lastAlertTime[key] || now - this.lastAlertTime[key] > this.alertCooldown) {
+      this.lastAlertTime[key] = now;
+      alert(message);
+    }
   }
 
   /**
@@ -2224,9 +2245,26 @@ class HololiveBattleEngine {
     e.preventDefault();
     e.target.classList.remove('drop-zone-hover');
     
+    // 重複実行防止チェック（処理中フラグ + 時間ベース）
+    if (this.isDropProcessing) {
+      console.log('ドロップ処理中のため無視');
+      return;
+    }
+    
+    const now = Date.now();
+    if (this.lastDropTime && now - this.lastDropTime < 500) {
+      console.log('重複ドロップイベントを無視（時間ベース）');
+      return;
+    }
+    
+    // 処理開始
+    this.isDropProcessing = true;
+    this.lastDropTime = now;
+    
     const droppedData = this.draggedCard || this.draggedPlacedCard;
     if (!droppedData) {
       console.log('ドラッグデータが見つかりません');
+      this.isDropProcessing = false;
       return;
     }
     
@@ -2246,8 +2284,9 @@ class HololiveBattleEngine {
       
       const placementCheck = this.placementController.canPlaceCard(card, positionName, 1);
       if (!placementCheck.allowed) {
-        alert(`⚠️ 配置不可\n\n${placementCheck.reason}`);
+        this.showAlert(`⚠️ 配置不可\n\n${placementCheck.reason}`, `placement_failed_${positionName}`);
         console.log('配置制御により配置が拒否されました:', placementCheck.reason);
+        this.isDropProcessing = false;
         return;
       }
     }
@@ -2273,6 +2312,9 @@ class HololiveBattleEngine {
     this.clearHighlights();
     this.draggedCard = null;
     this.draggedPlacedCard = null;
+    
+    // 処理完了フラグをリセット
+    this.isDropProcessing = false;
   }
 
   // カードタイプ判定（HandManagerに委任）

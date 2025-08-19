@@ -7,6 +7,22 @@ class HandManager {
   constructor(battleEngine) {
     this.battleEngine = battleEngine;
     this.handArea = null;
+    // 重複アラート防止機能
+    this.lastAlertTime = {};
+    this.alertCooldown = 1000; // 1秒間のクールダウン
+  }
+
+  /**
+   * 重複防止付きアラート表示
+   * @param {string} message - 表示メッセージ
+   * @param {string} key - 重複チェック用のキー
+   */
+  showAlert(message, key = 'default') {
+    const now = Date.now();
+    if (!this.lastAlertTime[key] || now - this.lastAlertTime[key] > this.alertCooldown) {
+      this.lastAlertTime[key] = now;
+      alert(message);
+    }
   }
 
   // 手札エリアの初期化
@@ -249,10 +265,19 @@ class HandManager {
     window.debugLog('現在のフェーズではホロメンカードを配置できません');
   }
 
-  // メインステップでのホロメンカード配置（制限削除）
+  // メインステップでのホロメンカード配置（6枚制限あり）
   placeHolomenCardMainStep(card, handIndex) {
     const player = this.battleEngine.players[this.battleEngine.gameState.currentPlayer];
     const cardCopy = this.createCardCopy(card);
+    
+    // 6枚フィールド制限チェック
+    if (this.battleEngine.placementController) {
+      const fieldCount = this.battleEngine.placementController.countFieldCards(this.battleEngine.gameState.currentPlayer);
+      if (fieldCount >= 6) {
+        window.debugLog(`配置不可: フィールドには最大6枚のホロメンまで配置できます（現在${fieldCount}枚）`);
+        return;
+      }
+    }
     
     // 空きスロットを順番に探す（優先順位：コラボ > センター > バック）
     const availableSlots = this.findAvailableSlots(player);
@@ -298,6 +323,15 @@ class HandManager {
   // Debut配置フェーズでの配置
   placeHolomenCardDebut(card, handIndex) {
     const player = this.battleEngine.players[this.battleEngine.gameState.currentPlayer];
+    
+    // 6枚フィールド制限チェック
+    if (this.battleEngine.placementController) {
+      const fieldCount = this.battleEngine.placementController.countFieldCards(this.battleEngine.gameState.currentPlayer);
+      if (fieldCount >= 6) {
+        window.debugLog(`配置不可: フィールドには最大6枚のホロメンまで配置できます（現在${fieldCount}枚）`);
+        return;
+      }
+    }
     
     // カードのディープコピーを作成
     const cardCopy = this.createCardCopy(card);
@@ -854,6 +888,17 @@ class HandManager {
       default:
         return;
     }
+
+    // 6枚フィールド制限チェック（ホロメンカードで、空の位置への配置の場合のみ）
+    if (card.card_type?.includes('ホロメン') && !targetCard) {
+      if (this.battleEngine.placementController) {
+        const fieldLimitCheck = this.battleEngine.placementController.checkFieldCardLimit(1, targetPosition, 'hand');
+        if (!fieldLimitCheck.valid) {
+          // アラート表示は battle_engine.js に委任
+          return;
+        }
+      }
+    }
     
     // ドロップ先にカードがある場合は交換処理またはブルーム処理
     if (targetCard) {
@@ -865,7 +910,7 @@ class HandManager {
         const bloomCheck = this.battleEngine.stateManager.canBloom(card, targetCard, 1);
         
         if (!bloomCheck.valid) {
-          alert(`⚠️ ブルーム不可\n\n${bloomCheck.reason}`);
+          this.showAlert(`⚠️ ブルーム不可\n\n${bloomCheck.reason}`, `bloom_failed_${targetPosition}`);
           return;
         }
         
@@ -953,7 +998,7 @@ class HandManager {
         
       } else if (targetCard) {
         // ホロライブTCGでは基本的にブルーム以外の自由な交換は許可されない
-        alert(`⚠️ カード交換不可\n\nブルーム以外での交換はできません。\n\n- 同名カードでレベルが進化する場合のみブルーム可能\n- 空いている位置への配置は可能`);
+        this.showAlert(`⚠️ カード交換不可\n\nブルーム以外での交換はできません。\n\n- 同名カードでレベルが進化する場合のみブルーム可能\n- 空いている位置への配置は可能`, `exchange_failed_${targetPosition}`);
         return;
       }
     } else {
