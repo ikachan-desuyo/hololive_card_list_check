@@ -1,5 +1,8 @@
-    html, body {
-        touch-action: manipulation;
+    /* タッチデバイスでのみタッチアクションを設定 */
+    @media (pointer: coarse) {
+        html, body {
+            touch-action: manipulation;
+        }
     }
 
     body {
