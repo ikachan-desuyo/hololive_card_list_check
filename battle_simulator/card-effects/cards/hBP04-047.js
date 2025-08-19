@@ -21,6 +21,7 @@ const cardEffect_hBP04_047 = {
       name: 'fleur',
       description: '自分の〈雪民〉が付いている〈雪花ラミィ〉がいる時、相手のホロメン1人に特殊ダメージ20を与える。ただし、ダウンしても相手のライフは減らない。',
       timing: 'manual',
+      auto_trigger: 'on_collab', // コラボ時に自動モーダル表示
       condition: (card, gameState, battleEngine) => {
         const currentPlayer = battleEngine.gameState.currentPlayer;
         const utils = new CardEffectUtils(battleEngine);
@@ -67,6 +68,7 @@ const cardEffect_hBP04_047 = {
       cost: { blue: 1, any: 1 },
       damage: 50,
       timing: 'manual',
+      auto_trigger: 'arts', // アーツ使用時に自動モーダル表示
       condition: (card, gameState, battleEngine) => {
         // 青色1個とany色1個のエール必要
         if (!card.yellCards) return false;

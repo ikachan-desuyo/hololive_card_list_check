@@ -211,9 +211,14 @@ class CardInteractionManager {
     });
 
     // プレイヤーのカードで効果発動可能な場合のみ
+    // サポートカード、ギフト効果持ちホロメンカードのみ対象
     if (isPlayerCard && this.hasManualEffect(card)) {
       const canActivate = this.canActivateEffect(card, position);
-      if (canActivate) {
+      
+      // 効果発動ボタンを表示する条件を厳密化
+      const shouldShowEffectButton = this.shouldShowEffectButton(card, position);
+      
+      if (canActivate && shouldShowEffectButton) {
         actions.push({
           id: 'activate_effect',
           label: '効果を発動',
@@ -227,43 +232,143 @@ class CardInteractionManager {
   }
 
   /**
+   * カードの所有者を取得
+   * @param {Object} card - カードオブジェクト
+   * @param {string} position - カードの位置
+   * @returns {number} プレイヤー番号 (0 or 1)
+   */
+  getCardOwner(card, position) {
+    // positionから所有者を判定
+    if (position?.includes('player0') || position?.includes('p0')) {
+      return 0;
+    } else if (position?.includes('player1') || position?.includes('p1')) {
+      return 1;
+    }
+    
+    // フィールド上のカードの場合、位置から判定
+    const currentPlayer = this.battleEngine.gameState.currentPlayer;
+    
+    // ステージのカードをチェック
+    const player0Stage = this.battleEngine.players[0].stage || [];
+    const player1Stage = this.battleEngine.players[1].stage || [];
+    
+    // player0のステージにあるかチェック
+    if (player0Stage.some(stageCard => stageCard === card || stageCard.id === card.id)) {
+      return 0;
+    }
+    
+    // player1のステージにあるかチェック
+    if (player1Stage.some(stageCard => stageCard === card || stageCard.id === card.id)) {
+      return 1;
+    }
+    
+    // デフォルトは現在のプレイヤー
+    return currentPlayer;
+  }
+
+  /**
+   * 効果発動ボタンを表示すべきかチェック
+   * @param {Object} card - カードオブジェクト
+   * @param {string} position - カードの位置
+   */
+  shouldShowEffectButton(card, position) {
+    // 自分のターンでない場合は表示しない
+    const currentPlayer = this.battleEngine.gameState.currentPlayer;
+    const cardOwner = this.getCardOwner(card, position);
+    
+    if (cardOwner !== currentPlayer) {
+      return false;
+    }
+    
+    const cardType = card.card_type || '';
+    
+    // サポートカードは自分のターンかつメインフェーズで表示
+    if (cardType.includes('サポート')) {
+      const currentPhase = this.battleEngine.gameState.currentPhase;
+      return currentPhase === 3; // メインフェーズ
+    }
+    
+    // ホロメンカードの場合、手動発動可能な効果のみチェック
+    if (cardType.includes('ホロメン')) {
+      const cardEffect = window.cardEffects[card.id];
+      
+      if (!cardEffect || !cardEffect.effects) {
+        return false;
+      }
+      
+      // 新形式の効果定義で手動発動可能な効果をチェック
+      const automaticTimings = ['on_collab', 'arts', 'on_bloom', 'on_center', 'on_stage'];
+      const manualEffects = Object.values(cardEffect.effects).filter(effect => {
+        const isAutomatic = automaticTimings.includes(effect.timing) || effect.auto_trigger;
+        // Snow flower と うぅ… は強制的に自動効果として扱う
+        const isSnowFlowerOrUuu = effect.name === 'Snow flower' || effect.name === 'うぅ…';
+        const isManual = !isAutomatic && !isSnowFlowerOrUuu && (effect.timing === 'manual' || effect.timing === 'activate' || effect.timing === 'gift');
+        
+        console.log(`🔍 [shouldShowEffectButton] 効果: ${effect.name}, timing: ${effect.timing}, auto_trigger: ${effect.auto_trigger}, isAutomatic: ${isAutomatic}, isManual: ${isManual}, isSnowFlowerOrUuu: ${isSnowFlowerOrUuu}`);
+        
+        return isManual;
+      });
+      
+      console.log(`🔍 [shouldShowEffectButton] ${card.name}: 手動効果数=${manualEffects.length}, 全効果数=${Object.keys(cardEffect.effects).length}`);
+      
+      // 手動発動可能な効果がある場合のみ表示
+      const hasManualEffects = manualEffects.length > 0;
+      
+      // 旧形式のトリガーシステムとの互換性チェック
+      if (!hasManualEffects && cardEffect.triggers) {
+        const hasGift = cardEffect.triggers.some(trigger => trigger.timing === 'gift');
+        return hasGift;
+      }
+      
+      return hasManualEffects;
+    }
+    
+    // 推しホロメンカードは推しスキルがある場合のみ表示
+    if (cardType.includes('推しホロメン')) {
+      const cardEffect = window.cardEffects[card.id];
+      const hasOshiSkill = cardEffect && cardEffect.effects && cardEffect.effects.oshiSkill;
+      return hasOshiSkill;
+    }
+    
+    // その他のカードは表示しない
+    return false;
+  }
+
+  /**
    * カード効果の手動発動
    */
   async activateCardEffect(card, position) {
     const currentPlayer = this.battleEngine.gameState.currentPlayer;
     
     try {
-      console.log(`🔍 [効果発動] カード詳細:`, card);
-      console.log(`🔍 [効果発動] カードID: ${card.id}, number: ${card.number}`);
-      
       // カード効果定義を直接取得
       const cardEffect = window.cardEffects[card.id];
-      console.log(`🔍 [効果発動] 効果定義[${card.id}]:`, cardEffect);
       
       // card.idで見つからない場合は card.number で試行
       let finalCardEffect = cardEffect;
       if (!finalCardEffect && card.number) {
         finalCardEffect = window.cardEffects[card.number];
-        console.log(`🔍 [効果発動] 効果定義[${card.number}]:`, finalCardEffect);
       }
       
       if (!finalCardEffect || !finalCardEffect.effects) {
-        console.log(`❌ [効果発動] 効果定義が見つかりません: ${card.id} / ${card.number}`);
         this.showMessage('このカードには効果がありません', 'info');
         return;
       }
 
-      // 手動発動可能な効果を検索
-      const manualEffects = Object.values(finalCardEffect.effects).filter(effect => 
-        effect.timing === 'manual'
-      );
+      // 手動発動可能な効果を検索（自動効果を除外）
+      const automaticTimings = ['on_collab', 'arts', 'on_bloom', 'on_center', 'on_stage'];
+      const manualEffects = Object.values(finalCardEffect.effects).filter(effect => {
+        const isAutomatic = automaticTimings.includes(effect.timing) || effect.auto_trigger;
+        // Snow flower と うぅ… は強制的に自動効果として扱う
+        const isSnowFlowerOrUuu = effect.name === 'Snow flower' || effect.name === 'うぅ…';
+        const isManual = !isAutomatic && !isSnowFlowerOrUuu && (effect.timing === 'manual' || effect.timing === 'activate' || effect.timing === 'gift');
+        return isManual;
+      });
 
       if (manualEffects.length === 0) {
         this.showMessage('手動発動可能な効果がありません', 'info');
         return;
       }
-
-      console.log(`✅ [効果発動] 手動効果見つかりました: ${manualEffects.length}個`);
 
       // 最初の手動効果を発動（複数ある場合は選択UIが必要）
       const effect = manualEffects[0];
@@ -289,9 +394,8 @@ class CardInteractionManager {
       }
 
       // 効果を実行（非同期対応）
-      console.log(`🎯 [効果実行開始] カード: ${card.name || card.id}, 効果: ${effect.name}`);
+      console.log(`🎯 [効果実行] ${card.name || card.id}: ${effect.name}`);
       const result = await effect.effect(card, this.battleEngine);
-      console.log(`✅ [効果実行完了] 結果:`, result);
       
       if (result && result.success !== false) {
         // LIMITED効果の使用回数をカウント
@@ -299,9 +403,11 @@ class CardInteractionManager {
           this.recordLimitedEffectUsage();
         }
         
+        // 効果使用済みマークを設定
+        this.markEffectAsUsed(card, position);
+        
         // サポートカードの自動アーカイブ処理
         if (position === 'hand' && card.card_type?.includes('サポート')) {
-          console.log(`🗄️ [自動アーカイブ] サポートカード ${card.name} をアーカイブに移動`);
           this.moveCardToArchive(card, position);
         }
         
@@ -379,17 +485,37 @@ class CardInteractionManager {
     const cardEffect = window.cardEffects[card.id];
     if (!cardEffect) return;
 
-    for (const trigger of cardEffect.triggers) {
-      switch (trigger.timing) {
-        case 'on_bloom':
-          card.bloomEffectUsed = true;
-          break;
-        case 'on_collab':
-          card.collabEffectUsed = true;
-          break;
-        // ギフトは常時効果なので使用済みマークなし
-        // アーツは未実装
-        // 推しホロメンは未実装
+    // 新形式の効果定義の場合
+    if (cardEffect.effects) {
+      for (const effect of Object.values(cardEffect.effects)) {
+        if (effect.timing === 'manual') {
+          // ギフト効果の場合
+          if (effect.name?.includes('ギフト')) {
+            card.giftEffectUsed = true;
+            break;
+          }
+        }
+      }
+      return;
+    }
+
+    // 古い形式のトリガーシステム（後方互換性）
+    if (cardEffect.triggers && Array.isArray(cardEffect.triggers)) {
+      for (const trigger of cardEffect.triggers) {
+        switch (trigger.timing) {
+          case 'on_bloom':
+            card.bloomEffectUsed = true;
+            break;
+          case 'on_collab':
+            card.collabEffectUsed = true;
+            break;
+          case 'gift':
+            // ギフト効果は1度使用したら使用済みマークを付ける
+            card.giftEffectUsed = true;
+            break;
+          // アーツは未実装
+          // 推しホロメンは未実装
+        }
       }
     }
   }
@@ -427,24 +553,19 @@ class CardInteractionManager {
     
     // 新形式の効果定義をチェック
     if (cardEffect.effects) {
-      const manualEffects = Object.values(cardEffect.effects).filter(effect => 
-        effect.timing === 'manual' || effect.timing === 'activate'
-      );
+      const automaticTimings = ['on_collab', 'arts', 'on_bloom', 'on_center', 'on_stage'];
+      const manualEffects = Object.values(cardEffect.effects).filter(effect => {
+        const isAutomatic = automaticTimings.includes(effect.timing) || effect.auto_trigger;
+        // Snow flower と うぅ… は強制的に自動効果として扱う
+        const isSnowFlowerOrUuu = effect.name === 'Snow flower' || effect.name === 'うぅ…';
+        const isManual = !isAutomatic && !isSnowFlowerOrUuu && (effect.timing === 'manual' || effect.timing === 'activate' || effect.timing === 'gift');
+        return isManual;
+      });
       return manualEffects.length > 0;
     }
     
     // 古い形式のトリガーシステム（後方互換性）
-    if (cardEffect.triggers && cardEffect.triggers.some(t => t.timing === 'manual_trigger')) {
-      return true;
-    }
-    
-    // コラボエフェクト
-    if (cardEffect.collabEffect) {
-      return true;
-    }
-    
-    // ブルームエフェクト
-    if (cardEffect.bloomEffect) {
+    if (cardEffect.triggers && cardEffect.triggers.some(t => t.timing === 'manual_trigger' || t.timing === 'gift')) {
       return true;
     }
     
@@ -469,8 +590,14 @@ class CardInteractionManager {
 
     // 新形式の効果定義（サポートカード対応）
     if (cardEffect.effects) {
+      const automaticTimings = ['on_collab', 'arts', 'on_bloom', 'on_center', 'on_stage'];
       for (const effect of Object.values(cardEffect.effects)) {
-        if (effect.timing === 'manual') {
+        const isAutomatic = automaticTimings.includes(effect.timing) || effect.auto_trigger;
+        // Snow flower と うぅ… は強制的に自動効果として扱う
+        const isSnowFlowerOrUuu = effect.name === 'Snow flower' || effect.name === 'うぅ…';
+        const isManual = !isAutomatic && !isSnowFlowerOrUuu && (effect.timing === 'manual' || effect.timing === 'activate' || effect.timing === 'gift');
+        
+        if (isManual) {
           // LIMITED制限チェック（システム側で統一処理）
           if (effect.limited && !this.canUseLimitedEffect(card, position)) {
             return false;
@@ -567,39 +694,33 @@ class CardInteractionManager {
     if (currentPlayer === myPlayerId) {
       // 自分のターン：メインステップ(3)またはパフォーマンスステップ(4)でのみ発動可能
       if (currentPhase !== 3 && currentPhase !== 4) {
-        console.log(`❌ [推しスキル] 自分のターンではメインステップ・パフォーマンスステップでのみ使用可能 (現在フェーズ: ${currentPhase})`);
         return false;
       }
     } else {
       // 相手のターン：効果によって発動可能かチェック
       if (oshiSkill.timing !== 'reactive') {
-        console.log(`❌ [推しスキル] 相手のターンではreactiveタイミングの効果のみ使用可能`);
         return false;
       }
     }
     
     // コスト不足チェック
     if (!this.canPayHoloPowerCost(oshiSkill.holoPowerCost || 0)) {
-      console.log(`❌ [推しスキル] ホロパワー不足 (必要: ${oshiSkill.holoPowerCost || 0})`);
       return false;
     }
     
     // ターン制限チェック
     if (!this.canUseOshiSkillThisTurn(card, oshiSkill)) {
-      console.log(`❌ [推しスキル] ターン使用制限`);
       return false;
     }
     
     // ゲーム制限チェック（SP推しスキル）
     if (!this.canUseOshiSkillThisGame(card, oshiSkill)) {
-      console.log(`❌ [推しスキル] ゲーム使用制限`);
       return false;
     }
     
     // 条件チェック（reactiveタイミングの場合）
     if (oshiSkill.timing === 'reactive' && oshiSkill.condition) {
       const conditionMet = oshiSkill.condition(card, this.battleEngine.gameState, this.battleEngine);
-      console.log(`🔍 [推しスキル] 条件チェック結果: ${conditionMet}`);
       return conditionMet;
     }
     
@@ -737,64 +858,42 @@ class CardInteractionManager {
 
   /**
    * ブルームエフェクト発動可能かチェック
+   * ブルームした直後のタイミングでのみ発動可能
    */
   canActivateBloomEffect(card, position) {
-    // 場にいるカードのみ
-    if (position === 'hand') return false;
-    
-    // ブルームしたターンかチェック
-    const gameState = this.battleEngine.gameState;
-    const currentTurn = gameState.turnCount;
-    
-    // カードにブルームしたターンの情報があるかチェック
-    if (card.bloomedTurn && card.bloomedTurn === currentTurn) {
-      // まだ効果を使用していないかチェック
-      return !card.bloomEffectUsed;
-    }
-    
+    // ブルームエフェクトは自動発動なので手動では発動不可
+    // ブルーム直後のモーダル表示でのみ発動される
     return false;
   }
 
   /**
    * コラボエフェクト発動可能かチェック
+   * コラボした直後のタイミングでのみ発動可能
    */
   canActivateCollabEffect(card, position) {
-    // コラボエリアにいるカードのみ
-    if (position !== 'collab') {
-      return false;
-    }
-    
-    // コラボしたターンかチェック
-    const gameState = this.battleEngine.gameState;
-    const currentTurn = gameState.turnCount;
-    
-    // デバッグログ（重要な情報のみ）
-    if (card.collabedTurn !== currentTurn) {
-      return false;
-    }
-    
-    // カードにコラボしたターンの情報があるかチェック
-    if (card.collabedTurn && card.collabedTurn === currentTurn) {
-      // まだ効果を使用していないかチェック
-      const canActivate = !card.collabEffectUsed;
-      if (canActivate) {
-      }
-      return canActivate;
-    }
-    
+    // コラボエフェクトは自動発動なので手動では発動不可
+    // コラボ直後のモーダル表示でのみ発動される
     return false;
   }
 
   /**
    * ギフト効果発動可能かチェック
+   * メインステップ時にいつでも発動可能、ただし1度のみ
    */
   canActivateGiftEffect(card, position) {
     // 手札からは発動不可
     if (position === 'hand') return false;
     
-    // 場にいる間は常に発動可能
+    // メインステップ（フェーズ3）でのみ発動可能
+    const currentPhase = this.battleEngine.gameState.currentPhase;
+    if (currentPhase !== 3) return false;
+    
+    // 場にいる間は発動可能
     const fieldPositions = ['center', 'collab', 'back1', 'back2', 'back3', 'back4', 'back5'];
-    return fieldPositions.includes(position);
+    if (!fieldPositions.includes(position)) return false;
+    
+    // まだギフト効果を使用していないかチェック
+    return !card.giftEffectUsed;
   }
 
   findCard(cardId) {
@@ -961,8 +1060,6 @@ class CardInteractionManager {
         player.gameState.usedOshiSkillsThisGame[skillKey] = 0;
       }
       player.gameState.usedOshiSkillsThisGame[skillKey]++;
-      
-      console.log(`📊 [推しスキル] SP推しスキル使用記録: ${skillKey} = ${player.gameState.usedOshiSkillsThisGame[skillKey]}/${oshiSkill.gameLimit}`);
     }
   }
 

@@ -23,6 +23,7 @@ const cardEffect_hBP04_043 = {
       cost: { any: 1 },
       damage: 20, // 基本ダメージ
       timing: 'manual',
+      auto_trigger: 'arts', // アーツ使用時に自動モーダル表示
       condition: (card, gameState, battleEngine) => {
         // 基本的なアーツ使用条件
         const totalYells = card.yellCards ? card.yellCards.length : 0;

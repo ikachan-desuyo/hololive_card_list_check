@@ -23,6 +23,7 @@ const cardEffect_hBP04_046 = {
       cost: { any: 1 },
       damage: 30, // 基本ダメージ
       timing: 'manual',
+      auto_trigger: 'arts', // アーツ使用時に自動モーダル表示
       condition: (card, gameState, battleEngine) => {
         // any色1個のエール必要
         const totalYells = card.yellCards ? card.yellCards.length : 0;

@@ -22,6 +22,7 @@ const cardEffect_hBP04_048 = {
       name: 'ユニーリアの令嬢',
       description: '自分のエールデッキの上から1枚を、自分の〈雪民〉が付いている〈雪花ラミィ〉に送る。',
       timing: 'manual',
+      auto_trigger: 'on_bloom', // ブルーム時に自動モーダル表示
       condition: (card, gameState, battleEngine) => {
         const currentPlayer = battleEngine.gameState.currentPlayer;
         const utils = new CardEffectUtils(battleEngine);
@@ -89,6 +90,7 @@ const cardEffect_hBP04_048 = {
       damage: 130,
       tokkou: { red: 50 },
       timing: 'manual',
+      auto_trigger: 'arts', // アーツ使用時に自動モーダル表示
       condition: (card, gameState, battleEngine) => {
         // 青色1個とany色2個のエール必要
         if (!card.yellCards) return false;

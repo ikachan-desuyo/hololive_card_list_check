@@ -23,6 +23,7 @@ const cardEffect_hBP04_045 = {
       cost: { blue: 1 },
       damage: 30,
       timing: 'manual',
+      auto_trigger: 'arts', // アーツ使用時に自動モーダル表示
       condition: (card, gameState, battleEngine) => {
         // 青色1個のエール必要
         if (!card.yellCards) return false;
@@ -67,6 +68,7 @@ const cardEffect_hBP04_045 = {
       cost: { blue: 1, any: 1 },
       damage: 50,
       timing: 'manual',
+      auto_trigger: 'arts', // アーツ使用時に自動モーダル表示
       condition: (card, gameState, battleEngine) => {
         // 青色1個とany色1個のエール必要
         if (!card.yellCards) return false;

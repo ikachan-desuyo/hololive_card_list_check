@@ -23,6 +23,7 @@ const cardEffect_hBP02_042 = {
       cost: { any: 1 },
       damage: 20,
       timing: 'manual',
+      auto_trigger: 'arts', // アーツ使用時に自動モーダル表示
       condition: (card, gameState, battleEngine) => {
         // 基本的なアーツ使用条件
         const currentPlayer = battleEngine.gameState.currentPlayer;

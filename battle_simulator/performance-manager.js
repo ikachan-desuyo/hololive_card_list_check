@@ -1382,6 +1382,12 @@ class PerformanceManager {
       return;
     }
 
+    // 既に効果を使用済みかチェック
+    if (card.bloomEffectUsed) {
+      console.log(`⚠️ [Performance] ブルームエフェクト使用済み: ${card.name}`);
+      return;
+    }
+
     // プレイヤーの場合のみ確認UI表示
     if (playerId === 1) {
       this.showEffectConfirmationDialog(card, 'bloom', position, playerId);
@@ -1412,6 +1418,12 @@ class PerformanceManager {
 
     if (!hasCollabEffect) {
       console.log(`❌ [Performance] コラボエフェクトなし: ${card.name}`);
+      return;
+    }
+
+    // 既に効果を使用済みかチェック
+    if (card.collabEffectUsed) {
+      console.log(`⚠️ [Performance] コラボエフェクト使用済み: ${card.name}`);
       return;
     }
 

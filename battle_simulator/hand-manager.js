@@ -551,6 +551,11 @@ class HandManager {
         return false;
       }
       
+      // yellCardsプロパティを確実に初期化
+      if (!originalCard.yellCards || !Array.isArray(originalCard.yellCards)) {
+        originalCard.yellCards = [];
+      }
+      
       window.debugLog(`🔄 コラボ移動: ${originalCard?.name} (エール: ${originalCard?.yellCards?.length || 0}枚)`);
       
       // 3. コラボ移動の記録（カード状態ベース）
@@ -560,6 +565,9 @@ class HandManager {
       if (originalCard?.yellCards && Array.isArray(originalCard.yellCards)) {
         updatedSourceCard.yellCards = [...originalCard.yellCards];
         // コラボ移動: エール引継ぎ完了
+      } else {
+        // yellCardsが未初期化の場合は空配列を設定
+        updatedSourceCard.yellCards = [];
       }
       
       // 5. コラボ移動実行（State Managerがコラボロックを自動設定）
@@ -572,10 +580,17 @@ class HandManager {
       // 7. エール情報が確実に反映されるよう再度設定（SWAP_CARDS実行後）
       setTimeout(() => {
         const collabCard = battleEnginePlayer[targetPosition];
-        if (collabCard && originalCard?.yellCards?.length > 0) {
-          // エール情報を確実に設定
-          collabCard.yellCards = [...originalCard.yellCards];
-          window.debugLog(`コラボ移動後エール再設定: ${collabCard.name} (エール: ${collabCard.yellCards.length}枚)`);
+        if (collabCard) {
+          // yellCardsプロパティを初期化
+          if (!collabCard.yellCards || !Array.isArray(collabCard.yellCards)) {
+            collabCard.yellCards = [];
+          }
+          
+          if (originalCard?.yellCards?.length > 0) {
+            // エール情報を確実に設定
+            collabCard.yellCards = [...originalCard.yellCards];
+            window.debugLog(`コラボ移動後エール再設定: ${collabCard.name} (エール: ${collabCard.yellCards.length}枚)`);
+          }
         }
         
         // エール再設定の確実性を高める
@@ -583,6 +598,10 @@ class HandManager {
           
           // State Managerにも反映
           if (this.battleEngine.stateManager.state.players[playerId].cards[targetPosition]) {
+            // yellCardsの初期化を確認
+            if (!originalCard.yellCards || !Array.isArray(originalCard.yellCards)) {
+              originalCard.yellCards = [];
+            }
             this.battleEngine.stateManager.state.players[playerId].cards[targetPosition].yellCards = [...originalCard.yellCards];
             // State Manager同期: エール情報設定完了
           }
@@ -607,6 +626,11 @@ class HandManager {
         
         // コラボ移動後のUI更新
         this.battleEngine.updateUI();
+        
+        // 🎯 コラボ効果の自動チェック - カードがコラボ位置に移動した後
+        setTimeout(() => {
+          this.checkAndTriggerCollabEffects(playerId, targetPosition);
+        }, 100);
         
       }, 50);
       
@@ -956,6 +980,808 @@ class HandManager {
     if (!targetCard || !this.battleEngine.stateManager.isBloom(card, targetCard)) {
       this.updateHandDisplay();
       this.battleEngine.updateUI();
+    }
+  }
+
+  /**
+   * コラボ移動後にコラボ効果をチェックして自動発動モーダルを表示
+   * @param {number} playerId - プレイヤーID
+   * @param {string} position - カード位置（'collab'）
+   */
+  checkAndTriggerCollabEffects(playerId, position) {
+    try {
+      console.log(`🎯 [コラボ効果チェック] 開始: プレイヤー${playerId}, 位置: ${position}`);
+      
+      const card = this.battleEngine.players[playerId][position];
+      if (!card) {
+        console.log(`⚠️ [コラボ効果チェック] カードが見つかりません: ${position}`);
+        return;
+      }
+      
+      console.log(`🔍 [コラボ効果チェック] カード確認: ${card.name || card.id}`);
+      
+      // カード効果定義を取得
+      const cardEffects = window.cardEffects?.[card.id || card.cardId];
+      if (!cardEffects?.effects) {
+        console.log(`📝 [コラボ効果チェック] カード効果定義なし: ${card.name || card.id}`);
+        return;
+      }
+      
+      // コラボ効果をチェック
+      const collabEffect = cardEffects.effects.collabEffect;
+      if (!collabEffect) {
+        console.log(`📝 [コラボ効果チェック] コラボ効果なし: ${card.name || card.id}`);
+        return;
+      }
+      
+      // auto_trigger が on_collab のもののみ対象
+      if (collabEffect.auto_trigger !== 'on_collab') {
+        console.log(`📝 [コラボ効果チェック] 自動発動対象外: ${collabEffect.auto_trigger}`);
+        return;
+      }
+      
+      console.log(`✨ [コラボ効果チェック] コラボ効果発見: ${collabEffect.name}`);
+      
+      // コラボ効果発動モーダルを表示
+      this.showCollabEffectModal(card, collabEffect, playerId, position);
+      
+    } catch (error) {
+      console.error('🚨 [コラボ効果チェック] エラー:', error);
+    }
+  }
+
+  /**
+   * コラボ効果発動確認モーダルを表示
+   * @param {Object} card - カード情報
+   * @param {Object} collabEffect - コラボ効果定義
+   * @param {number} playerId - プレイヤーID
+   * @param {string} position - カード位置
+   */
+  showCollabEffectModal(card, collabEffect, playerId, position) {
+    try {
+      console.log(`🎭 [コラボ効果モーダル] 表示開始: ${collabEffect.name}`);
+      
+      // 既存のモーダルを除去
+      const existingModal = document.querySelector('.collab-effect-modal');
+      if (existingModal) {
+        existingModal.remove();
+      }
+      
+      // モーダル要素を作成
+      const modal = document.createElement('div');
+      modal.className = 'collab-effect-modal';
+      modal.style.cssText = `
+        position: fixed;
+        top: 0;
+        left: 0;
+        width: 100%;
+        height: 100%;
+        background: rgba(0, 0, 0, 0.7);
+        display: flex;
+        justify-content: center;
+        align-items: center;
+        z-index: 10000;
+        font-family: Arial, sans-serif;
+      `;
+      
+      // モーダルコンテンツ
+      const content = document.createElement('div');
+      content.style.cssText = `
+        background: white;
+        padding: 30px;
+        border-radius: 15px;
+        box-shadow: 0 8px 32px rgba(0, 0, 0, 0.3);
+        max-width: 500px;
+        width: 90%;
+        text-align: center;
+        border: 3px solid #4A90E2;
+      `;
+      
+      // タイトル
+      const title = document.createElement('h3');
+      title.textContent = 'コラボエフェクト発動';
+      title.style.cssText = `
+        margin: 0 0 20px 0;
+        color: #4A90E2;
+        font-size: 24px;
+        font-weight: bold;
+      `;
+      
+      // カード名
+      const cardNameElement = document.createElement('div');
+      cardNameElement.textContent = card.name || card.id;
+      cardNameElement.style.cssText = `
+        font-size: 20px;
+        font-weight: bold;
+        margin-bottom: 15px;
+        color: #333;
+      `;
+      
+      // 効果名
+      const effectNameElement = document.createElement('div');
+      effectNameElement.textContent = `「${collabEffect.name}」`;
+      effectNameElement.style.cssText = `
+        font-size: 18px;
+        font-weight: bold;
+        margin-bottom: 15px;
+        color: #E74C3C;
+      `;
+      
+      // 効果説明
+      const description = document.createElement('div');
+      description.textContent = collabEffect.description || 'コラボエフェクトを発動します';
+      description.style.cssText = `
+        margin-bottom: 25px;
+        line-height: 1.6;
+        color: #555;
+        font-size: 14px;
+        padding: 15px;
+        background: #f8f9fa;
+        border-radius: 8px;
+        border-left: 4px solid #4A90E2;
+      `;
+      
+      // ボタンコンテナ
+      const buttonContainer = document.createElement('div');
+      buttonContainer.style.cssText = `
+        display: flex;
+        gap: 15px;
+        justify-content: center;
+      `;
+      
+      // 発動ボタン
+      const activateButton = document.createElement('button');
+      activateButton.textContent = '効果を発動';
+      activateButton.style.cssText = `
+        padding: 12px 25px;
+        background: #4A90E2;
+        color: white;
+        border: none;
+        border-radius: 8px;
+        font-size: 16px;
+        font-weight: bold;
+        cursor: pointer;
+        transition: background 0.3s;
+      `;
+      activateButton.addEventListener('mouseenter', () => {
+        activateButton.style.background = '#357ABD';
+      });
+      activateButton.addEventListener('mouseleave', () => {
+        activateButton.style.background = '#4A90E2';
+      });
+      
+      // キャンセルボタン
+      const cancelButton = document.createElement('button');
+      cancelButton.textContent = 'キャンセル';
+      cancelButton.style.cssText = `
+        padding: 12px 25px;
+        background: #95A5A6;
+        color: white;
+        border: none;
+        border-radius: 8px;
+        font-size: 16px;
+        cursor: pointer;
+        transition: background 0.3s;
+      `;
+      cancelButton.addEventListener('mouseenter', () => {
+        cancelButton.style.background = '#7F8C8D';
+      });
+      cancelButton.addEventListener('mouseleave', () => {
+        cancelButton.style.background = '#95A5A6';
+      });
+      
+      // イベントリスナー
+      activateButton.addEventListener('click', () => {
+        modal.remove();
+        this.executeCollabEffect(card, collabEffect, playerId, position);
+      });
+      
+      cancelButton.addEventListener('click', () => {
+        modal.remove();
+        console.log(`❌ [コラボ効果モーダル] キャンセル: ${collabEffect.name}`);
+      });
+      
+      // モーダル外クリックで閉じる
+      modal.addEventListener('click', (e) => {
+        if (e.target === modal) {
+          modal.remove();
+          console.log(`❌ [コラボ効果モーダル] 外クリックでキャンセル: ${collabEffect.name}`);
+        }
+      });
+      
+      // ESCキーで閉じる
+      const handleEscape = (e) => {
+        if (e.key === 'Escape') {
+          modal.remove();
+          document.removeEventListener('keydown', handleEscape);
+          console.log(`❌ [コラボ効果モーダル] ESCでキャンセル: ${collabEffect.name}`);
+        }
+      };
+      document.addEventListener('keydown', handleEscape);
+      
+      // 要素を組み立て
+      buttonContainer.appendChild(activateButton);
+      buttonContainer.appendChild(cancelButton);
+      
+      content.appendChild(title);
+      content.appendChild(cardNameElement);
+      content.appendChild(effectNameElement);
+      content.appendChild(description);
+      content.appendChild(buttonContainer);
+      
+      modal.appendChild(content);
+      document.body.appendChild(modal);
+      
+      console.log(`✅ [コラボ効果モーダル] 表示完了: ${collabEffect.name}`);
+      
+    } catch (error) {
+      console.error('🚨 [コラボ効果モーダル] 作成エラー:', error);
+    }
+  }
+
+  /**
+   * コラボ効果を実行
+   * @param {Object} card - カード情報
+   * @param {Object} collabEffect - コラボ効果定義
+   * @param {number} playerId - プレイヤーID
+   * @param {string} position - カード位置
+   */
+  async executeCollabEffect(card, collabEffect, playerId, position) {
+    try {
+      console.log(`🚀 [コラボ効果実行] 開始: ${collabEffect.name}`);
+      
+      // 条件チェック
+      if (collabEffect.condition) {
+        const conditionMet = collabEffect.condition(card, this.battleEngine.gameState, this.battleEngine);
+        if (!conditionMet) {
+          console.log(`❌ [コラボ効果実行] 条件不適合: ${collabEffect.name}`);
+          alert('この効果の発動条件を満たしていません。');
+          return;
+        }
+      }
+      
+      // 効果実行
+      if (collabEffect.effect) {
+        const result = await collabEffect.effect(card, this.battleEngine);
+        
+        if (result?.success) {
+          console.log(`✅ [コラボ効果実行] 成功: ${collabEffect.name}`, result);
+          if (result.message) {
+            // 成功メッセージを表示（簡易版）
+            setTimeout(() => {
+              alert(`効果発動成功！\n${result.message}`);
+            }, 100);
+          }
+        } else {
+          console.log(`❌ [コラボ効果実行] 失敗: ${collabEffect.name}`, result);
+          if (result?.message) {
+            alert(`効果発動失敗:\n${result.message}`);
+          }
+        }
+      } else {
+        console.warn(`⚠️ [コラボ効果実行] 効果関数未定義: ${collabEffect.name}`);
+      }
+      
+    } catch (error) {
+      console.error('🚨 [コラボ効果実行] エラー:', error);
+      alert('効果の実行中にエラーが発生しました。');
+    }
+  }
+
+  /**
+   * アーツ使用時にアーツ効果をチェックして自動発動モーダルを表示
+   * @param {Object} card - カード情報
+   * @param {string} artName - 使用するアーツ名
+   * @param {number} playerId - プレイヤーID
+   * @param {string} position - カード位置
+   */
+  checkAndTriggerArtsEffects(card, artName, playerId, position) {
+    try {
+      console.log(`🎯 [アーツ効果チェック] 開始: ${card.name || card.id}, アーツ: ${artName}`);
+      
+      // カード効果定義を取得
+      const cardEffects = window.cardEffects?.[card.id || card.cardId];
+      if (!cardEffects?.effects) {
+        console.log(`📝 [アーツ効果チェック] カード効果定義なし: ${card.name || card.id}`);
+        return;
+      }
+      
+      // 該当するアーツ効果を検索
+      const artsEffect = Object.values(cardEffects.effects).find(effect => 
+        effect.type === 'art' && effect.name === artName
+      );
+      
+      if (!artsEffect) {
+        console.log(`📝 [アーツ効果チェック] アーツ効果なし: ${artName}`);
+        return;
+      }
+      
+      // auto_trigger が arts のもののみ対象
+      if (artsEffect.auto_trigger !== 'arts') {
+        console.log(`📝 [アーツ効果チェック] 自動発動対象外: ${artsEffect.auto_trigger}`);
+        return;
+      }
+      
+      console.log(`✨ [アーツ效果チェック] アーツ効果発見: ${artsEffect.name}`);
+      
+      // アーツ効果発動モーダルを表示
+      this.showArtsEffectModal(card, artsEffect, playerId, position);
+      
+    } catch (error) {
+      console.error('🚨 [アーツ效果チェック] エラー:', error);
+    }
+  }
+
+  /**
+   * アーツ効果発動確認モーダルを表示
+   * @param {Object} card - カード情報
+   * @param {Object} artsEffect - アーツ効果定義
+   * @param {number} playerId - プレイヤーID
+   * @param {string} position - カード位置
+   */
+  showArtsEffectModal(card, artsEffect, playerId, position) {
+    try {
+      console.log(`🎭 [アーツ效果モーダル] 表示開始: ${artsEffect.name}`);
+      
+      // 既存のモーダルを除去
+      const existingModal = document.querySelector('.arts-effect-modal');
+      if (existingModal) {
+        existingModal.remove();
+      }
+      
+      // モーダル要素を作成
+      const modal = document.createElement('div');
+      modal.className = 'arts-effect-modal';
+      modal.style.cssText = `
+        position: fixed;
+        top: 0;
+        left: 0;
+        width: 100%;
+        height: 100%;
+        background: rgba(0, 0, 0, 0.7);
+        display: flex;
+        justify-content: center;
+        align-items: center;
+        z-index: 10000;
+        font-family: Arial, sans-serif;
+      `;
+      
+      // モーダルコンテンツ
+      const content = document.createElement('div');
+      content.style.cssText = `
+        background: white;
+        padding: 30px;
+        border-radius: 15px;
+        box-shadow: 0 8px 32px rgba(0, 0, 0, 0.3);
+        max-width: 500px;
+        width: 90%;
+        text-align: center;
+        border: 3px solid #E74C3C;
+      `;
+      
+      // タイトル
+      const title = document.createElement('h3');
+      title.textContent = 'アーツ効果発動';
+      title.style.cssText = `
+        margin: 0 0 20px 0;
+        color: #E74C3C;
+        font-size: 24px;
+        font-weight: bold;
+      `;
+      
+      // カード名
+      const cardNameElement = document.createElement('div');
+      cardNameElement.textContent = card.name || card.id;
+      cardNameElement.style.cssText = `
+        font-size: 20px;
+        font-weight: bold;
+        margin-bottom: 15px;
+        color: #333;
+      `;
+      
+      // 效果名
+      const effectNameElement = document.createElement('div');
+      effectNameElement.textContent = `「${artsEffect.name}」`;
+      effectNameElement.style.cssText = `
+        font-size: 18px;
+        font-weight: bold;
+        margin-bottom: 15px;
+        color: #4A90E2;
+      `;
+      
+      // 効果説明
+      const description = document.createElement('div');
+      description.textContent = artsEffect.description || 'アーツ効果を発動します';
+      description.style.cssText = `
+        margin-bottom: 25px;
+        line-height: 1.6;
+        color: #555;
+        font-size: 14px;
+        padding: 15px;
+        background: #f8f9fa;
+        border-radius: 8px;
+        border-left: 4px solid #E74C3C;
+      `;
+      
+      // ボタンコンテナ
+      const buttonContainer = document.createElement('div');
+      buttonContainer.style.cssText = `
+        display: flex;
+        gap: 15px;
+        justify-content: center;
+      `;
+      
+      // 発動ボタン
+      const activateButton = document.createElement('button');
+      activateButton.textContent = 'アーツを使用';
+      activateButton.style.cssText = `
+        padding: 12px 25px;
+        background: #E74C3C;
+        color: white;
+        border: none;
+        border-radius: 8px;
+        font-size: 16px;
+        font-weight: bold;
+        cursor: pointer;
+        transition: background 0.3s;
+      `;
+      activateButton.addEventListener('mouseenter', () => {
+        activateButton.style.background = '#C0392B';
+      });
+      activateButton.addEventListener('mouseleave', () => {
+        activateButton.style.background = '#E74C3C';
+      });
+      
+      // キャンセルボタン
+      const cancelButton = document.createElement('button');
+      cancelButton.textContent = 'キャンセル';
+      cancelButton.style.cssText = `
+        padding: 12px 25px;
+        background: #95A5A6;
+        color: white;
+        border: none;
+        border-radius: 8px;
+        font-size: 16px;
+        cursor: pointer;
+        transition: background 0.3s;
+      `;
+      cancelButton.addEventListener('mouseenter', () => {
+        cancelButton.style.background = '#7F8C8D';
+      });
+      cancelButton.addEventListener('mouseleave', () => {
+        cancelButton.style.background = '#95A5A6';
+      });
+      
+      // イベントリスナー
+      activateButton.addEventListener('click', () => {
+        modal.remove();
+        this.executeArtsEffect(card, artsEffect, playerId, position);
+      });
+      
+      cancelButton.addEventListener('click', () => {
+        modal.remove();
+        console.log(`❌ [アーツ效果モーダル] キャンセル: ${artsEffect.name}`);
+      });
+      
+      // モーダル外クリックで閉じる
+      modal.addEventListener('click', (e) => {
+        if (e.target === modal) {
+          modal.remove();
+          console.log(`❌ [アーツ效果モーダル] 外クリックでキャンセル: ${artsEffect.name}`);
+        }
+      });
+      
+      // ESCキーで閉じる
+      const handleEscape = (e) => {
+        if (e.key === 'Escape') {
+          modal.remove();
+          document.removeEventListener('keydown', handleEscape);
+          console.log(`❌ [アーツ效果モーダル] ESCでキャンセル: ${artsEffect.name}`);
+        }
+      };
+      document.addEventListener('keydown', handleEscape);
+      
+      // 要素を組み立て
+      buttonContainer.appendChild(activateButton);
+      buttonContainer.appendChild(cancelButton);
+      
+      content.appendChild(title);
+      content.appendChild(cardNameElement);
+      content.appendChild(effectNameElement);
+      content.appendChild(description);
+      content.appendChild(buttonContainer);
+      
+      modal.appendChild(content);
+      document.body.appendChild(modal);
+      
+      console.log(`✅ [アーツ效果モーダル] 表示完了: ${artsEffect.name}`);
+      
+    } catch (error) {
+      console.error('🚨 [アーツ效果モーダル] 作成エラー:', error);
+    }
+  }
+
+  /**
+   * アーツ効果を実行
+   * @param {Object} card - カード情報
+   * @param {Object} artsEffect - アーツ効果定義
+   * @param {number} playerId - プレイヤーID
+   * @param {string} position - カード位置
+   */
+  async executeArtsEffect(card, artsEffect, playerId, position) {
+    try {
+      console.log(`🚀 [アーツ效果実行] 開始: ${artsEffect.name}`);
+      
+      // 条件チェック
+      if (artsEffect.condition) {
+        const conditionMet = artsEffect.condition(card, this.battleEngine.gameState, this.battleEngine);
+        if (!conditionMet) {
+          console.log(`❌ [アーツ效果実行] 条件不適合: ${artsEffect.name}`);
+          alert('このアーツの発動条件を満たしていません。');
+          return;
+        }
+      }
+      
+      // 効果実行
+      if (artsEffect.effect) {
+        const result = await artsEffect.effect(card, this.battleEngine);
+        
+        if (result?.success) {
+          console.log(`✅ [アーツ效果実行] 成功: ${artsEffect.name}`, result);
+          if (result.message) {
+            // 成功メッセージを表示（簡易版）
+            setTimeout(() => {
+              alert(`アーツ効果発動成功！\n${result.message}`);
+            }, 100);
+          }
+        } else {
+          console.log(`❌ [アーツ效果実行] 失敗: ${artsEffect.name}`, result);
+          if (result?.message) {
+            alert(`アーツ効果発動失敗:\n${result.message}`);
+          }
+        }
+      } else {
+        console.warn(`⚠️ [アーツ效果実行] 効果関数未定義: ${artsEffect.name}`);
+      }
+      
+    } catch (error) {
+      console.error('🚨 [アーツ效果実行] エラー:', error);
+      alert('アーツ効果の実行中にエラーが発生しました。');
+    }
+  }
+
+  /**
+   * ブルーム時にブルーム効果をチェックして自動発動モーダルを表示
+   * @param {Object} card - ブルームしたカード情報
+   * @param {number} playerId - プレイヤーID
+   * @param {string} position - カード位置
+   */
+  checkAndTriggerBloomEffects(card, playerId, position) {
+    try {
+      console.log(`🌸 [ブルーム効果チェック] 開始: ${card.name || card.id}`);
+      
+      // カード効果定義を取得
+      const cardId = card.id || card.cardId || card.number;
+      const cardEffects = window.cardEffects?.[cardId];
+      
+      if (!cardEffects?.effects) {
+        console.log(`📝 [ブルーム効果チェック] カード効果定義なし: ${card.name || card.id}`);
+        return;
+      }
+      
+      // ブルーム効果を検索
+      const bloomEffects = Object.values(cardEffects.effects).filter(effect => 
+        effect.type === 'bloom' && effect.auto_trigger === 'on_bloom'
+      );
+      
+      if (bloomEffects.length === 0) {
+        console.log(`📝 [ブルーム効果チェック] 自動発動ブルーム効果なし: ${card.name || card.id}`);
+        return;
+      }
+      
+      // 各ブルーム効果をチェック
+      bloomEffects.forEach(bloomEffect => {
+        // 条件チェック
+        const conditionMet = bloomEffect.condition ? 
+          bloomEffect.condition(card, this.battleEngine.gameState, this.battleEngine) : true;
+        
+        if (conditionMet) {
+          console.log(`✨ [ブルーム効果発動] ${bloomEffect.name || 'ブルーム効果'} 条件満足`);
+          this.showBloomEffectModal(card, bloomEffect, playerId, position);
+        } else {
+          console.log(`❌ [ブルーム効果] ${bloomEffect.name || 'ブルーム効果'} 条件不満足`);
+        }
+      });
+      
+    } catch (error) {
+      console.error('🚨 [ブルーム効果チェック] エラー:', error);
+    }
+  }
+
+  /**
+   * ブルーム効果発動モーダルを表示
+   * @param {Object} card - カード情報
+   * @param {Object} bloomEffect - ブルーム効果定義
+   * @param {number} playerId - プレイヤーID
+   * @param {string} position - カード位置
+   */
+  showBloomEffectModal(card, bloomEffect, playerId, position) {
+    try {
+      console.log(`🌸 [ブルームモーダル] 表示開始: ${bloomEffect.name}`);
+      
+      // 既存のモーダルを閉じる
+      const existingModal = document.getElementById('bloom-effect-modal');
+      if (existingModal) {
+        existingModal.remove();
+      }
+      
+      // モーダル作成
+      const modal = document.createElement('div');
+      modal.id = 'bloom-effect-modal';
+      modal.style.cssText = `
+        position: fixed;
+        top: 0;
+        left: 0;
+        width: 100%;
+        height: 100%;
+        background: rgba(0, 0, 0, 0.7);
+        display: flex;
+        justify-content: center;
+        align-items: center;
+        z-index: 10000;
+        font-family: Arial, sans-serif;
+      `;
+      
+      // モーダルコンテンツ
+      const content = document.createElement('div');
+      content.style.cssText = `
+        background: linear-gradient(135deg, #FFF3E0, #FFE0B2);
+        border: 3px solid #FF9800;
+        border-radius: 15px;
+        padding: 25px;
+        max-width: 500px;
+        max-height: 80vh;
+        overflow-y: auto;
+        box-shadow: 0 10px 30px rgba(255, 152, 0, 0.3);
+        text-align: center;
+        position: relative;
+      `;
+      
+      // アイコンとタイトル
+      content.innerHTML = `
+        <div style="margin-bottom: 20px;">
+          <div style="font-size: 48px; margin-bottom: 10px;">🌸</div>
+          <h2 style="color: #E65100; margin: 0; font-size: 24px; text-shadow: 1px 1px 2px rgba(0,0,0,0.1);">
+            ブルーム効果発動！
+          </h2>
+        </div>
+        
+        <div style="background: rgba(255, 255, 255, 0.8); border-radius: 10px; padding: 20px; margin: 20px 0; border: 2px solid #FFB74D;">
+          <h3 style="color: #BF360C; margin: 0 0 10px 0; font-size: 20px;">
+            ${bloomEffect.name || 'ブルーム効果'}
+          </h3>
+          <p style="color: #5D4037; margin: 0; font-size: 16px; line-height: 1.4;">
+            ${bloomEffect.description || '効果説明がありません'}
+          </p>
+        </div>
+        
+        <div style="margin-top: 25px; display: flex; gap: 15px; justify-content: center;">
+        </div>
+      `;
+      
+      const buttonContainer = content.querySelector('div:last-child');
+      
+      // 発動ボタン
+      const activateButton = document.createElement('button');
+      activateButton.textContent = '効果を発動';
+      activateButton.style.cssText = `
+        padding: 12px 25px;
+        background: #FF9800;
+        color: white;
+        border: none;
+        border-radius: 8px;
+        font-size: 16px;
+        font-weight: bold;
+        cursor: pointer;
+        transition: all 0.3s ease;
+        box-shadow: 0 4px 8px rgba(255, 152, 0, 0.3);
+      `;
+      
+      activateButton.addEventListener('mouseenter', () => {
+        activateButton.style.background = '#F57C00';
+        activateButton.style.transform = 'translateY(-2px)';
+        activateButton.style.boxShadow = '0 6px 12px rgba(255, 152, 0, 0.4)';
+      });
+      activateButton.addEventListener('mouseleave', () => {
+        activateButton.style.background = '#FF9800';
+        activateButton.style.transform = 'translateY(0)';
+        activateButton.style.boxShadow = '0 4px 8px rgba(255, 152, 0, 0.3)';
+      });
+      
+      // キャンセルボタン
+      const cancelButton = document.createElement('button');
+      cancelButton.textContent = 'キャンセル';
+      cancelButton.style.cssText = `
+        padding: 12px 25px;
+        background: #95A5A6;
+        color: white;
+        border: none;
+        border-radius: 8px;
+        font-size: 16px;
+        cursor: pointer;
+        transition: all 0.3s ease;
+      `;
+      
+      cancelButton.addEventListener('mouseenter', () => {
+        cancelButton.style.background = '#7F8C8D';
+      });
+      cancelButton.addEventListener('mouseleave', () => {
+        cancelButton.style.background = '#95A5A6';
+      });
+      
+      // イベントリスナー
+      activateButton.addEventListener('click', () => {
+        modal.remove();
+        this.executeBloomEffect(card, bloomEffect, playerId, position);
+      });
+      
+      cancelButton.addEventListener('click', () => {
+        console.log(`❌ [ブルームモーダル] キャンセル: ${bloomEffect.name}`);
+        modal.remove();
+      });
+      
+      // ESCキーでキャンセル
+      document.addEventListener('keydown', function escHandler(e) {
+        if (e.key === 'Escape') {
+          modal.remove();
+          document.removeEventListener('keydown', escHandler);
+        }
+      });
+      
+      buttonContainer.appendChild(activateButton);
+      buttonContainer.appendChild(cancelButton);
+      modal.appendChild(content);
+      document.body.appendChild(modal);
+      
+      console.log(`✅ [ブルームモーダル] 表示完了: ${bloomEffect.name}`);
+      
+    } catch (error) {
+      console.error('🚨 [ブルームモーダル] エラー:', error);
+    }
+  }
+
+  /**
+   * ブルーム効果を実行
+   * @param {Object} card - カード情報
+   * @param {Object} bloomEffect - ブルーム効果定義
+   * @param {number} playerId - プレイヤーID
+   * @param {string} position - カード位置
+   */
+  executeBloomEffect(card, bloomEffect, playerId, position) {
+    try {
+      console.log(`🌸 [ブルーム効果実行] 開始: ${bloomEffect.name}`);
+      
+      if (bloomEffect.effect && typeof bloomEffect.effect === 'function') {
+        const result = bloomEffect.effect(card, this.battleEngine, playerId, position);
+        
+        if (result) {
+          if (result.success) {
+            console.log(`✅ [ブルーム効果実行] 成功: ${result.message || 'ブルーム効果が発動しました'}`);
+            if (result.message) {
+              alert(`ブルーム効果発動成功:\n${result.message}`);
+            }
+          } else {
+            console.log(`❌ [ブルーム効果実行] 失敗: ${result.message}`);
+            alert(`ブルーム効果発動失敗:\n${result.message}`);
+          }
+        }
+      } else {
+        console.warn(`⚠️ [ブルーム効果実行] 効果関数未定義: ${bloomEffect.name}`);
+      }
+      
+    } catch (error) {
+      console.error('🚨 [ブルーム効果実行] エラー:', error);
+      alert('ブルーム効果の実行中にエラーが発生しました。');
     }
   }
 }

@@ -20,7 +20,8 @@ const cardEffect_hBP04_044 = {
       type: 'collab',
       name: 'Snow flower',
       description: '自分の〈雪民〉が付いている〈雪花ラミィ〉がいない時、自分のデッキから、〈雪民〉1枚を公開し、自分の〈雪花ラミィ〉に付ける。そしてデッキをシャッフルする。',
-      timing: 'manual',
+      timing: 'manual', // 現在のシステムではmanualで実装（将来的にon_collabに変更予定）
+      auto_trigger: 'on_collab', // 自動発動のためのメタデータ
       condition: (card, gameState, battleEngine) => {
         const currentPlayer = battleEngine.gameState.currentPlayer;
         const player = battleEngine.players[currentPlayer];
@@ -108,7 +109,8 @@ const cardEffect_hBP04_044 = {
       description: 'ダメージ30',
       cost: { any: 1 },
       damage: 30,
-      timing: 'manual',
+      timing: 'manual', // 現在のシステムではmanualで実装（将来的にartsに変更予定）
+      auto_trigger: 'arts', // 自動発動のためのメタデータ
       condition: (card, gameState, battleEngine) => {
         // 基本的なアーツ使用条件
         const totalYells = card.yellCards ? card.yellCards.length : 0;

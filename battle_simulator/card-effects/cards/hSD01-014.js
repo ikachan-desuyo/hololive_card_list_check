@@ -23,6 +23,7 @@ const cardEffect_hSD01_014 = {
       cost: { white: 1, green: 1 },
       damage: 30,
       timing: 'manual',
+      auto_trigger: 'arts', // アーツ使用時に自動モーダル表示
       condition: (card, gameState, battleEngine) => {
         // エールの色チェック（白1個、緑1個必要）
         if (!card.yellCards) return false;

@@ -21,6 +21,7 @@ const cardEffect_hBP02_045 = {
       name: '久しぶりの全体ライブーっ！！',
       description: '自分のデッキの上から3枚を見る。その中から、[青ホロメンか紫ホロメン]1枚を公開し、手札に加える。そして残ったカードを好きな順でデッキの下に戻す。',
       timing: 'manual',
+      auto_trigger: 'on_bloom', // ブルーム時に自動モーダル表示
       condition: (card, gameState, battleEngine) => {
         // ブルーム時に発動
         const currentPlayer = battleEngine.gameState.currentPlayer;
@@ -136,7 +137,8 @@ const cardEffect_hBP02_045 = {
       description: 'ダメージ40',
       cost: { any: 1 },
       damage: 40,
-      timing: 'activation',
+      timing: 'manual',
+      auto_trigger: 'arts', // アーツ使用時に自動モーダル表示
       condition: (card, gameState, battleEngine) => {
         // 基本的なアーツ使用条件
         const totalYells = card.yellCards ? card.yellCards.length : 0;

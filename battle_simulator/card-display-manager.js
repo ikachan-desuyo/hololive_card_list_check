@@ -170,8 +170,9 @@ class CardDisplayManager {
     // カードを表示
     cardsToDisplay.forEach((card, index) => {
       if (card) {
-        // プレイヤーIDに基づいて判定（エリアの場所ではなく、実際に処理中のプレイヤーIDを使用）
-        const isPlayerCard = (playerId === 1);
+        // プレイヤーIDに基づいて判定（現在のプレイヤーのカードのみドラッグ可能）
+        const currentPlayer = this.battleEngine?.stateManager?.state?.turn?.currentPlayer || 1;
+        const isPlayerCard = (playerId === currentPlayer);
         console.log(`🔍 [Card Display] カード表示: ${card.name}, プレイヤーID: ${playerId}, isPlayerCard: ${isPlayerCard}, エリア: ${areaId}`);
         const cardElement = this.createCardElement(card, areaId, index, isPlayerCard);
         area.appendChild(cardElement);
@@ -502,7 +503,8 @@ class CardDisplayManager {
         if (!card.cardState) {
           console.warn(`⚠️ バックカード${index + 1}に状態情報がありません:`, card);
         }
-        const isPlayerCard = (playerId === 1); // プレイヤー1のカードのみドラッグ可能
+        const currentPlayer = this.battleEngine?.stateManager?.state?.turn?.currentPlayer || 1;
+        const isPlayerCard = (playerId === currentPlayer); // 現在のプレイヤーのカードのみドラッグ可能
         const cardElement = this.createCardElement(card, 'backs', index, isPlayerCard);
         // バックスロット内でのサイズ調整
         cardElement.style.width = '100%';
@@ -1057,9 +1059,16 @@ class CardDisplayManager {
       console.log(`🔍 [効果ボタン] 特殊エリア (${areaId}) のカード: ${card.name || card.id}`);
     }
     
-    // デバッグ用：hSD01-016の場合は強制的にボタンを表示
+    // デバッグ用：特定のカードは強制的にボタンを表示
     const isTestCard = card.id === 'hSD01-016' || card.number === 'hSD01-016';
-    console.log(`🔍 [効果ボタン] カード: ${card.name || card.id}, ID: ${card.id}, テストカード: ${isTestCard}, エリア: ${areaId}`);
+    
+    // 追加デバッグ：通常の手動効果を持つカードも強制表示（一時的）
+    const hasManualTiming = window.cardEffects?.[card.id]?.effects && 
+      Object.values(window.cardEffects[card.id].effects).some(effect => 
+        effect.timing === 'manual' || effect.timing === 'activate' || effect.timing === 'gift'
+      );
+    
+    console.log(`🔍 [効果ボタン] カード: ${card.name || card.id}, ID: ${card.id}, テストカード: ${isTestCard}, 手動効果あり: ${hasManualTiming}, エリア: ${areaId}`);
     
     // カードに効果があるか確認（またはテストカード）
     const hasEffect = this.cardHasActivatableEffect(card, areaId) || isTestCard;
@@ -1154,8 +1163,32 @@ class CardDisplayManager {
     
     // 新形式の効果定義をチェック
     if (cardEffect.effects) {
+      console.log(`🔍 [効果チェック] カード効果構造:`, cardEffect.effects);
       const manualEffects = Object.values(cardEffect.effects).filter(effect => {
-        const isManual = effect.timing === 'manual';
+        console.log(`🔍 [効果チェック] 効果詳細:`, {
+          name: effect.name,
+          timing: effect.timing,
+          type: effect.type,
+          auto_trigger: effect.auto_trigger,
+          effectObject: effect
+        });
+        
+        // 自動効果を除外（timing: 'on_collab', 'arts', 'on_bloom' 等 または auto_trigger プロパティあり）
+        const automaticTimings = ['on_collab', 'arts', 'on_bloom', 'on_center', 'on_stage'];
+        const isAutomatic = automaticTimings.includes(effect.timing) || effect.auto_trigger;
+        
+        // Snow flower と うぅ… は強制的に自動効果として扱う
+        const isSnowFlowerOrUuu = effect.name === 'Snow flower' || effect.name === 'うぅ…';
+        
+        // 手動発動可能な効果のみをチェック（manual、gift、activate）
+        const isManual = !isAutomatic && !isSnowFlowerOrUuu && (effect.timing === 'manual' || effect.timing === 'activate' || effect.timing === 'gift');
+        
+        // 自動効果の場合は手動発動ボタンを表示しない（この効果をフィルタリング）
+        if (isAutomatic || effect.auto_trigger || isSnowFlowerOrUuu) {
+          console.log(`🔍 [効果チェック] 自動効果のため手動発動不可: ${effect.name} (timing: ${effect.timing}, auto_trigger: ${effect.auto_trigger}, isSnowFlowerOrUuu: ${isSnowFlowerOrUuu})`);
+          return false; // この効果のみを除外
+        }
+        
         let conditionMet = true;
         
         // conditionが定義されている場合のみチェック
@@ -1175,7 +1208,7 @@ class CardDisplayManager {
           conditionMet = true;
         }
         
-        console.log(`🔍 [効果チェック] 効果: ${effect.name}, manual: ${isManual}, condition: ${conditionMet}`);
+        console.log(`🔍 [効果チェック] 効果: ${effect.name}, manual: ${isManual}, automatic: ${isAutomatic}, condition: ${conditionMet}, timing: ${effect.timing}`);
         return isManual && conditionMet;
       });
       console.log(`📊 [効果チェック] 発動可能な効果数: ${manualEffects.length}`);

@@ -444,6 +444,14 @@ class HololiveStateManager {
             // コラボ移動の場合は、HandManagerで既にチェック済みなので直接交換
             const isCollabMove = payload.targetPosition === 'collab' && payload.sourcePosition.startsWith('back');
             
+            console.log(`🔍 [StateManager] カード移動処理:`, {
+              sourcePosition: payload.sourcePosition,
+              targetPosition: payload.targetPosition,
+              isCollabMove: isCollabMove,
+              sourceCard: tempSourceCard?.name,
+              targetCard: tempTargetCard?.name
+            });
+            
             if (isCollabMove) {
               // 直接代入でコラボ移動を実行
               try {
@@ -483,8 +491,12 @@ class HololiveStateManager {
             
             // 🔒 コラボ移動の場合は、コラボロック状態を確実に設定
             if (isCollabMove) {
+              console.log(`🤝 [StateManager] コラボ移動処理開始`);
+              
               const collabCard = battleEnginePlayer[payload.targetPosition];
               if (collabCard) {
+                console.log(`🤝 [StateManager] コラボカード確認: ${collabCard.name}`);
+                
                 // cardStateが存在しない場合は初期化
                 if (!collabCard.cardState) {
                   collabCard.cardState = {};
@@ -495,6 +507,7 @@ class HololiveStateManager {
                 
                 // コラボしたターンを記録
                 collabCard.collabedTurn = this.state.turn.turnCount;
+                console.log(`🤝 [StateManager] コラボターン設定: ${collabCard.collabedTurn}`);
                 
                 // State Manager側でも同期
                 if (player.cards[payload.targetPosition]) {
@@ -507,12 +520,22 @@ class HololiveStateManager {
                 
                 // コラボエフェクト確認UIを表示
                 setTimeout(() => {
+                  console.log(`🤝 [StateManager] コラボエフェクト確認UI表示準備:`, {
+                    cardName: collabCard.name,
+                    cardId: collabCard.id,
+                    position: payload.targetPosition,
+                    playerId: payload.playerId,
+                    hasPerformanceManager: !!this.battleEngine.performanceManager
+                  });
+                  
                   if (this.battleEngine.performanceManager) {
                     this.battleEngine.performanceManager.showCollabEffectConfirmation(
                       collabCard, 
                       payload.targetPosition, 
                       payload.playerId
                     );
+                  } else {
+                    console.error(`❌ [StateManager] PerformanceManager が見つかりません`);
                   }
                 }, 500);
                 
@@ -578,6 +601,17 @@ class HololiveStateManager {
                 
                 // ブルーム完了フラグを設定
                 this.bloomCompleted = true;
+                
+                // ブルーム効果チェック（center配置時）
+                setTimeout(() => {
+                  if (this.battleEngine.handManager) {
+                    this.battleEngine.handManager.checkAndTriggerBloomEffects(
+                      newCard, 
+                      payload.player, 
+                      payload.position
+                    );
+                  }
+                }, 500);
               } else {
                 // 通常配置
                 const newCard = this.addCardState(payload.card, {
@@ -628,6 +662,17 @@ class HololiveStateManager {
                 
                 // ブルーム完了フラグを設定
                 this.bloomCompleted = true;
+                
+                // ブルーム効果チェック（center配置時）
+                setTimeout(() => {
+                  if (this.battleEngine.handManager) {
+                    this.battleEngine.handManager.checkAndTriggerBloomEffects(
+                      newCard, 
+                      payload.player, 
+                      'center'
+                    );
+                  }
+                }, 500);
               } else {
                 // 通常配置
                 const newCard = this.addCardState(payload.card, {
@@ -748,6 +793,17 @@ class HololiveStateManager {
             if (card) {
               card.bloomedTurn = newState.turn.turnCount;
               card.bloomEffectUsed = false; // 効果未使用にリセット
+              
+              // ブルームエフェクト自動モーダル表示（ブルーム直後）
+              setTimeout(() => {
+                if (this.battleEngine.handManager) {
+                  this.battleEngine.handManager.checkAndTriggerBloomEffects(
+                    card, 
+                    payload.player, 
+                    payload.position
+                  );
+                }
+              }, 500);
             }
           }
         }
