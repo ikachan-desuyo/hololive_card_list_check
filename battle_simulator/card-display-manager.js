@@ -430,7 +430,8 @@ class CardDisplayManager {
     
     
     // センター①があるかどうかで最大使用スロット数を決定
-    const maxSlots = player.collab ? 4 : 5;
+    // コラボ時のback5制限を無効化
+    const maxSlots = 5; // player.collab ? 4 : 5;
     
     backSlots.forEach((slot, index) => {
       // 既存のカード要素をクリア（スロット自体は保持）

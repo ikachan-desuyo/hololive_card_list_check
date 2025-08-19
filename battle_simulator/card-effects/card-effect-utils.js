@@ -443,8 +443,8 @@ class CardEffectUtils {
         border: 2px solid #4a9eff;
         border-radius: 15px;
         padding: 25px;
-        max-width: 90%;
-        max-height: 80%;
+        max-width: 95%;
+        max-height: 85%;
         overflow-y: auto;
         box-shadow: 0 20px 60px rgba(74, 158, 255, 0.3);
         animation: slideIn 0.3s ease-out;
@@ -477,59 +477,56 @@ class CardEffectUtils {
       // カードグリッド
       const cardGrid = document.createElement('div');
       cardGrid.style.cssText = `
-        display: grid;
-        grid-template-columns: repeat(auto-fill, minmax(120px, 1fr));
-        gap: 10px;
+        display: flex;
+        flex-wrap: wrap;
+        gap: 15px;
         margin-bottom: 20px;
-        max-height: 400px;
+        max-height: 500px;
         overflow-y: auto;
+        justify-content: center;
+        padding: 10px;
       `;
 
       const selectedCards = [];
 
-      // カードを表示
+      // カードを画像表示
       cards.forEach((card, index) => {
         const cardElement = document.createElement('div');
         cardElement.style.cssText = `
-          background: linear-gradient(135deg, #2a2a4e 0%, #1e2a5e 100%);
-          border: 2px solid #666;
-          border-radius: 8px;
-          padding: 10px;
+          width: 120px;
+          height: 168px;
+          border: 3px solid #666;
+          border-radius: 12px;
           cursor: pointer;
           transition: all 0.3s ease;
-          text-align: center;
           position: relative;
+          background-image: url('${card.image_url || card.imageUrl || ''}');
+          background-size: cover;
+          background-position: center;
+          background-repeat: no-repeat;
+          background-color: #2a2a4e;
+          overflow: hidden;
+          box-shadow: 0 4px 8px rgba(0, 0, 0, 0.3);
         `;
 
-        const cardName = document.createElement('div');
-        cardName.textContent = card.name || card.card_name || `カード${index + 1}`;
-        cardName.style.cssText = `
-          color: #ffffff;
-          font-size: 12px;
+        // カード名オーバーレイ
+        const nameOverlay = document.createElement('div');
+        nameOverlay.textContent = card.name || card.card_name || `カード${index + 1}`;
+        nameOverlay.style.cssText = `
+          position: absolute;
+          bottom: 0;
+          left: 0;
+          right: 0;
+          background: linear-gradient(transparent, rgba(0, 0, 0, 0.8));
+          color: white;
+          padding: 8px 4px 4px;
+          font-size: 11px;
           font-weight: bold;
-          margin-bottom: 5px;
+          text-align: center;
+          line-height: 1.2;
         `;
 
-        const cardType = document.createElement('div');
-        cardType.textContent = card.card_type || '';
-        cardType.style.cssText = `
-          color: #aaaaaa;
-          font-size: 10px;
-          margin-bottom: 3px;
-        `;
-
-        const cardLevel = document.createElement('div');
-        if (card.bloom_level) {
-          cardLevel.textContent = card.bloom_level;
-          cardLevel.style.cssText = `
-            color: #ffaa00;
-            font-size: 10px;
-          `;
-        }
-
-        cardElement.appendChild(cardName);
-        cardElement.appendChild(cardType);
-        cardElement.appendChild(cardLevel);
+        cardElement.appendChild(nameOverlay);
 
         // クリックイベント
         cardElement.addEventListener('click', () => {
@@ -539,13 +536,15 @@ class CardEffectUtils {
             // 選択解除
             const idx = selectedCards.indexOf(card);
             selectedCards.splice(idx, 1);
-            cardElement.style.border = '2px solid #666';
-            cardElement.style.background = 'linear-gradient(135deg, #2a2a4e 0%, #1e2a5e 100%)';
+            cardElement.style.border = '3px solid #666';
+            cardElement.style.transform = 'scale(1)';
+            cardElement.style.boxShadow = '0 4px 8px rgba(0, 0, 0, 0.3)';
           } else if (selectedCards.length < count) {
             // 選択
             selectedCards.push(card);
-            cardElement.style.border = '2px solid #4a9eff';
-            cardElement.style.background = 'linear-gradient(135deg, #4a9eff20 0%, #4a9eff10 100%)';
+            cardElement.style.border = '3px solid #4a9eff';
+            cardElement.style.transform = 'scale(1.05)';
+            cardElement.style.boxShadow = '0 6px 20px rgba(74, 158, 255, 0.5)';
           }
           
           updateSelectionInfo(selectedCards.length);
