@@ -3171,10 +3171,11 @@ class HololiveBattleEngine {
     cardName.textContent = card.name || card.card_name || `カード${index + 1}`;
     cardElement.appendChild(cardName);
     
-    // クリックイベント（カード詳細表示）
-    cardElement.addEventListener('click', () => {
-      if (this.cardInteractionManager) {
-        this.cardInteractionManager.showCardInfo(card, 'archive');
+    // クリックイベント（カード詳細モーダル表示）
+    cardElement.addEventListener('click', (e) => {
+      e.stopPropagation(); // イベントの伝播を停止
+      if (window.showCardDetailModal) {
+        window.showCardDetailModal(card);
       } else {
         console.log('📋 [Archive] カード詳細:', card);
       }
@@ -3187,6 +3188,350 @@ class HololiveBattleEngine {
 // グローバル関数としてアーカイブモーダルの閉じる機能を追加
 window.closeArchiveModal = function() {
   const modal = document.getElementById('archiveModal');
+  if (modal) {
+    modal.style.display = 'none';
+  }
+};
+
+// グローバル関数としてカード詳細モーダル機能を追加
+window.showCardDetailModal = function(card) {
+  const modal = document.getElementById('cardDetailModal');
+  const image = document.getElementById('cardDetailImage');
+  const content = document.getElementById('cardDetailContent');
+  const title = document.getElementById('cardDetailModalTitle');
+  
+  if (!modal || !image || !content || !title) {
+    console.warn('🚨 カード詳細モーダルの要素が見つかりません');
+    return;
+  }
+
+  // 色アイコンマッピング
+  const iconImageMap = {
+    red: "images/TCG-ColorArtIcon-Red.png",
+    blue: "images/TCG-ColorArtIcon-Blue.png", 
+    yellow: "images/TCG-ColorArtIcon-Yellow.png",
+    green: "images/TCG-ColorArtIcon-Green.png",
+    purple: "images/TCG-ColorArtIcon-Purple.png",
+    white: "images/TCG-ColorArtIcon-White.png",
+    any: "images/TCG-ColorArtIcon-Colorless.png"
+  };
+
+  // アイコンを画像に変換する関数
+  function convertIconsToImages(icons) {
+    if (!icons || !Array.isArray(icons)) return '';
+    
+    return icons.map(icon => {
+      const src = iconImageMap[icon.toLowerCase()];
+      return src
+        ? `<img src="${src}" alt="${icon}" class="skill-icon" style="height:20px; max-width:24px; object-fit:contain; background:transparent; vertical-align:middle; margin:0 2px;" />`
+        : icon;
+    }).join(' ');
+  }
+
+  // カード画像を設定
+  if (card.image_url) {
+    image.src = card.image_url;
+    image.alt = card.name || card.card_name || 'カード画像';
+  } else {
+    image.src = 'images/placeholder.png';
+    image.alt = 'プレースホルダー画像';
+  }
+
+  // タイトルを設定
+  title.textContent = card.name || card.card_name || 'カード詳細';
+
+  // カード詳細情報を作成
+  let detailHtml = '';
+  
+  // 基本情報
+  if (card.name || card.card_name) {
+    detailHtml += `
+      <div class="detail-section">
+        <h4>カード名</h4>
+        <div class="detail-value">${card.name || card.card_name}</div>
+      </div>
+    `;
+  }
+
+  if (card.card_type) {
+    detailHtml += `
+      <div class="detail-section">
+        <div class="detail-label">カードタイプ</div>
+        <div class="detail-value">${card.card_type}</div>
+      </div>
+    `;
+  }
+
+  if (card.card_color) {
+    detailHtml += `
+      <div class="detail-section">
+        <div class="detail-label">カラー</div>
+        <div class="detail-value">${card.card_color}</div>
+      </div>
+    `;
+  }
+
+  if (card.bloom_level) {
+    detailHtml += `
+      <div class="detail-section">
+        <div class="detail-label">ブルームレベル</div>
+        <div class="detail-value">${card.bloom_level}</div>
+      </div>
+    `;
+  }
+
+  if (card.hp) {
+    detailHtml += `
+      <div class="detail-section">
+        <div class="detail-label">HP</div>
+        <div class="detail-value">${card.hp}</div>
+      </div>
+    `;
+  }
+
+  if (card.rarity) {
+    detailHtml += `
+      <div class="detail-section">
+        <div class="detail-label">レアリティ</div>
+        <div class="detail-value">${card.rarity}</div>
+      </div>
+    `;
+  }
+
+  // コスト
+  if (card.cost !== undefined && card.cost !== null) {
+    detailHtml += `
+      <div class="detail-section">
+        <div class="detail-label">コスト</div>
+        <div class="detail-value">${card.cost}</div>
+      </div>
+    `;
+  }
+
+  // ダメージ
+  if (card.damage !== undefined && card.damage !== null) {
+    detailHtml += `
+      <div class="detail-section">
+        <div class="detail-label">ダメージ</div>
+        <div class="detail-value">${card.damage}</div>
+      </div>
+    `;
+  }
+
+  // スキル情報
+  if (card.skill_name && card.skill_description) {
+    detailHtml += `
+      <div class="detail-section">
+        <h4>スキル</h4>
+        <div class="skill-description">
+          <div class="skill-title">${card.skill_name}</div>
+          <div class="skill-text">${card.skill_description}</div>
+        </div>
+      </div>
+    `;
+  }
+
+  // 一般的なskillsプロパティも確認（アーツ、サポート効果、その他のスキルを分類）
+  if (card.skills && Array.isArray(card.skills) && card.skills.length > 0) {
+    // アーツ、サポート効果、その他のスキルを分類
+    const artSkills = [];
+    const supportSkills = [];
+    const otherSkills = [];
+    
+    card.skills.forEach((skill) => {
+      if (skill.type === 'アーツ') {
+        artSkills.push(skill);
+      } else if (skill.type === 'サポート効果') {
+        supportSkills.push(skill);
+      } else {
+        otherSkills.push(skill);
+      }
+    });
+    
+    // アーツを表示
+    artSkills.forEach((skill, index) => {
+      const artName = skill.name || `アーツ ${index + 1}`;
+      const artDesc = skill.description || skill.text;
+      const dmg = skill.dmg || skill.damage;
+      const icons = skill.icons;
+      
+      let artContent = '';
+      if (dmg) {
+        artContent += `<div class="detail-label">ダメージ: ${dmg}</div>`;
+      }
+      if (icons && icons.main) {
+        const iconImagesHtml = convertIconsToImages(icons.main);
+        artContent += `<div class="detail-label">必要エール: ${iconImagesHtml}</div>`;
+      }
+      if (artDesc) {
+        artContent += `<div class="skill-text">${artDesc}</div>`;
+      }
+      
+      if (artContent) {
+        detailHtml += `
+          <div class="detail-section">
+            <h4>🎨 ${artName}</h4>
+            <div class="skill-description">
+              ${artContent}
+            </div>
+          </div>
+        `;
+      }
+    });
+    
+    // サポート効果を表示
+    supportSkills.forEach((skill, index) => {
+      const skillName = skill.name ? 'サポート効果' : `サポート効果 ${index + 1}`;
+      const skillDesc = skill.name || skill.description || skill.text;
+      if (skillDesc) {
+        detailHtml += `
+          <div class="detail-section">
+            <h4>📋 ${skillName}</h4>
+            <div class="skill-description">
+              <div class="skill-text">${skillDesc}</div>
+            </div>
+          </div>
+        `;
+      }
+    });
+    
+    // その他のスキルを表示
+    otherSkills.forEach((skill, index) => {
+      const skillName = skill.name || skill.skill_name || `${skill.type || 'スキル'} ${index + 1}`;
+      const skillDesc = skill.description || skill.text || skill.skill_description;
+      if (skillDesc) {
+        detailHtml += `
+          <div class="detail-section">
+            <h4>${skillName}</h4>
+            <div class="skill-description">
+              <div class="skill-text">${skillDesc}</div>
+            </div>
+          </div>
+        `;
+      }
+    });
+  }
+
+  // 推しホロメンスキル
+  if (card.oshi_skill_name && card.oshi_skill_description) {
+    detailHtml += `
+      <div class="detail-section">
+        <h4>推しホロメンスキル</h4>
+        <div class="skill-description">
+          <div class="skill-title">${card.oshi_skill_name}</div>
+          <div class="skill-text">${card.oshi_skill_description}</div>
+        </div>
+      </div>
+    `;
+  }
+
+  // ブルームスキル
+  if (card.bloom_skill_name && card.bloom_skill_description) {
+    detailHtml += `
+      <div class="detail-section">
+        <h4>ブルームスキル</h4>
+        <div class="skill-description">
+          <div class="skill-title">${card.bloom_skill_name}</div>
+          <div class="skill-text">${card.bloom_skill_description}</div>
+        </div>
+      </div>
+    `;
+  }
+
+  // スペシャルスキル
+  if (card.special_skill_name && card.special_skill_description) {
+    detailHtml += `
+      <div class="detail-section">
+        <h4>スペシャルスキル</h4>
+        <div class="skill-description">
+          <div class="skill-title">${card.special_skill_name}</div>
+          <div class="skill-text">${card.special_skill_description}</div>
+        </div>
+      </div>
+    `;
+  }
+
+  // リミテッドスキル
+  if (card.limited_skill_name && card.limited_skill_description) {
+    detailHtml += `
+      <div class="detail-section">
+        <h4>リミテッドスキル</h4>
+        <div class="skill-description">
+          <div class="skill-title">${card.limited_skill_name}</div>
+          <div class="skill-text">${card.limited_skill_description}</div>
+        </div>
+      </div>
+    `;
+  }
+
+  // アーツ（直接プロパティとして定義されている場合）
+  if (card.art_name && card.art_description) {
+    detailHtml += `
+      <div class="detail-section">
+        <h4>🎨 ${card.art_name}</h4>
+        <div class="skill-description">
+          <div class="skill-text">${card.art_description}</div>
+        </div>
+      </div>
+    `;
+  }
+
+  // 生成ホロメンスキル
+  if (card.generate_holomem_skill_name && card.generate_holomem_skill_description) {
+    detailHtml += `
+      <div class="detail-section">
+        <h4>生成ホロメンスキル</h4>
+        <div class="skill-description">
+          <div class="skill-title">${card.generate_holomem_skill_name}</div>
+          <div class="skill-text">${card.generate_holomem_skill_description}</div>
+        </div>
+      </div>
+    `;
+  }
+
+  // ギフトスキル
+  if (card.gift_skill_name && card.gift_skill_description) {
+    detailHtml += `
+      <div class="detail-section">
+        <h4>ギフトスキル</h4>
+        <div class="skill-description">
+          <div class="skill-title">${card.gift_skill_name}</div>
+          <div class="skill-text">${card.gift_skill_description}</div>
+        </div>
+      </div>
+    `;
+  }
+
+  // デビューテキスト
+  if (card.debut_text) {
+    detailHtml += `
+      <div class="detail-section">
+        <h4>デビューテキスト</h4>
+        <div class="skill-description">
+          <div class="skill-text">${card.debut_text}</div>
+        </div>
+      </div>
+    `;
+  }
+
+  // 一般的なdescriptionプロパティ
+  if (card.description && !card.skill_description) {
+    detailHtml += `
+      <div class="detail-section">
+        <h4>説明</h4>
+        <div class="skill-description">
+          <div class="skill-text">${card.description}</div>
+        </div>
+      </div>
+    `;
+  }
+
+  content.innerHTML = detailHtml;
+  modal.style.display = 'flex';
+};
+
+window.closeCardDetailModal = function() {
+  const modal = document.getElementById('cardDetailModal');
   if (modal) {
     modal.style.display = 'none';
   }

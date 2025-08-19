@@ -77,6 +77,27 @@
     </div>
   </div>
 
+  <!-- カード詳細モーダル -->
+  <div id="cardDetailModal" class="card-detail-modal" style="display: none;">
+    <div class="card-detail-modal-backdrop" onclick="closeCardDetailModal()"></div>
+    <div class="card-detail-modal-content">
+      <div class="card-detail-modal-header">
+        <h3 id="cardDetailModalTitle">カード詳細</h3>
+        <button class="card-detail-modal-close" onclick="closeCardDetailModal()">×</button>
+      </div>
+      <div class="card-detail-modal-body">
+        <div class="card-detail-container">
+          <div class="card-detail-image">
+            <img id="cardDetailImage" src="" alt="カード画像" />
+          </div>
+          <div class="card-detail-info">
+            <div id="cardDetailContent"></div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
   <script src="js/utils.js"></script>
   <script src="js/modal-ui.js"></script>
   <script src="js/deck_manager.js"></script>

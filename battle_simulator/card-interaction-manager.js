@@ -20,75 +20,21 @@ class CardInteractionManager {
     };
   }
 
-  /**
-   * カード情報を右側パネルに表示し、アクションマークをカード上に表示
+    /**
+   * カード詳細情報を表示
    * @param {Object} card - カードオブジェクト
    * @param {string} position - カードの位置（hand, center, collab等）
    */
   showCardInfo(card, position = null) {
-    // 右側パネルにカード詳細を表示
-    this.showCardDetailInPanel(card);
+    // カード詳細モーダルを表示
+    if (window.showCardDetailModal) {
+      window.showCardDetailModal(card);
+    } else {
+      console.log('📋 [CardInfo] カード詳細:', card);
+    }
     
     // カード上にアクションマークを表示
     this.showActionMarksOnCard(card, position);
-  }
-
-  /**
-   * 右側パネルにカード詳細を表示
-   * @param {Object} card - カードオブジェクト
-   */
-  showCardDetailInPanel(card) {
-    // InfoPanelManagerを使用してカード詳細を表示
-    if (this.battleEngine.infoPanelManager) {
-      const cardDetailHtml = this.formatCardDetailForPanel(card);
-      this.battleEngine.infoPanelManager.cardDetailElement.innerHTML = cardDetailHtml;
-    }
-  }
-
-  /**
-   * パネル用のカード詳細HTMLをフォーマット
-   * @param {Object} card - カードオブジェクト
-   */
-  formatCardDetailForPanel(card) {
-    let html = `
-      <h3>📋 カード詳細</h3>
-      <div class="card-name">${card.name || 'Unknown'}</div>
-    `;
-
-    if (card.card_type) {
-      html += `<div class="card-type">種類: ${card.card_type}</div>`;
-    }
-
-    if (card.card_color) {
-      html += `<div class="card-color">色: ${card.card_color}</div>`;
-    }
-
-    if (card.bloom_level) {
-      html += `<div class="card-bloom">ブルーム: ${card.bloom_level}</div>`;
-    }
-
-    if (card.hp) {
-      html += `<div class="card-hp">HP: ${card.hp}</div>`;
-    }
-
-    if (card.rarity) {
-      html += `<div class="card-rarity">レアリティ: ${card.rarity}</div>`;
-    }
-
-    if (card.skills && card.skills.length > 0) {
-      html += `<div class="card-skills"><strong>🎯 スキル:</strong><br>`;
-      card.skills.forEach(skill => {
-        const skillText = skill.text || skill.name || skill.description || 'スキル詳細なし';
-        html += `<div class="skill-item">• ${skillText}</div>`;
-      });
-      html += `</div>`;
-    }
-
-    if (card.skill_description) {
-      html += `<div class="card-description"><strong>📝 効果:</strong><br>${card.skill_description}</div>`;
-    }
-
-    return html;
   }
 
   /**

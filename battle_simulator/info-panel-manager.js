@@ -70,41 +70,19 @@ class InfoPanelManager {
    * イベントリスナーの設定
    */
   setupEventListeners() {
+    // マウスオーバーでのカード詳細表示は無効化
+    // カード詳細はクリック時のモーダルで表示する仕様に変更
+    console.log('📄 [InfoPanel] マウスオーバーでのカード詳細表示は無効化されました');
+    
     // 既存のリスナーを削除（重複防止）
     if (this.mouseOverHandler) {
       document.removeEventListener('mouseover', this.mouseOverHandler);
+      this.mouseOverHandler = null;
     }
     if (this.mouseOutHandler) {
       document.removeEventListener('mouseout', this.mouseOutHandler);
+      this.mouseOutHandler = null;
     }
-    
-    // 新しいリスナーを設定
-    this.mouseOverHandler = (event) => {
-      if (event.target.classList.contains('card') || 
-          event.target.classList.contains('hand-card') ||
-          event.target.classList.contains('yell-card')) {
-        this.showCardDetail(event.target);
-      }
-    };
-
-    this.mouseOutHandler = (event) => {
-      if (event.target.classList.contains('card') || 
-          event.target.classList.contains('hand-card') ||
-          event.target.classList.contains('yell-card')) {
-        // 一定時間後にカード詳細をクリア（他のカードにすぐ移動する場合は維持）
-        setTimeout(() => {
-          if (!document.querySelector(':hover')?.closest('.card, .hand-card, .yell-card')) {
-            this.clearCardDetail();
-          }
-        }, 100);
-      }
-    };
-    
-    // カードホバーイベントを監視
-    document.addEventListener('mouseover', this.mouseOverHandler);
-
-    // カードから離れた時の処理
-    document.addEventListener('mouseout', this.mouseOutHandler);
   }
 
   /**
