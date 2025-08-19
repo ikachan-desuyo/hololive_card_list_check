@@ -423,9 +423,15 @@ function setViewMode(mode) {
           raritySet.add(c.rarity);
           colorSet.add(c.color);
           bloomSet.add(c.bloom);
-          if (!c.product.includes(",")) {
+          
+          // 複数商品にまたがる場合も個別に分解して追加
+          if (c.product.includes(",")) {
+            const products = c.product.split(",").map(p => p.trim());
+            products.forEach(product => productSet.add(product));
+          } else {
             productSet.add(c.product);
           }
+          
           // タグの処理（存在する場合）
           if (c.tags && Array.isArray(c.tags)) {
             c.tags.forEach(tag => tagSet.add(tag));
@@ -1063,6 +1069,10 @@ window.onload = async () => {
                 caches.keys().then(cacheNames => {
                   return Promise.all(cacheNames.map(cacheName => caches.delete(cacheName)));
                 }).then(() => {
+                  // Clear localStorage cache as well
+                  localStorage.removeItem('cardData');
+                  localStorage.removeItem('releaseData');
+                  localStorage.removeItem('dataTimestamp');
                   // Force reload without user confirmation
                   window.location.reload(true);
                 });
