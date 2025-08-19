@@ -1218,13 +1218,15 @@
           deletedCaches++;
         }
         
-        // 2. localStorage を削除
+        // 2. localStorage を削除（バインダー関連は保護）
         const localStorageKeys = Object.keys(localStorage);
         const appKeys = localStorageKeys.filter(key => 
-          key.includes('card') || key.includes('deck') || key.includes('binder') || 
+          (key.includes('card') || key.includes('deck') || 
           key.includes('Data') || key.includes('darkMode') || key.includes('version') ||
           key.includes('filter') || key.includes('view') || key.includes('owned') ||
-          key.startsWith('count_')
+          key.startsWith('count_')) &&
+          // バインダー関連のキーは除外
+          !key.includes('binder') && !key.includes('Binder')
         );
         
         appKeys.forEach(key => {
