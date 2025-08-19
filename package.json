@@ -1,6 +1,6 @@
 {
   "name": "hololive-card-list-check",
-  "version": "4.11.4",
+  "version": "4.11.5",
   "description": "ホロライブカードゲーム管理ツール",
   "scripts": {
     "version-update": "node update-version.js",

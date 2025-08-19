@@ -1,23 +1,23 @@
 // Version Management Configuration
 // このファイルはバージョンアップ時に更新されます
 
-const APP_VERSION = "4.11.4";
-const VERSION_DESCRIPTION = "カード詳細モーダル改善とアーカイブ機能追加";
+const APP_VERSION = "4.11.5";
+const VERSION_DESCRIPTION = "カードデータ更新とリリース日情報追加";
 
 // ✅ 各ページのバージョン情報を一元管理
 const PAGE_VERSIONS = {
-  "index.html": "4.11.4",
-  "binder_collection.html": "4.11.4",
-  "collection_binder.html": "4.11.4",
-  "card_list.html": "4.11.4",
-  "holoca_skill_page.html": "4.11.4",
-  "deck_builder.html": "4.11.4"
+  "index.html": "4.11.5",
+  "binder_collection.html": "4.11.5",
+  "collection_binder.html": "4.11.5",
+  "card_list.html": "4.11.5",
+  "holoca_skill_page.html": "4.11.5",
+  "deck_builder.html": "4.11.5"
 };
 
 // ✅ 更新内容の詳細情報
 const UPDATE_DETAILS = {
-  title: "v4.11.4",
-  description: "カード詳細モーダル改善とアーカイブ機能追加",
+  title: "v4.11.5",
+  description: "カードデータ更新とリリース日情報追加",
   changes: [
     "カード詳細モーダルを大幅改善（クリック時のみ表示）",
     "アーカイブカード一覧モーダル機能を追加",
