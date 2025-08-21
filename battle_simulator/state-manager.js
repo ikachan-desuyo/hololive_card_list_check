@@ -295,10 +295,7 @@ class HololiveStateManager {
           
           // バトンタッチ使用時はターン1制限を解除
           if (newState.turn.playerTurnCount[payload.player] <= 1) {
-            console.log(`🔄 [RESET_TURN_FLAGS] プレイヤー${payload.player}のターン回数を${newState.turn.playerTurnCount[payload.player]}から2に変更`);
             newState.turn.playerTurnCount[payload.player] = 2;
-          } else {
-            console.log(`🔄 [RESET_TURN_FLAGS] プレイヤー${payload.player}のターン回数は既に${newState.turn.playerTurnCount[payload.player]}`);
           }
           
         } else {
@@ -1766,10 +1763,6 @@ class HololiveStateManager {
     const currentTurn = gameState.turn.turnCount;
     const playerTurnCount = gameState.turn.playerTurnCount[playerId] || 0;
     
-    // デバッグログ追加
-    console.log(`🔍 [canBloom] ブルームチェック: プレイヤー${playerId}, ターン回数: ${playerTurnCount}, 全体ターン: ${currentTurn}`);
-    console.log(`🔍 [canBloom] ゲーム状態:`, gameState.turn);
-    
     // 1. 基本的な互換性チェック
     const compatibilityCheck = this.checkBloomCompatibility(card, targetCard, playerId);
     if (!compatibilityCheck.valid) {
@@ -1778,13 +1771,10 @@ class HololiveStateManager {
 
     // 2. 初回ターン制限チェック（各プレイヤーの最初のターン）
     if (playerTurnCount <= 1) {
-      console.log(`❌ [canBloom] ターン1制限: プレイヤー${playerId}のターン回数${playerTurnCount}は1以下`);
       return {
         valid: false,
         reason: `プレイヤー${playerId}の最初のターンではブルームできません`
       };
-    } else {
-      console.log(`✅ [canBloom] ターン1制限クリア: プレイヤー${playerId}のターン回数${playerTurnCount}は2以上`);
     }
 
 
