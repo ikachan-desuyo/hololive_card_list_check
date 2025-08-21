@@ -24,7 +24,7 @@ const cardEffect_hY04_001 = {
         return attachedHolomem != null;
       },
       effect: async (card, battleEngine, attachedHolomem) => {
-        console.log(`💙 [青エール] ${card.name || 'hY04-001'}が${attachedHolomem?.name}に付着可能！`);
+        console.log(`💙 [青エール] ${card.name || 'hY04-001'}が${attachedHolomem ? attachedHolomem.name : 'unknown'}に付着可能！`);
         
         return new Promise((resolve) => {
           battleEngine.modalUI.showCardEffectModal({

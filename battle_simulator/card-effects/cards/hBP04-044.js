@@ -29,8 +29,8 @@ const cardEffect_hBP04_044 = {
         // 〈雪民〉が付いている〈雪花ラミィ〉がいないかチェック
         const stageHolomens = new CardEffectUtils(battleEngine).getStageHolomens(currentPlayer);
         const hasYukiminAttached = stageHolomens.some(h => {
-          if (h.card.name?.includes('雪花ラミィ') && h.card.yellCards) {
-            return h.card.yellCards.some(yell => yell.name?.includes('雪民'));
+          if (h.card.name && h.card.name.includes('雪花ラミィ') && h.card.yellCards) {
+            return h.card.yellCards.some(yell => yell.name && yell.name.includes('雪民'));
           }
           return false;
         });
@@ -67,7 +67,7 @@ const cardEffect_hBP04_044 = {
                 description: '〈雪民〉を選択してください',
                 allowLess: true,
                 customFilter: [
-                  (card) => card.name?.includes('雪民')
+                  (card) => card.name && card.name.includes('雪民')
                 ]
               });
 
@@ -83,7 +83,7 @@ const cardEffect_hBP04_044 = {
               
               // 〈雪花ラミィ〉を選択して〈雪民〉を付ける
               const stageHolomens = utils.getStageHolomens(currentPlayer);
-              const lamiis = stageHolomens.filter(h => h.card.name?.includes('雪花ラミィ'));
+              const lamiis = stageHolomens.filter(h => h.card.name && h.card.name.includes('雪花ラミィ'));
               
               if (lamiis.length === 0) {
                 resolve({

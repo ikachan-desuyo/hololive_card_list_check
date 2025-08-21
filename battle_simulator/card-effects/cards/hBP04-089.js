@@ -52,7 +52,7 @@ const cardEffect_hBP04_089 = {
               // 1. ステージの色が1色で異なる色のホロメン2人を選択
               const stageHolomens = battleEngine.gameState.stage[currentPlayer] || [];
               const eligibleHolomens = stageHolomens.filter(holomem => 
-                holomem && holomem.card_type?.includes('ホロメン')
+                holomem && holomem.card_type && holomem.card_type.includes('ホロメン')
               );
               
               if (eligibleHolomens.length < 2) {
@@ -75,8 +75,8 @@ const cardEffect_hBP04_089 = {
                 const deckCard = player.deck.find(card => 
                   (card.name === targetName || card.card_name === targetName) &&
                   card.bloom_level === '1st' &&
-                  card.card_type?.includes('ホロメン') &&
-                  !card.card_name?.includes('Buzz')
+                  card.card_type && card.card_type.includes('ホロメン') &&
+                  (!card.card_name || !card.card_name.includes('Buzz'))
                 );
                 
                 if (deckCard) {

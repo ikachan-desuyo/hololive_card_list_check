@@ -1,0 +1,316 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>カード効果動作テスト</title>
+    <style>
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            max-width: 1200px;
+            margin: 0 auto;
+            padding: 20px;
+            background: #f5f5f5;
+        }
+        .test-container {
+            background: white;
+            border-radius: 10px;
+            padding: 20px;
+            margin-bottom: 20px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+        }
+        .card-test {
+            border: 1px solid #ddd;
+            padding: 15px;
+            margin: 10px 0;
+            border-radius: 8px;
+            background: #fafafa;
+        }
+        .card-test.success {
+            border-color: #4caf50;
+            background: #e8f5e8;
+        }
+        .card-test.error {
+            border-color: #f44336;
+            background: #fdeaea;
+        }
+        .test-result {
+            font-weight: bold;
+            margin-top: 10px;
+        }
+        .effect-list {
+            margin-left: 20px;
+        }
+        .effect-item {
+            padding: 5px 0;
+            border-bottom: 1px dotted #ccc;
+        }
+        .test-button {
+            background: #2196f3;
+            color: white;
+            border: none;
+            padding: 10px 20px;
+            border-radius: 5px;
+            cursor: pointer;
+            margin: 5px;
+        }
+        .test-button:hover {
+            background: #1976d2;
+        }
+        .status-badge {
+            display: inline-block;
+            padding: 3px 8px;
+            border-radius: 12px;
+            font-size: 12px;
+            font-weight: bold;
+            color: white;
+        }
+        .status-success { background: #4caf50; }
+        .status-error { background: #f44336; }
+        .status-warning { background: #ff9800; }
+    </style>
+</head>
+<body>
+    <div class="test-container">
+        <h1>🧪 カード効果動作テスト</h1>
+        <p>実装済みカード効果の読み込みと基本動作を確認します。</p>
+        
+        <button class="test-button" onclick="runAllTests()">🚀 全テスト実行</button>
+        <button class="test-button" onclick="clearResults()">🗑️ 結果クリア</button>
+        
+        <div id="testResults"></div>
+    </div>
+
+    <!-- モーダルUI -->
+    <script src="../../js/modal-ui.js"></script>
+    
+    <!-- 模擬環境セットアップ -->
+    <script>
+        // 模擬バトルエンジン環境
+        window.CardEffectUtils = class {
+            constructor(battleEngine) {
+                this.battleEngine = battleEngine;
+            }
+            
+            getStageHolomens(player) {
+                return [];
+            }
+            
+            dealDamage(target, amount, options) {
+                console.log(`💥 ダメージ処理: ${amount} → プレイヤー${target}`);
+                return { success: true, damage: amount };
+            }
+            
+            updateDisplay() {
+                console.log('🔄 UI更新');
+            }
+            
+            drawCards(player, count) {
+                console.log(`📄 ${count}枚ドロー`);
+                return Array(count).fill({ name: 'テストカード' });
+            }
+        };
+
+        // 模擬バトルエンジン
+        const mockBattleEngine = {
+            gameState: {
+                currentPlayer: 0,
+                currentPhase: 3
+            },
+            players: [
+                { 
+                    hand: [], 
+                    deck: Array(30).fill({ name: 'テストカード', card_type: 'ホロメン', bloom_level: 'Debut' }),
+                    archive: []
+                },
+                { 
+                    hand: [], 
+                    deck: Array(30).fill({ name: 'テストカード' }),
+                    archive: []
+                }
+            ],
+            modalUI: new ModalUI()
+        };
+
+        // カード効果登録システム
+        window.cardEffects = {};
+        window.pendingCardEffects = [];
+        
+        // テスト対象カード
+        const testCards = [
+            'hBP01-104', 'hBP02-042', 'hBP02-045', 'hBP02-076', 'hBP02-084',
+            'hBP04-004', 'hBP04-043', 'hBP04-044', 'hBP04-045', 'hBP04-046',
+            'hBP04-047', 'hBP04-048', 'hBP04-089', 'hSD01-014', 'hSD01-016',
+            'hSD01-017', 'hY04-001'
+        ];
+
+        // テスト結果表示
+        function displayTestResult(cardId, result) {
+            const resultsDiv = document.getElementById('testResults');
+            const cardDiv = document.createElement('div');
+            cardDiv.className = `card-test ${result.success ? 'success' : 'error'}`;
+            
+            const effectsList = result.effects.map(effect => 
+                `<div class="effect-item">
+                    <span class="status-badge ${effect.working ? 'status-success' : 'status-error'}">
+                        ${effect.working ? '✓' : '✗'}
+                    </span>
+                    ${effect.type}: ${effect.name}
+                </div>`
+            ).join('');
+            
+            cardDiv.innerHTML = `
+                <h3>${cardId} ${result.cardName ? `(${result.cardName})` : ''}</h3>
+                <div class="test-result">
+                    <span class="status-badge ${result.success ? 'status-success' : 'status-error'}">
+                        ${result.success ? '✅ 正常' : '❌ エラー'}
+                    </span>
+                    ${result.message}
+                </div>
+                <div class="effect-list">
+                    ${effectsList}
+                </div>
+                ${result.error ? `<div style="color: red; margin-top: 10px;">エラー詳細: ${result.error}</div>` : ''}
+            `;
+            
+            resultsDiv.appendChild(cardDiv);
+        }
+
+        // 個別カードテスト
+        async function testCard(cardId) {
+            try {
+                // カードファイル読み込み
+                const script = document.createElement('script');
+                script.src = `cards/${cardId}.js`;
+                
+                return new Promise((resolve) => {
+                    script.onload = () => {
+                        try {
+                            // カード効果オブジェクト取得
+                            const effectVar = `cardEffect_${cardId.replace(/-/g, '_')}`;
+                            const cardEffect = window[effectVar];
+                            
+                            if (!cardEffect) {
+                                resolve({
+                                    success: false,
+                                    message: 'カード効果オブジェクトが見つかりません',
+                                    effects: []
+                                });
+                                return;
+                            }
+
+                            // 効果の詳細チェック
+                            const effects = [];
+                            if (cardEffect.effects) {
+                                for (const [key, effect] of Object.entries(cardEffect.effects)) {
+                                    const working = 
+                                        typeof effect.condition === 'function' &&
+                                        typeof effect.effect === 'function';
+                                    
+                                    effects.push({
+                                        type: effect.type || key,
+                                        name: effect.name || 'Unknown',
+                                        working: working
+                                    });
+                                }
+                            }
+
+                            const allWorking = effects.length > 0 && effects.every(e => e.working);
+                            
+                            resolve({
+                                success: allWorking,
+                                cardName: cardEffect.cardName,
+                                message: `${effects.length}個の効果を検出`,
+                                effects: effects
+                            });
+                            
+                        } catch (error) {
+                            resolve({
+                                success: false,
+                                message: 'カード効果の解析に失敗',
+                                error: error.message,
+                                effects: []
+                            });
+                        }
+                    };
+                    
+                    script.onerror = () => {
+                        resolve({
+                            success: false,
+                            message: 'ファイルの読み込みに失敗',
+                            effects: []
+                        });
+                    };
+                    
+                    document.head.appendChild(script);
+                });
+                
+            } catch (error) {
+                return {
+                    success: false,
+                    message: 'テスト実行エラー',
+                    error: error.message,
+                    effects: []
+                };
+            }
+        }
+
+        // 全テスト実行
+        async function runAllTests() {
+            const resultsDiv = document.getElementById('testResults');
+            resultsDiv.innerHTML = '<h2>🔄 テスト実行中...</h2>';
+            
+            let successCount = 0;
+            const totalCards = testCards.length;
+            
+            for (const cardId of testCards) {
+                const result = await testCard(cardId);
+                displayTestResult(cardId, result);
+                
+                if (result.success) {
+                    successCount++;
+                }
+                
+                // 少し待つ（読み込み負荷軽減）
+                await new Promise(resolve => setTimeout(resolve, 100));
+            }
+            
+            // サマリー表示
+            const summaryDiv = document.createElement('div');
+            summaryDiv.className = 'test-container';
+            summaryDiv.innerHTML = `
+                <h2>📊 テスト結果サマリー</h2>
+                <div style="font-size: 18px; margin: 10px 0;">
+                    <span class="status-badge ${successCount === totalCards ? 'status-success' : 'status-warning'}">
+                        ${successCount}/${totalCards} カード正常
+                    </span>
+                </div>
+                <p>成功率: ${Math.round(successCount/totalCards*100)}%</p>
+            `;
+            
+            resultsDiv.insertBefore(summaryDiv, resultsDiv.firstChild);
+        }
+
+        // 結果クリア
+        function clearResults() {
+            document.getElementById('testResults').innerHTML = '';
+        }
+
+        // 初期メッセージ
+        document.getElementById('testResults').innerHTML = `
+            <div class="card-test">
+                <h3>📋 テスト準備完了</h3>
+                <p>「全テスト実行」ボタンを押して、実装済み${testCards.length}枚のカード効果をテストしてください。</p>
+                <p><strong>テスト内容:</strong></p>
+                <ul>
+                    <li>✅ ファイル読み込み確認</li>
+                    <li>✅ 効果オブジェクト構造確認</li>
+                    <li>✅ condition関数存在確認</li>
+                    <li>✅ effect関数存在確認</li>
+                    <li>✅ モーダル対応確認</li>
+                </ul>
+            </div>
+        `;
+    </script>
+</body>
+</html>

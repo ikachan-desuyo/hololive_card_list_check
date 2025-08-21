@@ -29,8 +29,8 @@ const cardEffect_hBP04_047 = {
         // 〈雪民〉が付いている〈雪花ラミィ〉がいるかチェック
         const stageHolomens = utils.getStageHolomens(currentPlayer);
         const hasYukiminLamii = stageHolomens.some(h => {
-          if (h.card.name?.includes('雪花ラミィ') && h.card.yellCards) {
-            return h.card.yellCards.some(yell => yell.name?.includes('雪民'));
+          if (h.card.name && h.card.name.includes('雪花ラミィ') && h.card.yellCards) {
+            return h.card.yellCards.some(yell => yell.name && yell.name.includes('雪民'));
           }
           return false;
         });

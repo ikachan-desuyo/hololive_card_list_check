@@ -66,7 +66,7 @@ const cardEffect_hBP02_084 = {
                 // Debutホロメンをサーチ
                 const player = battleEngine.players[currentPlayer];
                 const hasDebutHolomen = player.deck.some(deckCard => 
-                  deckCard.card_type?.includes('ホロメン') && 
+                  deckCard.card_type && deckCard.card_type.includes('ホロメン') && 
                   deckCard.bloom_level === 'Debut'
                 );
                 

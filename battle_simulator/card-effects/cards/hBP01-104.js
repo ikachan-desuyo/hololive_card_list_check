@@ -25,7 +25,7 @@ const cardEffect_hBP01_104 = {
         
         // デッキにDebutホロメンがいるかチェック
         const hasDebutHolomen = player.deck.some(deckCard => 
-          deckCard.card_type?.includes('ホロメン') && 
+          deckCard.card_type && deckCard.card_type.includes('ホロメン') && 
           deckCard.bloom_level === 'Debut'
         );
         

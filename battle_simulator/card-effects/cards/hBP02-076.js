@@ -24,7 +24,7 @@ const cardEffect_hBP02_076 = {
         const player = battleEngine.players[currentPlayer];
         
         const hasDebutHolomen = player.hand.some(handCard => 
-          handCard.card_type?.includes('ホロメン') && 
+          handCard.card_type && handCard.card_type.includes('ホロメン') && 
           handCard.bloom_level === 'Debut'
         );
         
@@ -57,7 +57,7 @@ const cardEffect_hBP02_076 = {
               
               // 手札からDebutホロメンを選択
               const debutHolomens = player.hand.filter(handCard => 
-                handCard.card_type?.includes('ホロメン') && 
+                handCard.card_type && handCard.card_type.includes('ホロメン') && 
                 handCard.bloom_level === 'Debut'
               );
               

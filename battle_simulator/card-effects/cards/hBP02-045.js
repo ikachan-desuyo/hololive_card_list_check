@@ -68,7 +68,7 @@ const cardEffect_hBP02_045 = {
               
               // 青または紫のホロメンを探す
               const eligibleCards = topCards.filter(deckCard => 
-                deckCard.card_type?.includes('ホロメン') && 
+                deckCard.card_type && deckCard.card_type.includes('ホロメン') && 
                 (deckCard.color === '青' || deckCard.color === '紫')
               );
               
