@@ -2183,6 +2183,9 @@ class HololiveBattleEngine {
   handlePlacedCardDragStart(e, card, areaId, index) {
     console.log('配置済みカードからドラッグ開始:', card.name, 'エリア:', areaId, 'インデックス:', index);
     
+    // ドロップ処理フラグをリセット（新しいドラッグ開始時）
+    this.isDropProcessing = false;
+    
     // ドラッグ中のカードデータを保存
     this.draggedCard = {
       card: card,
@@ -2218,6 +2221,10 @@ class HololiveBattleEngine {
     
     // ドラッグ状態をクリア
     this.draggedCard = null;
+    
+    // ドロップ処理フラグをリセット（ドラッグ終了時）
+    this.isDropProcessing = false;
+    console.log('🔄 [dragEnd] ドロップ処理フラグをリセット');
   }
 
   // 手札ドラッグ終了処理（HandManagerに委任）
@@ -2245,15 +2252,16 @@ class HololiveBattleEngine {
     e.preventDefault();
     e.target.classList.remove('drop-zone-hover');
     
-    // 重複実行防止チェック（処理中フラグ + 時間ベース）
-    if (this.isDropProcessing) {
-      console.log('ドロップ処理中のため無視');
+    // 重複実行防止チェック（時間ベースのみ、より短時間に調整）
+    const now = Date.now();
+    if (this.lastDropTime && now - this.lastDropTime < 100) {
+      console.log('重複ドロップイベントを無視（時間ベース）');
       return;
     }
     
-    const now = Date.now();
-    if (this.lastDropTime && now - this.lastDropTime < 500) {
-      console.log('重複ドロップイベントを無視（時間ベース）');
+    // 処理中フラグを確認（より厳密に）
+    if (this.isDropProcessing) {
+      console.log('ドロップ処理中のため無視');
       return;
     }
     
@@ -2261,60 +2269,70 @@ class HololiveBattleEngine {
     this.isDropProcessing = true;
     this.lastDropTime = now;
     
-    const droppedData = this.draggedCard || this.draggedPlacedCard;
-    if (!droppedData) {
-      console.log('ドラッグデータが見つかりません');
-      this.isDropProcessing = false;
-      return;
-    }
+    console.log('🎯 [handleDrop] ドロップ処理開始');
     
-    const card = droppedData.card;
-    const dropZone = this.getDropZoneInfo(e.target);
-    
-    console.log('ドロップ先:', dropZone);
-    console.log('ドラッグ元:', droppedData.source);
-    
-    // 配置制御チェック
-    if (this.placementController && dropZone.type !== 'support') {
-      // バックスロットの場合は具体的なポジション名を作成
-      let positionName = dropZone.type;
-      if (dropZone.type === 'back' && dropZone.index !== undefined) {
-        positionName = `back${dropZone.index + 1}`; // index 0 → back1
-      }
-      
-      const placementCheck = this.placementController.canPlaceCard(card, positionName, 1);
-      if (!placementCheck.allowed) {
-        this.showAlert(`⚠️ 配置不可\n\n${placementCheck.reason}`, `placement_failed_${positionName}`);
-        console.log('配置制御により配置が拒否されました:', placementCheck.reason);
+    try {
+      const droppedData = this.draggedCard || this.draggedPlacedCard;
+      if (!droppedData) {
+        console.log('ドラッグデータが見つかりません');
         this.isDropProcessing = false;
         return;
       }
-    }
-    
-    if (droppedData.source === 'hand') {
-      // 手札からの配置
-      if (this.isValidDropTarget(e.target, card)) {
-        this.placeCardFromHand(card, droppedData.index, dropZone);
-      } else {
-        console.log('無効なドロップ先です');
+      
+      const card = droppedData.card;
+      const dropZone = this.getDropZoneInfo(e.target);
+      
+      console.log('ドロップ先:', dropZone);
+      console.log('ドラッグ元:', droppedData.source);
+      
+      // 配置制御チェック
+      if (this.placementController && dropZone.type !== 'support') {
+        // バックスロットの場合は具体的なポジション名を作成
+        let positionName = dropZone.type;
+        if (dropZone.type === 'back' && dropZone.index !== undefined) {
+          positionName = `back${dropZone.index + 1}`; // index 0 → back1
+        }
+        
+        const placementCheck = this.placementController.canPlaceCard(card, positionName, 1);
+        if (!placementCheck.allowed) {
+          this.showAlert(`⚠️ 配置不可\n\n${placementCheck.reason}`, `placement_failed_${positionName}`);
+          console.log('配置制御により配置が拒否されました:', placementCheck.reason);
+          return;
+        }
       }
-    } else if (droppedData.source === 'placed') {
-      // 配置済みカードの移動・交換
-      if (this.isValidSwapTarget(e.target, card)) {
-        // swapCardsメソッドを正しい引数で呼び出し
-        this.performCardSwap(droppedData, dropZone);
-      } else {
-        console.log('無効な交換先です');
+      
+      if (droppedData.source === 'hand') {
+        // 手札からの配置
+        if (this.isValidDropTarget(e.target, card)) {
+          this.placeCardFromHand(card, droppedData.index, dropZone);
+        } else {
+          console.log('無効なドロップ先です');
+        }
+      } else if (droppedData.source === 'placed') {
+        // 配置済みカードの移動・交換
+        if (this.isValidSwapTarget(e.target, card)) {
+          // バトンタッチの場合は特別処理
+          if (droppedData.area === 'center' && dropZone.type === 'back' && dropZone.targetCard) {
+            this.handleBatonTouch(card, dropZone.targetCard, `back${dropZone.index + 1}`);
+          } else {
+            // 通常のカード移動・交換
+            this.performCardSwap(droppedData, dropZone);
+          }
+        } else {
+          console.log('無効な交換先です');
+        }
       }
+      
+    } catch (error) {
+      console.error('❌ [handleDrop] ドロップ処理エラー:', error);
+    } finally {
+      // 必ず実行される処理（クリーンアップ）
+      this.clearHighlights();
+      this.draggedCard = null;
+      this.draggedPlacedCard = null;
+      this.isDropProcessing = false;
+      console.log('🔄 [handleDrop] 処理完了、フラグリセット');
     }
-    
-    // ドラッグ状態をクリア
-    this.clearHighlights();
-    this.draggedCard = null;
-    this.draggedPlacedCard = null;
-    
-    // 処理完了フラグをリセット
-    this.isDropProcessing = false;
   }
 
   // カードタイプ判定（HandManagerに委任）
@@ -2471,6 +2489,12 @@ class HololiveBattleEngine {
       case 'center':
         return true; // センターエリアは常に交換可能
       case 'back':
+        // バトンタッチ（センター⇔バック間の交換）の場合は配置制限を無視
+        if (this.draggedCard && this.draggedCard.areaId === 'center') {
+          // センターからバックへの移動（バトンタッチ）
+          return true;
+        }
+        // 通常のバック配置の場合は制限チェック
         return this.canPlaceCardInBackSlot(card, dropZone.index);
       default:
         return false;
@@ -2545,9 +2569,10 @@ class HololiveBattleEngine {
         return false;
       }
       
-      // バトンタッチの場合は特別処理
+      // バトンタッチの場合は特別処理（後続処理をスキップ）
       if (sourcePosition === 'center' && targetPosition.startsWith('back') && targetCard) {
-        return this.handleBatonTouch(sourceCard, targetCard, targetPosition);
+        this.handleBatonTouch(sourceCard, targetCard, targetPosition);
+        return true; // バトンタッチ処理開始、後続処理はスキップ
       }
     }
     
@@ -3063,7 +3088,6 @@ class HololiveBattleEngine {
    * @param {Object} batonCheck - バトンタッチチェック結果
    */
   showBatonTouchYellSelection(sourceCard, targetCard, targetPosition, batonCheck) {
-    // シンプルな確認ダイアログ（後でより高度なUIに置き換え可能）
     const requiredCosts = batonCheck.requiredCosts;
     const totalRequired = Object.values(requiredCosts).reduce((sum, count) => sum + count, 0);
     
@@ -3072,32 +3096,131 @@ class HololiveBattleEngine {
       .map(([color, count]) => `${color}:${count}`)
       .join(', ');
 
-    const message = `バトンタッチを実行しますか？\n\n` +
-                   `${sourceCard.name} ⇔ ${targetCard.name}\n\n` +
-                   `必要コスト: ${costText || 'なし'}\n` +
-                   `アーカイブ予定: ${totalRequired}枚のエール`;
+    // コストが0の場合は即座に実行
+    if (totalRequired === 0) {
+      const message = `バトンタッチを実行しますか？\n\n` +
+                     `${sourceCard.name} ⇔ ${targetCard.name}\n\n` +
+                     `コスト: なし`;
 
-    if (confirm(message)) {
-      // 使用可能なエールカードから必要分を自動選択
-      const selectedCards = this.autoSelectYellCards(batonCheck.availableYellCards, requiredCosts);
-      
-      if (selectedCards.length >= totalRequired) {
-        // バトンタッチ実行
+      if (confirm(message)) {
         const success = this.stateManager.executeBatonTouch(
-          sourceCard, targetCard, targetPosition, 1, selectedCards
+          sourceCard, targetCard, targetPosition, 1, []
         );
         
         if (success) {
-          // UI更新
           this.updateUI();
           this.infoPanelManager?.addLogEntry('action', 
-            `バトンタッチ: ${sourceCard.name} ⇔ ${targetCard.name} (エール${selectedCards.length}枚使用)`
+            `バトンタッチ: ${sourceCard.name} ⇔ ${targetCard.name}`
           );
         }
-      } else {
-        alert('エールカードが不足しています');
       }
+      return;
     }
+
+    // エール選択モーダルを表示
+    this.showBatonTouchYellModal(sourceCard, targetCard, targetPosition, batonCheck);
+  }
+
+  /**
+   * バトンタッチ用エール選択モーダルを表示
+   */
+  showBatonTouchYellModal(sourceCard, targetCard, targetPosition, batonCheck) {
+    const requiredCosts = batonCheck.requiredCosts;
+    const availableCards = batonCheck.availableYellCards;
+    const totalRequired = Object.values(requiredCosts).reduce((sum, count) => sum + count, 0);
+
+    // モーダル要素作成
+    const modal = document.createElement('div');
+    modal.className = 'modal-overlay';
+    modal.style.cssText = `
+      position: fixed; top: 0; left: 0; width: 100%; height: 100%;
+      background: rgba(0,0,0,0.8); z-index: 1000; display: flex;
+      align-items: center; justify-content: center;
+    `;
+
+    const modalContent = document.createElement('div');
+    modalContent.style.cssText = `
+      background: white; padding: 20px; border-radius: 10px; max-width: 600px;
+      max-height: 80vh; overflow-y: auto;
+    `;
+
+    const costText = Object.entries(requiredCosts)
+      .filter(([color, count]) => count > 0)
+      .map(([color, count]) => `${color}:${count}`)
+      .join(', ');
+
+    modalContent.innerHTML = `
+      <h3>🏃 バトンタッチ</h3>
+      <p><strong>${sourceCard.name}</strong> ⇔ <strong>${targetCard.name}</strong></p>
+      <p>必要コスト: ${costText}</p>
+      <p>アーカイブするエールカードを${totalRequired}枚選択してください：</p>
+      <div id="yell-selection" style="max-height: 300px; overflow-y: auto; border: 1px solid #ccc; padding: 10px;"></div>
+      <div style="margin-top: 15px;">
+        <button id="confirm-baton" disabled>実行</button>
+        <button id="cancel-baton">キャンセル</button>
+      </div>
+    `;
+
+    const yellSelection = modalContent.querySelector('#yell-selection');
+    const confirmBtn = modalContent.querySelector('#confirm-baton');
+    const cancelBtn = modalContent.querySelector('#cancel-baton');
+    
+    let selectedCards = [];
+
+    // エールカード一覧表示
+    availableCards.forEach((cardInfo, index) => {
+      const cardDiv = document.createElement('div');
+      cardDiv.style.cssText = `
+        padding: 5px; margin: 2px; border: 2px solid #ccc; border-radius: 5px;
+        cursor: pointer; display: flex; align-items: center; background: #f9f9f9;
+      `;
+      cardDiv.innerHTML = `
+        <input type="checkbox" id="yell-${index}" style="margin-right: 10px;">
+        <span>[${cardInfo.color}] ${cardInfo.name}</span>
+      `;
+      
+      const checkbox = cardDiv.querySelector('input');
+      checkbox.addEventListener('change', () => {
+        if (checkbox.checked) {
+          selectedCards.push(cardInfo);
+          cardDiv.style.background = '#e3f2fd';
+        } else {
+          selectedCards = selectedCards.filter(c => c !== cardInfo);
+          cardDiv.style.background = '#f9f9f9';
+        }
+        
+        // 選択数チェック
+        confirmBtn.disabled = selectedCards.length < totalRequired;
+        confirmBtn.textContent = `実行 (${selectedCards.length}/${totalRequired})`;
+      });
+      
+      yellSelection.appendChild(cardDiv);
+    });
+
+    // イベントリスナー
+    confirmBtn.addEventListener('click', () => {
+      if (selectedCards.length >= totalRequired) {
+        const success = this.stateManager.executeBatonTouch(
+          sourceCard, targetCard, targetPosition, 1, selectedCards.slice(0, totalRequired)
+        );
+        
+        if (success) {
+          this.updateUI();
+          this.infoPanelManager?.addLogEntry('action', 
+            `バトンタッチ: ${sourceCard.name} ⇔ ${targetCard.name} (エール${totalRequired}枚使用)`
+          );
+        }
+        
+        document.body.removeChild(modal);
+      }
+    });
+
+    cancelBtn.addEventListener('click', () => {
+      document.body.removeChild(modal);
+    });
+
+    modal.appendChild(modalContent);
+    document.body.appendChild(modal);
   }
 
   /**

@@ -648,6 +648,96 @@ class CardEffectUtils {
   }
 
   /**
+   * ホロメンをステージに配置
+   * @param {number} playerId - プレイヤーID
+   * @param {Object} holomemCard - 配置するホロメンカード
+   * @param {string} preferredPosition - 希望配置位置 ('center', 'back1-5')
+   * @returns {Object} 配置結果
+   */
+  placeHolomenOnStage(playerId, holomemCard, preferredPosition = null) {
+    console.log(`🎭 [placeHolomenOnStage] 開始: プレイヤー${playerId}, ${holomemCard.name}`);
+    
+    const player = this.battleEngine.players[playerId];
+    if (!player) {
+      return { success: false, reason: 'プレイヤーが見つかりません' };
+    }
+
+    // ホロメンカードかチェック
+    if (!holomemCard.card_type?.includes('ホロメン')) {
+      return { success: false, reason: 'ホロメンカードではありません' };
+    }
+
+    // 配置可能位置を決定
+    let targetPosition = null;
+    
+    if (preferredPosition && !player[preferredPosition]) {
+      // 希望位置が空いている場合
+      targetPosition = preferredPosition;
+    } else {
+      // 自動配置: Debutはセンター優先、その他はバック優先
+      if (holomemCard.bloom_level === 'Debut') {
+        if (!player.center) {
+          targetPosition = 'center';
+        } else {
+          // センターが埋まっている場合はバックを探す
+          for (let i = 1; i <= 5; i++) {
+            if (!player[`back${i}`]) {
+              targetPosition = `back${i}`;
+              break;
+            }
+          }
+        }
+      } else {
+        // 1st以上はバック優先
+        for (let i = 1; i <= 5; i++) {
+          if (!player[`back${i}`]) {
+            targetPosition = `back${i}`;
+            break;
+          }
+        }
+        // バックが全て埋まっている場合はセンターをチェック
+        if (!targetPosition && !player.center) {
+          targetPosition = 'center';
+        }
+      }
+    }
+
+    if (!targetPosition) {
+      return { success: false, reason: 'ステージに空きがありません' };
+    }
+
+    // デッキから除去
+    const deckIndex = player.deck.indexOf(holomemCard);
+    if (deckIndex !== -1) {
+      player.deck.splice(deckIndex, 1);
+    } else {
+      console.warn(`⚠️ [placeHolomenOnStage] ${holomemCard.name} がデッキに見つかりません`);
+    }
+
+    // ステージに配置
+    player[targetPosition] = holomemCard;
+
+    // HP初期化（ホロメンの場合）
+    if (holomemCard.hp) {
+      if (this.battleEngine.stateManager) {
+        this.battleEngine.stateManager.setCurrentHP(holomemCard, playerId, parseInt(holomemCard.hp));
+      }
+    }
+
+    // デッキをシャッフル
+    this.shuffleDeck(playerId);
+
+    console.log(`✅ [placeHolomenOnStage] ${holomemCard.name} を ${targetPosition} に配置完了`);
+    
+    return { 
+      success: true, 
+      reason: `${holomemCard.name}を${targetPosition}に配置しました`,
+      position: targetPosition,
+      card: holomemCard
+    };
+  }
+
+  /**
    * UI更新
    */
   updateDisplay() {

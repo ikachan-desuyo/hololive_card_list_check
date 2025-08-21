@@ -289,6 +289,16 @@ class HololiveStateManager {
           if (player.gameState) {
             const oldFlag = player.gameState.collabMovedThisTurn;
             player.gameState.collabMovedThisTurn = false;
+            // バトンタッチ使用フラグもリセット
+            player.gameState.batonTouchUsedThisTurn = false;
+          }
+          
+          // バトンタッチ使用時はターン1制限を解除
+          if (newState.turn.playerTurnCount[payload.player] <= 1) {
+            console.log(`🔄 [RESET_TURN_FLAGS] プレイヤー${payload.player}のターン回数を${newState.turn.playerTurnCount[payload.player]}から2に変更`);
+            newState.turn.playerTurnCount[payload.player] = 2;
+          } else {
+            console.log(`🔄 [RESET_TURN_FLAGS] プレイヤー${payload.player}のターン回数は既に${newState.turn.playerTurnCount[payload.player]}`);
           }
           
         } else {
@@ -461,19 +471,27 @@ class HololiveStateManager {
               }
             } else {
               // 通常の交換処理
-              try {
-                  // Battle Engineの専用swapCardsメソッドを使用
-                  const swapResult = battleEngine.swapCards(
-                      tempSourceCard, 
-                      payload.sourcePosition, 
-                      tempTargetCard, 
-                      payload.targetPosition, 
-                      payload.player
-                  );
-              } catch (error) {
-                  // フォールバック: 直接代入を試行
-                  battleEnginePlayer[payload.targetPosition] = tempSourceCard;
-                  battleEnginePlayer[payload.sourcePosition] = tempTargetCard;
+              
+              // バトンタッチの場合は直接交換（ブルーム判定をスキップ）
+              if (payload.isBatonTouch) {
+                battleEnginePlayer[payload.targetPosition] = tempSourceCard;
+                battleEnginePlayer[payload.sourcePosition] = tempTargetCard;
+              } else {
+                // 通常の移動はBattle Engineの検証を通す
+                try {
+                    // Battle Engineの専用swapCardsメソッドを使用
+                    const swapResult = battleEngine.swapCards(
+                        tempSourceCard, 
+                        payload.sourcePosition, 
+                        tempTargetCard, 
+                        payload.targetPosition, 
+                        payload.player
+                    );
+                } catch (error) {
+                    // フォールバック: 直接代入を試行
+                    battleEnginePlayer[payload.targetPosition] = tempSourceCard;
+                    battleEnginePlayer[payload.sourcePosition] = tempTargetCard;
+                }
               }
             }
             
@@ -1748,6 +1766,9 @@ class HololiveStateManager {
     const currentTurn = gameState.turn.turnCount;
     const playerTurnCount = gameState.turn.playerTurnCount[playerId] || 0;
     
+    // デバッグログ追加
+    console.log(`🔍 [canBloom] ブルームチェック: プレイヤー${playerId}, ターン回数: ${playerTurnCount}, 全体ターン: ${currentTurn}`);
+    console.log(`🔍 [canBloom] ゲーム状態:`, gameState.turn);
     
     // 1. 基本的な互換性チェック
     const compatibilityCheck = this.checkBloomCompatibility(card, targetCard, playerId);
@@ -1757,10 +1778,13 @@ class HololiveStateManager {
 
     // 2. 初回ターン制限チェック（各プレイヤーの最初のターン）
     if (playerTurnCount <= 1) {
+      console.log(`❌ [canBloom] ターン1制限: プレイヤー${playerId}のターン回数${playerTurnCount}は1以下`);
       return {
         valid: false,
         reason: `プレイヤー${playerId}の最初のターンではブルームできません`
       };
+    } else {
+      console.log(`✅ [canBloom] ターン1制限クリア: プレイヤー${playerId}のターン回数${playerTurnCount}は2以上`);
     }
 
 
@@ -2370,7 +2394,9 @@ class HololiveStateManager {
 
     // センターカードのbaton_touch情報を取得
     const batonTouchInfo = sourceCard.baton_touch;
-    if (!batonTouchInfo || batonTouchInfo.length === 0) {
+    if (!batonTouchInfo || 
+        (typeof batonTouchInfo === 'string' && batonTouchInfo.length === 0) ||
+        (Array.isArray(batonTouchInfo) && batonTouchInfo.length === 0)) {
       return {
         valid: false,
         reason: 'このカードはバトンタッチ能力を持っていません'
@@ -2462,7 +2488,7 @@ class HololiveStateManager {
 
   /**
    * バトンタッチのコスト計算
-   * @param {Array} batonTouchInfo - baton_touch配列
+   * @param {string|Array} batonTouchInfo - baton_touch情報（文字列または配列）
    * @returns {Object} 必要コスト
    */
   calculateBatonTouchCost(batonTouchInfo) {
@@ -2476,7 +2502,18 @@ class HololiveStateManager {
       colorless: 0
     };
 
-    batonTouchInfo.forEach(cost => {
+    // 文字列の場合は配列に変換
+    let costArray;
+    if (typeof batonTouchInfo === 'string') {
+      costArray = [batonTouchInfo];
+    } else if (Array.isArray(batonTouchInfo)) {
+      costArray = batonTouchInfo;
+    } else {
+      console.warn('不正なバトンタッチ情報:', batonTouchInfo);
+      return costs;
+    }
+
+    costArray.forEach(cost => {
       const colorKey = cost.toLowerCase();
       if (colorKey === '無色') {
         costs.colorless++;
@@ -2628,6 +2665,11 @@ class HololiveStateManager {
         value: true
       });
 
+      // ターン1フラグをリセット（バトンタッチ使用時）
+      this.updateState('RESET_TURN_FLAGS', {
+        player: playerId
+      });
+
       // 使用したエールカードをアーカイブに移動
       usedYellCards.forEach(cardInfo => {
         this.moveYellCardToArchive(cardInfo, playerId);
@@ -2637,7 +2679,8 @@ class HololiveStateManager {
       this.updateState('SWAP_CARDS', {
         player: playerId,
         sourcePosition: 'center',
-        targetPosition: targetPosition
+        targetPosition: targetPosition,
+        isBatonTouch: true  // バトンタッチフラグを追加
       });
 
       return true;
