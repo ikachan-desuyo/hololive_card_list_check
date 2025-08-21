@@ -30,54 +30,89 @@ const cardEffect_hBP04_048 = {
         // 〈雪民〉が付いている〈雪花ラミィ〉がいるかチェック
         const stageHolomens = utils.getStageHolomens(currentPlayer);
         return stageHolomens.some(h => {
-          if (h.card.name?.includes('雪花ラミィ') && h.card.yellCards) {
-            return h.card.yellCards.some(yell => yell.name?.includes('雪民'));
+          if (h.card && h.card.name && h.card.name.includes('雪花ラミィ') && h.card.yellCards) {
+            return h.card.yellCards.some(yell => yell.name && yell.name.includes('雪民'));
           }
           return false;
         });
       },
-      effect: (card, battleEngine) => {
-        console.log(`🌸 [ブルームエフェクト] ${card.name || 'hBP04-048'}の「ユニーリアの令嬢」が発動！`);
+      effect: async (card, battleEngine) => {
+        console.log(`🌸 [ブルームエフェクト] ${card.name || 'hBP04-048'}の「ユニーリアの令嬢」が発動可能！`);
         
-        const currentPlayer = battleEngine.gameState.currentPlayer;
-        const utils = new CardEffectUtils(battleEngine);
-        
-        // 〈雪民〉が付いている〈雪花ラミィ〉を検索
-        const stageHolomens = utils.getStageHolomens(currentPlayer);
-        const lamyWithYukimin = stageHolomens.filter(h => {
-          if (h.card.name?.includes('雪花ラミィ') && h.card.yellCards) {
-            return h.card.yellCards.some(yell => yell.name?.includes('雪民'));
-          }
-          return false;
+        return new Promise((resolve) => {
+          battleEngine.modalUI.showCardEffectModal({
+            cardName: card.name || '雪花ラミィ',
+            effectName: 'ユニーリアの令嬢',
+            effectDescription: '自分のエールデッキの上から1枚を、自分の〈雪民〉が付いている〈雪花ラミィ〉に送る。',
+            effectType: 'bloom'
+          }, async (confirmed) => {
+            if (!confirmed) {
+              resolve({
+                success: false,
+                message: 'ブルームエフェクトの発動をキャンセルしました'
+              });
+              return;
+            }
+            
+            try {
+              console.log(`🌸 [ブルームエフェクト] 「ユニーリアの令嬢」を実行中...`);
+              
+              const currentPlayer = battleEngine.gameState.currentPlayer;
+              const utils = new CardEffectUtils(battleEngine);
+              
+              // 〈雪民〉が付いている〈雪花ラミィ〉を検索
+              const stageHolomens = utils.getStageHolomens(currentPlayer);
+              const lamyWithYukimin = stageHolomens.filter(h => {
+                if (h.card && h.card.name && h.card.name.includes('雪花ラミィ') && h.card.yellCards) {
+                  return h.card.yellCards.some(yell => yell.name && yell.name.includes('雪民'));
+                }
+                return false;
+              });
+              
+              if (lamyWithYukimin.length === 0) {
+                resolve({
+                  success: false,
+                  message: '〈雪民〉が付いている〈雪花ラミィ〉がいません'
+                });
+                return;
+              }
+              
+              // エールデッキから1枚取る
+              const yellDeck = utils.getYellDeck(currentPlayer);
+              if (yellDeck.length === 0) {
+                resolve({
+                  success: false,
+                  message: 'エールデッキにカードがありません'
+                });
+                return;
+              }
+              
+              // 最初の条件を満たすラミィにエールを付ける
+              const targetLamy = lamyWithYukimin[0];
+              const yellCard = yellDeck.shift();
+              
+              if (!targetLamy.card.yellCards) {
+                targetLamy.card.yellCards = [];
+              }
+              targetLamy.card.yellCards.push(yellCard);
+              
+              // UI更新
+              utils.updateDisplay();
+              
+              resolve({
+                success: true,
+                message: `${card.name || 'hBP04-048'}のブルームエフェクト「ユニーリアの令嬢」で${targetLamy.card.name}にエール1枚を付けました`,
+                yellAttached: 1
+              });
+            } catch (error) {
+              console.error('ブルームエフェクト実行エラー:', error);
+              resolve({
+                success: false,
+                message: 'ブルームエフェクトの実行中にエラーが発生しました'
+              });
+            }
+          });
         });
-        
-        if (lamyWithYukimin.length === 0) {
-          return { success: false, message: '〈雪民〉が付いている〈雪花ラミィ〉がいません' };
-        }
-        
-        // エールデッキから1枚取る
-        const yellDeck = utils.getYellDeck(currentPlayer);
-        if (yellDeck.length === 0) {
-          return { success: false, message: 'エールデッキにカードがありません' };
-        }
-        
-        // 最初の条件を満たすラミィにエールを付ける
-        const targetLamy = lamyWithYukimin[0];
-        const yellCard = yellDeck.shift();
-        
-        if (!targetLamy.card.yellCards) {
-          targetLamy.card.yellCards = [];
-        }
-        targetLamy.card.yellCards.push(yellCard);
-        
-        // UI更新
-        utils.updateDisplay();
-        
-        return {
-          success: true,
-          message: `${card.name || 'hBP04-048'}のブルームエフェクト「ユニーリアの令嬢」で${targetLamy.card.name}にエール1枚を付けました`,
-          yellAttached: 1
-        };
       }
     },
     
@@ -101,44 +136,71 @@ const cardEffect_hBP04_048 = {
         
         return blueCount >= 1 && card.yellCards.length >= 3;
       },
-      effect: (card, battleEngine) => {
-        console.log(`🎨 [アーツ] ${card.name || 'hBP04-048'}の「今日も祝福がありますように」が発動！`);
+      effect: async (card, battleEngine) => {
+        console.log(`🎨 [アーツ] ${card.name || 'hBP04-048'}の「今日も祝福がありますように」が発動可能！`);
         
-        const currentPlayer = battleEngine.gameState.currentPlayer;
-        const opponentPlayer = currentPlayer === 0 ? 1 : 0;
-        const utils = new CardEffectUtils(battleEngine);
-        
-        // 基本ダメージ130を与える
-        const damageResult = utils.dealDamage(opponentPlayer, 130, {
-          source: card,
-          type: 'art',
-          artName: '今日も祝福がありますように'
-        });
-        
-        // エール1枚をアーカイブできるか確認
-        if (card.yellCards && card.yellCards.length > 0) {
-          const archiveYell = confirm(`エール1枚をアーカイブして特殊ダメージ30を与えますか？`);
-          
-          if (archiveYell) {
-            // エール1枚をアーカイブ
-            const yellCard = card.yellCards.pop();
-            utils.addToArchive(currentPlayer, yellCard);
+        return new Promise((resolve) => {
+          battleEngine.modalUI.showCardEffectModal({
+            cardName: card.name || '雪花ラミィ',
+            effectName: '今日も祝福がありますように',
+            effectDescription: 'エール1枚をアーカイブして特殊ダメージ30を与える効果を発動しますか？',
+            effectType: 'art'
+          }, async (confirmed) => {
+            if (!confirmed) {
+              resolve({
+                success: false,
+                message: 'アーツ効果の発動をキャンセルしました'
+              });
+              return;
+            }
             
-            // 相手のセンターまたはバックホロメンに特殊ダメージ30
-            // TODO: 対象選択UIの実装
-            console.log(`⚡ [特殊ダメージ] 相手のホロメンに特殊ダメージ30`);
-          }
-        }
-        
-        // UI更新
-        utils.updateDisplay();
-        
-        return {
-          success: true,
-          message: `${card.name || 'hBP04-048'}の「今日も祝福がありますように」で130ダメージ！`,
-          damage: 130,
-          target: 'opponent'
-        };
+            try {
+              console.log(`🎨 [アーツ効果] 「今日も祝福がありますように」の追加効果を実行中...`);
+              
+              const currentPlayer = battleEngine.gameState.currentPlayer;
+              const player = battleEngine.players[currentPlayer];
+              const opponentPlayer = currentPlayer === 0 ? 1 : 0;
+              const utils = new CardEffectUtils(battleEngine);
+              
+              // エールが1枚以上あるかチェック
+              if (!card.yellCards || card.yellCards.length === 0) {
+                resolve({
+                  success: false,
+                  message: 'アーカイブできるエールがありません'
+                });
+                return;
+              }
+              
+              // エール1枚をアーカイブ
+              const yellCard = card.yellCards.pop(); // 最後のエールを取得
+              if (!player.archive) player.archive = [];
+              player.archive.push(yellCard);
+              
+              // 特殊ダメージ30を与える
+              const damageResult = utils.dealDamage(opponentPlayer, 30, {
+                source: card,
+                type: 'special',
+                artName: '今日も祝福がありますように'
+              });
+              
+              // UI更新
+              utils.updateDisplay();
+              
+              resolve({
+                success: true,
+                message: `エール1枚をアーカイブして特殊ダメージ30を与えました`,
+                damage: 30,
+                archivedYell: yellCard
+              });
+            } catch (error) {
+              console.error('アーツ効果実行エラー:', error);
+              resolve({
+                success: false,
+                message: 'アーツ効果の実行中にエラーが発生しました'
+              });
+            }
+          });
+        });
       }
     }
   }

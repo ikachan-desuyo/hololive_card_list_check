@@ -33,33 +33,62 @@ const cardEffect_hBP02_042 = {
         const totalYells = card.yellCards ? card.yellCards.length : 0;
         return totalYells >= 1; // any色1個
       },
-      effect: (card, battleEngine) => {
-        console.log(`🎨 [アーツ] ${card.name || 'hBP02-042'}の「どうも～」が発動！`);
+      effect: async (card, battleEngine) => {
+        console.log(`🎨 [アーツ] ${card.name || 'hBP02-042'}の「どうも～」が発動可能！`);
         
-        const currentPlayer = battleEngine.gameState.currentPlayer;
-        const opponentPlayer = currentPlayer === 0 ? 1 : 0;
-        const utils = new CardEffectUtils(battleEngine);
-        
-        // 20ダメージを相手に与える
-        const damageResult = utils.dealDamage(opponentPlayer, 20, {
-          source: card,
-          type: 'art',
-          artName: 'どうも～'
+        return new Promise((resolve) => {
+          battleEngine.modalUI.showCardEffectModal({
+            cardName: card.name || '紫咲シオン',
+            effectName: 'どうも～',
+            effectDescription: 'ダメージ20',
+            effectType: 'art'
+          }, async (confirmed) => {
+            if (!confirmed) {
+              resolve({
+                success: false,
+                message: 'アーツの発動をキャンセルしました'
+              });
+              return;
+            }
+            
+            try {
+              console.log(`🎨 [アーツ] 「どうも～」を実行中...`);
+              
+              const currentPlayer = battleEngine.gameState.currentPlayer;
+              const opponentPlayer = currentPlayer === 0 ? 1 : 0;
+              const utils = new CardEffectUtils(battleEngine);
+              
+              // 20ダメージを相手に与える
+              const damageResult = utils.dealDamage(opponentPlayer, 20, {
+                source: card,
+                type: 'art',
+                artName: 'どうも～'
+              });
+              
+              // UI更新
+              utils.updateDisplay();
+              
+              resolve({
+                success: true,
+                message: `${card.name || 'hBP02-042'}の「どうも～」で20ダメージ！`,
+                damage: 20,
+                target: 'opponent'
+              });
+            } catch (error) {
+              console.error('アーツ実行エラー:', error);
+              resolve({
+                success: false,
+                message: 'アーツの実行中にエラーが発生しました'
+              });
+            }
+          });
         });
-        
-        // UI更新
-        utils.updateDisplay();
-        
-        return {
-          success: true,
-          message: `${card.name || 'hBP02-042'}の「どうも～」で20ダメージ！`,
-          damage: 20,
-          target: 'opponent'
-        };
       }
     }
   }
-};// 効果を登録（新システム対応）
+};
+
+// 効果を登録（新システム対応）
 if (window.cardEffects) {
   window.cardEffects['hBP02-042'] = cardEffect_hBP02_042;
 } else {
@@ -70,9 +99,6 @@ if (window.cardEffects) {
     effect: cardEffect_hBP02_042
   });
 }
-
-// グローバルに公開
-window.cardEffect_hBP02_042 = cardEffect_hBP02_042;
 
 // グローバルに公開
 window.cardEffect_hBP02_042 = cardEffect_hBP02_042;

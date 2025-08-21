@@ -496,6 +496,205 @@ class ModalUI {
 
     document.body.appendChild(modal);
   }
+
+  /**
+   * カード効果発動確認モーダルを表示
+   * @param {Object} options - モーダル設定
+   * @param {string} options.cardName - カード名
+   * @param {string} options.effectName - 効果名
+   * @param {string} options.effectDescription - 効果説明
+   * @param {string} options.effectType - 効果タイプ（bloom, collab, gift, support, art）
+   * @param {Function} callback - コールバック関数 (confirmed: boolean) => void
+   */
+  showCardEffectModal(options, callback) {
+    const { cardName, effectName, effectDescription, effectType } = options;
+    
+    // 効果タイプに応じたアイコンと色
+    const typeConfig = {
+      bloom: { icon: '🌸', color: '#ff69b4', label: 'ブルームエフェクト' },
+      collab: { icon: '🤝', color: '#4169e1', label: 'コラボエフェクト' },
+      gift: { icon: '🎁', color: '#32cd32', label: 'ギフト' },
+      support: { icon: '📋', color: '#ff8c00', label: 'サポート効果' },
+      art: { icon: '⚡', color: '#dc143c', label: 'アーツ' }
+    };
+    
+    const config = typeConfig[effectType] || { icon: '✨', color: '#888', label: '効果' };
+    
+    const content = `
+      <div class="game-modal-description">
+        <div style="color: ${config.color}; font-size: 18px; margin-bottom: 10px;">
+          ${config.icon} ${config.label}
+        </div>
+        <div style="font-weight: bold; margin-bottom: 15px;">
+          ${cardName}
+        </div>
+        <div style="font-size: 16px; font-weight: bold; margin-bottom: 10px;">
+          ${effectName}
+        </div>
+        <div style="font-size: 14px; line-height: 1.5; margin-bottom: 20px;">
+          ${effectDescription}
+        </div>
+      </div>
+    `;
+
+    const actions = `
+      <button id="activate-effect" class="game-modal-button game-modal-button-primary">
+        発動する
+      </button>
+      <button id="cancel-effect" class="game-modal-button game-modal-button-secondary">
+        キャンセル
+      </button>
+    `;
+
+    const modal = this.createModal('card-effect-modal', `${config.icon} 効果発動確認`, content, actions, { closeable: true });
+
+    modal.querySelector('#activate-effect').addEventListener('click', () => {
+      callback(true);
+      this.removeModal('card-effect-modal');
+    });
+
+    modal.querySelector('#cancel-effect').addEventListener('click', () => {
+      callback(false);
+      this.removeModal('card-effect-modal');
+    });
+
+    document.body.appendChild(modal);
+  }
+
+  /**
+   * カード選択モーダルを表示
+   * @param {Object} options - 選択設定
+   * @param {Array} options.cards - 選択可能なカード配列
+   * @param {string} options.title - モーダルタイトル
+   * @param {string} options.description - 説明文
+   * @param {number} options.maxSelect - 最大選択数
+   * @param {number} options.minSelect - 最小選択数
+   * @param {Function} callback - コールバック関数 (selectedCards: Array) => void
+   */
+  showCardSelectionModal(options, callback) {
+    const { cards, title, description, maxSelect = 1, minSelect = 1 } = options;
+    let selectedCards = [];
+
+    const cardsList = cards.map((card, index) => {
+      const cardName = card.name || card.card_name || card.cardId || `カード${index + 1}`;
+      const cardType = card.card_type || '';
+      const rarity = card.rarity || '';
+      
+      return `
+        <div class="selectable-card" data-card-index="${index}">
+          <div class="card-info">
+            <div class="card-name">${cardName}</div>
+            <div class="card-details">${cardType} ${rarity}</div>
+          </div>
+          <div class="card-checkbox">
+            <input type="checkbox" id="card-${index}" />
+          </div>
+        </div>
+      `;
+    }).join('');
+
+    const content = `
+      <div class="game-modal-description">
+        ${description}
+      </div>
+      <div class="selection-info">
+        選択: <span id="selected-count">0</span> / ${maxSelect}
+      </div>
+      <div class="cards-selection-list">
+        ${cardsList}
+      </div>
+      <style>
+        .cards-selection-list {
+          max-height: 300px;
+          overflow-y: auto;
+          margin: 15px 0;
+        }
+        .selectable-card {
+          display: flex;
+          justify-content: space-between;
+          align-items: center;
+          padding: 10px;
+          border: 1px solid #ddd;
+          margin-bottom: 5px;
+          border-radius: 5px;
+          cursor: pointer;
+          transition: background-color 0.2s;
+        }
+        .selectable-card:hover {
+          background-color: #f5f5f5;
+        }
+        .selectable-card.selected {
+          background-color: #e3f2fd;
+          border-color: #2196f3;
+        }
+        .card-name {
+          font-weight: bold;
+        }
+        .card-details {
+          font-size: 12px;
+          color: #666;
+        }
+        .selection-info {
+          font-weight: bold;
+          margin-bottom: 10px;
+        }
+      </style>
+    `;
+
+    const actions = `
+      <button id="confirm-selection" class="game-modal-button game-modal-button-primary" disabled>
+        確定
+      </button>
+      <button id="cancel-selection" class="game-modal-button game-modal-button-secondary">
+        キャンセル
+      </button>
+    `;
+
+    const modal = this.createModal('card-selection-modal', title, content, actions, { closeable: true });
+
+    // カード選択処理
+    const updateSelection = () => {
+      const selectedCount = selectedCards.length;
+      modal.querySelector('#selected-count').textContent = selectedCount;
+      modal.querySelector('#confirm-selection').disabled = selectedCount < minSelect;
+    };
+
+    modal.querySelectorAll('.selectable-card').forEach((cardElement, index) => {
+      cardElement.addEventListener('click', () => {
+        const checkbox = cardElement.querySelector('input[type="checkbox"]');
+        const cardIndex = parseInt(cardElement.dataset.cardIndex);
+        
+        if (checkbox.checked) {
+          // 選択解除
+          checkbox.checked = false;
+          cardElement.classList.remove('selected');
+          selectedCards = selectedCards.filter(c => c.index !== cardIndex);
+        } else {
+          // 選択
+          if (selectedCards.length < maxSelect) {
+            checkbox.checked = true;
+            cardElement.classList.add('selected');
+            selectedCards.push({ ...cards[cardIndex], index: cardIndex });
+          }
+        }
+        
+        updateSelection();
+      });
+    });
+
+    modal.querySelector('#confirm-selection').addEventListener('click', () => {
+      callback(selectedCards);
+      this.removeModal('card-selection-modal');
+    });
+
+    modal.querySelector('#cancel-selection').addEventListener('click', () => {
+      callback([]);
+      this.removeModal('card-selection-modal');
+    });
+
+    updateSelection();
+    document.body.appendChild(modal);
+  }
 }
 
 // グローバルアクセス用

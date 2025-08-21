@@ -38,67 +38,88 @@ const cardEffect_hBP04_044 = {
         return !hasYukiminAttached;
       },
       effect: async (card, battleEngine) => {
-        console.log(`🌸 [コラボエフェクト] ${card.name || 'hBP04-044'}の「Snow flower」が発動！`);
+        console.log(`🌸 [コラボエフェクト] ${card.name || 'hBP04-044'}の「Snow flower」が発動可能！`);
         
-        const currentPlayer = battleEngine.gameState.currentPlayer;
-        const utils = new CardEffectUtils(battleEngine);
-        
-        try {
-          // デッキから〈雪民〉を選択
-          const selectionResult = await utils.selectCardsFromDeck(currentPlayer, {
-            count: 1,
-            description: '〈雪民〉を選択してください',
-            allowLess: true,
-            mandatory: false,
-            customFilter: [
-              (deckCard) => deckCard.name?.includes('雪民') || deckCard.card_name?.includes('雪民')
-            ]
+        return new Promise((resolve) => {
+          battleEngine.modalUI.showCardEffectModal({
+            cardName: card.name || '雪花ラミィ',
+            effectName: 'Snow flower',
+            effectDescription: '自分の〈雪民〉が付いている〈雪花ラミィ〉がいない時、自分のデッキから、〈雪民〉1枚を公開し、自分の〈雪花ラミィ〉に付ける。そしてデッキをシャッフルする。',
+            effectType: 'collab'
+          }, async (confirmed) => {
+            if (!confirmed) {
+              resolve({
+                success: false,
+                message: 'コラボエフェクトの発動をキャンセルしました'
+              });
+              return;
+            }
+            
+            try {
+              console.log(`🌸 [コラボエフェクト] 「Snow flower」を実行中...`);
+              
+              const currentPlayer = battleEngine.gameState.currentPlayer;
+              const utils = new CardEffectUtils(battleEngine);
+              
+              // デッキから〈雪民〉を選択
+              const selectionResult = await utils.selectCardsFromDeck(currentPlayer, {
+                count: 1,
+                description: '〈雪民〉を選択してください',
+                allowLess: true,
+                customFilter: [
+                  (card) => card.name?.includes('雪民')
+                ]
+              });
+
+              if (!selectionResult.success || selectionResult.cards.length === 0) {
+                resolve({
+                  success: false,
+                  message: 'デッキに〈雪民〉が見つかりませんでした'
+                });
+                return;
+              }
+
+              const yukiminCard = selectionResult.cards[0];
+              
+              // 〈雪花ラミィ〉を選択して〈雪民〉を付ける
+              const stageHolomens = utils.getStageHolomens(currentPlayer);
+              const lamiis = stageHolomens.filter(h => h.card.name?.includes('雪花ラミィ'));
+              
+              if (lamiis.length === 0) {
+                resolve({
+                  success: false,
+                  message: 'ステージに〈雪花ラミィ〉がいません'
+                });
+                return;
+              }
+              
+              // TODO: 複数の雪花ラミィがいる場合の選択UI
+              const targetLamii = lamiis[0]; // 仮で最初の雪花ラミィを選択
+              
+              // 〈雪民〉を〈雪花ラミィ〉に付ける
+              if (!targetLamii.card.yellCards) {
+                targetLamii.card.yellCards = [];
+              }
+              targetLamii.card.yellCards.push(yukiminCard);
+              
+              // UI更新
+              utils.updateDisplay();
+              
+              resolve({
+                success: true,
+                message: `${card.name || 'hBP04-044'}のコラボエフェクト「Snow flower」で〈雪民〉を〈雪花ラミィ〉に付けました`,
+                attachedYell: yukiminCard,
+                targetHolomem: targetLamii.card
+              });
+            } catch (error) {
+              console.error('コラボエフェクト実行エラー:', error);
+              resolve({
+                success: false,
+                message: 'コラボエフェクトの実行中にエラーが発生しました'
+              });
+            }
           });
-          
-          if (!selectionResult.success || selectionResult.cards.length === 0) {
-            return {
-              success: true,
-              message: 'デッキに〈雪民〉が見つかりませんでした'
-            };
-          }
-          
-          const yukiminCard = selectionResult.cards[0];
-          
-          // カードを公開
-          console.log(`📢 [カード公開] 〈雪民〉を公開: ${yukiminCard.name || yukiminCard.card_name}`);
-          
-          // デッキからカードを除去
-          const player = battleEngine.players[currentPlayer];
-          const deckIndex = player.deck.indexOf(yukiminCard);
-          if (deckIndex !== -1) {
-            player.deck.splice(deckIndex, 1);
-          }
-          
-          // 〈雪花ラミィ〉に〈雪民〉を付ける（このカード自身に）
-          if (!card.yellCards) {
-            card.yellCards = [];
-          }
-          card.yellCards.push(yukiminCard);
-          
-          // デッキをシャッフル
-          utils.shuffleDeck(currentPlayer);
-          
-          // UI更新
-          utils.updateDisplay();
-          
-          return {
-            success: true,
-            message: `〈雪民〉を${card.name || 'hBP04-044'}に付けました`,
-            attachedCard: yukiminCard
-          };
-          
-        } catch (error) {
-          console.error('hBP04-044 コラボエフェクト実行エラー:', error);
-          return {
-            success: false,
-            message: '効果の実行中にエラーが発生しました'
-          };
-        }
+        });
       }
     },
     
@@ -109,36 +130,63 @@ const cardEffect_hBP04_044 = {
       description: 'ダメージ30',
       cost: { any: 1 },
       damage: 30,
-      timing: 'manual', // 現在のシステムではmanualで実装（将来的にartsに変更予定）
-      auto_trigger: 'arts', // 自動発動のためのメタデータ
+      timing: 'manual',
+      auto_trigger: 'arts',
       condition: (card, gameState, battleEngine) => {
         // 基本的なアーツ使用条件
         const totalYells = card.yellCards ? card.yellCards.length : 0;
         return totalYells >= 1; // any色1個
       },
-      effect: (card, battleEngine) => {
-        console.log(`🎨 [アーツ] ${card.name || 'hBP04-044'}の「うぅ…」が発動！`);
+      effect: async (card, battleEngine) => {
+        console.log(`🎨 [アーツ] ${card.name || 'hBP04-044'}の「うぅ…」が発動可能！`);
         
-        const currentPlayer = battleEngine.gameState.currentPlayer;
-        const opponentPlayer = currentPlayer === 0 ? 1 : 0;
-        const utils = new CardEffectUtils(battleEngine);
-        
-        // 30ダメージを相手に与える
-        const damageResult = utils.dealDamage(opponentPlayer, 30, {
-          source: card,
-          type: 'art',
-          artName: 'うぅ…'
+        return new Promise((resolve) => {
+          battleEngine.modalUI.showCardEffectModal({
+            cardName: card.name || '雪花ラミィ',
+            effectName: 'うぅ…',
+            effectDescription: 'ダメージ30',
+            effectType: 'art'
+          }, async (confirmed) => {
+            if (!confirmed) {
+              resolve({
+                success: false,
+                message: 'アーツの発動をキャンセルしました'
+              });
+              return;
+            }
+            
+            try {
+              console.log(`🎨 [アーツ] 「うぅ…」を実行中...`);
+              
+              const currentPlayer = battleEngine.gameState.currentPlayer;
+              const opponentPlayer = currentPlayer === 0 ? 1 : 0;
+              const utils = new CardEffectUtils(battleEngine);
+              
+              // 30ダメージを相手に与える
+              const damageResult = utils.dealDamage(opponentPlayer, 30, {
+                source: card,
+                type: 'art',
+                artName: 'うぅ…'
+              });
+              
+              // UI更新
+              utils.updateDisplay();
+              
+              resolve({
+                success: true,
+                message: `${card.name || 'hBP04-044'}の「うぅ…」で30ダメージ！`,
+                damage: 30,
+                target: 'opponent'
+              });
+            } catch (error) {
+              console.error('アーツ実行エラー:', error);
+              resolve({
+                success: false,
+                message: 'アーツの実行中にエラーが発生しました'
+              });
+            }
+          });
         });
-        
-        // UI更新
-        utils.updateDisplay();
-        
-        return {
-          success: true,
-          message: `${card.name || 'hBP04-044'}の「うぅ…」で30ダメージ！`,
-          damage: 30,
-          target: 'opponent'
-        };
       }
     }
   }

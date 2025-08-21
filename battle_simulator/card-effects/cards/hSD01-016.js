@@ -24,31 +24,58 @@ const cardEffect_hSD01_016 = {
         const phase = battleEngine.gameState.currentPhase;
         return phase === 3; // メインステップ
       },
-      effect: (card, battleEngine) => {
-        console.log(`📚 [サポート] ${card.name || 'hSD01-016'}の効果が発動！`);
+      effect: async (card, battleEngine) => {
+        console.log(`📚 [サポート] ${card.name || 'hSD01-016'}の効果が発動可能！`);
         
-        const currentPlayer = battleEngine.gameState.currentPlayer;
-        const utils = new CardEffectUtils(battleEngine);
-        
-        // デッキを3枚引く
-        const drawnCards = utils.drawCards(currentPlayer, 3);
-        
-        // このサポートカードをアーカイブ
-        const player = battleEngine.players[currentPlayer];
-        const handIndex = player.hand.indexOf(card);
-        if (handIndex !== -1) {
-          player.hand.splice(handIndex, 1);
-          player.archive.push(card);
-        }
-        
-        // UI更新
-        utils.updateDisplay();
-        
-        return {
-          success: true,
-          message: `${card.name || 'hSD01-016'}の効果でデッキを${drawnCards.length}枚引きました`,
-          drawnCards: drawnCards
-        };
+        return new Promise((resolve) => {
+          battleEngine.modalUI.showCardEffectModal({
+            cardName: card.name || 'カナゴマ',
+            effectName: 'サポート効果',
+            effectDescription: '自分のデッキを3枚引く。',
+            effectType: 'support'
+          }, async (confirmed) => {
+            if (!confirmed) {
+              resolve({
+                success: false,
+                message: 'サポート効果の発動をキャンセルしました'
+              });
+              return;
+            }
+            
+            try {
+              console.log(`📚 [サポート効果] 「カナゴマ」を実行中...`);
+              
+              const currentPlayer = battleEngine.gameState.currentPlayer;
+              const utils = new CardEffectUtils(battleEngine);
+              
+              // デッキを3枚引く
+              const drawnCards = utils.drawCards(currentPlayer, 3);
+              
+              // このサポートカードをアーカイブ
+              const player = battleEngine.players[currentPlayer];
+              const handIndex = player.hand.indexOf(card);
+              if (handIndex !== -1) {
+                player.hand.splice(handIndex, 1);
+                player.archive.push(card);
+              }
+              
+              // UI更新
+              utils.updateDisplay();
+              
+              resolve({
+                success: true,
+                message: `${card.name || 'hSD01-016'}の効果でデッキを${drawnCards.length}枚引きました`,
+                drawnCards: drawnCards
+              });
+            } catch (error) {
+              console.error('サポート効果実行エラー:', error);
+              resolve({
+                success: false,
+                message: 'サポート効果の実行中にエラーが発生しました'
+              });
+            }
+          });
+        });
       }
     }
   }

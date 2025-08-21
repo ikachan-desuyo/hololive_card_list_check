@@ -27,84 +27,107 @@ const cardEffect_hBP02_084 = {
         return player.deck.length >= 2;
       },
       effect: async (card, battleEngine) => {
-        console.log(`🎪 [サポート効果] ${card.name || 'hBP02-084'}の効果が発動！`);
+        console.log(`🎪 [サポート効果] ${card.name || 'hBP02-084'}の効果が発動可能！`);
         
-        const currentPlayer = battleEngine.gameState.currentPlayer;
-        const utils = new CardEffectUtils(battleEngine);
-        
-        try {
-          // 1. デッキを2枚引く
-          const drawResult = utils.drawCards(currentPlayer, 2, true);
-          console.log(`📚 [みっころね24] 2枚ドロー: ${drawResult.cards.length}枚`);
-          
-          // 2. サイコロを振る（1-6）
-          const diceRoll = Math.floor(Math.random() * 6) + 1;
-          console.log(`🎲 [みっころね24] サイコロの目: ${diceRoll}`);
-          
-          let additionalMessage = '';
-          let additionalCards = [];
-          
-          // 3. サイコロの結果に応じて追加効果
-          if ([3, 5, 6].includes(diceRoll)) {
-            // Debutホロメンをサーチ
-            const player = battleEngine.players[currentPlayer];
-            const hasDebutHolomen = player.deck.some(deckCard => 
-              deckCard.card_type?.includes('ホロメン') && 
-              deckCard.bloom_level === 'Debut'
-            );
-            
-            if (hasDebutHolomen) {
-              const selectionResult = await utils.selectCardsFromDeck(currentPlayer, {
-                count: 1,
-                types: ['ホロメン'],
-                bloomLevel: 'Debut',
-                description: 'Debutホロメンを選択してください',
-                mandatory: true,
-                allowLess: false
+        return new Promise((resolve) => {
+          battleEngine.modalUI.showCardEffectModal({
+            cardName: card.name || 'みっころね24',
+            effectName: 'サポート効果',
+            effectDescription: '自分のデッキを2枚引き、サイコロを1回振る：3か5か6の時、自分のデッキから、Debutホロメン1枚を公開し、手札に加える。そしてデッキをシャッフルする。2か4の時、自分のデッキを1枚引く。',
+            effectType: 'support'
+          }, async (confirmed) => {
+            if (!confirmed) {
+              resolve({
+                success: false,
+                message: 'サポート効果の発動をキャンセルしました'
               });
-              
-              if (selectionResult.success && selectionResult.cards.length > 0) {
-                const addResult = utils.addCardsToHand(currentPlayer, selectionResult.cards, true);
-                if (addResult.success) {
-                  console.log(`🔍 [みっころね24] Debutホロメン発見: ${selectionResult.cards[0].name || selectionResult.cards[0].card_name}`);
-                  additionalMessage = `、Debutホロメン「${selectionResult.cards[0].name || selectionResult.cards[0].card_name}」を手札に加えました`;
-                  additionalCards = selectionResult.cards;
-                }
-              }
-            } else {
-              console.log(`❌ [みっころね24] デッキにDebutホロメンがありません`);
-              additionalMessage = '、デッキにDebutホロメンがありませんでした';
+              return;
             }
-          } else if ([2, 4].includes(diceRoll)) {
-            // 追加で1枚ドロー
-            const additionalDraw = utils.drawCards(currentPlayer, 1, true);
-            console.log(`📚 [みっころね24] 追加ドロー: ${additionalDraw.cards.length}枚`);
-            additionalMessage = `、追加で${additionalDraw.cards.length}枚ドローしました`;
-            additionalCards = additionalDraw.cards;
-          } else {
-            // 1の場合は追加効果なし
-            additionalMessage = '';
-          }
-          
-          // UI更新
-          utils.updateDisplay();
-          
-          return {
-            success: true,
-            message: `${card.name || 'みっころね24'}の効果でデッキを${drawResult.cards.length}枚引き、サイコロの目は${diceRoll}でした${additionalMessage}`,
-            cardsDrawn: drawResult.cards.length,
-            diceRoll: diceRoll,
-            additionalCards: additionalCards,
-            autoArchive: true // 自動アーカイブ移動を指示
-          };
-          
-        } catch (error) {
-          console.error('🚨 [みっころね24] エラー:', error);
-          return {
-            success: false,
-            message: '効果の実行中にエラーが発生しました'
-          };
-        }
+            
+            try {
+              console.log(`🎪 [サポート効果] 「みっころね24」を実行中...`);
+              
+              const currentPlayer = battleEngine.gameState.currentPlayer;
+              const utils = new CardEffectUtils(battleEngine);
+              
+              // 1. デッキを2枚引く
+              const drawResult = utils.drawCards(currentPlayer, 2, true);
+              console.log(`📚 [みっころね24] 2枚ドロー: ${drawResult.cards.length}枚`);
+              
+              // 2. サイコロを振る（1-6）
+              const diceRoll = Math.floor(Math.random() * 6) + 1;
+              console.log(`🎲 [みっころね24] サイコロの目: ${diceRoll}`);
+              
+              let additionalMessage = '';
+              let additionalCards = [];
+              
+              // 3. サイコロの結果に応じて追加効果
+              if ([3, 5, 6].includes(diceRoll)) {
+                // Debutホロメンをサーチ
+                const player = battleEngine.players[currentPlayer];
+                const hasDebutHolomen = player.deck.some(deckCard => 
+                  deckCard.card_type?.includes('ホロメン') && 
+                  deckCard.bloom_level === 'Debut'
+                );
+                
+                if (hasDebutHolomen) {
+                  const searchResult = await utils.selectCardsFromDeck(currentPlayer, {
+                    count: 1,
+                    types: ['ホロメン'],
+                    bloomLevel: 'Debut',
+                    description: 'Debutホロメンを選択してください',
+                    mandatory: false,
+                    allowLess: true
+                  });
+                  
+                  if (searchResult.success && searchResult.cards.length > 0) {
+                    const addResult = utils.addCardsToHand(currentPlayer, searchResult.cards, true);
+                    if (addResult.success) {
+                      additionalCards = searchResult.cards;
+                      additionalMessage = `、さらにDebutホロメン「${searchResult.cards[0].name || searchResult.cards[0].card_name}」を手札に加えました`;
+                    }
+                  }
+                } else {
+                  additionalMessage = '、Debutホロメンが見つかりませんでした';
+                }
+              } else if ([2, 4].includes(diceRoll)) {
+                // 追加で1枚ドロー
+                const extraDraw = utils.drawCards(currentPlayer, 1, true);
+                if (extraDraw.cards.length > 0) {
+                  additionalCards = extraDraw.cards;
+                  additionalMessage = '、さらに1枚ドローしました';
+                }
+              } else {
+                additionalMessage = '、追加効果なし';
+              }
+              
+              // サポートカードをアーカイブ
+              const player = battleEngine.players[currentPlayer];
+              const handIndex = player.hand.indexOf(card);
+              if (handIndex !== -1) {
+                player.hand.splice(handIndex, 1);
+                player.archive.push(card);
+              }
+              
+              // UI更新
+              utils.updateDisplay();
+              
+              resolve({
+                success: true,
+                message: `${card.name || 'hBP02-084'}の効果で2枚ドロー、サイコロ: ${diceRoll}${additionalMessage}`,
+                drawnCards: drawResult.cards,
+                diceRoll: diceRoll,
+                additionalCards: additionalCards
+              });
+            } catch (error) {
+              console.error('サポート効果実行エラー:', error);
+              resolve({
+                success: false,
+                message: 'サポート効果の実行中にエラーが発生しました'
+              });
+            }
+          });
+        });
       }
     }
   }

@@ -30,6 +30,35 @@ function getBaseCardNumber(cardId) {
 }
 
 /**
+ * 効果テキストから任意/強制効果を判定
+ * @param {string} description - 効果説明文
+ * @returns {object} - {isOptional: boolean, baseEffect: string, optionalEffect: string}
+ */
+function analyzeEffectType(description) {
+  if (!description) return { isOptional: false, baseEffect: description || '', optionalEffect: '' };
+  
+  // 「できる」「してもよい」「may」などの任意効果キーワード
+  const optionalKeywords = ['できる', 'してもよい', 'may', 'can'];
+  const hasOptionalKeyword = optionalKeywords.some(keyword => description.includes(keyword));
+  
+  // コロン（：）で分割して基本効果と追加効果を分離
+  const colonSplit = description.split('：');
+  if (colonSplit.length > 1 && hasOptionalKeyword) {
+    return {
+      isOptional: true,
+      baseEffect: colonSplit[0].trim(),
+      optionalEffect: colonSplit.slice(1).join('：').trim()
+    };
+  }
+  
+  return {
+    isOptional: hasOptionalKeyword,
+    baseEffect: description,
+    optionalEffect: ''
+  };
+}
+
+/**
  * ファイル名を生成
  */
 function getFileName(baseNumber) {
@@ -199,6 +228,8 @@ const ${varName} = {
   
   // ブルームエフェクト
   if (bloomEffect) {
+    const effectAnalysis = analyzeEffectType(bloomEffect.description);
+    
     content += `
     // ブルームエフェクト: ${bloomEffect.name}
     bloomEffect: {
@@ -210,22 +241,80 @@ const ${varName} = {
       condition: (card, gameState, battleEngine) => {
         // TODO: 発動条件を実装
         return true;
-      },
-      effect: (card, battleEngine) => {
+      },`;
+    
+    if (effectAnalysis.isOptional) {
+      // 任意効果の場合はモーダル表示
+      content += `
+      effect: async (card, battleEngine) => {
+        console.log(\`🌸 [ブルームエフェクト] \${card.name || '${cardId}'}の「${bloomEffect.name}」が発動可能！\`);
+        
+        // モーダル表示で発動確認（任意効果）
+        return new Promise((resolve) => {
+          battleEngine.modalUI.showCardEffectModal({
+            cardName: card.name || '${cardId}',
+            effectName: '${bloomEffect.name}',
+            effectDescription: '${escapeJavaScriptString(bloomEffect.description)}',
+            effectType: 'bloom'
+          }, async (confirmed) => {
+            if (!confirmed) {
+              resolve({
+                success: false,
+                message: 'ブルームエフェクト「${bloomEffect.name}」の発動をキャンセルしました'
+              });
+              return;
+            }
+            
+            try {
+              console.log(\`🌸 [ブルームエフェクト] 「${bloomEffect.name}」を実行中...\`);
+              
+              // TODO: 効果処理を実装
+              
+              resolve({
+                success: true,
+                message: \`\${card.name || '${cardId}'}のブルームエフェクト「${bloomEffect.name}」が発動しました\`
+              });
+            } catch (error) {
+              console.error('ブルームエフェクト実行エラー:', error);
+              resolve({
+                success: false,
+                message: 'ブルームエフェクトの実行中にエラーが発生しました'
+              });
+            }
+          });
+        });
+      }`;
+    } else {
+      // 強制効果の場合は自動実行
+      content += `
+      effect: async (card, battleEngine) => {
         console.log(\`🌸 [ブルームエフェクト] \${card.name || '${cardId}'}の「${bloomEffect.name}」が発動！\`);
         
-        // TODO: 効果処理を実装
-        
-        return {
-          success: true,
-          message: \`\${card.name || '${cardId}'}のブルームエフェクト「${bloomEffect.name}」が発動しました\`
-        };
-      }
+        try {
+          // TODO: 効果処理を実装
+          
+          return {
+            success: true,
+            message: \`\${card.name || '${cardId}'}のブルームエフェクト「${bloomEffect.name}」が発動しました\`
+          };
+        } catch (error) {
+          console.error('ブルームエフェクト実行エラー:', error);
+          return {
+            success: false,
+            message: 'ブルームエフェクトの実行中にエラーが発生しました'
+          };
+        }
+      }`;
+    }
+    
+    content += `
     },`;
   }
   
   // コラボエフェクト
   if (collabEffect) {
+    const effectAnalysis = analyzeEffectType(collabEffect.description);
+    
     content += `
     // コラボエフェクト: ${collabEffect.name}
     collabEffect: {
@@ -237,17 +326,73 @@ const ${varName} = {
       condition: (card, gameState, battleEngine) => {
         // TODO: 発動条件を実装
         return true;
-      },
-      effect: (card, battleEngine) => {
+      },`;
+    
+    if (effectAnalysis.isOptional) {
+      // 任意効果の場合はモーダル表示
+      content += `
+      effect: async (card, battleEngine) => {
+        console.log(\`🤝 [コラボエフェクト] \${card.name || '${cardId}'}の「${collabEffect.name}」が発動可能！\`);
+        
+        // モーダル表示で発動確認（任意効果）
+        return new Promise((resolve) => {
+          battleEngine.modalUI.showCardEffectModal({
+            cardName: card.name || '${cardId}',
+            effectName: '${collabEffect.name}',
+            effectDescription: '${escapeJavaScriptString(collabEffect.description)}',
+            effectType: 'collab'
+          }, async (confirmed) => {
+            if (!confirmed) {
+              resolve({
+                success: false,
+                message: 'コラボエフェクト「${collabEffect.name}」の発動をキャンセルしました'
+              });
+              return;
+            }
+            
+            try {
+              console.log(\`🤝 [コラボエフェクト] 「${collabEffect.name}」を実行中...\`);
+              
+              // TODO: 効果処理を実装
+              
+              resolve({
+                success: true,
+                message: \`\${card.name || '${cardId}'}のコラボエフェクト「${collabEffect.name}」が発動しました\`
+              });
+            } catch (error) {
+              console.error('コラボエフェクト実行エラー:', error);
+              resolve({
+                success: false,
+                message: 'コラボエフェクトの実行中にエラーが発生しました'
+              });
+            }
+          });
+        });
+      }`;
+    } else {
+      // 強制効果の場合は自動実行
+      content += `
+      effect: async (card, battleEngine) => {
         console.log(\`🤝 [コラボエフェクト] \${card.name || '${cardId}'}の「${collabEffect.name}」が発動！\`);
         
-        // TODO: 効果処理を実装
-        
-        return {
-          success: true,
-          message: \`\${card.name || '${cardId}'}のコラボエフェクト「${collabEffect.name}」が発動しました\`
-        };
-      }
+        try {
+          // TODO: 効果処理を実装
+          
+          return {
+            success: true,
+            message: \`\${card.name || '${cardId}'}のコラボエフェクト「${collabEffect.name}」が発動しました\`
+          };
+        } catch (error) {
+          console.error('コラボエフェクト実行エラー:', error);
+          return {
+            success: false,
+            message: 'コラボエフェクトの実行中にエラーが発生しました'
+          };
+        }
+      }`;
+    }
+    
+    content += `
     },`;
   }
   
@@ -290,15 +435,42 @@ const ${varName} = {
         // TODO: 使用条件を実装
         return true;
       },
-      effect: (card, battleEngine) => {
-        console.log(\`📋 [サポート効果] \${card.name || '${cardId}'}が発動！\`);
+      effect: async (card, battleEngine) => {
+        console.log(\`📋 [サポート効果] \${card.name || '${cardId}'}が発動可能！\`);
         
-        // TODO: 効果処理を実装
-        
-        return {
-          success: true,
-          message: \`\${card.name || '${cardId}'}のサポート効果が発動しました\`
-        };
+        // モーダル表示で発動確認
+        return new Promise((resolve) => {
+          battleEngine.modalUI.showCardEffectModal({
+            cardName: card.name || '${cardId}',
+            effectName: 'サポート効果',
+            effectDescription: '${escapeJavaScriptString(supportEffect.name)}',
+            effectType: 'support'
+          }, async (confirmed) => {
+            if (!confirmed) {
+              resolve({
+                success: false,
+                message: 'サポート効果の発動をキャンセルしました'
+              });
+              return;
+            }
+            
+            try {
+              // TODO: 効果処理を実装
+              console.log(\`📋 [サポート効果] サポート効果を実行中...\`);
+              
+              resolve({
+                success: true,
+                message: \`\${card.name || '${cardId}'}のサポート効果が発動しました\`
+              });
+            } catch (error) {
+              console.error('サポート効果実行エラー:', error);
+              resolve({
+                success: false,
+                message: 'サポート効果の実行中にエラーが発生しました'
+              });
+            }
+          });
+        });
       }
     },`;
   }
@@ -330,17 +502,60 @@ const ${varName} = {
         // TODO: アーツ使用条件を実装（エールコストチェックなど）
         return true;
       },
-      effect: (card, battleEngine) => {
+      effect: async (card, battleEngine) => {
         console.log(\`🎨 [アーツ] \${card.name || '${cardId}'}の「${artName}」が発動！\`);
         
-        // TODO: アーツ効果を実装
-        
-        return {
-          success: true,
-          message: \`\${card.name || '${cardId}'}の「${artName}」で${damage}ダメージ！\`,
-          damage: ${damage},
-          target: 'opponent'
-        };
+        try {
+          const currentPlayer = battleEngine.gameState.currentPlayer;
+          const opponentPlayer = currentPlayer === 0 ? 1 : 0;
+          const utils = new CardEffectUtils(battleEngine);
+          
+          // 基本ダメージ${damage}を与える（強制）
+          const damageResult = utils.dealDamage(opponentPlayer, ${damage}, {
+            source: card,
+            type: 'art',
+            artName: '${artName}'
+          });
+          
+          // TODO: 任意効果がある場合はここにモーダル選択を実装
+          // 例：if (card.yellCards && card.yellCards.length > 0) {
+          //   return new Promise((resolve) => {
+          //     battleEngine.modalUI.showCardEffectModal({
+          //       cardName: card.name || '${cardId}',
+          //       effectName: '追加効果（任意）',
+          //       effectDescription: '任意効果の説明',
+          //       effectType: 'art'
+          //     }, (confirmed) => {
+          //       if (confirmed) {
+          //         // 任意効果の処理
+          //       }
+          //       utils.updateDisplay();
+          //       resolve({
+          //         success: true,
+          //         message: \`\${card.name || '${cardId}'}の「${artName}」で${damage}ダメージ！\`,
+          //         damage: ${damage},
+          //         target: 'opponent'
+          //       });
+          //     });
+          //   });
+          // }
+          
+          // UI更新
+          utils.updateDisplay();
+          
+          return {
+            success: true,
+            message: \`\${card.name || '${cardId}'}の「${artName}」で${damage}ダメージ！\`,
+            damage: ${damage},
+            target: 'opponent'
+          };
+        } catch (error) {
+          console.error('アーツ実行エラー:', error);
+          return {
+            success: false,
+            message: 'アーツの実行中にエラーが発生しました'
+          };
+        }
       }
     },`;
   });

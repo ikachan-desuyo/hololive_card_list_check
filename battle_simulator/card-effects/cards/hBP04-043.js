@@ -29,34 +29,61 @@ const cardEffect_hBP04_043 = {
         const totalYells = card.yellCards ? card.yellCards.length : 0;
         return totalYells >= 1; // any色1個
       },
-      effect: (card, battleEngine) => {
-        console.log(`🎨 [アーツ] ${card.name || 'hBP04-043'}の「こんらみ～」が発動！`);
+      effect: async (card, battleEngine) => {
+        console.log(`🎨 [アーツ] ${card.name || 'hBP04-043'}の「こんらみ～」が発動可能！`);
         
-        const currentPlayer = battleEngine.gameState.currentPlayer;
-        const opponentPlayer = currentPlayer === 0 ? 1 : 0;
-        const utils = new CardEffectUtils(battleEngine);
-        
-        // 通常の20ダメージを与える
-        const damageResult = utils.dealDamage(opponentPlayer, 20, {
-          source: card,
-          type: 'art',
-          artName: 'こんらみ～'
+        return new Promise((resolve) => {
+          battleEngine.modalUI.showCardEffectModal({
+            cardName: card.name || '雪花ラミィ',
+            effectName: 'こんらみ～',
+            effectDescription: '相手のホロメン1人に特殊ダメージ10を与える。ただし、ダウンしても相手のライフは減らない。',
+            effectType: 'art'
+          }, async (confirmed) => {
+            if (!confirmed) {
+              resolve({
+                success: false,
+                message: 'アーツ効果の発動をキャンセルしました'
+              });
+              return;
+            }
+            
+            try {
+              console.log(`🎨 [アーツ] 「こんらみ～」を実行中...`);
+              
+              const currentPlayer = battleEngine.gameState.currentPlayer;
+              const opponentPlayer = currentPlayer === 0 ? 1 : 0;
+              const utils = new CardEffectUtils(battleEngine);
+              
+              // 通常の20ダメージを与える
+              const damageResult = utils.dealDamage(opponentPlayer, 20, {
+                source: card,
+                type: 'art',
+                artName: 'こんらみ～'
+              });
+              
+              // 追加で特殊ダメージ10を与える（ライフダメージなし）
+              // TODO: 特殊ダメージの実装が必要
+              console.log(`⚡ [特殊ダメージ] 相手のホロメンに特殊ダメージ10（ライフダメージなし）`);
+              
+              // UI更新
+              utils.updateDisplay();
+              
+              resolve({
+                success: true,
+                message: `${card.name || 'hBP04-043'}の「こんらみ～」で20ダメージ＋特殊ダメージ10！`,
+                damage: 20,
+                specialDamage: 10,
+                target: 'opponent'
+              });
+            } catch (error) {
+              console.error('アーツ効果実行エラー:', error);
+              resolve({
+                success: false,
+                message: 'アーツ効果の実行中にエラーが発生しました'
+              });
+            }
+          });
         });
-        
-        // 追加で特殊ダメージ10を与える（ライフダメージなし）
-        // TODO: 特殊ダメージの実装が必要
-        console.log(`⚡ [特殊ダメージ] 相手のホロメンに特殊ダメージ10（ライフダメージなし）`);
-        
-        // UI更新
-        utils.updateDisplay();
-        
-        return {
-          success: true,
-          message: `${card.name || 'hBP04-043'}の「こんらみ～」で20ダメージ＋特殊ダメージ10！`,
-          damage: 20,
-          specialDamage: 10,
-          target: 'opponent'
-        };
       }
     }
   }

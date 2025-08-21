@@ -32,51 +32,79 @@ const cardEffect_hSD01_017 = {
         const otherCards = player.hand.filter(handCard => handCard.id !== card.id);
         return otherCards.length >= 1;
       },
-      effect: (card, battleEngine) => {
-        console.log(`🔄 [サポート] ${card.name || 'hSD01-017'}の効果が発動！`);
+      effect: async (card, battleEngine) => {
+        console.log(`🔄 [サポート] ${card.name || 'hSD01-017'}の効果が発動可能！`);
         
-        const currentPlayer = battleEngine.gameState.currentPlayer;
-        const player = battleEngine.players[currentPlayer];
-        const utils = new CardEffectUtils(battleEngine);
-        
-        // このカードを除いた手札をすべてデッキに戻す
-        const otherCards = player.hand.filter(handCard => handCard.id !== card.id);
-        if (otherCards.length === 0) {
-          return {
-            success: false,
-            message: '手札にこのカード以外のカードがありません'
-          };
-        }
-        
-        // 手札をデッキに戻す
-        if (!player.deck) player.deck = [];
-        player.deck.push(...otherCards);
-        
-        // 手札からカードを削除（このカード以外）
-        player.hand = player.hand.filter(handCard => handCard.id === card.id);
-        
-        // デッキをシャッフル
-        utils.shuffleDeck(currentPlayer);
-        
-        // 5枚ドロー
-        const drawnCards = utils.drawCards(currentPlayer, 5);
-        
-        // このサポートカードをアーカイブ
-        const handIndex = player.hand.indexOf(card);
-        if (handIndex !== -1) {
-          player.hand.splice(handIndex, 1);
-          player.archive.push(card);
-        }
-        
-        // UI更新
-        utils.updateDisplay();
-        
-        return {
-          success: true,
-          message: `${card.name || 'hSD01-017'}の効果で手札をリフレッシュし、${drawnCards.length}枚ドローしました`,
-          cardsReturned: otherCards.length,
-          cardsDrawn: drawnCards.length
-        };
+        return new Promise((resolve) => {
+          battleEngine.modalUI.showCardEffectModal({
+            cardName: card.name || 'マネちゃん',
+            effectName: 'サポート効果',
+            effectDescription: '自分の手札すべてをデッキに戻してシャッフルする。そして自分のデッキを5枚引く。',
+            effectType: 'support'
+          }, async (confirmed) => {
+            if (!confirmed) {
+              resolve({
+                success: false,
+                message: 'サポート効果の発動をキャンセルしました'
+              });
+              return;
+            }
+            
+            try {
+              console.log(`🔄 [サポート効果] 「マネちゃん」を実行中...`);
+              
+              const currentPlayer = battleEngine.gameState.currentPlayer;
+              const player = battleEngine.players[currentPlayer];
+              const utils = new CardEffectUtils(battleEngine);
+              
+              // このカードを除いた手札をすべてデッキに戻す
+              const otherCards = player.hand.filter(handCard => handCard.id !== card.id);
+              if (otherCards.length === 0) {
+                resolve({
+                  success: false,
+                  message: '手札にこのカード以外のカードがありません'
+                });
+                return;
+              }
+              
+              // 手札をデッキに戻す
+              if (!player.deck) player.deck = [];
+              player.deck.push(...otherCards);
+              
+              // 手札からカードを削除（このカード以外）
+              player.hand = player.hand.filter(handCard => handCard.id === card.id);
+              
+              // デッキをシャッフル
+              utils.shuffleDeck(currentPlayer);
+              
+              // 5枚ドロー
+              const drawnCards = utils.drawCards(currentPlayer, 5);
+              
+              // このサポートカードをアーカイブ
+              const handIndex = player.hand.indexOf(card);
+              if (handIndex !== -1) {
+                player.hand.splice(handIndex, 1);
+                player.archive.push(card);
+              }
+              
+              // UI更新
+              utils.updateDisplay();
+              
+              resolve({
+                success: true,
+                message: `${card.name || 'hSD01-017'}の効果で手札をリフレッシュし、${drawnCards.length}枚ドローしました`,
+                cardsReturned: otherCards.length,
+                cardsDrawn: drawnCards.length
+              });
+            } catch (error) {
+              console.error('サポート効果実行エラー:', error);
+              resolve({
+                success: false,
+                message: 'サポート効果の実行中にエラーが発生しました'
+              });
+            }
+          });
+        });
       }
     }
   }

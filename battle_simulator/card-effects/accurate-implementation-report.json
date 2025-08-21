@@ -1,0 +1,405 @@
+{
+  "generatedAt": "2025-08-21T16:42:44.593Z",
+  "summary": {
+    "total": 17,
+    "production_ready": 3,
+    "validated": 5,
+    "partial_impl": 0,
+    "skeleton_only": 9,
+    "not_started": 0,
+    "syntax_valid": 8,
+    "modal_support": 17
+  },
+  "results": [
+    {
+      "cardId": "hBP01-104",
+      "exists": true,
+      "syntaxValid": false,
+      "hasEffects": false,
+      "hasModal": true,
+      "effectCount": 0,
+      "effects": [],
+      "codeLines": 100,
+      "implementationLevel": "SKELETON_ONLY",
+      "issues": [
+        "構文エラー: Unexpected token '.'"
+      ]
+    },
+    {
+      "cardId": "hBP02-042",
+      "exists": true,
+      "syntaxValid": true,
+      "hasEffects": true,
+      "hasModal": true,
+      "effectCount": 1,
+      "effects": [
+        {
+          "key": "art1",
+          "name": "どうも～",
+          "type": "art",
+          "hasCondition": true,
+          "hasEffect": true
+        }
+      ],
+      "codeLines": 80,
+      "implementationLevel": "VALIDATED",
+      "issues": []
+    },
+    {
+      "cardId": "hBP02-045",
+      "exists": true,
+      "syntaxValid": false,
+      "hasEffects": false,
+      "hasModal": true,
+      "effectCount": 0,
+      "effects": [],
+      "codeLines": 165,
+      "implementationLevel": "SKELETON_ONLY",
+      "issues": [
+        "構文エラー: Unexpected token '.'"
+      ]
+    },
+    {
+      "cardId": "hBP02-076",
+      "exists": true,
+      "syntaxValid": false,
+      "hasEffects": false,
+      "hasModal": true,
+      "effectCount": 0,
+      "effects": [],
+      "codeLines": 132,
+      "implementationLevel": "SKELETON_ONLY",
+      "issues": [
+        "構文エラー: Unexpected token '.'"
+      ]
+    },
+    {
+      "cardId": "hBP02-084",
+      "exists": true,
+      "syntaxValid": false,
+      "hasEffects": false,
+      "hasModal": true,
+      "effectCount": 0,
+      "effects": [],
+      "codeLines": 115,
+      "implementationLevel": "SKELETON_ONLY",
+      "issues": [
+        "構文エラー: Unexpected token '.'"
+      ]
+    },
+    {
+      "cardId": "hBP04-004",
+      "exists": true,
+      "syntaxValid": true,
+      "hasEffects": true,
+      "hasModal": true,
+      "effectCount": 2,
+      "effects": [
+        {
+          "key": "oshiSkill",
+          "name": "愛してる",
+          "type": "oshi_skill",
+          "hasCondition": true,
+          "hasEffect": true
+        },
+        {
+          "key": "spOshiSkill",
+          "name": "ぶーん、バリバリバリバリ",
+          "type": "sp_oshi_skill",
+          "hasCondition": true,
+          "hasEffect": true
+        }
+      ],
+      "codeLines": 158,
+      "implementationLevel": "PRODUCTION_READY",
+      "issues": []
+    },
+    {
+      "cardId": "hBP04-043",
+      "exists": true,
+      "syntaxValid": true,
+      "hasEffects": true,
+      "hasModal": true,
+      "effectCount": 1,
+      "effects": [
+        {
+          "key": "art1",
+          "name": "こんらみ～",
+          "type": "art",
+          "hasCondition": true,
+          "hasEffect": true
+        }
+      ],
+      "codeLines": 80,
+      "implementationLevel": "VALIDATED",
+      "issues": []
+    },
+    {
+      "cardId": "hBP04-044",
+      "exists": true,
+      "syntaxValid": false,
+      "hasEffects": false,
+      "hasModal": true,
+      "effectCount": 0,
+      "effects": [],
+      "codeLines": 164,
+      "implementationLevel": "SKELETON_ONLY",
+      "issues": [
+        "構文エラー: Unexpected token '.'"
+      ]
+    },
+    {
+      "cardId": "hBP04-045",
+      "exists": true,
+      "syntaxValid": true,
+      "hasEffects": true,
+      "hasModal": true,
+      "effectCount": 2,
+      "effects": [
+        {
+          "key": "art1",
+          "name": "おつらみ",
+          "type": "art",
+          "hasCondition": true,
+          "hasEffect": true
+        },
+        {
+          "key": "art2",
+          "name": "ボスが攻略できな～い",
+          "type": "art",
+          "hasCondition": true,
+          "hasEffect": true
+        }
+      ],
+      "codeLines": 141,
+      "implementationLevel": "PRODUCTION_READY",
+      "issues": []
+    },
+    {
+      "cardId": "hBP04-046",
+      "exists": true,
+      "syntaxValid": true,
+      "hasEffects": true,
+      "hasModal": true,
+      "effectCount": 1,
+      "effects": [
+        {
+          "key": "art1",
+          "name": "いっぱい頑張るよ！",
+          "type": "art",
+          "hasCondition": true,
+          "hasEffect": true
+        }
+      ],
+      "codeLines": 88,
+      "implementationLevel": "VALIDATED",
+      "issues": []
+    },
+    {
+      "cardId": "hBP04-047",
+      "exists": true,
+      "syntaxValid": false,
+      "hasEffects": false,
+      "hasModal": true,
+      "effectCount": 0,
+      "effects": [],
+      "codeLines": 139,
+      "implementationLevel": "SKELETON_ONLY",
+      "issues": [
+        "構文エラー: Unexpected token '.'"
+      ]
+    },
+    {
+      "cardId": "hBP04-048",
+      "exists": true,
+      "syntaxValid": true,
+      "hasEffects": true,
+      "hasModal": true,
+      "effectCount": 2,
+      "effects": [
+        {
+          "key": "bloomEffect",
+          "name": "ユニーリアの令嬢",
+          "type": "bloom",
+          "hasCondition": true,
+          "hasEffect": true
+        },
+        {
+          "key": "art1",
+          "name": "今日も祝福がありますように",
+          "type": "art",
+          "hasCondition": true,
+          "hasEffect": true
+        }
+      ],
+      "codeLines": 176,
+      "implementationLevel": "PRODUCTION_READY",
+      "issues": []
+    },
+    {
+      "cardId": "hBP04-089",
+      "exists": true,
+      "syntaxValid": false,
+      "hasEffects": false,
+      "hasModal": true,
+      "effectCount": 0,
+      "effects": [],
+      "codeLines": 105,
+      "implementationLevel": "SKELETON_ONLY",
+      "issues": [
+        "構文エラー: Unexpected token '.'"
+      ]
+    },
+    {
+      "cardId": "hSD01-014",
+      "exists": true,
+      "syntaxValid": false,
+      "hasEffects": false,
+      "hasModal": true,
+      "effectCount": 0,
+      "effects": [],
+      "codeLines": 80,
+      "implementationLevel": "SKELETON_ONLY",
+      "issues": [
+        "構文エラー: ScalableCardEffectManager is not defined"
+      ]
+    },
+    {
+      "cardId": "hSD01-016",
+      "exists": true,
+      "syntaxValid": true,
+      "hasEffects": true,
+      "hasModal": true,
+      "effectCount": 1,
+      "effects": [
+        {
+          "key": "supportEffect",
+          "name": "春先のどか",
+          "type": "support",
+          "hasCondition": true,
+          "hasEffect": true
+        }
+      ],
+      "codeLines": 73,
+      "implementationLevel": "VALIDATED",
+      "issues": []
+    },
+    {
+      "cardId": "hSD01-017",
+      "exists": true,
+      "syntaxValid": true,
+      "hasEffects": true,
+      "hasModal": true,
+      "effectCount": 1,
+      "effects": [
+        {
+          "key": "supportEffect",
+          "name": "マネちゃん",
+          "type": "support",
+          "hasCondition": true,
+          "hasEffect": true
+        }
+      ],
+      "codeLines": 92,
+      "implementationLevel": "VALIDATED",
+      "issues": []
+    },
+    {
+      "cardId": "hY04-001",
+      "exists": true,
+      "syntaxValid": false,
+      "hasEffects": false,
+      "hasModal": true,
+      "effectCount": 0,
+      "effects": [],
+      "codeLines": 74,
+      "implementationLevel": "SKELETON_ONLY",
+      "issues": [
+        "構文エラー: Unexpected token '.'"
+      ]
+    }
+  ],
+  "productionCards": [
+    {
+      "cardId": "hBP04-004",
+      "exists": true,
+      "syntaxValid": true,
+      "hasEffects": true,
+      "hasModal": true,
+      "effectCount": 2,
+      "effects": [
+        {
+          "key": "oshiSkill",
+          "name": "愛してる",
+          "type": "oshi_skill",
+          "hasCondition": true,
+          "hasEffect": true
+        },
+        {
+          "key": "spOshiSkill",
+          "name": "ぶーん、バリバリバリバリ",
+          "type": "sp_oshi_skill",
+          "hasCondition": true,
+          "hasEffect": true
+        }
+      ],
+      "codeLines": 158,
+      "implementationLevel": "PRODUCTION_READY",
+      "issues": []
+    },
+    {
+      "cardId": "hBP04-045",
+      "exists": true,
+      "syntaxValid": true,
+      "hasEffects": true,
+      "hasModal": true,
+      "effectCount": 2,
+      "effects": [
+        {
+          "key": "art1",
+          "name": "おつらみ",
+          "type": "art",
+          "hasCondition": true,
+          "hasEffect": true
+        },
+        {
+          "key": "art2",
+          "name": "ボスが攻略できな～い",
+          "type": "art",
+          "hasCondition": true,
+          "hasEffect": true
+        }
+      ],
+      "codeLines": 141,
+      "implementationLevel": "PRODUCTION_READY",
+      "issues": []
+    },
+    {
+      "cardId": "hBP04-048",
+      "exists": true,
+      "syntaxValid": true,
+      "hasEffects": true,
+      "hasModal": true,
+      "effectCount": 2,
+      "effects": [
+        {
+          "key": "bloomEffect",
+          "name": "ユニーリアの令嬢",
+          "type": "bloom",
+          "hasCondition": true,
+          "hasEffect": true
+        },
+        {
+          "key": "art1",
+          "name": "今日も祝福がありますように",
+          "type": "art",
+          "hasCondition": true,
+          "hasEffect": true
+        }
+      ],
+      "codeLines": 176,
+      "implementationLevel": "PRODUCTION_READY",
+      "issues": []
+    }
+  ]
+}

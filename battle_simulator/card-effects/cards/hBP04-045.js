@@ -34,29 +34,56 @@ const cardEffect_hBP04_045 = {
         
         return blueCount >= 1;
       },
-      effect: (card, battleEngine) => {
-        console.log(`🎨 [アーツ] ${card.name || 'hBP04-045'}の「おつらみ」が発動！`);
+      effect: async (card, battleEngine) => {
+        console.log(`🎨 [アーツ] ${card.name || 'hBP04-045'}の「おつらみ」が発動可能！`);
         
-        const currentPlayer = battleEngine.gameState.currentPlayer;
-        const opponentPlayer = currentPlayer === 0 ? 1 : 0;
-        const utils = new CardEffectUtils(battleEngine);
-        
-        // 30ダメージを相手に与える
-        const damageResult = utils.dealDamage(opponentPlayer, 30, {
-          source: card,
-          type: 'art',
-          artName: 'おつらみ'
+        return new Promise((resolve) => {
+          battleEngine.modalUI.showCardEffectModal({
+            cardName: card.name || '雪花ラミィ',
+            effectName: 'おつらみ',
+            effectDescription: 'ダメージ30',
+            effectType: 'art'
+          }, async (confirmed) => {
+            if (!confirmed) {
+              resolve({
+                success: false,
+                message: 'アーツ効果の発動をキャンセルしました'
+              });
+              return;
+            }
+            
+            try {
+              console.log(`🎨 [アーツ] 「おつらみ」を実行中...`);
+              
+              const currentPlayer = battleEngine.gameState.currentPlayer;
+              const opponentPlayer = currentPlayer === 0 ? 1 : 0;
+              const utils = new CardEffectUtils(battleEngine);
+              
+              // 30ダメージを相手に与える
+              const damageResult = utils.dealDamage(opponentPlayer, 30, {
+                source: card,
+                type: 'art',
+                artName: 'おつらみ'
+              });
+              
+              // UI更新
+              utils.updateDisplay();
+              
+              resolve({
+                success: true,
+                message: `${card.name || 'hBP04-045'}の「おつらみ」で30ダメージ！`,
+                damage: 30,
+                target: 'opponent'
+              });
+            } catch (error) {
+              console.error('アーツ効果実行エラー:', error);
+              resolve({
+                success: false,
+                message: 'アーツ効果の実行中にエラーが発生しました'
+              });
+            }
+          });
         });
-        
-        // UI更新
-        utils.updateDisplay();
-        
-        return {
-          success: true,
-          message: `${card.name || 'hBP04-045'}の「おつらみ」で30ダメージ！`,
-          damage: 30,
-          target: 'opponent'
-        };
       }
     },
     
@@ -79,29 +106,56 @@ const cardEffect_hBP04_045 = {
         
         return blueCount >= 1 && card.yellCards.length >= 2;
       },
-      effect: (card, battleEngine) => {
-        console.log(`� [アーツ] ${card.name || 'hBP04-045'}の「ボスが攻略できな～い」が発動！`);
+      effect: async (card, battleEngine) => {
+        console.log(`🎨 [アーツ] ${card.name || 'hBP04-045'}の「ボスが攻略できな～い」が発動可能！`);
         
-        const currentPlayer = battleEngine.gameState.currentPlayer;
-        const opponentPlayer = currentPlayer === 0 ? 1 : 0;
-        const utils = new CardEffectUtils(battleEngine);
-        
-        // 50ダメージを相手に与える
-        const damageResult = utils.dealDamage(opponentPlayer, 50, {
-          source: card,
-          type: 'art',
-          artName: 'ボスが攻略できな～い'
+        return new Promise((resolve) => {
+          battleEngine.modalUI.showCardEffectModal({
+            cardName: card.name || '雪花ラミィ',
+            effectName: 'ボスが攻略できな～い',
+            effectDescription: 'ダメージ50',
+            effectType: 'art'
+          }, async (confirmed) => {
+            if (!confirmed) {
+              resolve({
+                success: false,
+                message: 'アーツ効果の発動をキャンセルしました'
+              });
+              return;
+            }
+            
+            try {
+              console.log(`🎨 [アーツ] 「ボスが攻略できな～い」を実行中...`);
+              
+              const currentPlayer = battleEngine.gameState.currentPlayer;
+              const opponentPlayer = currentPlayer === 0 ? 1 : 0;
+              const utils = new CardEffectUtils(battleEngine);
+              
+              // 50ダメージを相手に与える
+              const damageResult = utils.dealDamage(opponentPlayer, 50, {
+                source: card,
+                type: 'art',
+                artName: 'ボスが攻略できな～い'
+              });
+              
+              // UI更新
+              utils.updateDisplay();
+              
+              resolve({
+                success: true,
+                message: `${card.name || 'hBP04-045'}の「ボスが攻略できな～い」で50ダメージ！`,
+                damage: 50,
+                target: 'opponent'
+              });
+            } catch (error) {
+              console.error('アーツ効果実行エラー:', error);
+              resolve({
+                success: false,
+                message: 'アーツ効果の実行中にエラーが発生しました'
+              });
+            }
+          });
         });
-        
-        // UI更新
-        utils.updateDisplay();
-        
-        return {
-          success: true,
-          message: `${card.name || 'hBP04-045'}の「ボスが攻略できな～い」で50ダメージ！`,
-          damage: 50,
-          target: 'opponent'
-        };
       }
     }
   }

@@ -32,86 +32,84 @@ const cardEffect_hBP01_104 = {
         return hasDebutHolomen;
       },
       effect: async (card, battleEngine) => {
-        console.log(`🖥️ [サポート効果] ${card.name || 'hBP01-104'}のサポート効果が発動！`);
+        console.log(`🖥️ [サポート効果] ${card.name || 'hBP01-104'}のサポート効果が発動可能！`);
         
-        const currentPlayer = battleEngine.gameState.currentPlayer;
-        const utils = new CardEffectUtils(battleEngine);
-        
-        try {
-          // デッキからDebutホロメンを選択
-          const selectionResult = await utils.selectCardsFromDeck(currentPlayer, {
-            count: 1,
-            types: ['ホロメン'],
-            bloomLevel: 'Debut',
-            description: 'Debutホロメンを選択してください',
-            mandatory: true,
-            allowLess: false
+        return new Promise((resolve) => {
+          battleEngine.modalUI.showCardEffectModal({
+            cardName: card.name || 'ふつうのパソコン',
+            effectName: 'サポート効果',
+            effectDescription: '自分のデッキから、Debutホロメン１枚を公開し、ステージに出す。そしてデッキをシャッフルする。',
+            effectType: 'support'
+          }, async (confirmed) => {
+            if (!confirmed) {
+              resolve({
+                success: false,
+                message: 'サポート効果の発動をキャンセルしました'
+              });
+              return;
+            }
+            
+            try {
+              console.log(`🖥️ [サポート効果] 「ふつうのパソコン」を実行中...`);
+              
+              const currentPlayer = battleEngine.gameState.currentPlayer;
+              const utils = new CardEffectUtils(battleEngine);
+              
+              // デッキからDebutホロメンを選択
+              const selectionResult = await utils.selectCardsFromDeck(currentPlayer, {
+                count: 1,
+                types: ['ホロメン'],
+                bloomLevel: 'Debut',
+                description: 'Debutホロメンを選択してください',
+                mandatory: true,
+                allowLess: false
+              });
+
+              if (!selectionResult.success || selectionResult.cards.length === 0) {
+                resolve({
+                  success: false,
+                  message: 'Debutホロメンの選択に失敗しました'
+                });
+                return;
+              }
+
+              const selectedHolomem = selectionResult.cards[0];
+              
+              // ステージに配置
+              const placementResult = utils.placeHolomenOnStage(currentPlayer, selectedHolomem);
+              
+              if (placementResult.success) {
+                // サポートカードをアーカイブ
+                const player = battleEngine.players[currentPlayer];
+                const handIndex = player.hand.indexOf(card);
+                if (handIndex !== -1) {
+                  player.hand.splice(handIndex, 1);
+                  player.archive.push(card);
+                }
+                
+                // UI更新
+                utils.updateDisplay();
+                
+                resolve({
+                  success: true,
+                  message: `${card.name || 'hBP01-104'}の効果で「${selectedHolomem.name || selectedHolomem.card_name}」をステージに出しました`,
+                  placedHolomem: selectedHolomem
+                });
+              } else {
+                resolve({
+                  success: false,
+                  message: placementResult.reason || 'ホロメンをステージに配置できませんでした'
+                });
+              }
+            } catch (error) {
+              console.error('サポート効果実行エラー:', error);
+              resolve({
+                success: false,
+                message: 'サポート効果の実行中にエラーが発生しました'
+              });
+            }
           });
-
-          if (!selectionResult.success || selectionResult.cards.length === 0) {
-            return {
-              success: false,
-              message: 'Debutホロメンの選択に失敗しました'
-            };
-          }
-
-          const selectedHolomen = selectionResult.cards[0];
-          
-          // カードを公開（ログに表示）
-          console.log(`📢 [カード公開] ${selectedHolomen.name || selectedHolomen.card_name} を公開しました`);
-          
-          const player = battleEngine.players[currentPlayer];
-          
-          // シンプルな配置ロジック（バック優先）
-          let targetPosition = 'collab'; // デフォルト
-          
-          // バックスロットをチェック
-          for (let i = 1; i <= 5; i++) {
-            if (!player[`back${i}`]) {
-              targetPosition = `back${i}`;
-              break;
-            }
-          }
-          
-          // もしバックが埋まっていたら、center、collabの順でチェック
-          if (targetPosition === 'collab') {
-            if (!player.center) {
-              targetPosition = 'center';
-            } else if (!player.collab) {
-              targetPosition = 'collab';
-            }
-          }
-          
-          // デッキからカードを除去
-          const deckIndex = player.deck.indexOf(selectedHolomen);
-          if (deckIndex !== -1) {
-            player.deck.splice(deckIndex, 1);
-          }
-          
-          // ステージに配置
-          player[targetPosition] = selectedHolomen;
-          console.log(`📍 [ふつうのパソコン] カード配置: ${selectedHolomen.name} → ${targetPosition}`);
-          
-          // デッキをシャッフル
-          utils.shuffleDeck(currentPlayer);
-          
-          // UI更新
-          utils.updateDisplay();
-          
-          return {
-            success: true,
-            message: `${selectedHolomen.name || selectedHolomen.card_name}を${targetPosition}に配置しました`,
-            placedCard: selectedHolomen,
-            position: targetPosition
-          };
-          
-        } catch (error) {
-          console.error('🚨 [ふつうのパソコン] 効果実行エラー:', error);
-          return {
-            success: false,
-            message: '効果の実行中にエラーが発生しました: ' + error.message
-          };
-        }
+        });
       }
     }
   }

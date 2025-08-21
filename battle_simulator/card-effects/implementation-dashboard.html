@@ -1,0 +1,539 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>カード効果実装状況ダッシュボード - リアルタイム</title>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            padding: 20px;
+        }
+        
+        .container {
+            max-width: 1400px;
+            margin: 0 auto;
+            background: white;
+            border-radius: 20px;
+            box-shadow: 0 20px 40px rgba(0,0,0,0.1);
+            overflow: hidden;
+        }
+        
+        .header {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            padding: 30px;
+            text-align: center;
+        }
+        
+        .header h1 {
+            font-size: 2.5em;
+            margin-bottom: 10px;
+        }
+        
+        .header p {
+            font-size: 1.2em;
+            opacity: 0.9;
+        }
+
+        .refresh-btn {
+            background: rgba(255,255,255,0.2);
+            color: white;
+            border: 2px solid white;
+            padding: 10px 20px;
+            border-radius: 25px;
+            cursor: pointer;
+            margin-top: 15px;
+            font-size: 1em;
+        }
+
+        .refresh-btn:hover {
+            background: rgba(255,255,255,0.3);
+        }
+        
+        .stats-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 20px;
+            padding: 30px;
+            background: #f8f9fa;
+        }
+        
+        .stat-card {
+            background: white;
+            padding: 25px;
+            border-radius: 15px;
+            box-shadow: 0 5px 15px rgba(0,0,0,0.08);
+            text-align: center;
+            transition: transform 0.3s ease;
+        }
+        
+        .stat-card:hover {
+            transform: translateY(-5px);
+        }
+        
+        .stat-number {
+            font-size: 3em;
+            font-weight: bold;
+            margin-bottom: 10px;
+        }
+        
+        .stat-label {
+            color: #666;
+            font-size: 1.1em;
+        }
+        
+        .level-0 { color: #ff4444; }
+        .level-1 { color: #ff9944; }
+        .level-2 { color: #ffdd44; }
+        .level-3 { color: #44dd44; }
+        .level-4 { color: #4444dd; }
+        .level-5 { color: #44aa44; }
+        
+        .progress-section {
+            padding: 30px;
+        }
+        
+        .progress-bar {
+            width: 100%;
+            height: 30px;
+            background: #e0e0e0;
+            border-radius: 15px;
+            overflow: hidden;
+            margin: 10px 0;
+            position: relative;
+        }
+        
+        .progress-fill {
+            height: 100%;
+            background: linear-gradient(90deg, #44dd44, #44aa44);
+            border-radius: 15px;
+            transition: width 0.8s ease;
+            position: relative;
+        }
+        
+        .progress-text {
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            color: white;
+            font-weight: bold;
+            font-size: 0.9em;
+        }
+        
+        .card-list {
+            padding: 30px;
+        }
+        
+        .filter-bar {
+            display: flex;
+            gap: 15px;
+            margin-bottom: 25px;
+            flex-wrap: wrap;
+        }
+        
+        .filter-btn {
+            padding: 10px 20px;
+            border: none;
+            border-radius: 25px;
+            background: #f0f0f0;
+            cursor: pointer;
+            transition: all 0.3s ease;
+        }
+        
+        .filter-btn.active {
+            background: #667eea;
+            color: white;
+        }
+        
+        .card-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
+            gap: 20px;
+        }
+        
+        .card-item {
+            background: white;
+            border-radius: 15px;
+            box-shadow: 0 5px 15px rgba(0,0,0,0.08);
+            overflow: hidden;
+            transition: transform 0.3s ease;
+        }
+        
+        .card-item:hover {
+            transform: translateY(-3px);
+            box-shadow: 0 8px 25px rgba(0,0,0,0.15);
+        }
+        
+        .card-header {
+            padding: 20px;
+            border-bottom: 1px solid #eee;
+        }
+        
+        .card-id {
+            font-weight: bold;
+            font-size: 1.2em;
+            margin-bottom: 5px;
+        }
+        
+        .card-name {
+            color: #666;
+            margin-bottom: 10px;
+        }
+        
+        .status-badge {
+            display: inline-block;
+            padding: 5px 12px;
+            border-radius: 20px;
+            font-size: 0.8em;
+            font-weight: bold;
+            color: white;
+        }
+        
+        .card-effects {
+            padding: 15px 20px;
+        }
+        
+        .effect-item {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 8px 0;
+            border-bottom: 1px solid #f0f0f0;
+        }
+        
+        .effect-item:last-child {
+            border-bottom: none;
+        }
+        
+        .effect-name {
+            font-weight: 500;
+        }
+        
+        .effect-status {
+            font-size: 0.8em;
+            padding: 3px 8px;
+            border-radius: 10px;
+        }
+        
+        .status-implemented {
+            background: #d4edda;
+            color: #155724;
+        }
+        
+        .status-missing {
+            background: #f8d7da;
+            color: #721c24;
+        }
+        
+        .status-partial {
+            background: #fff3cd;
+            color: #856404;
+        }
+        
+        .search-box {
+            width: 100%;
+            max-width: 400px;
+            padding: 12px 20px;
+            border: 2px solid #e0e0e0;
+            border-radius: 25px;
+            font-size: 1em;
+            outline: none;
+            transition: border-color 0.3s ease;
+        }
+        
+        .search-box:focus {
+            border-color: #667eea;
+        }
+        
+        .refresh-btn {
+            background: #667eea;
+            color: white;
+            border: none;
+            padding: 12px 25px;
+            border-radius: 25px;
+            cursor: pointer;
+            font-size: 1em;
+            transition: background 0.3s ease;
+        }
+        
+        .refresh-btn:hover {
+            background: #5a6fd8;
+        }
+        
+        .loading {
+            text-align: center;
+            padding: 50px;
+            font-size: 1.2em;
+            color: #666;
+        }
+        
+        @media (max-width: 768px) {
+            .stats-grid {
+                grid-template-columns: repeat(2, 1fr);
+            }
+            
+            .card-grid {
+                grid-template-columns: 1fr;
+            }
+            
+            .filter-bar {
+                justify-content: center;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <h1>🎮 カード効果実装状況ダッシュボード</h1>
+            <p>ホロライブ公式カードゲーム - 実装進捗管理システム</p>
+            <button class="refresh-btn" onclick="loadRealTimeData()">🔄 データを更新</button>
+            <div id="lastUpdated" style="margin-top: 10px; font-size: 0.9em; opacity: 0.8;"></div>
+        </div>
+        
+        <div class="stats-grid">
+            <div class="stat-card">
+                <div class="stat-number level-5" id="productionReady">-</div>
+                <div class="stat-label">プロダクション対応</div>
+            </div>
+            <div class="stat-card">
+                <div class="stat-number level-4" id="validated">-</div>
+                <div class="stat-label">検証済み</div>
+            </div>
+            <div class="stat-card">
+                <div class="stat-number level-3" id="fullImpl">-</div>
+                <div class="stat-label">完全実装</div>
+            </div>
+            <div class="stat-card">
+                <div class="stat-number level-2" id="partialImpl">-</div>
+                <div class="stat-label">部分実装</div>
+            </div>
+            <div class="stat-card">
+                <div class="stat-number level-1" id="skeletonOnly">-</div>
+                <div class="stat-label">スケルトンのみ</div>
+            </div>
+            <div class="stat-card">
+                <div class="stat-number level-0" id="notStarted">-</div>
+                <div class="stat-label">未着手</div>
+            </div>
+        </div>
+        
+        <div class="progress-section">
+            <h2>実装進捗</h2>
+            <div class="progress-bar">
+                <div class="progress-fill" id="overallProgress" style="width: 0%;">
+                    <div class="progress-text" id="overallProgressText">データ読み込み中...</div>
+                </div>
+            </div>
+            
+            <h3>構文正常率</h3>
+            <div class="progress-bar">
+                <div class="progress-fill" id="syntaxProgress" style="width: 0%;">
+                    <div class="progress-text" id="syntaxProgressText">データ読み込み中...</div>
+                </div>
+            </div>
+            
+            <h3>モーダル対応率</h3>
+            <div class="progress-bar">
+                <div class="progress-fill" id="modalProgress" style="width: 0%;">
+                    <div class="progress-text" id="modalProgressText">データ読み込み中...</div>
+                </div>
+            </div>
+        </div>
+
+        <div class="charts-section">
+            <h2>📊 統計グラフ</h2>
+            <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 30px; margin-top: 20px;">
+                <div style="background: white; padding: 20px; border-radius: 10px; box-shadow: 0 4px 6px rgba(0,0,0,0.1);">
+                    <h3>実装レベル別分布</h3>
+                    <canvas id="levelChart" width="400" height="400"></canvas>
+                </div>
+                <div style="background: white; padding: 20px; border-radius: 10px; box-shadow: 0 4px 6px rgba(0,0,0,0.1);">
+                    <h3>プロダクション対応カード</h3>
+                    <div id="productionCards">データ読み込み中...</div>
+                </div>
+            </div>
+        </div>
+        
+        <div class="card-list">
+            <h2>実装済みカード一覧</h2>
+            
+            <div class="filter-bar">
+                <input type="text" class="search-box" id="searchBox" placeholder="カード名またはIDで検索...">
+                <button class="filter-btn active" data-filter="all">すべて</button>
+                <button class="filter-btn" data-filter="production_ready">プロダクション対応</button>
+                <button class="filter-btn" data-filter="validated">検証済み</button>
+                <button class="filter-btn" data-filter="full_implementation">完全実装</button>
+                <button class="refresh-btn" id="refreshBtn">🔄 更新</button>
+            </div>
+            
+            <div class="card-grid" id="cardGrid">
+                <!-- カードが動的に表示される -->
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // 実装データ（実際の環境では外部ファイルから読み込み）
+        const implementationData = {
+            production_ready: [
+                {
+                    cardId: 'hBP04-048',
+                    cardName: '雪花ラミィ',
+                    bloomLevel: '2nd',
+                    color: '青',
+                    effects: [
+                        { type: 'ブルームエフェクト', name: 'ユニーリアの令嬢', implemented: true, modal: true, validated: true },
+                        { type: 'アーツ', name: '今日も祝福がありますように', implemented: true, modal: true, validated: true }
+                    ],
+                    lastValidated: '2025-08-22'
+                },
+                {
+                    cardId: 'hBP02-042',
+                    cardName: '紫咲シオン',
+                    bloomLevel: 'Debut',
+                    color: '紫',
+                    effects: [
+                        { type: 'アーツ', name: 'どうも～', implemented: true, modal: true, validated: true }
+                    ],
+                    lastValidated: '2025-08-22'
+                },
+                {
+                    cardId: 'hBP02-045',
+                    cardName: '紫咲シオン',
+                    bloomLevel: '1st',
+                    color: '紫',
+                    effects: [
+                        { type: 'ブルームエフェクト', name: '久しぶりの全体ライブーっ！！', implemented: true, modal: true, validated: true },
+                        { type: 'アーツ', name: '最高にハッピーです！！', implemented: true, modal: true, validated: true }
+                    ],
+                    lastValidated: '2025-08-22'
+                }
+            ],
+            validated: [
+                // ... 他のカードデータ
+            ]
+        };
+
+        // DOM要素
+        const cardGrid = document.getElementById('cardGrid');
+        const searchBox = document.getElementById('searchBox');
+        const filterBtns = document.querySelectorAll('.filter-btn');
+        const refreshBtn = document.getElementById('refreshBtn');
+
+        let currentFilter = 'all';
+        let searchTerm = '';
+
+        // カード表示関数
+        function renderCards() {
+            cardGrid.innerHTML = '';
+            
+            const allCards = [
+                ...implementationData.production_ready,
+                ...implementationData.validated || [],
+                ...implementationData.full_implementation || []
+            ];
+
+            const filteredCards = allCards.filter(card => {
+                const matchesFilter = currentFilter === 'all' || 
+                    (currentFilter === 'production_ready' && implementationData.production_ready.includes(card)) ||
+                    (currentFilter === 'validated' && implementationData.validated?.includes(card)) ||
+                    (currentFilter === 'full_implementation' && implementationData.full_implementation?.includes(card));
+
+                const matchesSearch = searchTerm === '' ||
+                    card.cardId.toLowerCase().includes(searchTerm.toLowerCase()) ||
+                    card.cardName.toLowerCase().includes(searchTerm.toLowerCase());
+
+                return matchesFilter && matchesSearch;
+            });
+
+            filteredCards.forEach(card => {
+                const cardElement = createCardElement(card);
+                cardGrid.appendChild(cardElement);
+            });
+
+            if (filteredCards.length === 0) {
+                cardGrid.innerHTML = '<div class="loading">該当するカードが見つかりません</div>';
+            }
+        }
+
+        // カード要素作成
+        function createCardElement(card) {
+            const cardDiv = document.createElement('div');
+            cardDiv.className = 'card-item';
+
+            const statusClass = getStatusClass(card);
+            const statusText = getStatusText(card);
+
+            cardDiv.innerHTML = `
+                <div class="card-header">
+                    <div class="card-id">${card.cardId}</div>
+                    <div class="card-name">${card.cardName} ${card.bloomLevel || ''}</div>
+                    <span class="status-badge ${statusClass}">${statusText}</span>
+                </div>
+                <div class="card-effects">
+                    ${card.effects.map(effect => `
+                        <div class="effect-item">
+                            <span class="effect-name">${effect.type}: ${effect.name}</span>
+                            <span class="effect-status ${effect.implemented ? 'status-implemented' : 'status-missing'}">
+                                ${effect.implemented ? '✓ 実装済み' : '✗ 未実装'}
+                            </span>
+                        </div>
+                    `).join('')}
+                </div>
+            `;
+
+            return cardDiv;
+        }
+
+        // ステータスクラス取得
+        function getStatusClass(card) {
+            if (implementationData.production_ready.includes(card)) return 'level-5';
+            if (implementationData.validated?.includes(card)) return 'level-4';
+            if (implementationData.full_implementation?.includes(card)) return 'level-3';
+            return 'level-2';
+        }
+
+        // ステータステキスト取得
+        function getStatusText(card) {
+            if (implementationData.production_ready.includes(card)) return 'プロダクション対応';
+            if (implementationData.validated?.includes(card)) return '検証済み';
+            if (implementationData.full_implementation?.includes(card)) return '完全実装';
+            return '部分実装';
+        }
+
+        // イベントリスナー
+        filterBtns.forEach(btn => {
+            btn.addEventListener('click', () => {
+                filterBtns.forEach(b => b.classList.remove('active'));
+                btn.classList.add('active');
+                currentFilter = btn.dataset.filter;
+                renderCards();
+            });
+        });
+
+        searchBox.addEventListener('input', (e) => {
+            searchTerm = e.target.value;
+            renderCards();
+        });
+
+        refreshBtn.addEventListener('click', () => {
+            location.reload();
+        });
+
+        // 初期表示
+        renderCards();
+    </script>
+</body>
+</html>
