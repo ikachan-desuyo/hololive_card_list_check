@@ -4,7 +4,9 @@
   "description": "ホロライブカードゲーム管理ツール",
   "scripts": {
     "version-update": "node update-version.js",
-    "version": "node update-version.js"
+    "version": "node update-version.js",
+    "generate-card-skeletons": "node generate-card-skeletons.js",
+    "generate-card-skeletons-dry": "node generate-card-skeletons.js --dry-run"
   },
   "devDependencies": {
     "stylelint": "^16.22.0",
