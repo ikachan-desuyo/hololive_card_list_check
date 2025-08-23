@@ -10,6 +10,12 @@ class HandManager {
     // 重複アラート防止機能
     this.lastAlertTime = {};
     this.alertCooldown = 1000; // 1秒間のクールダウン
+    
+    // 装備モード状態
+    this.equipmentMode = { active: false };
+    
+    // グローバル参照を設定（モーダルから呼び出すため）
+    window.handManager = this;
   }
 
   /**
@@ -467,22 +473,404 @@ class HandManager {
 
   // サポートカード効果使用
   useSupportCard(card, handIndex) {
-    const useCard = confirm(`「${card.name}」の効果を使用しますか？`);
+    // サポートカードのタイプを判定
+    const cardType = card.card_type || '';
     
-    if (useCard) {
+    // 装備可能なサポートカード（ファン、ツール、マスコット）の場合
+    if (cardType.includes('ファン') || cardType.includes('ツール') || cardType.includes('マスコット')) {
+      this.showSupportCardEquipmentDialog(card, handIndex);
+    } else {
+      // その他のサポートカード（スタッフなど）の場合は従来の処理
+      const useCard = confirm(`「${card.name}」の効果を使用しますか？`);
+      
+      if (useCard) {
+        // 手札から削除
+        this.battleEngine.players[1].hand.splice(handIndex, 1);
+        
+        // アーカイブに移動
+        this.battleEngine.players[1].archive.push(card);
+        
+        // カード効果の実行（効果管理システムを使用）
+        if (this.battleEngine.cardEffectManager) {
+          this.battleEngine.cardEffectManager.executeCardEffect(card, 'support');
+        } else {
+          alert(`${card.name}の効果を発動しました！`);
+        }
+        
+        // UI更新
+        this.updateHandDisplay();
+        this.battleEngine.updateUI();
+      }
+    }
+  }
+
+  /**
+   * サポートカード装備モードを開始
+   * @param {Object} card - 装備するサポートカード
+   * @param {number} handIndex - 手札でのインデックス
+   */
+  showSupportCardEquipmentDialog(card, handIndex) {
+    // 装備可能なホロメンを取得
+    const fieldHolomens = this.getFieldHolomens(1); // プレイヤー1のホロメン
+    
+    if (fieldHolomens.length === 0) {
+      this.showAlert('装備可能なホロメンがフィールドにいません');
+      return;
+    }
+    
+    // 装備モードを開始（ホロメンをハイライト表示）
+    this.startEquipmentMode(card, handIndex, fieldHolomens);
+  }
+
+  /**
+   * 装備モードを開始（ホロメンをハイライト表示）
+   * @param {Object} card - 装備するサポートカード
+   * @param {number} handIndex - 手札でのインデックス
+   * @param {Array} fieldHolomens - 装備可能なホロメン一覧
+   */
+  startEquipmentMode(card, handIndex, fieldHolomens) {
+    // 既存の装備モードをクリア
+    this.clearEquipmentMode();
+    
+    // 装備モード状態を保存
+    this.equipmentMode = {
+      active: true,
+      card: card,
+      handIndex: handIndex,
+      targetHolomens: fieldHolomens
+    };
+    
+    // ホロメンカードをハイライト表示
+    fieldHolomens.forEach(holomem => {
+      this.highlightHolomenForEquipment(holomem);
+    });
+    
+    // 装備モード案内を表示
+    this.showEquipmentModeUI(card);
+    
+    // ESCキーで装備モードをキャンセル
+    this.setupEquipmentModeKeyListener();
+  }
+
+  /**
+   * ホロメンカードを装備可能としてハイライト
+   * @param {Object} holomem - ハイライトするホロメン
+   */
+  highlightHolomenForEquipment(holomem) {
+    // ホロメンの位置を特定
+    const position = this.findHolomenPosition(holomem);
+    if (!position) return;
+    
+    // カード要素を取得
+    const cardElement = this.getCardElementByPosition(position);
+    if (!cardElement) return;
+    
+    // ハイライト用のクラスを追加
+    cardElement.classList.add('equipment-target');
+    
+    // クリックイベントを追加
+    const clickHandler = (e) => {
+      e.preventDefault();
+      e.stopPropagation();
+      e.stopImmediatePropagation(); // 他のクリックハンドラーの実行も停止
+      this.showEquipmentConfirmationClick(holomem);
+    };
+    
+    cardElement.addEventListener('click', clickHandler, true); // キャプチャーフェーズで実行
+    cardElement._equipmentClickHandler = clickHandler; // 後で削除するために保存
+  }
+
+  /**
+   * 装備確認モーダルを表示（クリック用）
+   * @param {Object} targetHolomem - 装備対象のホロメン
+   */
+  showEquipmentConfirmationClick(targetHolomem) {
+    const { card, handIndex } = this.equipmentMode;
+    
+    // 装備制限をチェック
+    const canEquip = this.checkEquipmentRestrictions(card, targetHolomem);
+    
+    if (!canEquip.success) {
+      this.showAlert(canEquip.reason);
+      return;
+    }
+    
+    // 確認モーダルを表示
+    const modal = this.createEquipmentConfirmationModal(card, targetHolomem, handIndex);
+    document.body.appendChild(modal);
+  }
+
+  /**
+   * 装備確認モーダルを表示（ドラッグ&ドロップ用）
+   * @param {Object} targetHolomem - 装備対象のホロメン
+   * @param {Object} card - サポートカード
+   * @param {number} handIndex - 手札インデックス
+   */
+  showEquipmentConfirmation(targetHolomem, card, handIndex) {
+    // 装備制限をチェック
+    const canEquip = this.checkEquipmentRestrictions(card, targetHolomem);
+    
+    if (!canEquip.success) {
+      this.showAlert(canEquip.reason);
+      return;
+    }
+    
+    // 確認モーダルを表示
+    const modal = this.createEquipmentConfirmationModal(card, targetHolomem, handIndex);
+    document.body.appendChild(modal);
+  }
+
+  /**
+   * 装備制限をチェック
+   * @param {Object} card - サポートカード
+   * @param {Object} targetHolomem - 装備対象ホロメン
+   * @returns {Object} チェック結果
+   */
+  checkEquipmentRestrictions(card, targetHolomem) {
+    const utils = new CardEffectUtils(this.battleEngine);
+    return utils.attachSupportCard(1, targetHolomem, card);
+  }
+
+  /**
+   * 装備確認モーダルを作成（改良版）
+   * @param {Object} card - サポートカード
+   * @param {Object} targetHolomem - 装備対象ホロメン
+   * @param {number} handIndex - 手札インデックス
+   * @returns {HTMLElement} モーダル要素
+   */
+  createEquipmentConfirmationModal(card, targetHolomem, handIndex) {
+    const modal = document.createElement('div');
+    modal.className = 'equipment-confirmation-modal';
+    modal.innerHTML = `
+      <div class="modal-backdrop"></div>
+      <div class="modal-content">
+        <div class="modal-header">
+          <h3>サポートカード装備確認</h3>
+          <button class="modal-close" onclick="this.closest('.equipment-confirmation-modal').remove(); window.handManager.clearEquipmentMode();">×</button>
+        </div>
+        <div class="modal-body">
+          <div class="equipment-preview">
+            <div class="support-card">
+              <img src="${card.image_url || '/images/placeholder.png'}" alt="${card.name}" />
+              <p><strong>${card.name}</strong></p>
+              <p class="card-type">${card.card_type}</p>
+            </div>
+            <div class="arrow">→</div>
+            <div class="target-holomem">
+              <img src="${targetHolomem.image_url || '/images/placeholder.png'}" alt="${targetHolomem.name}" />
+              <p><strong>${targetHolomem.name}</strong></p>
+            </div>
+          </div>
+          <p class="confirmation-text">「${card.name}」を「${targetHolomem.name}」に装備しますか？</p>
+        </div>
+        <div class="modal-footer">
+          <button class="btn-cancel" onclick="this.closest('.equipment-confirmation-modal').remove(); window.handManager.clearEquipmentMode();">キャンセル</button>
+          <button class="btn-confirm" onclick="window.handManager.confirmEquipmentByModal('${targetHolomem.id}', '${card.id}', ${handIndex}); this.closest('.equipment-confirmation-modal').remove();">装備する</button>
+        </div>
+      </div>
+    `;
+    
+    return modal;
+  }
+
+  /**
+   * モーダルからの装備確定
+   * @param {string} targetHolomenId - 装備対象ホロメンのID
+   * @param {string} cardId - サポートカードのID
+   * @param {number} handIndex - 手札インデックス
+   */
+  confirmEquipmentByModal(targetHolomenId, cardId, handIndex) {
+    const card = this.battleEngine.players[1].hand[handIndex];
+    const fieldHolomens = this.getFieldHolomens(1);
+    const targetHolomem = fieldHolomens.find(h => h.id === targetHolomenId);
+    
+    if (!card || card.id !== cardId) {
+      this.showAlert('カードが見つかりません');
+      this.clearEquipmentMode();
+      return;
+    }
+    
+    if (!targetHolomem) {
+      this.showAlert('装備対象が見つかりません');
+      this.clearEquipmentMode();
+      return;
+    }
+    
+    // 実際の装備処理を実行
+    this.equipSupportCard(card, handIndex, targetHolomem);
+    this.clearEquipmentMode();
+  }
+
+  /**
+   * 装備を確定
+   * @param {string} targetHolomenId - 装備対象ホロメンのID
+   */
+  confirmEquipment(targetHolomenId) {
+    const { card, handIndex, targetHolomens } = this.equipmentMode;
+    const targetHolomem = targetHolomens.find(h => h.id === targetHolomenId);
+    
+    if (!targetHolomem) {
+      this.showAlert('装備対象が見つかりません');
+      this.clearEquipmentMode();
+      return;
+    }
+    
+    // 実際の装備処理を実行
+    this.equipSupportCard(card, handIndex, targetHolomem);
+    this.clearEquipmentMode();
+  }
+
+  /**
+   * 装備モードをクリア
+   */
+  clearEquipmentMode() {
+    if (!this.equipmentMode?.active) return;
+    
+    // ハイライトを削除
+    document.querySelectorAll('.equipment-target').forEach(element => {
+      element.classList.remove('equipment-target');
+      
+      // クリックハンドラーを削除
+      if (element._equipmentClickHandler) {
+        element.removeEventListener('click', element._equipmentClickHandler, true); // キャプチャーフェーズで削除
+        delete element._equipmentClickHandler;
+      }
+    });
+    
+    // 装備モードUIを削除
+    const modeUI = document.querySelector('.equipment-mode-ui');
+    if (modeUI) modeUI.remove();
+    
+    // キーリスナーを削除
+    if (this.equipmentModeKeyListener) {
+      document.removeEventListener('keydown', this.equipmentModeKeyListener);
+      delete this.equipmentModeKeyListener;
+    }
+    
+    // 装備モード状態をクリア
+    this.equipmentMode = { active: false };
+  }
+
+  /**
+   * 装備モードUI案内を表示
+   * @param {Object} card - 装備するサポートカード
+   */
+  showEquipmentModeUI(card) {
+    const modeUI = document.createElement('div');
+    modeUI.className = 'equipment-mode-ui';
+    modeUI.innerHTML = `
+      <div class="equipment-mode-message">
+        <span class="card-name">「${card.name}」</span>を装備します
+        <br>
+        <small>装備先のホロメンをクリックしてください（ESCでキャンセル）</small>
+      </div>
+    `;
+    
+    // 適切な位置に表示（手札エリアの上など）
+    const handArea = document.querySelector('.hand-area');
+    if (handArea) {
+      handArea.appendChild(modeUI);
+    } else {
+      document.body.appendChild(modeUI);
+    }
+  }
+
+  /**
+   * 装備モード用のキーリスナーを設定
+   */
+  setupEquipmentModeKeyListener() {
+    this.equipmentModeKeyListener = (e) => {
+      if (e.key === 'Escape') {
+        this.clearEquipmentMode();
+      }
+    };
+    
+    document.addEventListener('keydown', this.equipmentModeKeyListener);
+  }
+
+  /**
+   * ホロメンの位置を特定
+   * @param {Object} holomem - ホロメンオブジェクト
+   * @returns {string|null} ポジション文字列
+   */
+  findHolomenPosition(holomem) {
+    const player = this.battleEngine.players[1];
+    
+    if (player.center?.id === holomem.id) return 'center';
+    if (player.collab?.id === holomem.id) return 'collab';
+    
+    for (let i = 1; i <= 5; i++) {
+      if (player[`back${i}`]?.id === holomem.id) return `back${i}`;
+    }
+    
+    return null;
+  }
+
+  /**
+   * ポジションからカード要素を取得
+   * @param {string} position - ポジション文字列
+   * @returns {HTMLElement|null} カード要素
+   */
+  getCardElementByPosition(position) {
+    const sectionClass = '.battle-player';
+    
+    if (position.startsWith('back')) {
+      const backSlot = position.replace('back', '');
+      const slotIndex = parseInt(backSlot) - 1;
+      return document.querySelector(`${sectionClass} .backs .back-slot[data-slot="${slotIndex}"] .card`);
+    } else {
+      return document.querySelector(`${sectionClass} .${position} .card`);
+    }
+  }
+
+  /**
+   * サポートカードを装備
+   * @param {Object} card - 装備するサポートカード
+   * @param {number} handIndex - 手札でのインデックス
+   * @param {Object} targetHolomem - 装備対象のホロメン
+   */
+  equipSupportCard(card, handIndex, targetHolomem) {
+    // CardEffectUtilsを使用して装備
+    const utils = new CardEffectUtils(this.battleEngine);
+    const result = utils.attachSupportCard(1, targetHolomem, card);
+    
+    if (result.success) {
       // 手札から削除
       this.battleEngine.players[1].hand.splice(handIndex, 1);
       
-      // アーカイブに移動（実際のゲームルールに応じて）
-      this.battleEngine.players[1].archive.push(card);
-      
-      // TODO: 実際のカード効果処理を実装
-      alert(`${card.name}の効果を発動しました！`);
+      this.showAlert(`${card.name}を${targetHolomem.name}に装備しました！`, 'success');
       
       // UI更新
       this.updateHandDisplay();
       this.battleEngine.updateUI();
+      this.battleEngine.cardDisplayManager.updateCardAreas();
+    } else {
+      this.showAlert(`装備できませんでした: ${result.reason}`, 'error');
     }
+  }
+
+  /**
+   * フィールドのホロメンを取得
+   * @param {number} playerId - プレイヤーID
+   * @returns {Array} ホロメンの配列
+   */
+  getFieldHolomens(playerId) {
+    const player = this.battleEngine.players[playerId];
+    const holomens = [];
+    
+    // センターホロメン
+    if (player.center) holomens.push(player.center);
+    
+    // コラボホロメン
+    if (player.collab) holomens.push(player.collab);
+    
+    // バックホロメン
+    for (let i = 1; i <= 5; i++) {
+      const backHolomem = player[`back${i}`];
+      if (backHolomem) holomens.push(backHolomem);
+    }
+    
+    return holomens;
   }
 
   /**

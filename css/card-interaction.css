@@ -1,5 +1,207 @@
 /* カードインタラクション用CSS - シンプル版 */
 
+/* 装備モード用スタイル */
+.equipment-target {
+  outline: 3px solid #28a745 !important;
+  outline-offset: 2px;
+  box-shadow: 0 0 15px rgba(40, 167, 69, 0.6) !important;
+  cursor: pointer !important;
+  animation: equipmentPulse 2s infinite;
+}
+
+/* ドラッグ&ドロップ用スタイル */
+.equipment-potential-target {
+  outline: 2px dashed #ffc107 !important;
+  outline-offset: 2px;
+  background: rgba(255, 193, 7, 0.1) !important;
+}
+
+.equipment-drop-target {
+  outline: 3px solid #007bff !important;
+  outline-offset: 2px;
+  background: rgba(0, 123, 255, 0.2) !important;
+  box-shadow: 0 0 20px rgba(0, 123, 255, 0.7) !important;
+}
+
+/* ドラッグ中のサポートカード */
+.card[draggable="true"]:active {
+  opacity: 0.7;
+  transform: rotate(5deg);
+}
+
+@keyframes equipmentPulse {
+  0%, 100% { transform: scale(1); }
+  50% { transform: scale(1.05); }
+}
+
+.equipment-mode-ui {
+  position: fixed;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  background: rgba(0, 0, 0, 0.9);
+  color: white;
+  padding: 20px;
+  border-radius: 10px;
+  text-align: center;
+  z-index: 1000;
+  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.5);
+}
+
+.equipment-mode-message .card-name {
+  color: #ffd700;
+  font-weight: bold;
+}
+
+/* 装備確認モーダル */
+.equipment-confirmation-modal {
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  z-index: 2000;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.equipment-confirmation-modal .modal-backdrop {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  background: rgba(0, 0, 0, 0.7);
+}
+
+.equipment-confirmation-modal .modal-content {
+  position: relative;
+  background: white;
+  border-radius: 10px;
+  padding: 0;
+  max-width: 500px;
+  width: 90%;
+  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.3);
+}
+
+.equipment-confirmation-modal .modal-header {
+  background: #007bff;
+  color: white;
+  padding: 15px 20px;
+  border-radius: 10px 10px 0 0;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.equipment-confirmation-modal .modal-header h3 {
+  margin: 0;
+}
+
+.equipment-confirmation-modal .modal-close {
+  background: none;
+  border: none;
+  color: white;
+  font-size: 24px;
+  cursor: pointer;
+  padding: 0;
+  width: 30px;
+  height: 30px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 50%;
+}
+
+.equipment-confirmation-modal .modal-close:hover {
+  background: rgba(255, 255, 255, 0.2);
+}
+
+.equipment-confirmation-modal .modal-body {
+  padding: 20px;
+}
+
+.equipment-preview {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  margin-bottom: 20px;
+  gap: 20px;
+}
+
+.equipment-preview .support-card,
+.equipment-preview .target-holomem {
+  text-align: center;
+  flex: 1;
+}
+
+.equipment-preview img {
+  width: 120px;
+  height: auto;
+  border-radius: 8px;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.2);
+}
+
+.equipment-preview .arrow {
+  font-size: 24px;
+  color: #007bff;
+  font-weight: bold;
+}
+
+.equipment-preview p {
+  margin: 10px 0 5px 0;
+}
+
+.equipment-preview .card-type {
+  font-size: 12px;
+  color: #666;
+  margin: 0;
+}
+
+.confirmation-text {
+  text-align: center;
+  font-size: 16px;
+  color: #333;
+  margin: 0;
+}
+
+.equipment-confirmation-modal .modal-footer {
+  padding: 15px 20px;
+  border-top: 1px solid #eee;
+  display: flex;
+  justify-content: space-between;
+  gap: 10px;
+}
+
+.equipment-confirmation-modal .btn-cancel,
+.equipment-confirmation-modal .btn-confirm {
+  padding: 10px 20px;
+  border: none;
+  border-radius: 5px;
+  cursor: pointer;
+  font-size: 14px;
+  flex: 1;
+}
+
+.equipment-confirmation-modal .btn-cancel {
+  background: #6c757d;
+  color: white;
+}
+
+.equipment-confirmation-modal .btn-cancel:hover {
+  background: #5a6268;
+}
+
+.equipment-confirmation-modal .btn-confirm {
+  background: #28a745;
+  color: white;
+}
+
+.equipment-confirmation-modal .btn-confirm:hover {
+  background: #218838;
+}
+
 /* アクションマーク */
 .card-action-marks {
   position: absolute;
