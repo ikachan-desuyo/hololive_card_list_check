@@ -14,6 +14,8 @@
       <button onclick="window.location.href='index.html'">🏠 ホーム</button>
       <button onclick="window.location.href='deck_builder.html'">🃏 デッキ作成</button>
       <button onclick="window.location.href='card_list.html'">📋 カード一覧</button>
+      <button onclick="addTestEquipmentCards()" style="background: #ff6b6b;">🔧 装備テスト</button>
+      <button onclick="showEquipmentStatus()" style="background: #4ecdc4;">📊 装備状態</button>
     </div>
     <h1>⚔️ バトルシミュレーター</h1>
   </nav>
@@ -126,5 +128,128 @@
   
   <script src="js/battle_engine.js"></script>
   <script src="battle_simulator/cpu_logic.js"></script>
+  
+  <script>
+    // 装備テスト用カードを手札に追加
+    function addTestEquipmentCards() {
+      if (!window.battleEngine || !window.battleEngine.players || !window.battleEngine.players[1]) {
+        alert('バトルエンジンが初期化されていません。ゲームを開始してから試してください。');
+        return;
+      }
+      
+      const testCards = [
+        {
+          id: 'test-fan-001',
+          name: 'テストファン',
+          card_type: 'サポート・ファン',
+          image_url: 'images/placeholder.png',
+          description: 'テスト用のファンカード'
+        },
+        {
+          id: 'test-tool-001',
+          name: 'テストツール',
+          card_type: 'サポート・ツール',
+          image_url: 'images/placeholder.png',
+          description: 'テスト用のツールカード'
+        },
+        {
+          id: 'test-mascot-001',
+          name: 'テストマスコット',
+          card_type: 'サポート・マスコット',
+          image_url: 'images/placeholder.png',
+          description: 'テスト用のマスコットカード'
+        },
+        {
+          id: 'test-yukimin-001',
+          name: '雪民',
+          card_type: 'サポート・ファン',
+          image_url: 'images/placeholder.png',
+          description: '雪花ラミィ専用ファンカード'
+        }
+      ];
+      
+      // プレイヤー1の手札に追加
+      testCards.forEach(card => {
+        window.battleEngine.players[1].hand.push(card);
+      });
+      
+      // UI更新
+      window.battleEngine.updateUI();
+      
+      alert('装備テスト用カードを手札に追加しました！\n・テストファン\n・テストツール\n・テストマスコット\n・雪民');
+      
+      console.log('🔧 装備テスト用カード追加完了:', testCards);
+    }
+    
+    // 現在の装備状態を表示
+    function showEquipmentStatus() {
+      if (!window.battleEngine || !window.battleEngine.players) {
+        alert('バトルエンジンが初期化されていません。');
+        return;
+      }
+      
+      let statusMessage = '=== 装備状態一覧 ===\n\n';
+      
+      [1, 2].forEach(playerId => {
+        const player = window.battleEngine.players[playerId];
+        if (!player) return;
+        
+        statusMessage += `【プレイヤー${playerId}】\n`;
+        
+        // フィールドのホロメンをチェック
+        const positions = ['center', 'collab', 'back1', 'back2', 'back3', 'back4', 'back5'];
+        let hasAnyEquipment = false;
+        
+        positions.forEach(pos => {
+          const holomem = player[pos];
+          if (holomem) {
+            statusMessage += `  ${pos}: ${holomem.name}`;
+            
+            if (holomem.equipment) {
+              const fans = holomem.equipment.fans || [];
+              const tools = holomem.equipment.tools || [];
+              const mascots = holomem.equipment.mascots || [];
+              const totalEquipment = fans.length + tools.length + mascots.length;
+              
+              if (totalEquipment > 0) {
+                hasAnyEquipment = true;
+                statusMessage += ` (装備${totalEquipment}個)\n`;
+                if (fans.length > 0) {
+                  const fanNames = fans.map(f => f.card ? f.card.name : f.name).join(', ');
+                  statusMessage += `    ファン: ${fanNames}\n`;
+                }
+                if (tools.length > 0) {
+                  const toolNames = tools.map(t => t.card ? t.card.name : t.name).join(', ');
+                  statusMessage += `    ツール: ${toolNames}\n`;
+                }
+                if (mascots.length > 0) {
+                  const mascotNames = mascots.map(m => m.card ? m.card.name : m.name).join(', ');
+                  statusMessage += `    マスコット: ${mascotNames}\n`;
+                }
+              } else {
+                statusMessage += ' (装備なし)\n';
+              }
+            } else {
+              statusMessage += ' (装備データなし)\n';
+            }
+          }
+        });
+        
+        if (!hasAnyEquipment) {
+          statusMessage += '  装備されているカードはありません\n';
+        }
+        statusMessage += '\n';
+      });
+      
+      alert(statusMessage);
+      console.log('🔍 装備状態確認:', statusMessage);
+      
+      // コンソールにより詳細な情報も出力
+      console.log('🔍 詳細な装備データ:', {
+        player1: window.battleEngine.players[1],
+        player2: window.battleEngine.players[2]
+      });
+    }
+  </script>
 </body>
 </html>

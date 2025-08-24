@@ -471,15 +471,170 @@ class HandManager {
     return card.card_type && card.card_type.includes('サポート');
   }
 
+  /**
+   * フィールドのホロメンカードを取得
+   * @returns {Array} フィールド上のホロメンカードの配列
+   */
+  getFieldHolomens() {
+    console.log('=== getFieldHolomens 開始 ===');
+    const fieldHolomens = [];
+    
+    // 緊急回避: DOM要素から直接ホロメンデータを取得
+    console.log('🚨 DOM要素から直接取得方式を使用');
+    
+    try {
+      // フィールド上のホロメンカード要素を直接取得
+      const holomenElements = document.querySelectorAll('.battle-player .card[data-card-type*="ホロメン"]');
+      console.log('🔍 フィールドのホロメン要素数:', holomenElements.length);
+      
+      holomenElements.forEach((element, index) => {
+        const cardId = element.dataset.cardId;
+        const cardName = element.dataset.cardName;
+        const cardType = element.dataset.cardType;
+        
+        console.log(`🔍 要素${index + 1}:`, {
+          cardId: cardId,
+          cardName: cardName,
+          cardType: cardType,
+          element: element
+        });
+        
+        if (cardId && cardName) {
+          // ポジションを特定（改善版）
+          let position = 'unknown';
+          const parentElement = element.closest('.center, .collab, .back-slot, .oshi');
+          
+          if (parentElement) {
+            if (parentElement.classList.contains('center')) {
+              position = 'center';
+            } else if (parentElement.classList.contains('collab')) {
+              position = 'collab';
+            } else if (parentElement.classList.contains('oshi')) {
+              position = 'oshi';
+            } else if (parentElement.classList.contains('back-slot')) {
+              const slotIndex = parentElement.dataset.slot;
+              if (slotIndex !== undefined) {
+                position = `back${parseInt(slotIndex) + 1}`;
+              }
+            }
+          }
+          
+          // プレイヤー判定（プレイヤー1のカードのみ対象）
+          const isPlayer1Card = element.closest('.battle-player') !== null;
+          const isPlayer2Card = element.closest('.battle-cpu') !== null;
+          
+          console.log(`🔍 ポジション特定:`, position, 'プレイヤー判定:', isPlayer1Card ? 'P1' : isPlayer2Card ? 'P2' : '不明');
+          
+          // プレイヤー1のカードで、かつポジションが特定できた場合のみ追加
+          if (isPlayer1Card && position !== 'unknown') {
+            const holomenData = {
+              id: cardId,
+              card_id: cardId,
+              name: cardName,
+              card_type: cardType,
+              position: position,
+              equipment: { fans: [], tools: [], mascots: [] } // 初期装備データ
+            };
+            
+            fieldHolomens.push(holomenData);
+            console.log(`✅ ホロメン追加:`, holomenData.name, holomenData.position);
+          } else {
+            console.log(`❌ スキップ:`, cardName, `(${position}, ${isPlayer1Card ? 'P1' : isPlayer2Card ? 'P2' : '不明'})`);
+          }
+        }
+      });
+      
+      if (fieldHolomens.length === 0) {
+        console.warn('⚠️ DOM要素からホロメンが見つかりませんでした');
+        // 代替: センター・コラボエリアから直接検索
+        const centerElement = document.querySelector('.battle-player .center .card');
+        const collabElement = document.querySelector('.battle-player .collab .card');
+        
+        if (centerElement) {
+          const cardId = centerElement.dataset.cardId;
+          const cardName = centerElement.dataset.cardName;
+          if (cardId && cardName) {
+            fieldHolomens.push({
+              id: cardId,
+              card_id: cardId,
+              name: cardName,
+              position: 'center',
+              equipment: { fans: [], tools: [], mascots: [] }
+            });
+            console.log('✅ センター要素から追加:', cardName);
+          }
+        }
+        
+        if (collabElement) {
+          const cardId = collabElement.dataset.cardId;
+          const cardName = collabElement.dataset.cardName;
+          if (cardId && cardName) {
+            fieldHolomens.push({
+              id: cardId,
+              card_id: cardId,
+              name: cardName,
+              position: 'collab',
+              equipment: { fans: [], tools: [], mascots: [] }
+            });
+            console.log('✅ コラボ要素から追加:', cardName);
+          }
+        }
+        
+        // バックスロットも確認
+        for (let i = 0; i < 5; i++) {
+          const backElement = document.querySelector(`.battle-player .back-slot[data-slot="${i}"] .card`);
+          if (backElement) {
+            const cardId = backElement.dataset.cardId;
+            const cardName = backElement.dataset.cardName;
+            if (cardId && cardName) {
+              fieldHolomens.push({
+                id: cardId,
+                card_id: cardId,
+                name: cardName,
+                position: `back${i + 1}`,
+                equipment: { fans: [], tools: [], mascots: [] }
+              });
+              console.log(`✅ バック${i + 1}要素から追加:`, cardName);
+            }
+          }
+        }
+      }
+      
+    } catch (e) {
+      console.error('DOM要素取得エラー:', e);
+    }
+    
+    console.log('フィールドホロメン取得結果:', fieldHolomens.map(h => `${h.name}(${h.position})`));
+    console.log('=== getFieldHolomens 終了 ===');
+    return fieldHolomens;
+  }
+
   // サポートカード効果使用
   useSupportCard(card, handIndex) {
+    console.log('HandManager.useSupportCard 実行開始:', card.name, 'インデックス:', handIndex);
+    
     // サポートカードのタイプを判定
     const cardType = card.card_type || '';
     
     // 装備可能なサポートカード（ファン、ツール、マスコット）の場合
     if (cardType.includes('ファン') || cardType.includes('ツール') || cardType.includes('マスコット')) {
-      this.showSupportCardEquipmentDialog(card, handIndex);
+      console.log('装備可能なカード:', cardType);
+      
+      // 装備可能なホロメンを取得（正しいパス）
+      const fieldHolomens = this.getFieldHolomens();
+      
+      if (fieldHolomens.length === 0) {
+        console.log('フィールドにホロメンが存在しない');
+        this.showAlert('フィールドにホロメンがいません。');
+        return false;
+      }
+      
+      console.log('フィールドのホロメン数:', fieldHolomens.length);
+      console.log('装備ダイアログ表示処理開始');
+      
+      this.showSupportCardEquipmentDialog(card, handIndex, fieldHolomens);
     } else {
+      console.log('通常のサポートカード処理:', cardType);
       // その他のサポートカード（スタッフなど）の場合は従来の処理
       const useCard = confirm(`「${card.name}」の効果を使用しますか？`);
       
@@ -508,10 +663,17 @@ class HandManager {
    * サポートカード装備モードを開始
    * @param {Object} card - 装備するサポートカード
    * @param {number} handIndex - 手札でのインデックス
+   * @param {Array} fieldHolomens - 装備可能なホロメン一覧（オプション）
    */
-  showSupportCardEquipmentDialog(card, handIndex) {
-    // 装備可能なホロメンを取得
-    const fieldHolomens = this.getFieldHolomens(1); // プレイヤー1のホロメン
+  showSupportCardEquipmentDialog(card, handIndex, fieldHolomens = null) {
+    console.log('装備ダイアログ表示:', card.name);
+    
+    // fieldHolomensが渡されていない場合は取得
+    if (!fieldHolomens) {
+      fieldHolomens = this.getFieldHolomens(); // プレイヤー1のホロメン
+    }
+    
+    console.log('取得したホロメン数:', fieldHolomens.length);
     
     if (fieldHolomens.length === 0) {
       this.showAlert('装備可能なホロメンがフィールドにいません');
@@ -529,6 +691,9 @@ class HandManager {
    * @param {Array} fieldHolomens - 装備可能なホロメン一覧
    */
   startEquipmentMode(card, handIndex, fieldHolomens) {
+    console.log('装備モード開始:', card.name);
+    console.log('装備対象ホロメン数:', fieldHolomens.length, fieldHolomens.map(h => h.name));
+    
     // 既存の装備モードをクリア
     this.clearEquipmentMode();
     
@@ -541,7 +706,8 @@ class HandManager {
     };
     
     // ホロメンカードをハイライト表示
-    fieldHolomens.forEach(holomem => {
+    fieldHolomens.forEach((holomem, index) => {
+      console.log(`ホロメン${index + 1}をハイライト:`, holomem.name);
       this.highlightHolomenForEquipment(holomem);
     });
     
@@ -550,6 +716,8 @@ class HandManager {
     
     // ESCキーで装備モードをキャンセル
     this.setupEquipmentModeKeyListener();
+    
+    console.log('装備モード設定完了。ホロメンをクリックしてください。');
   }
 
   /**
@@ -557,19 +725,33 @@ class HandManager {
    * @param {Object} holomem - ハイライトするホロメン
    */
   highlightHolomenForEquipment(holomem) {
+    console.log('ハイライト処理開始 - ホロメン:', holomem.name);
+    
     // ホロメンの位置を特定
     const position = this.findHolomenPosition(holomem);
-    if (!position) return;
+    if (!position) {
+      console.error('ホロメンの位置が見つからない:', holomem.name);
+      return;
+    }
+    
+    console.log('ホロメンの位置:', position);
     
     // カード要素を取得
     const cardElement = this.getCardElementByPosition(position);
-    if (!cardElement) return;
+    if (!cardElement) {
+      console.error('カード要素が見つからない:', position);
+      return;
+    }
+    
+    console.log('カード要素取得成功:', cardElement);
     
     // ハイライト用のクラスを追加
     cardElement.classList.add('equipment-target');
+    console.log('equipment-targetクラス追加完了');
     
     // クリックイベントを追加
     const clickHandler = (e) => {
+      console.log('ホロメンクリック検出:', holomem.name);
       e.preventDefault();
       e.stopPropagation();
       e.stopImmediatePropagation(); // 他のクリックハンドラーの実行も停止
@@ -578,6 +760,8 @@ class HandManager {
     
     cardElement.addEventListener('click', clickHandler, true); // キャプチャーフェーズで実行
     cardElement._equipmentClickHandler = clickHandler; // 後で削除するために保存
+    
+    console.log('クリックハンドラー追加完了');
   }
 
   /**
@@ -585,19 +769,33 @@ class HandManager {
    * @param {Object} targetHolomem - 装備対象のホロメン
    */
   showEquipmentConfirmationClick(targetHolomem) {
+    console.log('装備確認モーダル表示:', targetHolomem.name);
+    
     const { card, handIndex } = this.equipmentMode;
+    
+    if (!card) {
+      console.error('装備モードのカード情報が見つからない');
+      return;
+    }
+    
+    console.log('装備予定カード:', card.name);
     
     // 装備制限をチェック
     const canEquip = this.checkEquipmentRestrictions(card, targetHolomem);
     
     if (!canEquip.success) {
+      console.log('装備制限エラー:', canEquip.reason);
       this.showAlert(canEquip.reason);
       return;
     }
     
+    console.log('装備制限チェック通過');
+    
     // 確認モーダルを表示
     const modal = this.createEquipmentConfirmationModal(card, targetHolomem, handIndex);
     document.body.appendChild(modal);
+    
+    console.log('装備確認モーダル表示完了');
   }
 
   /**
@@ -681,7 +879,7 @@ class HandManager {
    */
   confirmEquipmentByModal(targetHolomenId, cardId, handIndex) {
     const card = this.battleEngine.players[1].hand[handIndex];
-    const fieldHolomens = this.getFieldHolomens(1);
+    const fieldHolomens = this.getFieldHolomens();
     const targetHolomem = fieldHolomens.find(h => h.id === targetHolomenId);
     
     if (!card || card.id !== cardId) {
@@ -794,6 +992,12 @@ class HandManager {
    * @returns {string|null} ポジション文字列
    */
   findHolomenPosition(holomem) {
+    // position プロパティがある場合はそれを使用
+    if (holomem.position) {
+      return holomem.position;
+    }
+    
+    // fallback: State Manager から検索
     const player = this.battleEngine.players[1];
     
     if (player.center?.id === holomem.id) return 'center';
@@ -840,37 +1044,87 @@ class HandManager {
       
       this.showAlert(`${card.name}を${targetHolomem.name}に装備しました！`, 'success');
       
-      // UI更新
+      // フィールド上の実際のホロメンオブジェクトを更新
+      this.updateFieldHolomenEquipment(targetHolomem);
+      
+      // UI更新を複数回実行して確実に反映
       this.updateHandDisplay();
       this.battleEngine.updateUI();
       this.battleEngine.cardDisplayManager.updateCardAreas();
+      
+      // 少し遅延してもう一度更新（装備データが確実に反映されるように）
+      setTimeout(() => {
+        this.battleEngine.cardDisplayManager.updateCardAreas();
+      }, 100);
     } else {
       this.showAlert(`装備できませんでした: ${result.reason}`, 'error');
     }
   }
 
   /**
-   * フィールドのホロメンを取得
-   * @param {number} playerId - プレイヤーID
-   * @returns {Array} ホロメンの配列
+   * フィールド上のホロメンの装備データを確実に更新
+   * @param {Object} targetHolomem - 装備対象のホロメン
    */
-  getFieldHolomens(playerId) {
-    const player = this.battleEngine.players[playerId];
-    const holomens = [];
+  updateFieldHolomenEquipment(targetHolomem) {
+    console.log('🔧 装備更新開始:', targetHolomem.name, targetHolomem.equipment);
     
-    // センターホロメン
-    if (player.center) holomens.push(player.center);
-    
-    // コラボホロメン
-    if (player.collab) holomens.push(player.collab);
-    
-    // バックホロメン
-    for (let i = 1; i <= 5; i++) {
-      const backHolomem = player[`back${i}`];
-      if (backHolomem) holomens.push(backHolomem);
+    // State Manager経由で直接更新
+    if (this.battleEngine.stateManager) {
+      console.log('🔧 State Manager更新実行:', {
+        player: 1,
+        cardId: targetHolomem.id,
+        equipment: targetHolomem.equipment
+      });
+      
+      // State Managerに装備データを直接保存
+      this.battleEngine.stateManager.updateState('UPDATE_CARD_EQUIPMENT', {
+        player: 1,
+        cardId: targetHolomem.id,
+        equipment: targetHolomem.equipment
+      });
+      
+      // 各ポジションを確認してState Managerで直接更新
+      const positions = ['center', 'collab', 'back1', 'back2', 'back3', 'back4', 'back5'];
+      let updated = false;
+      
+      positions.forEach(pos => {
+        const cardData = this.battleEngine.stateManager.getStateByPath(`players.1.cards.${pos}`);
+        if (cardData && cardData.id === targetHolomem.id) {
+          console.log(`🔧 ${pos}のState Manager更新:`, cardData.name);
+          // State Manager経由で直接装備データを設定
+          cardData.equipment = JSON.parse(JSON.stringify(targetHolomem.equipment));
+          console.log(`🔧 ${pos}更新後:`, cardData.equipment);
+          updated = true;
+        }
+      });
+      
+      // 更新後のState Managerデータを確認
+      const stateData = this.battleEngine.stateManager.getStateByPath(`players.1.cards.center`);
+      console.log('🔧 State Manager更新後データ:', stateData);
+      
+    } else {
+      console.error('🔧 State Manager が存在しません');
     }
     
-    return holomens;
+    // プロキシシステムにもバックアップとして更新を試行
+    try {
+      if (this.battleEngine.players && this.battleEngine.players[1]) {
+        const player = this.battleEngine.players[1];
+        const positions = ['center', 'collab', 'back1', 'back2', 'back3', 'back4', 'back5'];
+        
+        positions.forEach(pos => {
+          const fieldHolomem = player[pos];
+          if (fieldHolomem && fieldHolomem.id === targetHolomem.id) {
+            console.log(`🔧 プロキシ${pos}の装備データ更新:`, fieldHolomem.name);
+            fieldHolomem.equipment = JSON.parse(JSON.stringify(targetHolomem.equipment));
+          }
+        });
+      }
+    } catch (e) {
+      console.log('🔧 プロキシ更新はスキップ:', e.message);
+    }
+    
+    console.log('🔧 装備更新完了');
   }
 
   /**

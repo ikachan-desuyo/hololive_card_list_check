@@ -1,0 +1,344 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>装備カード表示テスト</title>
+    <style>
+        body {
+            font-family: 'Noto Sans JP', sans-serif;
+            margin: 20px;
+            background-color: #f0f0f0;
+        }
+        .test-container {
+            max-width: 1200px;
+            margin: 0 auto;
+            background: white;
+            padding: 20px;
+            border-radius: 10px;
+            box-shadow: 0 4px 6px rgba(0,0,0,0.1);
+        }
+        .test-section {
+            margin-bottom: 30px;
+            padding: 20px;
+            border: 2px solid #ddd;
+            border-radius: 8px;
+        }
+        .test-title {
+            font-size: 1.2em;
+            font-weight: bold;
+            color: #333;
+            margin-bottom: 15px;
+        }
+        .test-card {
+            width: 150px;
+            height: 210px;
+            border: 2px solid #ccc;
+            border-radius: 8px;
+            position: relative;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            display: inline-block;
+            margin: 10px;
+            padding: 10px;
+            box-sizing: border-box;
+        }
+        .card-name {
+            font-weight: bold;
+            margin-bottom: 10px;
+        }
+        .equipped-cards {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            pointer-events: none;
+            z-index: 5;
+            display: flex;
+            flex-direction: column;
+            justify-content: flex-start;
+            align-items: flex-end;
+            padding: 2px;
+            gap: 1px;
+        }
+        .equipped-card {
+            width: 20px;
+            height: 28px;
+            background: #ffcc02;
+            border: 1px solid #333;
+            border-radius: 2px;
+            position: relative;
+            font-size: 8px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            color: #333;
+            font-weight: bold;
+            box-shadow: 0 1px 2px rgba(0,0,0,0.3);
+            cursor: pointer;
+            pointer-events: all;
+            transition: transform 0.2s;
+        }
+        .equipped-card:hover {
+            transform: scale(1.1);
+            z-index: 10;
+        }
+        .equipped-card[data-equipment-type="fan"] {
+            background: linear-gradient(135deg, #ff6b6b, #ee5a5a);
+            color: white;
+        }
+        .equipped-card[data-equipment-type="tool"] {
+            background: linear-gradient(135deg, #4ecdc4, #44b3a8);
+            color: white;
+        }
+        .equipped-card[data-equipment-type="mascot"] {
+            background: linear-gradient(135deg, #45b7d1, #3a9bc1);
+            color: white;
+        }
+        .test-button {
+            background: #4CAF50;
+            color: white;
+            padding: 10px 20px;
+            border: none;
+            border-radius: 5px;
+            cursor: pointer;
+            margin: 5px;
+        }
+        .test-button:hover {
+            background: #45a049;
+        }
+        .test-log {
+            background: #f8f8f8;
+            border: 1px solid #ddd;
+            padding: 10px;
+            margin-top: 10px;
+            max-height: 200px;
+            overflow-y: auto;
+            font-family: monospace;
+            font-size: 12px;
+        }
+    </style>
+</head>
+<body>
+    <div class="test-container">
+        <h1>装備カード表示システム テスト</h1>
+        
+        <div class="test-section">
+            <div class="test-title">基本装備表示テスト</div>
+            <div class="test-card" id="test-holomem">
+                <div class="card-name">テストホロメン</div>
+                <div>装備数: <span id="equipment-count">0</span></div>
+            </div>
+            
+            <button class="test-button" onclick="addFanEquipment()">ファン装備追加</button>
+            <button class="test-button" onclick="addToolEquipment()">ツール装備追加</button>
+            <button class="test-button" onclick="addMascotEquipment()">マスコット装備追加</button>
+            <button class="test-button" onclick="clearEquipment()">装備クリア</button>
+            
+            <div class="test-log" id="test-log"></div>
+        </div>
+        
+        <div class="test-section">
+            <div class="test-title">複数装備テスト</div>
+            <div class="test-card" id="test-holomem-multi">
+                <div class="card-name">複数装備ホロメン</div>
+                <div>装備数: <span id="equipment-count-multi">0</span></div>
+            </div>
+            
+            <button class="test-button" onclick="addMultipleEquipment()">複数装備追加</button>
+            <button class="test-button" onclick="clearMultipleEquipment()">装備クリア</button>
+        </div>
+    </div>
+
+    <script>
+        // テスト用のホロメンデータ
+        const testHolomem = {
+            name: 'テストホロメン',
+            id: 'test-001',
+            equipment: {
+                fans: [],
+                tools: [],
+                mascots: []
+            }
+        };
+
+        const testHolomenMulti = {
+            name: '複数装備ホロメン',
+            id: 'test-002',
+            equipment: {
+                fans: [],
+                tools: [],
+                mascots: []
+            }
+        };
+
+        // ログ出力関数
+        function log(message) {
+            const logElement = document.getElementById('test-log');
+            const timestamp = new Date().toLocaleTimeString();
+            logElement.innerHTML += `[${timestamp}] ${message}<br>`;
+            logElement.scrollTop = logElement.scrollHeight;
+        }
+
+        // 装備表示を追加する関数（card-display-manager.jsから移植）
+        function addEquippedCardsDisplay(holomenElement, holomenCard) {
+            log(`🔧 装備表示チェック: ${holomenCard.name}`);
+            
+            // 既存の装備表示をクリア
+            const existingEquipment = holomenElement.querySelector('.equipped-cards');
+            if (existingEquipment) {
+                existingEquipment.remove();
+                log('既存の装備表示をクリア');
+            }
+
+            // 装備データが存在するかチェック
+            if (!holomenCard.equipment) {
+                log('装備データが存在しません');
+                return;
+            }
+
+            // 装備されているカードがあるかチェック
+            const allEquipment = [
+                ...(holomenCard.equipment.fans || []),
+                ...(holomenCard.equipment.mascots || []),
+                ...(holomenCard.equipment.tools || [])
+            ];
+
+            log(`装備一覧: ${allEquipment.length}個`);
+
+            if (allEquipment.length === 0) {
+                log('装備されているカードがありません');
+                return;
+            }
+
+            log(`${allEquipment.length}個の装備を表示します`);
+
+            // 装備カード表示コンテナを作成
+            const equipmentContainer = document.createElement('div');
+            equipmentContainer.className = 'equipped-cards';
+
+            // 各装備アイテムを表示
+            allEquipment.forEach((equipment, index) => {
+                const equipmentElement = document.createElement('div');
+                equipmentElement.className = 'equipped-card';
+                
+                // 装備タイプを判定
+                let equipmentType = 'fan';
+                if (holomenCard.equipment.tools && holomenCard.equipment.tools.includes(equipment)) {
+                    equipmentType = 'tool';
+                } else if (holomenCard.equipment.mascots && holomenCard.equipment.mascots.includes(equipment)) {
+                    equipmentType = 'mascot';
+                }
+                
+                equipmentElement.setAttribute('data-equipment-type', equipmentType);
+                equipmentElement.setAttribute('data-equipment-name', equipment.name);
+                
+                // 装備名の最初の文字を表示
+                equipmentElement.textContent = equipment.name ? equipment.name.charAt(0) : '?';
+                
+                // ツールチップ用のタイトル
+                equipmentElement.title = `${equipment.name} (${equipmentType})`;
+                
+                log(`装備表示作成: ${equipment.name} (${equipmentType})`);
+                
+                equipmentContainer.appendChild(equipmentElement);
+            });
+
+            holomenElement.appendChild(equipmentContainer);
+            log('装備表示コンテナを追加完了');
+        }
+
+        // 装備数を更新
+        function updateEquipmentCount(holomenCard, countElementId) {
+            const allEquipment = [
+                ...(holomenCard.equipment.fans || []),
+                ...(holomenCard.equipment.mascots || []),
+                ...(holomenCard.equipment.tools || [])
+            ];
+            document.getElementById(countElementId).textContent = allEquipment.length;
+        }
+
+        // ファン装備追加
+        function addFanEquipment() {
+            const fanCard = { name: 'テストファン', id: 'fan-001' };
+            testHolomem.equipment.fans.push(fanCard);
+            log(`ファン装備追加: ${fanCard.name}`);
+            
+            const holomenElement = document.getElementById('test-holomem');
+            addEquippedCardsDisplay(holomenElement, testHolomem);
+            updateEquipmentCount(testHolomem, 'equipment-count');
+        }
+
+        // ツール装備追加
+        function addToolEquipment() {
+            const toolCard = { name: 'テストツール', id: 'tool-001' };
+            testHolomem.equipment.tools.push(toolCard);
+            log(`ツール装備追加: ${toolCard.name}`);
+            
+            const holomenElement = document.getElementById('test-holomem');
+            addEquippedCardsDisplay(holomenElement, testHolomem);
+            updateEquipmentCount(testHolomem, 'equipment-count');
+        }
+
+        // マスコット装備追加
+        function addMascotEquipment() {
+            const mascotCard = { name: 'テストマスコット', id: 'mascot-001' };
+            testHolomem.equipment.mascots.push(mascotCard);
+            log(`マスコット装備追加: ${mascotCard.name}`);
+            
+            const holomenElement = document.getElementById('test-holomem');
+            addEquippedCardsDisplay(holomenElement, testHolomem);
+            updateEquipmentCount(testHolomem, 'equipment-count');
+        }
+
+        // 装備クリア
+        function clearEquipment() {
+            testHolomem.equipment.fans = [];
+            testHolomem.equipment.tools = [];
+            testHolomem.equipment.mascots = [];
+            log('装備をクリアしました');
+            
+            const holomenElement = document.getElementById('test-holomem');
+            addEquippedCardsDisplay(holomenElement, testHolomem);
+            updateEquipmentCount(testHolomem, 'equipment-count');
+        }
+
+        // 複数装備追加
+        function addMultipleEquipment() {
+            testHolomenMulti.equipment.fans = [
+                { name: 'ファン1', id: 'fan-1' },
+                { name: 'ファン2', id: 'fan-2' }
+            ];
+            testHolomenMulti.equipment.tools = [
+                { name: 'ツール1', id: 'tool-1' }
+            ];
+            testHolomenMulti.equipment.mascots = [
+                { name: 'マスコット1', id: 'mascot-1' },
+                { name: 'マスコット2', id: 'mascot-2' }
+            ];
+            
+            log('複数装備を追加しました');
+            
+            const holomenElement = document.getElementById('test-holomem-multi');
+            addEquippedCardsDisplay(holomenElement, testHolomenMulti);
+            updateEquipmentCount(testHolomenMulti, 'equipment-count-multi');
+        }
+
+        // 複数装備クリア
+        function clearMultipleEquipment() {
+            testHolomenMulti.equipment.fans = [];
+            testHolomenMulti.equipment.tools = [];
+            testHolomenMulti.equipment.mascots = [];
+            log('複数装備をクリアしました');
+            
+            const holomenElement = document.getElementById('test-holomem-multi');
+            addEquippedCardsDisplay(holomenElement, testHolomenMulti);
+            updateEquipmentCount(testHolomenMulti, 'equipment-count-multi');
+        }
+
+        // 初期化
+        log('装備表示テストページが読み込まれました');
+    </script>
+</body>
+</html>

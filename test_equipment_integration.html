@@ -1,0 +1,361 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>装備システム統合テスト</title>
+    <link rel="stylesheet" href="css/card_list.css">
+    <link rel="stylesheet" href="css/card-interaction.css">
+    <style>
+        body {
+            font-family: 'Noto Sans JP', sans-serif;
+            margin: 20px;
+            background-color: #f0f0f0;
+        }
+        .test-container {
+            max-width: 1200px;
+            margin: 0 auto;
+            background: white;
+            padding: 20px;
+            border-radius: 10px;
+            box-shadow: 0 4px 6px rgba(0,0,0,0.1);
+        }
+        .test-section {
+            margin-bottom: 30px;
+            padding: 20px;
+            border: 2px solid #ddd;
+            border-radius: 8px;
+        }
+        .card-area {
+            display: flex;
+            gap: 20px;
+            margin: 20px 0;
+        }
+        .holomem-card {
+            width: 150px;
+            height: 210px;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            border: 2px solid #333;
+            border-radius: 8px;
+            position: relative;
+            color: white;
+            padding: 10px;
+            box-sizing: border-box;
+        }
+        .support-card {
+            width: 120px;
+            height: 170px;
+            background: linear-gradient(135deg, #ffd89b 0%, #19547b 100%);
+            border: 2px solid #333;
+            border-radius: 8px;
+            color: white;
+            padding: 10px;
+            box-sizing: border-box;
+            cursor: pointer;
+        }
+        .support-card.fan {
+            background: linear-gradient(135deg, #ff6b6b, #ee5a5a);
+        }
+        .support-card.tool {
+            background: linear-gradient(135deg, #4ecdc4, #44b3a8);
+        }
+        .support-card.mascot {
+            background: linear-gradient(135deg, #45b7d1, #3a9bc1);
+        }
+        .card-name {
+            font-weight: bold;
+            margin-bottom: 10px;
+        }
+        .test-button {
+            background: #4CAF50;
+            color: white;
+            padding: 10px 20px;
+            border: none;
+            border-radius: 5px;
+            cursor: pointer;
+            margin: 5px;
+        }
+        .test-button:hover {
+            background: #45a049;
+        }
+        .test-log {
+            background: #f8f8f8;
+            border: 1px solid #ddd;
+            padding: 10px;
+            margin-top: 10px;
+            max-height: 300px;
+            overflow-y: auto;
+            font-family: monospace;
+            font-size: 12px;
+        }
+    </style>
+</head>
+<body>
+    <div class="test-container">
+        <h1>装備システム統合テスト</h1>
+        
+        <div class="test-section">
+            <h2>テスト用ホロメンカード</h2>
+            <div class="card-area">
+                <div class="holomem-card" id="test-holomem-1">
+                    <div class="card-name">テストホロメン1</div>
+                    <div>HP: 100</div>
+                    <div>装備数: <span id="equipment-count-1">0</span></div>
+                </div>
+                <div class="holomem-card" id="test-holomem-2">
+                    <div class="card-name">雪花ラミィ</div>
+                    <div>HP: 120</div>
+                    <div>装備数: <span id="equipment-count-2">0</span></div>
+                </div>
+            </div>
+        </div>
+        
+        <div class="test-section">
+            <h2>テスト用サポートカード</h2>
+            <div class="card-area">
+                <div class="support-card fan" onclick="equipCard('fan1')">
+                    <div class="card-name">テストファン</div>
+                    <div>ファンカード</div>
+                </div>
+                <div class="support-card tool" onclick="equipCard('tool1')">
+                    <div class="card-name">テストツール</div>
+                    <div>ツールカード</div>
+                </div>
+                <div class="support-card mascot" onclick="equipCard('mascot1')">
+                    <div class="card-name">テストマスコット</div>
+                    <div>マスコットカード</div>
+                </div>
+                <div class="support-card fan" onclick="equipCard('yukimin')">
+                    <div class="card-name">雪民</div>
+                    <div>特殊ファン</div>
+                </div>
+            </div>
+        </div>
+        
+        <div class="test-section">
+            <h2>テスト操作</h2>
+            <button class="test-button" onclick="clearAllEquipment()">全装備クリア</button>
+            <button class="test-button" onclick="testMultipleEquipment()">複数装備テスト</button>
+            <button class="test-button" onclick="testEquipmentLimits()">装備制限テスト</button>
+            
+            <div class="test-log" id="test-log"></div>
+        </div>
+    </div>
+
+    <script src="battle_simulator/card-effects/card-effect-utils.js"></script>
+    <script src="battle_simulator/card-display-manager.js"></script>
+    
+    <script>
+        // テスト用データ
+        const testHolomens = {
+            'test-holomem-1': {
+                name: 'テストホロメン1',
+                id: 'test-001',
+                hp: 100,
+                equipment: { fans: [], tools: [], mascots: [] }
+            },
+            'test-holomem-2': {
+                name: '雪花ラミィ',
+                id: 'test-002',
+                hp: 120,
+                equipment: { fans: [], tools: [], mascots: [] }
+            }
+        };
+
+        const testSupportCards = {
+            'fan1': {
+                name: 'テストファン',
+                id: 'fan-001',
+                card_type: 'サポート・ファン'
+            },
+            'tool1': {
+                name: 'テストツール',
+                id: 'tool-001',
+                card_type: 'サポート・ツール'
+            },
+            'mascot1': {
+                name: 'テストマスコット',
+                id: 'mascot-001',
+                card_type: 'サポート・マスコット'
+            },
+            'yukimin': {
+                name: '雪民',
+                id: 'yukimin-001',
+                card_type: 'サポート・ファン'
+            }
+        };
+
+        // ダミーBattleEngine
+        const mockBattleEngine = {
+            players: [null, { hand: [] }, { hand: [] }]
+        };
+
+        // CardDisplayManagerを初期化
+        const cardDisplayManager = new CardDisplayManager(mockBattleEngine);
+
+        // ログ出力関数
+        function log(message) {
+            const logElement = document.getElementById('test-log');
+            const timestamp = new Date().toLocaleTimeString();
+            logElement.innerHTML += `[${timestamp}] ${message}<br>`;
+            logElement.scrollTop = logElement.scrollHeight;
+        }
+
+        // 装備数更新
+        function updateEquipmentCount(holomenId) {
+            const holomem = testHolomens[holomenId];
+            const allEquipment = [
+                ...(holomem.equipment.fans || []),
+                ...(holomem.equipment.tools || []),
+                ...(holomem.equipment.mascots || [])
+            ];
+            
+            const countElement = document.getElementById(`equipment-count-${holomenId.split('-')[2]}`);
+            if (countElement) {
+                countElement.textContent = allEquipment.length;
+            }
+        }
+
+        // 装備実行
+        function equipCard(supportCardId) {
+            const supportCard = testSupportCards[supportCardId];
+            if (!supportCard) {
+                log(`❌ サポートカードが見つかりません: ${supportCardId}`);
+                return;
+            }
+
+            log(`🎯 装備開始: ${supportCard.name}`);
+
+            // ターゲット選択モード
+            const holomemCards = document.querySelectorAll('.holomem-card');
+            holomemCards.forEach(card => {
+                card.style.border = '3px solid #ffcc02';
+                card.style.cursor = 'pointer';
+                
+                // 一時的なクリックハンドラー
+                const clickHandler = () => {
+                    // 他のカードのスタイルをリセット
+                    holomemCards.forEach(c => {
+                        c.style.border = '2px solid #333';
+                        c.style.cursor = 'default';
+                        c.removeEventListener('click', clickHandler);
+                    });
+                    
+                    // 装備実行
+                    const holomenId = card.id;
+                    const targetHolomem = testHolomens[holomenId];
+                    
+                    if (!targetHolomem) {
+                        log(`❌ ターゲットホロメンが見つかりません: ${holomenId}`);
+                        return;
+                    }
+                    
+                    executeEquipment(targetHolomem, supportCard, card);
+                };
+                
+                card.addEventListener('click', clickHandler);
+            });
+            
+            log('👆 装備対象のホロメンをクリックしてください');
+        }
+
+        // 装備実行
+        function executeEquipment(targetHolomem, supportCard, holomenElement) {
+            const utils = new CardEffectUtils(mockBattleEngine);
+            const result = utils.attachSupportCard(1, targetHolomem, supportCard);
+            
+            if (result.success) {
+                log(`✅ 装備成功: ${supportCard.name} → ${targetHolomem.name}`);
+                
+                // 装備表示を更新
+                cardDisplayManager.addEquippedCardsDisplay(holomenElement, targetHolomem);
+                
+                // 装備数を更新
+                updateEquipmentCount(holomenElement.id);
+                
+            } else {
+                log(`❌ 装備失敗: ${result.reason}`);
+            }
+        }
+
+        // 全装備クリア
+        function clearAllEquipment() {
+            Object.keys(testHolomens).forEach(holomenId => {
+                const holomem = testHolomens[holomenId];
+                holomem.equipment = { fans: [], tools: [], mascots: [] };
+                
+                const holomenElement = document.getElementById(holomenId);
+                if (holomenElement) {
+                    cardDisplayManager.addEquippedCardsDisplay(holomenElement, holomem);
+                    updateEquipmentCount(holomenId);
+                }
+            });
+            
+            log('🧹 全装備をクリアしました');
+        }
+
+        // 複数装備テスト
+        function testMultipleEquipment() {
+            const targetHolomem = testHolomens['test-holomem-1'];
+            const holomenElement = document.getElementById('test-holomem-1');
+            
+            // 複数装備を追加
+            const utils = new CardEffectUtils(mockBattleEngine);
+            
+            const cards = [
+                testSupportCards.fan1,
+                testSupportCards.tool1,
+                testSupportCards.mascot1
+            ];
+            
+            cards.forEach(card => {
+                const result = utils.attachSupportCard(1, targetHolomem, card);
+                if (result.success) {
+                    log(`✅ 複数装備: ${card.name}`);
+                } else {
+                    log(`❌ 複数装備失敗: ${result.reason}`);
+                }
+            });
+            
+            // 表示更新
+            cardDisplayManager.addEquippedCardsDisplay(holomenElement, targetHolomem);
+            updateEquipmentCount('test-holomem-1');
+        }
+
+        // 装備制限テスト
+        function testEquipmentLimits() {
+            const targetHolomem = testHolomens['test-holomem-1'];
+            const utils = new CardEffectUtils(mockBattleEngine);
+            
+            // 同じタイプのカードを複数装備してみる
+            const fanCard1 = { ...testSupportCards.fan1, id: 'fan-002', name: 'テストファン2' };
+            const fanCard2 = { ...testSupportCards.fan1, id: 'fan-003', name: 'テストファン3' };
+            
+            const result1 = utils.attachSupportCard(1, targetHolomem, testSupportCards.fan1);
+            const result2 = utils.attachSupportCard(1, targetHolomem, fanCard1);
+            
+            log(`🧪 制限テスト1: ${result1.success ? '成功' : result1.reason}`);
+            log(`🧪 制限テスト2: ${result2.success ? '成功' : result2.reason}`);
+            
+            // 雪民の特殊制限テスト
+            const lamiTarget = testHolomens['test-holomem-2'];
+            const yukiminResult = utils.attachSupportCard(1, lamiTarget, testSupportCards.yukimin);
+            log(`❄️ 雪民テスト: ${yukiminResult.success ? '成功' : yukiminResult.reason}`);
+            
+            // 表示更新
+            const holomenElement1 = document.getElementById('test-holomem-1');
+            const holomenElement2 = document.getElementById('test-holomem-2');
+            
+            cardDisplayManager.addEquippedCardsDisplay(holomenElement1, targetHolomem);
+            cardDisplayManager.addEquippedCardsDisplay(holomenElement2, lamiTarget);
+            
+            updateEquipmentCount('test-holomem-1');
+            updateEquipmentCount('test-holomem-2');
+        }
+
+        // 初期化
+        log('装備システム統合テストページが読み込まれました');
+        log('サポートカードをクリックして装備をテストしてください');
+    </script>
+</body>
+</html>

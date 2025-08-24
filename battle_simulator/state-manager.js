@@ -377,6 +377,24 @@ class HololiveStateManager {
         }
         break;
         
+      case 'UPDATE_CARD_EQUIPMENT':
+        // カードの装備データを更新
+        if (payload.player && payload.cardId && payload.equipment && newState.players[payload.player]) {
+          const player = newState.players[payload.player];
+          const positions = ['center', 'collab', 'back1', 'back2', 'back3', 'back4', 'back5'];
+          
+          positions.forEach(pos => {
+            const card = player.cards && player.cards[pos];
+            if (card && card.id === payload.cardId) {
+              if (!card.equipment) {
+                card.equipment = { fans: [], tools: [], mascots: [] };
+              }
+              Object.assign(card.equipment, payload.equipment);
+            }
+          });
+        }
+        break;
+        
       case 'UPDATE_PLAYER_GAME_STATE':
         if (payload.player && payload.property && newState.players[payload.player]) {
           newState.players[payload.player].gameState[payload.property] = payload.value;

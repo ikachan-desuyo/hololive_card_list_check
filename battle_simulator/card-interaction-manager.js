@@ -248,9 +248,9 @@ class CardInteractionManager {
     // フィールド上のカードの場合、位置から判定
     const currentPlayer = this.battleEngine.gameState.currentPlayer;
     
-    // ステージのカードをチェック
-    const player0Stage = this.battleEngine.players[0].stage || [];
-    const player1Stage = this.battleEngine.players[1].stage || [];
+    // ステージのカードをチェック（安全なアクセス）
+    const player0Stage = (this.battleEngine.players && this.battleEngine.players[0] && this.battleEngine.players[0].stage) || [];
+    const player1Stage = (this.battleEngine.players && this.battleEngine.players[1] && this.battleEngine.players[1].stage) || [];
     
     // player0のステージにあるかチェック
     if (player0Stage.some(stageCard => stageCard === card || stageCard.id === card.id)) {
