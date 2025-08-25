@@ -208,18 +208,18 @@ class CardDisplayManager {
    * @returns {Object} 最新のカードデータ
    */
   getLatestCardData(card, areaId, playerId) {
-    console.log('🔧 装備表示チェック:', {cardName: card.name, hasEquipment: !!card.equipment, equipment: card.equipment});
+    // console.log('🔧 装備表示チェック:', {cardName: card.name, hasEquipment: !!card.equipment, equipment: card.equipment});
     
     // まずState Managerから最新データを取得を試みる
     if (this.battleEngine.stateManager && this.battleEngine.stateManager.state) {
       const statePlayer = this.battleEngine.stateManager.state.players[playerId];
       if (statePlayer && statePlayer.cards) {
-        console.log('🔧 State Manager プレイヤーデータ存在確認 OK');
+        // console.log('🔧 State Manager プレイヤーデータ存在確認 OK');
         
         if (['center', 'collab', 'oshi'].includes(areaId)) {
           const stateCard = statePlayer.cards[areaId];
           if (stateCard && stateCard.id === card.id) {
-            console.log('🔧 State Managerから取得:', {name: stateCard.name, equipment: stateCard.equipment});
+            // console.log('🔧 State Managerから取得:', {name: stateCard.name, equipment: stateCard.equipment});
             return stateCard;
           } else {
             console.log('🔧 State Manager センター/コラボ/推し データ不一致:', {
@@ -235,7 +235,7 @@ class CardDisplayManager {
           for (const pos of positions) {
             const stateCard = statePlayer.cards[pos];
             if (stateCard && stateCard.id === card.id) {
-              console.log('🔧 State Managerからバック取得:', {name: stateCard.name, equipment: stateCard.equipment});
+              // console.log('🔧 State Managerからバック取得:', {name: stateCard.name, equipment: stateCard.equipment});
               return stateCard;
             }
           }
@@ -249,8 +249,14 @@ class CardDisplayManager {
         if (['back1', 'back2', 'back3', 'back4', 'back5'].includes(areaId)) {
           const stateCard = statePlayer.cards[areaId];
           if (stateCard && stateCard.id === card.id) {
-            console.log('🔧 State Managerから直接バック取得:', {name: stateCard.name, equipment: stateCard.equipment});
+            console.log('🔧 State Managerから直接バック取得:', {name: stateCard.name, equipment: stateCard.equipment, areaId});
             return stateCard;
+          } else {
+            console.log('🔧 State Manager 直接バック データ不一致:', {
+              stateCard: stateCard,
+              searchingFor: card.id,
+              areaId: areaId
+            });
           }
         }
       } else {
@@ -260,7 +266,7 @@ class CardDisplayManager {
       console.log('🔧 State Manager または state が存在しません');
     }
     
-    console.log('🔧 装備データが存在しません');
+    // console.log('🔧 装備データが存在しません');
     
     // State Managerにデータがない場合はBattle Engineから取得
     const player = this.battleEngine.players[playerId];
@@ -438,7 +444,8 @@ class CardDisplayManager {
     // 配置済みカードのドラッグ機能を追加（プレイヤー1のセンター、バックのホロメンカードのみ）
     if (shouldShowFaceUp && card && isPlayerCard && 
         this.battleEngine.isHolomenCard && this.battleEngine.isHolomenCard(card) && 
-        (areaId === 'collab' || areaId === 'center' || areaId === 'backs')) {
+        (areaId === 'collab' || areaId === 'center' || areaId === 'backs' || 
+         ['back1', 'back2', 'back3', 'back4', 'back5'].includes(areaId))) {
       cardElement.draggable = true;
       cardElement.setAttribute('data-card-id', card.id);
       cardElement.setAttribute('data-area-id', areaId);
@@ -446,7 +453,7 @@ class CardDisplayManager {
 
       
       // バックスロットの場合は、スロットインデックスも設定
-      if (areaId === 'backs') {
+      if (areaId === 'backs' || ['back1', 'back2', 'back3', 'back4', 'back5'].includes(areaId)) {
         cardElement.setAttribute('data-slot-index', cardIndex);
       }
       
@@ -567,7 +574,8 @@ class CardDisplayManager {
       const card = player[backPositions[index]];
       if (card) {
         // フィールドから最新のカードデータを取得（装備データを含む）
-        const latestCard = this.getLatestCardData(card, 'backs', playerId);
+        // 正確なバックポジションを渡す
+        const latestCard = this.getLatestCardData(card, backPositions[index], playerId);
         
         // カード表示処理
         if (latestCard.cardState?.bloomedThisTurn) {
@@ -577,7 +585,7 @@ class CardDisplayManager {
         }
         const currentPlayer = this.battleEngine?.stateManager?.state?.turn?.currentPlayer || 1;
         const isPlayerCard = (playerId === currentPlayer); // 現在のプレイヤーのカードのみドラッグ可能
-        const cardElement = this.createCardElement(latestCard, 'backs', index, isPlayerCard);
+        const cardElement = this.createCardElement(latestCard, backPositions[index], index, isPlayerCard);
         // バックスロット内でのサイズ調整
         cardElement.style.width = '100%';
         cardElement.style.height = '100%';
@@ -869,7 +877,7 @@ class CardDisplayManager {
     }
     
     // 表向きで表示すべきエリア
-    const faceUpAreas = ['collab', 'center', 'backs', 'archive'];
+    const faceUpAreas = ['collab', 'center', 'backs', 'back1', 'back2', 'back3', 'back4', 'back5', 'archive'];
     return faceUpAreas.includes(areaId);
   }
 
@@ -1076,6 +1084,12 @@ class CardDisplayManager {
     if (areaId === 'hand') {
       // 手札：サポートカードのみ効果発動可能
       const isSupport = card.card_type?.includes('サポート');
+      console.log('🔧 手札サポートカードチェック:', {
+        cardName: card.name,
+        cardType: card.card_type,
+        isSupport: isSupport
+      });
+      
       if (!isSupport) {
         return;
       }
@@ -1086,6 +1100,7 @@ class CardDisplayManager {
                                   card.card_type?.includes('マスコット');
       
       if (isEquippableSupport) {
+        console.log('🔧 装備可能なサポートカードにドラッグ機能追加:', card.name);
         this.addSupportCardDragAndDrop(cardElement, card);
       }
     } else if (['center', 'collab', 'backs', 'back1', 'back2', 'back3', 'back4', 'back5'].includes(areaId)) {
@@ -1097,10 +1112,12 @@ class CardDisplayManager {
       
       // ホロメンカードにサポートカードのドロップターゲット機能を追加
       if (isPlayerCard) {
+        console.log('🔧 フィールドホロメンにドロップターゲット追加:', card.name, 'エリア:', areaId);
         this.addSupportCardDropTarget(cardElement, card, areaId);
       }
     } else if (areaId === 'oshi') {
       // 推しホロメン：カードは常に表示、効果ボタンのみ条件チェック
+      console.log('🔧 推しホロメンエリア - ドロップターゲット追加なし:', card.name);
       
       // 推しスキル発動可能性をチェック（ボタン表示用）
       let canActivateSkill = false;
@@ -1126,6 +1143,13 @@ class CardDisplayManager {
     
     // カードに効果があるか確認（またはテストカード）
     const hasEffect = this.cardHasActivatableEffect(card, areaId) || isTestCard;
+    
+    console.log('🔧 効果ボタン表示チェック:', {
+      cardName: card.name,
+      areaId: areaId,
+      hasEffect: hasEffect,
+      isTestCard: isTestCard
+    });
     
     if (!hasEffect) {
       return;
@@ -1448,11 +1472,22 @@ class CardDisplayManager {
    * @param {string} areaId - エリアID
    */
   addSupportCardDropTarget(cardElement, card, areaId) {
+    console.log('🔧 ドロップターゲット追加:', {
+      cardName: card.name,
+      areaId: areaId,
+      cardType: card.card_type
+    });
+    
     cardElement.addEventListener('dragover', (e) => {
       e.preventDefault();
+      console.log('🔧 dragover イベント:', {
+        targetCard: card.name,
+        areaId: areaId
+      });
       const dragData = this.getDragData(e);
       if (dragData?.type === 'support-equipment') {
         cardElement.classList.add('equipment-drop-target');
+        console.log('🔧 装備ドロップターゲット有効化:', card.name);
       }
     });
     
@@ -1462,10 +1497,21 @@ class CardDisplayManager {
     
     cardElement.addEventListener('drop', (e) => {
       e.preventDefault();
+      console.log('🔧 drop イベント発生:', {
+        targetCard: card.name,
+        areaId: areaId,
+        cardType: card.card_type
+      });
+      
       cardElement.classList.remove('equipment-drop-target');
       
       const dragData = this.getDragData(e);
       if (dragData?.type === 'support-equipment') {
+        console.log('🔧 装備ドロップ処理開始:', {
+          supportCard: dragData.card.name,
+          targetCard: card.name,
+          targetArea: areaId
+        });
         this.handleSupportCardDrop(dragData.card, card);
       }
     });
@@ -1488,10 +1534,20 @@ class CardDisplayManager {
    * 装備可能なホロメンをハイライト
    */
   highlightEquipmentTargets() {
-    const holomenElements = document.querySelectorAll('.battle-player .card[data-card-type*="ホロメン"]');
-    holomenElements.forEach(element => {
-      element.classList.add('equipment-potential-target');
+    // フィールドのホロメンカードのみをハイライト（推しホロメンは除外）
+    const fieldAreas = ['.center', '.collab', '.back-slot'];
+    let highlightedCount = 0;
+    
+    fieldAreas.forEach(areaSelector => {
+      const holomenElements = document.querySelectorAll(`.battle-player ${areaSelector} .card[data-card-type*="ホロメン"]`);
+      holomenElements.forEach(element => {
+        element.classList.add('equipment-potential-target');
+        highlightedCount++;
+        console.log('🔧 装備ターゲットハイライト:', element.getAttribute('data-card-name'), 'エリア:', areaSelector);
+      });
     });
+    
+    console.log('🔧 ハイライト対象カード数:', highlightedCount);
   }
 
   /**
@@ -1512,6 +1568,19 @@ class CardDisplayManager {
    * @param {Object} targetHolomem - 装備対象ホロメン
    */
   handleSupportCardDrop(supportCard, targetHolomem) {
+    console.log('🔧 装備試行:', {
+      supportCard: supportCard.name,
+      targetCard: targetHolomem.name,
+      targetType: targetHolomem.card_type
+    });
+    
+    // 推しホロメンへの装備を明示的にブロック
+    if (targetHolomem.card_type === '推しホロメン') {
+      console.log('🚫 推しホロメンへの装備をブロック');
+      alert('推しホロメンにはサポートカードを装備できません');
+      return;
+    }
+    
     // HandManagerの装備確認モーダルを使用
     if (this.battleEngine.handManager) {
       // 手札からカードのインデックスを取得
@@ -1527,7 +1596,7 @@ class CardDisplayManager {
   }
 
   /**
-   * 装備されたカードの表示を追加
+   * 装備されたカードの表示を追加（エールカード風表示）
    * @param {HTMLElement} holomenElement - ホロメンカード要素
    * @param {Object} holomenCard - ホロメンカード情報
    */
@@ -1538,8 +1607,16 @@ class CardDisplayManager {
       existingEquipment.remove();
     }
 
+    // デバッグログを追加
+    console.log('🔧 装備表示チェック:', {
+      cardName: holomenCard.name,
+      hasEquipment: !!holomenCard.equipment,
+      equipment: holomenCard.equipment
+    });
+
     // 装備データが存在するかチェック
     if (!holomenCard.equipment) {
+      console.log('🔧 装備データなし:', holomenCard.name);
       return;
     }
 
@@ -1550,82 +1627,94 @@ class CardDisplayManager {
       ...(holomenCard.equipment.tools || [])
     ];
 
+    console.log('🔧 装備カード数:', allEquipment.length, allEquipment);
+
     if (allEquipment.length === 0) {
+      console.log('🔧 装備カードなし');
       return;
     }
 
-    // 装備カード表示コンテナを作成
+    // 装備カード表示コンテナを作成（ホロメンカードの背景レイヤーに配置）
     const equipmentContainer = document.createElement('div');
     equipmentContainer.className = 'equipped-cards';
-    equipmentContainer.style.cssText = `
-      position: absolute;
-      top: 0;
-      left: 0;
-      width: 100%;
-      height: 100%;
-      pointer-events: none;
-      z-index: 5;
-      display: flex;
-      flex-direction: column;
-      justify-content: flex-start;
-      align-items: flex-end;
-      padding: 2px;
-      gap: 1px;
-    `;
+    
+    // エリア内での絶対配置（ホロメンカードより後ろに配置）
+    equipmentContainer.style.position = 'absolute';
+    equipmentContainer.style.top = '0';
+    equipmentContainer.style.left = '0';
+    equipmentContainer.style.width = '100%';
+    equipmentContainer.style.height = '100%';
+    equipmentContainer.style.zIndex = '1'; // ホロメンカード（z-index:100）より後ろ
+    equipmentContainer.style.pointerEvents = 'auto';
 
-    // 装備されているカードを表示順序でソート（card-effect-utils.jsの順序に従う）
+    // 装備されているカードを表示順序でソート
     allEquipment.sort((a, b) => this.getEquipmentDisplayOrder(a) - this.getEquipmentDisplayOrder(b));
 
-    // 各装備カードを表示
+    // 各装備カードを表示（エールカード風の重なり表示）
     allEquipment.forEach((equipment, index) => {
       const equipCard = equipment.card;
       if (!equipCard) return;
 
       const equipElement = document.createElement('div');
       equipElement.className = 'equipped-card';
-      equipElement.style.cssText = `
-        width: 20px;
-        height: 28px;
-        background-size: cover;
-        background-position: center;
-        background-repeat: no-repeat;
-        border: 1px solid #333;
-        border-radius: 2px;
-        position: relative;
-        pointer-events: auto;
-        cursor: pointer;
-        box-shadow: 0 1px 3px rgba(0,0,0,0.3);
-        transform: translateY(${index * 15}px);
-      `;
+      equipElement.title = `装備: ${equipCard.name}`;
+      
+      // 装備カード用のdata属性を設定
+      equipElement.setAttribute('data-card-id', equipCard.id || '');
+      equipElement.setAttribute('data-card-name', equipCard.name || '装備カード');
+      equipElement.setAttribute('data-card-type', equipCard.card_type || '装備カード');
+      equipElement.setAttribute('data-equipment-category', equipment.category);
+      
+      // エールカードと同じサイズに統一
+      equipElement.style.position = 'absolute';
+      equipElement.style.width = '120px';
+      equipElement.style.height = '168px';
+      equipElement.style.border = '2px solid #333';
+      equipElement.style.borderRadius = '8px';
+      equipElement.style.boxShadow = '0 2px 8px rgba(0,0,0,0.3)';
+      equipElement.style.cursor = 'pointer';
+      
+      // 装備タイプ別の境界線色
+      const borderColor = this.getEquipmentTypeColor(equipment.category);
+      equipElement.style.borderColor = borderColor;
+      
+      // 装備カードの配置（ホロメンカードの左側に重ねて表示）
+      const offsetX = -25 - (index * 15); // 左にずらして重ねる
+      const offsetY = 5 + (index * 8); // 少し下にずらして重ねる
+      equipElement.style.transform = `translate(${offsetX}px, ${offsetY}px) scale(0.8)`;
+      equipElement.style.zIndex = `${5 + index}`; // 装備カード同士での重なり順序（ホロメンより低い値）
 
       // 装備カードの画像を設定
       if (equipCard.image_url) {
         equipElement.style.backgroundImage = `url(${equipCard.image_url})`;
+        equipElement.style.backgroundSize = 'cover';
+        equipElement.style.backgroundPosition = 'center';
+        equipElement.style.backgroundRepeat = 'no-repeat';
       } else {
-        // 画像がない場合はタイプ別のカラーを表示
+        // 画像がない場合はタイプ別のカラーとアイコンを表示
         const bgColor = this.getEquipmentTypeColor(equipment.category);
         equipElement.style.backgroundColor = bgColor;
         equipElement.style.display = 'flex';
         equipElement.style.alignItems = 'center';
         equipElement.style.justifyContent = 'center';
-        equipElement.style.fontSize = '8px';
+        equipElement.style.fontSize = '24px';
         equipElement.style.color = 'white';
         equipElement.style.fontWeight = 'bold';
         equipElement.textContent = this.getEquipmentTypeIcon(equipment.category);
       }
 
-      // 装備カードのホバー効果
+      // ホバー効果（装備カードが一時的に前面に出るが、ホロメンカードは越えない）
       equipElement.addEventListener('mouseenter', () => {
-        equipElement.style.transform = `translateY(${index * 15}px) scale(1.2)`;
-        equipElement.style.zIndex = '10';
+        equipElement.style.transform = `translate(${offsetX}px, ${offsetY}px) scale(1.0)`;
+        equipElement.style.zIndex = '50'; // ホロメンカード（100）より低い値
         
         // ツールチップ表示
         this.showEquipmentTooltip(equipElement, equipCard);
       });
 
       equipElement.addEventListener('mouseleave', () => {
-        equipElement.style.transform = `translateY(${index * 15}px) scale(1)`;
-        equipElement.style.zIndex = '5';
+        equipElement.style.transform = `translate(${offsetX}px, ${offsetY}px) scale(0.8)`;
+        equipElement.style.zIndex = `${5 + index}`; // 元のz-indexに戻す
         
         // ツールチップ削除
         this.hideEquipmentTooltip();
@@ -1639,13 +1728,10 @@ class CardDisplayManager {
         }
       });
 
-      // データ属性を設定
-      equipElement.setAttribute('data-equipment-id', equipCard.id);
-      equipElement.setAttribute('data-equipment-type', equipment.category);
-
       equipmentContainer.appendChild(equipElement);
     });
 
+    // ホロメンカードの親要素に追加（エールカードと同じ方式）
     holomenElement.appendChild(equipmentContainer);
   }
 

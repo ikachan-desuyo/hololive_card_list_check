@@ -378,20 +378,34 @@ class HololiveStateManager {
         break;
         
       case 'UPDATE_CARD_EQUIPMENT':
-        // カードの装備データを更新
+        // カードの装備データを更新（個別カード管理対応）
         if (payload.player && payload.cardId && payload.equipment && newState.players[payload.player]) {
           const player = newState.players[payload.player];
           const positions = ['center', 'collab', 'back1', 'back2', 'back3', 'back4', 'back5'];
           
-          positions.forEach(pos => {
-            const card = player.cards && player.cards[pos];
+          // 特定位置が指定されている場合は、その位置のカードのみ更新
+          if (payload.position) {
+            const card = player.cards && player.cards[payload.position];
             if (card && card.id === payload.cardId) {
               if (!card.equipment) {
                 card.equipment = { fans: [], tools: [], mascots: [] };
               }
-              Object.assign(card.equipment, payload.equipment);
+              // 深いコピーで装備データを更新（参照問題を回避）
+              card.equipment = JSON.parse(JSON.stringify(payload.equipment));
             }
-          });
+          } else {
+            // 位置が指定されていない場合は、同一IDの全カードを更新（従来の動作）
+            positions.forEach(pos => {
+              const card = player.cards && player.cards[pos];
+              if (card && card.id === payload.cardId) {
+                if (!card.equipment) {
+                  card.equipment = { fans: [], tools: [], mascots: [] };
+                }
+                // 深いコピーで装備データを更新
+                card.equipment = JSON.parse(JSON.stringify(payload.equipment));
+              }
+            });
+          }
         }
         break;
         

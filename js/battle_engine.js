@@ -662,6 +662,17 @@ class HololiveBattleEngine {
     const cardAreas = document.querySelectorAll('.card-area');
     
     cardAreas.forEach(area => {
+      // 推しホロメンエリアにはドロップリスナーを追加しない
+      if (area.classList.contains('oshi')) {
+        console.log('🚫 推しホロメンエリアにはドロップリスナーを追加しません:', area);
+        // クリックのみ追加（効果発動用）
+        area.addEventListener('click', (e) => this.handleCardAreaClick(e));
+        area.addEventListener('dragover', (e) => {
+          e.preventDefault(); // dragoverは許可するが処理はしない
+        });
+        return; // dropイベントは追加しない
+      }
+      
       area.addEventListener('click', (e) => this.handleCardAreaClick(e));
       area.addEventListener('dragover', (e) => this.handleDragOver(e));
       area.addEventListener('dragenter', (e) => this.handleDragEnter(e));
@@ -2285,6 +2296,26 @@ class HololiveBattleEngine {
       console.log('ドロップ先:', dropZone);
       console.log('ドラッグ元:', droppedData.source);
       
+      // 推しホロメンへのサポートカードドロップをブロック
+      if (dropZone.type === 'oshi' && this.isSupportCard(card)) {
+        console.log('🚫 推しホロメンへのサポートカード装備をブロック:', {
+          supportCard: card.name,
+          dropZone: dropZone
+        });
+        this.showAlert('推しホロメンにはサポートカードを装備できません');
+        return;
+      }
+      
+      // 推しホロメンエリア全般をブロック（念のため）
+      if (dropZone.type === 'oshi') {
+        console.log('🚫 推しホロメンエリアへのドロップをブロック:', {
+          card: card.name,
+          dropZone: dropZone
+        });
+        this.showAlert('推しホロメンエリアにはカードを配置できません');
+        return;
+      }
+      
       // 配置制御チェック
       if (this.placementController && dropZone.type !== 'support') {
         // バックスロットの場合は具体的なポジション名を作成
@@ -2423,8 +2454,13 @@ class HololiveBattleEngine {
     // バックスロットをハイライト（現在位置以外）
     const backSlots = document.querySelectorAll('.battle-player .back-slot');
     backSlots.forEach((slot, index) => {
+      const backPositions = ['back1', 'back2', 'back3', 'back4', 'back5'];
+      const currentBackPosition = backPositions[index];
+      
       // 現在のバックスロット位置でない場合、または異なるエリアからの場合
-      if (currentAreaId !== 'backs' || currentIndex !== index) {
+      if ((currentAreaId !== 'backs' && currentAreaId !== currentBackPosition) || 
+          (currentAreaId === 'backs' && currentIndex !== index) ||
+          (currentAreaId === currentBackPosition && currentIndex !== index)) {
         const canPlace = this.canPlaceCardInBackSlot(card, index);
         if (canPlace) {
           slot.classList.add('drop-zone-active');
@@ -2670,6 +2706,12 @@ class HololiveBattleEngine {
   getDropZoneInfo(target) {
     console.log('getDropZoneInfo - target:', target, 'classList:', target.classList);
     
+    // 推しホロメンエリアの検出を最優先
+    if (target.classList.contains('oshi') || target.closest('.oshi')) {
+      console.log('🚫 推しホロメンエリア検出 - 装備不可');
+      return { type: 'oshi' };
+    }
+    
     // 既存のカードの場合
     if (target.classList.contains('card') && target.classList.contains('face-up')) {
       console.log('配置済みカードを検出');
@@ -2677,6 +2719,12 @@ class HololiveBattleEngine {
       const areaIndex = parseInt(target.dataset.areaIndex) || 0;
       
       console.log('カードエリア情報:', { areaId, areaIndex });
+      
+      // 推しホロメンカードの場合は明示的にブロック
+      if (areaId === 'oshi') {
+        console.log('🚫 推しホロメンカード検出 - 装備不可');
+        return { type: 'oshi', index: 0, element: target };
+      }
       
       switch (areaId) {
         case 'collab':
@@ -2697,6 +2745,11 @@ class HololiveBattleEngine {
     if (target.classList.contains('collab')) {
       console.log('コラボエリア検出');
       return { type: 'collab' };
+    }
+    
+    if (target.classList.contains('oshi')) {
+      console.log('🚫 推しエリア検出 - 装備不可');
+      return { type: 'oshi' };
     }
     
     if (target.classList.contains('holo')) {

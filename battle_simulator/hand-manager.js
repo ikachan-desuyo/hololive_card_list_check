@@ -82,6 +82,8 @@ class HandManager {
           const cardElement = this.createHandCardElement(card, index);
           handArea.appendChild(cardElement);
         });
+      } else {
+        console.log('🎴 [手札表示] 手札データがありません');
       }
     } catch (error) {
       window.errorLog('手札表示更新中にエラーが発生しました:', error);
@@ -476,41 +478,39 @@ class HandManager {
    * @returns {Array} フィールド上のホロメンカードの配列
    */
   getFieldHolomens() {
-    console.log('=== getFieldHolomens 開始 ===');
+    // console.log('=== getFieldHolomens 開始 ===');
     const fieldHolomens = [];
     
     // 緊急回避: DOM要素から直接ホロメンデータを取得
-    console.log('🚨 DOM要素から直接取得方式を使用');
+    // console.log('🚨 DOM要素から直接取得方式を使用');
     
     try {
-      // フィールド上のホロメンカード要素を直接取得
-      const holomenElements = document.querySelectorAll('.battle-player .card[data-card-type*="ホロメン"]');
-      console.log('🔍 フィールドのホロメン要素数:', holomenElements.length);
+      // フィールド上のホロメンカード要素を直接取得（推しエリアを除外）
+      const holomenElements = document.querySelectorAll('.battle-player .center .card[data-card-type*="ホロメン"], .battle-player .collab .card[data-card-type*="ホロメン"], .battle-player .back-slot .card[data-card-type*="ホロメン"]');
+      // console.log('🔍 フィールドのホロメン要素数:', holomenElements.length);
       
       holomenElements.forEach((element, index) => {
         const cardId = element.dataset.cardId;
         const cardName = element.dataset.cardName;
         const cardType = element.dataset.cardType;
         
-        console.log(`🔍 要素${index + 1}:`, {
-          cardId: cardId,
-          cardName: cardName,
-          cardType: cardType,
-          element: element
-        });
+        // console.log(`🔍 要素${index + 1}:`, {
+        //   cardId: cardId,
+        //   cardName: cardName,
+        //   cardType: cardType,
+        //   element: element
+        // });
         
         if (cardId && cardName) {
-          // ポジションを特定（改善版）
+          // ポジションを特定（フィールドホロメンのみ：center, collab, back）
           let position = 'unknown';
-          const parentElement = element.closest('.center, .collab, .back-slot, .oshi');
+          const parentElement = element.closest('.center, .collab, .back-slot');
           
           if (parentElement) {
             if (parentElement.classList.contains('center')) {
               position = 'center';
             } else if (parentElement.classList.contains('collab')) {
               position = 'collab';
-            } else if (parentElement.classList.contains('oshi')) {
-              position = 'oshi';
             } else if (parentElement.classList.contains('back-slot')) {
               const slotIndex = parentElement.dataset.slot;
               if (slotIndex !== undefined) {
@@ -525,8 +525,8 @@ class HandManager {
           
           console.log(`🔍 ポジション特定:`, position, 'プレイヤー判定:', isPlayer1Card ? 'P1' : isPlayer2Card ? 'P2' : '不明');
           
-          // プレイヤー1のカードで、かつポジションが特定できた場合のみ追加
-          if (isPlayer1Card && position !== 'unknown') {
+          // プレイヤー1のカードで、かつフィールドポジション（推し以外）の場合のみ追加
+          if (isPlayer1Card && position !== 'unknown' && position !== 'oshi') {
             const holomenData = {
               id: cardId,
               card_id: cardId,
@@ -1040,17 +1040,37 @@ class HandManager {
     
     if (result.success) {
       // 手札から削除
+      console.log('🔧 装備前の手札:', {
+        handLength: this.battleEngine.players[1].hand.length,
+        handIndex: handIndex,
+        cardToRemove: this.battleEngine.players[1].hand[handIndex]?.name
+      });
+      
       this.battleEngine.players[1].hand.splice(handIndex, 1);
+      
+      console.log('🔧 装備後の手札:', {
+        handLength: this.battleEngine.players[1].hand.length
+      });
       
       this.showAlert(`${card.name}を${targetHolomem.name}に装備しました！`, 'success');
       
       // フィールド上の実際のホロメンオブジェクトを更新
       this.updateFieldHolomenEquipment(targetHolomem);
       
+      // デバッグ: 装備後のデータ確認
+      console.log('🔧 装備完了後のデータ:', {
+        cardName: targetHolomem.name,
+        position: targetHolomem.position,
+        equipment: targetHolomem.equipment
+      });
+      
       // UI更新を複数回実行して確実に反映
+      console.log('🔧 UI更新開始');
       this.updateHandDisplay();
       this.battleEngine.updateUI();
       this.battleEngine.cardDisplayManager.updateCardAreas();
+      
+      console.log('🔧 UI更新完了');
       
       // 少し遅延してもう一度更新（装備データが確実に反映されるように）
       setTimeout(() => {
@@ -1062,69 +1082,54 @@ class HandManager {
   }
 
   /**
-   * フィールド上のホロメンの装備データを確実に更新
+   * フィールド上のホロメンの装備データを確実に更新（個別管理対応）
    * @param {Object} targetHolomem - 装備対象のホロメン
    */
   updateFieldHolomenEquipment(targetHolomem) {
-    console.log('🔧 装備更新開始:', targetHolomem.name, targetHolomem.equipment);
+    // 個別カードの装備管理 - 各カードインスタンスを個別に更新
     
-    // State Manager経由で直接更新
+    // State Manager経由で個別更新
     if (this.battleEngine.stateManager) {
-      console.log('🔧 State Manager更新実行:', {
-        player: 1,
-        cardId: targetHolomem.id,
-        equipment: targetHolomem.equipment
-      });
-      
-      // State Managerに装備データを直接保存
-      this.battleEngine.stateManager.updateState('UPDATE_CARD_EQUIPMENT', {
-        player: 1,
-        cardId: targetHolomem.id,
-        equipment: targetHolomem.equipment
-      });
-      
-      // 各ポジションを確認してState Managerで直接更新
+      // カードIDと位置を組み合わせた一意キーで管理
       const positions = ['center', 'collab', 'back1', 'back2', 'back3', 'back4', 'back5'];
-      let updated = false;
+      let updatedCount = 0;
       
       positions.forEach(pos => {
         const cardData = this.battleEngine.stateManager.getStateByPath(`players.1.cards.${pos}`);
-        if (cardData && cardData.id === targetHolomem.id) {
-          console.log(`🔧 ${pos}のState Manager更新:`, cardData.name);
-          // State Manager経由で直接装備データを設定
+        // 完全一致チェック：IDと位置の両方が一致する場合のみ更新
+        if (cardData && cardData.id === targetHolomem.id && targetHolomem.position === pos) {
+          // 装備データを深いコピーで更新（参照問題を回避）
           cardData.equipment = JSON.parse(JSON.stringify(targetHolomem.equipment));
-          console.log(`🔧 ${pos}更新後:`, cardData.equipment);
-          updated = true;
+          updatedCount++;
         }
       });
       
-      // 更新後のState Managerデータを確認
-      const stateData = this.battleEngine.stateManager.getStateByPath(`players.1.cards.center`);
-      console.log('🔧 State Manager更新後データ:', stateData);
+      // State Managerの更新アクションを実行
+      this.battleEngine.stateManager.updateState('UPDATE_CARD_EQUIPMENT', {
+        player: 1,
+        cardId: targetHolomem.id,
+        position: targetHolomem.position,
+        equipment: targetHolomem.equipment
+      });
       
     } else {
       console.error('🔧 State Manager が存在しません');
     }
     
-    // プロキシシステムにもバックアップとして更新を試行
+    // プロキシシステムの個別更新
     try {
       if (this.battleEngine.players && this.battleEngine.players[1]) {
         const player = this.battleEngine.players[1];
-        const positions = ['center', 'collab', 'back1', 'back2', 'back3', 'back4', 'back5'];
+        const targetPosition = targetHolomem.position;
         
-        positions.forEach(pos => {
-          const fieldHolomem = player[pos];
-          if (fieldHolomem && fieldHolomem.id === targetHolomem.id) {
-            console.log(`🔧 プロキシ${pos}の装備データ更新:`, fieldHolomem.name);
-            fieldHolomem.equipment = JSON.parse(JSON.stringify(targetHolomem.equipment));
-          }
-        });
+        // 特定位置のカードのみを更新（同一カードの他インスタンスには影響しない）
+        if (targetPosition && player[targetPosition] && player[targetPosition].id === targetHolomem.id) {
+          player[targetPosition].equipment = JSON.parse(JSON.stringify(targetHolomem.equipment));
+        }
       }
     } catch (e) {
-      console.log('🔧 プロキシ更新はスキップ:', e.message);
+      console.warn('🔧 プロキシ更新はスキップ:', e.message);
     }
-    
-    console.log('🔧 装備更新完了');
   }
 
   /**

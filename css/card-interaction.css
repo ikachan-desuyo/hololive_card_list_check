@@ -29,18 +29,35 @@
   transform: rotate(5deg);
 }
 
-/* 装備カード表示用スタイル */
+/* 装備カード表示用スタイル（エールカード風） */
 .equipped-cards {
   user-select: none;
 }
 
 .equipped-card {
   transition: all 0.2s ease;
+  border-radius: 8px;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.3);
 }
 
 .equipped-card:hover {
   filter: brightness(1.2);
-  border-color: #ffd700 !important;
+  transform: scale(1.0) !important;
+  z-index: 250 !important;
+  box-shadow: 0 4px 15px rgba(0, 0, 0, 0.5) !important;
+}
+
+/* 装備カードタイプ別の境界線色 */
+.equipped-card[data-equipment-category="fans"] {
+  border-color: #ff6b6b !important;
+}
+
+.equipped-card[data-equipment-category="mascots"] {
+  border-color: #4ecdc4 !important;
+}
+
+.equipped-card[data-equipment-category="tools"] {
+  border-color: #45b7d1 !important;
 }
 
 .equipment-tooltip {
@@ -65,7 +82,7 @@
   right: -1px;
   bottom: -1px;
   background: linear-gradient(45deg, transparent, rgba(255, 255, 255, 0.1), transparent);
-  border-radius: 2px;
+  border-radius: 8px;
   opacity: 0;
   transition: opacity 0.2s ease;
 }
@@ -73,6 +90,8 @@
 .card .equipped-cards .equipped-card:hover::before {
   opacity: 1;
 }
+
+/* 装備モード用スタイル */
 
 @keyframes equipmentPulse {
   0%, 100% { transform: scale(1); }
