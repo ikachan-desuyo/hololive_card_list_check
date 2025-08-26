@@ -168,8 +168,6 @@ class PerformanceManager {
       cardArea = document.querySelector(`${sectionClass} .${position}`);
     }
     
-    console.log(`🔧 [Performance] カードエリア検索: ${sectionClass} .${position}`, cardArea);
-    
     if (!cardArea) {
       console.error(`❌ [Performance] カードエリアが見つかりません: ${sectionClass} .${position}`);
       return;

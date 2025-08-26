@@ -82,8 +82,6 @@ class HandManager {
           const cardElement = this.createHandCardElement(card, index);
           handArea.appendChild(cardElement);
         });
-      } else {
-        console.log('🎴 [手札表示] 手札データがありません');
       }
     } catch (error) {
       window.errorLog('手札表示更新中にエラーが発生しました:', error);
@@ -478,28 +476,16 @@ class HandManager {
    * @returns {Array} フィールド上のホロメンカードの配列
    */
   getFieldHolomens() {
-    // console.log('=== getFieldHolomens 開始 ===');
     const fieldHolomens = [];
-    
-    // 緊急回避: DOM要素から直接ホロメンデータを取得
-    // console.log('🚨 DOM要素から直接取得方式を使用');
     
     try {
       // フィールド上のホロメンカード要素を直接取得（推しエリアを除外）
       const holomenElements = document.querySelectorAll('.battle-player .center .card[data-card-type*="ホロメン"], .battle-player .collab .card[data-card-type*="ホロメン"], .battle-player .back-slot .card[data-card-type*="ホロメン"]');
-      // console.log('🔍 フィールドのホロメン要素数:', holomenElements.length);
       
       holomenElements.forEach((element, index) => {
         const cardId = element.dataset.cardId;
         const cardName = element.dataset.cardName;
         const cardType = element.dataset.cardType;
-        
-        // console.log(`🔍 要素${index + 1}:`, {
-        //   cardId: cardId,
-        //   cardName: cardName,
-        //   cardType: cardType,
-        //   element: element
-        // });
         
         if (cardId && cardName) {
           // ポジションを特定（フィールドホロメンのみ：center, collab, back）
@@ -1040,37 +1026,17 @@ class HandManager {
     
     if (result.success) {
       // 手札から削除
-      console.log('🔧 装備前の手札:', {
-        handLength: this.battleEngine.players[1].hand.length,
-        handIndex: handIndex,
-        cardToRemove: this.battleEngine.players[1].hand[handIndex]?.name
-      });
-      
       this.battleEngine.players[1].hand.splice(handIndex, 1);
-      
-      console.log('🔧 装備後の手札:', {
-        handLength: this.battleEngine.players[1].hand.length
-      });
       
       this.showAlert(`${card.name}を${targetHolomem.name}に装備しました！`, 'success');
       
       // フィールド上の実際のホロメンオブジェクトを更新
       this.updateFieldHolomenEquipment(targetHolomem);
       
-      // デバッグ: 装備後のデータ確認
-      console.log('🔧 装備完了後のデータ:', {
-        cardName: targetHolomem.name,
-        position: targetHolomem.position,
-        equipment: targetHolomem.equipment
-      });
-      
       // UI更新を複数回実行して確実に反映
-      console.log('🔧 UI更新開始');
       this.updateHandDisplay();
       this.battleEngine.updateUI();
       this.battleEngine.cardDisplayManager.updateCardAreas();
-      
-      console.log('🔧 UI更新完了');
       
       // 少し遅延してもう一度更新（装備データが確実に反映されるように）
       setTimeout(() => {
