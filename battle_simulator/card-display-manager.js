@@ -1176,6 +1176,24 @@ class CardDisplayManager {
       return true;
     }
     
+    // 装備カードの場合の特別処理
+    if (card.card_type?.includes('ファン') || card.card_type?.includes('マスコット') || card.card_type?.includes('ツール')) {
+      // 手札にある装備カードは効果発動可能
+      if (areaId === 'hand') {
+        return true;
+      }
+      
+      // 装備エリアにある装備カードは個別効果をチェック
+      if (areaId === 'equipment' || areaId.includes('equipment')) {
+        const cardId = card.id || card.card_id;
+        if (window.cardEffects && window.cardEffects[cardId]) {
+          const cardEffect = window.cardEffects[cardId];
+          return cardEffect.effects && cardEffect.effects.supportEffect;
+        }
+        return false;
+      }
+    }
+    
     // カード効果定義をチェック
     if (!window.cardEffects || !window.cardEffects[card.id]) {
       return false;

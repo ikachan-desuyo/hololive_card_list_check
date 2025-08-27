@@ -805,14 +805,65 @@ class HandManager {
   }
 
   /**
-   * 装備制限をチェック
+   * 装備制限をチェック（実際の装備処理は行わない）
    * @param {Object} card - サポートカード
    * @param {Object} targetHolomem - 装備対象ホロメン
    * @returns {Object} チェック結果
    */
   checkEquipmentRestrictions(card, targetHolomem) {
-    const utils = new CardEffectUtils(this.battleEngine);
-    return utils.attachSupportCard(1, targetHolomem, card);
+    // カードタイプによる装備制限チェック
+    const cardType = card.card_type || card.cardType || '';
+    
+    // 装備カテゴリの決定
+    let equipCategory = null;
+    let maxCount = 1; // デフォルトは1枚制限
+    
+    if (cardType.includes('ファン')) {
+      equipCategory = 'fans';
+      // 雪民は複数枚装備可能
+      if (card.name?.includes('雪民')) {
+        maxCount = Infinity;
+      }
+    } else if (cardType.includes('マスコット')) {
+      equipCategory = 'mascots';
+      maxCount = 1; // マスコットは1枚制限
+    } else if (cardType.includes('ツール')) {
+      equipCategory = 'tools';
+      maxCount = 1; // ツールは1枚制限
+    } else if (cardType.includes('スタッフ')) {
+      // スタッフは装備ではなく使い切り
+      return { success: false, reason: 'スタッフカードは装備できません' };
+    } else {
+      return { success: false, reason: '装備できないカードタイプです' };
+    }
+
+    // 装備配列の初期化チェック
+    if (!targetHolomem.equipment) {
+      targetHolomem.equipment = {
+        fans: [],
+        mascots: [],
+        tools: []
+      };
+    }
+
+    // 装備制限チェック
+    const currentCount = targetHolomem.equipment[equipCategory].length;
+    if (currentCount >= maxCount) {
+      return { 
+        success: false, 
+        reason: `${equipCategory}は最大${maxCount}枚まで装備可能です` 
+      };
+    }
+
+    // 特定の装備制限チェック（雪民は雪花ラミィのみ）
+    if (card.name?.includes('雪民') && !targetHolomem.name?.includes('雪花ラミィ')) {
+      return { 
+        success: false, 
+        reason: '雪民は雪花ラミィにのみ装備できます' 
+      };
+    }
+
+    return { success: true, message: '装備可能です' };
   }
 
   /**
