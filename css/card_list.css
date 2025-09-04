@@ -233,41 +233,51 @@
     box-sizing: border-box !important;
   }
   .sticky-controls .chip {
-    font-size: 10px !important;
-    padding: 2px 6px !important;
-    border-radius: 10px !important;
-    background: #e9ecef !important;
-    color: #495057 !important;
-    border: 1px solid #ced4da !important;
+    font-size: 11px !important;
+    padding: 3px 8px !important;
+    border-radius: 14px !important;
+    background: var(--chip-bg) !important;
+    color: var(--chip-color) !important;
+    border: 1px solid var(--chip-border) !important;
     cursor: pointer !important;
     white-space: nowrap !important;
-    margin: 1.5px 1.5px 1.5px 0 !important;
-    min-width: 32px;
-    min-height: 22px;
+    margin: 2px 4px 2px 0 !important;
+    min-height: 24px;
     box-sizing: border-box !important;
     display: inline-block !important;
   }
+  .sticky-controls .chip:hover { background: var(--chip-bg-hover) !important; }
+  .sticky-controls .chip.selected {
+    background: var(--chip-selected-bg) !important;
+    color: var(--chip-selected-color) !important;
+    border: 1px solid var(--chip-selected-border) !important;
+    font-weight: bold !important;
+  }
   /* ◇ フィルター内ボタン（= .chip と同等の見た目） */
   .sticky-controls .filter-group button {
-    font-size: 11px;
-    padding: 4px 10px;
-    min-width: 40px;
-    min-height: 24px;
-    border-radius: 16px; /* pill 形状 */
-    margin: 2px 4px 4px 0;
-    box-sizing: border-box;
-    display: inline-block;
-    background: #f0f0f0;
-    color: #333;
-    border: 1px solid #aaa;
-    font-weight: normal;
-    box-shadow: none;
-    transition: background 0.15s, color 0.15s, border-color 0.15s;
-    outline: none;
-    letter-spacing: 0.01em;
-    white-space: nowrap;
-    word-break: keep-all;
-    text-align: center;
+    font-size: 11px !important;
+    padding: 3px 10px !important;
+    min-height: 26px !important;
+    border-radius: 16px !important;
+    margin: 2px 4px 4px 0 !important;
+    background: var(--chip-bg) !important;
+    color: var(--chip-color) !important;
+    border: 1px solid var(--chip-border) !important;
+    font-weight: normal !important;
+    box-shadow: none !important;
+    transition: background .15s, color .15s, border-color .15s !important;
+    letter-spacing: .01em !important;
+    white-space: nowrap !important;
+    word-break: keep-all !important;
+    text-align: center !important;
+  }
+  .sticky-controls .filter-group button:hover { background: var(--chip-bg-hover) !important; }
+  .sticky-controls .filter-group button.selected,
+  .sticky-controls .filter-group button[aria-pressed="true"] {
+    background: var(--chip-selected-bg) !important;
+    color: var(--chip-selected-color) !important;
+    border: 1px solid var(--chip-selected-border) !important;
+    font-weight: bold !important;
   }
   .mobile-layout .sticky-controls .filter-group:not(:has(.chip-group)) {
     display: flex !important;
@@ -352,24 +362,36 @@
     background: #333 !important;
     border: 1px solid #444 !important;
   }
-  .dark .sticky-controls .chip-group {
-    background: #333 !important;
-  }
+  .dark .sticky-controls .chip-group { background: transparent !important; }
   .dark .sticky-controls .chip {
-    background: #444 !important;
-    color: #eee !important;
-    border-color: #666 !important;
+    background: var(--chip-bg-dark) !important;
+    color: var(--chip-color-dark) !important;
+    border-color: #555 !important;
+  }
+  .dark .sticky-controls .chip:hover { background: var(--chip-bg-dark-hover) !important; }
+  .dark .sticky-controls .chip.selected {
+    background: var(--chip-selected-bg-dark) !important;
+    color: var(--chip-selected-color-dark) !important;
+    border-color: var(--chip-selected-border-dark) !important;
+    font-weight: 600 !important;
   }
   .dark .sticky-controls .filter-group button {
-    background: #444;
-    color: #eee;
-    border: 1px solid #666;
+    background: var(--chip-bg-dark) !important;
+    color: var(--chip-color-dark) !important;
+    border: 1px solid #555 !important;
   }
   .dark .sticky-controls .filter-group button:hover,
   .dark .sticky-controls .filter-group button:active {
-    background: #555;
-    color: #fff;
-    border-color: #777;
+    background: var(--chip-bg-dark-hover) !important;
+    color: #fff !important;
+    border-color: #666 !important;
+  }
+  .dark .sticky-controls .filter-group button.selected,
+  .dark .sticky-controls .filter-group button[aria-pressed="true"] {
+    background: var(--chip-selected-bg-dark) !important;
+    color: var(--chip-selected-color-dark) !important;
+    border-color: var(--chip-selected-border-dark) !important;
+    font-weight: 600 !important;
   }
 }
 body {
