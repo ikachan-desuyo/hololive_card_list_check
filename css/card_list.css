@@ -1,6 +1,48 @@
 /*
- * Version: 4.11.3
+ * Version: 4.11.6
+ * Cleanup: introduce CSS custom properties for colors & reduce !important usage where safe
+ * Update: filter chips unified with detail search page (v4.11.6)
  */
+
+/* ===============================
+   Theme Tokens
+   =============================== */
+:root {
+  --btn-bg: linear-gradient(90deg, #fff 0%, #b6e0fe 100%);
+  --btn-bg-hover: linear-gradient(90deg, #eaf6ff 0%, #00bfff 100%);
+  --btn-color: #22334a;
+  --btn-border: #7ecbfa;
+  --btn-shadow: 0 1.5px 6px 0 #b6e0fe33;
+  --btn-shadow-hover: 0 4px 16px 0 #00bfff33;
+
+  --btn-bg-dark: linear-gradient(90deg, #22334a 0%, #334e68 100%);
+  --btn-bg-dark-hover: linear-gradient(90deg, #334e68 0%, #00bfff 100%);
+  --btn-color-dark: #eaf6ff;
+  --btn-border-dark: #4fc3f7;
+  --btn-shadow-dark: 0 1.5px 6px 0 #22334a55;
+  --btn-shadow-dark-hover: 0 4px 16px 0 #00bfff33;
+
+  --chip-bg: #f0f0f0;
+  --chip-bg-hover: #ddd;
+  --chip-color: #333;
+  --chip-border: #aaa;
+  /* Unified (detail search style) */
+  --chip-selected-bg: #0095ff;
+  --chip-selected-color: #fff;
+  --chip-selected-border: #007acc;
+  --chip-all-bg: var(--chip-bg); /* no special gradient */
+  --chip-all-color: var(--chip-color);
+  --chip-all-border: var(--chip-border);
+
+  /* Dark mode: chips become border-only (transparent) unless hovered/selected */
+  --chip-bg-dark: transparent;
+  --chip-bg-dark-hover: #333;
+  --chip-color-dark: #eee;
+  --chip-border-dark: #666;
+  --chip-selected-bg-dark: #007acc;
+  --chip-selected-color-dark: #fff;
+  --chip-selected-border-dark: #005999;
+}
 @media (max-width: 540px) {
   /* ダーク時はcontainer, container-top, sticky-controlsの背景を透過にしてbody背景を見せる */
   .dark.mobile-layout .container,
@@ -59,35 +101,26 @@
     background: #222 !important;
   }
   .dark .sticky-controls .chip {
-    background: #333 !important;
+    background: var(--chip-bg-dark) !important; /* transparent */
     color: #eee !important;
-    border-color: #666 !important;
+    border-color: #555 !important;
   }
   /* モバイルダーク: chip.selectedの選択状態を明示的に強調 */
+  /* ◇ 統一: 詳細検索ページと同じシンプルチップスタイル（ダーク選択はソリッド青） */
   .dark .sticky-controls .chip.selected {
-    background: linear-gradient(90deg, #007acc 0%, #00bfff 100%) !important;
-    color: #fff !important;
-    border: 2px solid #00bfff !important;
-    font-weight: bold !important;
-    box-shadow: 0 2px 8px 0 #00bfff55 !important;
-    outline: none !important;
+    background: #007acc; /* !important 不要: このセレクタが最も具体的で後勝ち */
+    color: #fff;
+    border: 2px solid #005999;
+    font-weight: bold;
+    box-shadow: none;
+    outline: none;
   }
   .dark .sticky-controls .chip.all-chip.selected {
-    background: linear-gradient(90deg, #22334a 0%, #334e68 100%) !important;
-    color: #ffb6c1 !important;
-    border: 2px solid #ffb6c1 !important;
+    background: #334e68;
+    color: #ffb6c1;
+    border: 2px solid #ffb6c1;
   }
-  .dark .sticky-controls .filter-group button {
-    background: linear-gradient(90deg, #22334a 0%, #334e68 100%) !important;
-    color: #eaf6ff !important;
-    border: 1.5px solid #4fc3f7 !important;
-  }
-  .dark .sticky-controls .filter-group button:hover,
-  .dark .sticky-controls .filter-group button:active {
-    background: linear-gradient(90deg, #334e68 0%, #00bfff 100%) !important;
-    color: #fff !important;
-    border-color: #00bfff !important;
-  }
+  /* (cleaned) 重複していたダークモード用フィルターボタンの旧グラデーション定義を削除。後続の簡素スタイルを採用。 */
   /* container全体を画面幅いっぱいに */
   .container {
     width: 100vw !important;
@@ -96,7 +129,7 @@
     margin: 0 !important;
     padding: 0 !important;
     box-sizing: border-box !important;
-    background: #f7fbff !important;
+    background: #fff !important; /* unified */
   }
   .container-top {
     width: 100vw !important;
@@ -105,7 +138,7 @@
     margin: 0 !important;
     padding: 4px 4px 6px 4px !important;
     box-sizing: border-box !important;
-    background: linear-gradient(90deg, #eaf6ff 0%, #f7fbff 60%, #e0f3ff 100%) !important;
+    background: #fff !important; /* unified */
     border-bottom: 2px solid #00bfff33 !important;
     box-shadow: 0 2px 8px 0 #00bfff11 !important;
   }
@@ -214,26 +247,27 @@
     box-sizing: border-box !important;
     display: inline-block !important;
   }
+  /* ◇ フィルター内ボタン（= .chip と同等の見た目） */
   .sticky-controls .filter-group button {
-    font-size: 11px !important;
-    padding: 3px 8px !important;
-    min-width: 40px !important;
-    min-height: 24px !important;
-    border-radius: 5px !important;
-    margin: 2px 2px 3px 2px !important;
-    box-sizing: border-box !important;
-    display: inline-block !important;
-    background: linear-gradient(90deg, #fff 0%, #b6e0fe 100%) !important;
-    color: #22334a !important;
-    border: 1.5px solid #7ecbfa !important;
-    font-weight: bold !important;
-    box-shadow: 0 1.5px 6px 0 #b6e0fe33 !important;
-    transition: background 0.2s, color 0.2s, box-shadow 0.2s, transform 0.1s !important;
-    outline: none !important;
-    letter-spacing: 0.02em !important;
-    white-space: normal !important;
-    word-break: break-word !important;
-    text-align: center !important;
+    font-size: 11px;
+    padding: 4px 10px;
+    min-width: 40px;
+    min-height: 24px;
+    border-radius: 16px; /* pill 形状 */
+    margin: 2px 4px 4px 0;
+    box-sizing: border-box;
+    display: inline-block;
+    background: #f0f0f0;
+    color: #333;
+    border: 1px solid #aaa;
+    font-weight: normal;
+    box-shadow: none;
+    transition: background 0.15s, color 0.15s, border-color 0.15s;
+    outline: none;
+    letter-spacing: 0.01em;
+    white-space: nowrap;
+    word-break: keep-all;
+    text-align: center;
   }
   .mobile-layout .sticky-controls .filter-group:not(:has(.chip-group)) {
     display: flex !important;
@@ -327,15 +361,15 @@
     border-color: #666 !important;
   }
   .dark .sticky-controls .filter-group button {
-    background: linear-gradient(90deg, #22334a 0%, #334e68 100%) !important;
-    color: #eaf6ff !important;
-    border: 1.5px solid #4fc3f7 !important;
+    background: #444;
+    color: #eee;
+    border: 1px solid #666;
   }
   .dark .sticky-controls .filter-group button:hover,
   .dark .sticky-controls .filter-group button:active {
-    background: linear-gradient(90deg, #334e68 0%, #00bfff 100%) !important;
-    color: #fff !important;
-    border-color: #00bfff !important;
+    background: #555;
+    color: #fff;
+    border-color: #777;
   }
 }
 body {
@@ -344,7 +378,8 @@ body {
   font-size: 15px;
   transition: background 0.3s, color 0.3s;
   overflow-x: hidden;
-  background: linear-gradient(135deg, #eaf6ff 0%, #f7fbff 60%, #e0f3ff 100%);
+  /* unified with detail search page */
+  background: #fff;
   color: #22334a;
 }
 
@@ -426,7 +461,7 @@ body {
 }
 
 .container-top {
-  background: linear-gradient(90deg, #eaf6ff 0%, #f7fbff 60%, #e0f3ff 100%);
+  background: #fff; /* unified */
   border-bottom: 2px solid #00bfff33;
   box-shadow: 0 2px 8px 0 #00bfff11;
   padding: 10px;
@@ -436,7 +471,7 @@ body {
 .sticky-controls {
   position: sticky;
   top: 0;
-  background: #f7fbff;
+  background: #fff; /* unified */
   border-bottom: 1.5px solid #00bfff33;
   z-index: 10;
   padding: 8px 0;
@@ -550,12 +585,32 @@ h2 {
 .filter-group {
   border: 1px solid #ccc;
   border-radius: 6px;
-  padding: 6px;
-  margin-bottom: 2px;
+  padding: 10px 12px; /* slightly larger for desktop parity */
+  margin-bottom: 10px;
+  background: #fff; /* unify with detail search page style */
+  box-shadow: 0 1px 2px #0000000d;
 }
 
+/* Light mode filter legend styling (desktop) */
+.filter-group legend {
+  font-weight: bold;
+  padding: 0 6px;
+  font-size: 14px; /* bump for readability */
+  letter-spacing: .5px;
+  color: #333;
+}
+
+/* Compact spacing when multiple filter groups are shown */
+#filtersWrapper { gap: 8px; display: flex; flex-wrap: wrap; align-items: flex-start; }
+#filtersWrapper > .filter-group { flex: 1 1 260px; box-sizing: border-box; }
+
 .dark .filter-group {
-  border-color: #666;
+  background: #2a2a2a; /* slightly darker base */
+  border: 1px solid #3a3a3a;
+  box-shadow: none; /* flatter in dark mode */
+}
+.dark .filter-group legend {
+  color: #ddd;
 }
 
 #filtersWrapper {
@@ -697,14 +752,15 @@ input:focus, select:focus, textarea:focus {
 }
 
 .chip {
-  padding: 2px 10px;
-  border: 1px solid #aaa;
+  padding: 6px 12px; /* unify with detail search page */
+  border: 1px solid var(--chip-border);
   border-radius: 16px;
-  background: #f0f0f0;
+  background: var(--chip-bg);
   cursor: pointer;
   font-size: 14px;
   user-select: none;
   transition: 0.2s;
+  color: var(--chip-color);
 }
 
 .chip:focus {
@@ -712,38 +768,41 @@ input:focus, select:focus, textarea:focus {
   outline-offset: 2px;
 }
 
-.chip:hover {
-  background: #ddd;
-}
+.chip:hover { background: var(--chip-bg-hover); }
 
 .chip.selected {
-  background: linear-gradient(90deg, #fffde4 0%, #00bfff 100%);
-  color: #007acc;
-  border: 2px solid #00bfff;
+  background: var(--chip-selected-bg);
+  color: var(--chip-selected-color);
+  border: 1px solid var(--chip-selected-border);
   font-weight: bold;
 }
 
 .chip.all-chip {
-  background: linear-gradient(90deg, #fffde4 0%, #ffe4fa 100%);
-  color: #ff69b4;
-  border: 2px solid #ffb6c1;
+  background: var(--chip-all-bg);
+  color: var(--chip-all-color);
+  border: 1px solid var(--chip-all-border);
+  font-weight: bold;
+}
+
+/* Ensure the 'All' chip (すべて) also shows selected highlight in light mode */
+.chip.all-chip.selected {
+  background: var(--chip-selected-bg);
+  color: var(--chip-selected-color);
+  border: 1px solid var(--chip-selected-border);
 }
 
 /* ダークモード時のチップスタイル */
 .dark .chip {
-  background: #444;
-  color: #eee;
-  border-color: #666;
+  background: var(--chip-bg-dark); /* transparent */
+  color: var(--chip-color-dark);
+  border-color: #555; /* subtle border */
 }
-
-.dark .chip:hover {
-  background: #555;
-}
-
+.dark .chip:hover { background: var(--chip-bg-dark-hover); }
 .dark .chip.selected {
-  background: #007acc;
-  color: #fff;
-  border-color: #005999;
+  background: var(--chip-selected-bg-dark); /* only selected gets fill */
+  color: var(--chip-selected-color-dark);
+  border-color: var(--chip-selected-border-dark);
+  font-weight: 600;
 }
 
 /* ✅ スマホ専用表示レイアウト追加調整 */
@@ -849,15 +908,14 @@ button {
   appearance: none;
   -webkit-appearance: none;
   -moz-appearance: none;
-    border: none;
-    background: linear-gradient(90deg, #fff 0%, #b6e0fe 100%);
-    color: #22334a;
-    border: 1.5px solid #7ecbfa;
+  border: 1.5px solid var(--btn-border);
+  background: var(--btn-bg);
+  color: var(--btn-color);
   font-weight: bold;
   font-size: 14px;
   padding: 5px 13px;
   border-radius: 8px;
-  box-shadow: 0 1.5px 6px 0 #b6e0fe33;
+  box-shadow: var(--btn-shadow);
   margin: 1.5px 4px;
   cursor: pointer;
   transition: background 0.2s, color 0.2s, box-shadow 0.2s, transform 0.1s;
@@ -865,10 +923,10 @@ button {
   letter-spacing: 0.02em;
 }
 button:hover, button:active {
-  background: linear-gradient(90deg, #eaf6ff 0%, #00bfff 100%);
+  background: var(--btn-bg-hover);
   color: #007acc;
   border-color: #00bfff;
-  box-shadow: 0 4px 16px 0 #00bfff33;
+  box-shadow: var(--btn-shadow-hover);
   transform: translateY(-2px) scale(1.03);
 }
 
@@ -886,17 +944,17 @@ textarea {
 /* =============================== */
 /* ダークモード時の全ボタン配色を明示的に上書き（v4.11.3） */
 .dark button {
-  background: linear-gradient(90deg, #22334a 0%, #334e68 100%) !important;
-  color: #eaf6ff !important;
-  border: 1.5px solid #4fc3f7 !important;
-  box-shadow: 0 1.5px 6px 0 #22334a55 !important;
+  background: var(--btn-bg-dark);
+  color: var(--btn-color-dark);
+  border: 1.5px solid var(--btn-border-dark);
+  box-shadow: var(--btn-shadow-dark);
 }
 .dark button:hover, .dark button:active {
-  background: linear-gradient(90deg, #334e68 0%, #00bfff 100%) !important;
-  color: #fff !important;
-  border-color: #00bfff !important;
-  box-shadow: 0 4px 16px 0 #00bfff33 !important;
-  transform: translateY(-2px) scale(1.03) !important;
+  background: var(--btn-bg-dark-hover);
+  color: #fff;
+  border-color: #00bfff;
+  box-shadow: var(--btn-shadow-dark-hover);
+  transform: translateY(-2px) scale(1.03);
 }
 
 /* ===============================
@@ -1080,3 +1138,9 @@ textarea {
     order: 1; /* 最後に配置 */
   }
 }
+
+/* ------------------------------------------------------------
+ * cache-bust quick test marker: card_list.css loaded version => v4.11.3-test1 (2025-09-05T00:00Z)
+ * If you do not see this comment in DevTools > Network > card_list.css (preview/source),
+ * the Service Worker or HTTP cache is still serving an older cached asset.
+ * ------------------------------------------------------------ */

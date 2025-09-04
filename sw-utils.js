@@ -83,6 +83,21 @@ async function checkPageVersions() {
       }
       
       console.log(`Page ${page}: expected=${expectedVersion}, actual=${actualVersion}, cached=${cachedVersion}`);
+
+      // 🛠 Self-heal: if expected and actual are aligned (both new) but cached is older, update cache entry in-place.
+      try {
+        if (
+          actualVersion && expectedVersion && actualVersion === expectedVersion &&
+          cachedVersion && cachedVersion !== actualVersion
+        ) {
+          // Re-put the freshly fetched HTML (htmlText) under canonical key to sync cacheVersion.
+          await cache.put(`./${page}`, new Response(htmlText, { headers: { 'Content-Type': 'text/html' } }));
+          cachedVersion = actualVersion;
+          console.log(`♻️ Self-healed cached HTML for ${page} -> ${cachedVersion}`);
+        }
+      } catch(e) {
+        console.warn('Self-heal cache update failed for', page, e);
+      }
       
       // 詳細なバージョン比較とミスマッチの理由を判定
       let mismatchReason = null;
@@ -94,7 +109,8 @@ async function checkPageVersions() {
       } else if (expectedVersion !== actualVersion && compareVersions(expectedVersion, actualVersion)) {
         mismatchReason = 'expected_vs_actual_mismatch';
         needsUpdate = true;
-      } else if (cachedVersion && actualVersion !== cachedVersion && compareVersions(actualVersion, cachedVersion)) {
+  // Relaxed: only treat as mismatch if cached is newer (not just older) OR expected differs from actual
+  } else if (cachedVersion && actualVersion !== cachedVersion && compareVersions(actualVersion, cachedVersion) && expectedVersion !== actualVersion) {
         mismatchReason = 'actual_vs_cached_mismatch';
         needsUpdate = true;
       }

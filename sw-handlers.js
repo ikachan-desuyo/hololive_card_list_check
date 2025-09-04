@@ -186,6 +186,22 @@ async function handleMessage(event) {
           // バージョン比較とミスマッチの理由を判定
           let mismatchReason = null;
           let needsUpdate = false;
+
+          // 🛠 Self-heal for single page checks: if expected==actual but cached outdated
+          try {
+            if (
+              actualVersion && expectedVersion && actualVersion === expectedVersion &&
+              cachedVersion && cachedVersion !== actualVersion
+            ) {
+              const freshResp = new Response(htmlText, { headers: { 'Content-Type': 'text/html' } });
+              const cache = await caches.open(CACHE_NAME);
+              await cache.put(`./${targetPage}`, freshResp);
+              cachedVersion = actualVersion;
+              console.log(`♻️ Self-healed cached HTML (single) for ${targetPage} -> ${cachedVersion}`);
+            }
+          } catch(e) {
+            console.warn('Single page self-heal failed for', targetPage, e);
+          }
           
           if (!actualVersion) {
             mismatchReason = 'actual_version_not_found';
@@ -193,7 +209,8 @@ async function handleMessage(event) {
           } else if (expectedVersion !== actualVersion && compareVersions(expectedVersion, actualVersion)) {
             mismatchReason = 'expected_vs_actual_mismatch';
             needsUpdate = true;
-          } else if (cachedVersion && actualVersion !== cachedVersion && compareVersions(actualVersion, cachedVersion)) {
+          // Relaxed: ignore case where only cachedVersion is older than actual while expected == actual
+          } else if (cachedVersion && actualVersion !== cachedVersion && compareVersions(actualVersion, cachedVersion) && expectedVersion !== actualVersion) {
             mismatchReason = 'actual_vs_cached_mismatch';
             needsUpdate = true;
           }

@@ -110,16 +110,44 @@ self.addEventListener('activate', function(event) {
           })
         );
       }).then(function() {
-        // Recreate cache with fresh content for HTML files
-        return caches.open(CACHE_NAME).then(cache => {
-          console.log('Updating cache with fresh HTML content:', CACHE_NAME);
-          const cacheBustingUrls = urlsToCache.map(url => {
-            if (url.endsWith('.html') || url === './') {
-              return `${url}?v=${APP_VERSION}&t=${Date.now()}`;
+        // Recreate cache with fresh content ensuring canonical (query-less) HTML entries are updated
+        return caches.open(CACHE_NAME).then(async cache => {
+          console.log('Updating cache with fresh content (canonical HTML, no query):', CACHE_NAME);
+
+          const nowTs = Date.now();
+          const htmlPages = urlsToCache.filter(u => u === './' || u.endsWith('.html'));
+          const otherAssets = urlsToCache.filter(u => !(u === './' || u.endsWith('.html')));
+
+          // 1. Fetch each HTML with a cache-busting query, then store under its plain URL key
+          for (const page of htmlPages) {
+            const bustUrl = `${page}?v=${APP_VERSION}&t=${nowTs}`;
+            try {
+              const resp = await fetch(bustUrl, { cache: 'no-cache' });
+              if (resp.ok) {
+                await cache.put(page, resp.clone());
+                // Optionally remove any previously cached query variants of this page
+                const requests = await cache.keys();
+                for (const req of requests) {
+                  const urlStr = req.url;
+                  if (urlStr.includes(page + '?')) {
+                    await cache.delete(req);
+                  }
+                }
+                console.log('✔️ Cached (canonical):', page);
+              } else {
+                console.warn('⚠️ Failed to fetch HTML for caching:', page, resp.status);
+              }
+            } catch (e) {
+              console.warn('⚠️ Error fetching HTML page during activate:', page, e);
             }
-            return url;
-          });
-          return cache.addAll(cacheBustingUrls);
+          }
+
+            // 2. Add non-HTML assets (allow failures to continue)
+          try {
+            await cache.addAll(otherAssets);
+          } catch (e) {
+            console.warn('⚠️ Some non-HTML assets failed to cache:', e);
+          }
         });
       }),
       // Immediately claim all clients
