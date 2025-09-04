@@ -591,6 +591,50 @@ h2 {
   box-shadow: 0 1px 2px #0000000d;
 }
 
+/* Desktop (>=541px) filter-group internal buttons: unify with chip style (mobile already overrides) */
+@media (min-width: 541px) {
+  .sticky-controls .filter-group button {
+    font-size: 13px;
+    padding: 6px 12px;
+    min-height: 30px;
+    border-radius: 16px;
+    margin: 2px 6px 4px 0;
+    background: var(--chip-bg);
+    color: var(--chip-color);
+    border: 1px solid var(--chip-border);
+    font-weight: normal;
+    box-shadow: none;
+    letter-spacing: 0.01em;
+    cursor: pointer;
+    transition: background .15s, color .15s, border-color .15s;
+  }
+  .sticky-controls .filter-group button:hover {
+    background: var(--chip-bg-hover);
+  }
+  .sticky-controls .filter-group button.selected,
+  .sticky-controls .filter-group button[aria-pressed="true"] {
+    background: var(--chip-selected-bg);
+    color: var(--chip-selected-color);
+    border: 1px solid var(--chip-selected-border);
+    font-weight: bold;
+  }
+  .dark .sticky-controls .filter-group button {
+    background: var(--chip-bg-dark);
+    color: var(--chip-color-dark);
+    border: 1px solid #555;
+  }
+  .dark .sticky-controls .filter-group button:hover {
+    background: var(--chip-bg-dark-hover);
+  }
+  .dark .sticky-controls .filter-group button.selected,
+  .dark .sticky-controls .filter-group button[aria-pressed="true"] {
+    background: var(--chip-selected-bg-dark);
+    color: var(--chip-selected-color-dark);
+    border-color: var(--chip-selected-border-dark);
+    font-weight: 600;
+  }
+}
+
 /* Light mode filter legend styling (desktop) */
 .filter-group legend {
   font-weight: bold;
