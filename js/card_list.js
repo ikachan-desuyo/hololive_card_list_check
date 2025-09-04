@@ -634,8 +634,6 @@ function setViewMode(mode) {
 
         displayCards.forEach(card => {
           const bloomText = card.card_type === "Buzzホロメン" ? "1stBuzz" : card.bloom;
-          const productText = card.product.includes(",") ? card.product.replace(/,\s*/g, "<br>") : card.product;
-
           const row = document.createElement("tr");
           row.innerHTML = `
             <td><img src="${card.image}" loading="lazy" alt="${card.name}のカード画像" onclick="showImageModal('${card.image}', ${JSON.stringify(card).replace(/"/g, '&quot;')})" tabindex="0" onkeydown="if(event.key==='Enter'||event.key===' '){event.preventDefault();showImageModal('${card.image}', ${JSON.stringify(card).replace(/"/g, '&quot;')});}"></td>
@@ -647,7 +645,6 @@ function setViewMode(mode) {
             <td>${card.color}</td>
             <td>${bloomText}</td>
             <td>${card.hp ?? "-"}</td>
-            <td>${productText}</td>
             <td><input type="number" min="0" value="${card.owned}" onchange="updateOwned('${card.id}', this.value)" aria-label="${card.name}の所持枚数"></td>
           `;
           tbody.appendChild(row);
