@@ -1,6 +1,6 @@
 <!DOCTYPE html>
 <html lang="ja">
-<!-- Version: 4.11.7 -->
+<!-- Version: 4.11.10 -->
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
@@ -8,15 +8,15 @@
   <meta http-equiv="Pragma" content="no-cache">
   <meta http-equiv="Expires" content="0">
   <title>ホロライブカード一覧</title>
-  <!-- v クエリで SW の旧キャッシュを回避 (4.11.7) -->
-  <link rel="stylesheet" href="css/card_list.css?v=4.11.7">
+  <!-- v クエリで SW の旧キャッシュを回避 (4.11.10) -->
+  <link rel="stylesheet" href="css/card_list.css?v=4.11.10">
 </head>
 <body>
   <div class="container">
     <div class="container-top">
       <h2>ホロライブカード一覧<br>
         <!-- バージョン表示 -->
-  <span style="font-size: 12px; color: #999; font-weight: normal; display: inline-block; word-break: break-all; line-height: 1.3; margin-top: 2px;" id="versionDisplay">[v4.11.7]</span>
+  <span style="font-size: 12px; color: #999; font-weight: normal; display: inline-block; word-break: break-all; line-height: 1.3; margin-top: 2px;" id="versionDisplay">[v4.11.10]</span>
         <button onclick="checkForUpdates()" style="font-size: 10px; margin-left: 5px; margin-top: 2px; padding: 2px 6px; background: #007acc; color: white; border: none; border-radius: 3px; cursor: pointer; display: inline-block;">更新確認</button>
       </h2>
 
@@ -138,9 +138,9 @@
     <!-- ✅ 簡易表示領域（スマホ最適化済） -->
     <div id="cardPreviewArea" style="display:none;"></div>
 
-    <!-- ローディングインジケーター -->
+  <!-- ローディングインジケーター -->
     <div id="loadingIndicator" style="display:none; text-align:center; padding:20px; color:#666;">
-      <div style="display:inline-block;">📦 更にカードを読み込み中...</div>
+      <div style="display:inline-block;">📦 読み込み中...</div>
     </div>
 
     <!-- ✅ 画像ズーム表示モーダル -->
@@ -226,7 +226,7 @@
 </div>
 
   <script src="js/utils.js"></script>
-  <script src="js/card_list.js?v=4.11.7"></script>
+  <script src="js/card_list.js?v=4.11.10"></script>
   <!-- オフライン状態管理 -->
   <script src="js/offline-utils.js"></script>
 </body>

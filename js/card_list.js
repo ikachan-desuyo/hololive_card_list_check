@@ -25,6 +25,10 @@ function updateViewModeButton() {
       let viewMode = "compact";
       let renderLimit = 50; // 初期表示数を50に削減
       let isRendering = false; // レンダリング中フラグを追加
+  let enableAutoScroll = true; // 無限スクロール有効フラグ（手動ボタンは廃止済）
+      let autoLoadCount = 0; // 連続自動追加回数
+      let hasMoreGlobal = false; // 直近レンダー時に更に要素があるか
+  let wasNearBottom = false; // 直前スクロールチェックで閾値内だったか
 
       const ownedLabelMap = {
         owned: "所持あり",
@@ -616,11 +620,13 @@ function setViewMode(mode) {
       return !Object.values(match).includes(false);
     });
 
-    const sortedCards = sortCards(filtered);
-    const displayCards = sortedCards.slice(0, renderLimit); // ← 表示分だけ
+  const sortedCards = sortCards(filtered);
+  const displayCards = sortedCards.slice(0, renderLimit); // ← 表示分だけ
+  const hasMore = sortedCards.length > renderLimit;
+  hasMoreGlobal = hasMore;
 
-    const tbody = tableArea.querySelector("tbody");
-    tbody.innerHTML = "";
+  const tbody = tableArea.querySelector("tbody");
+  tbody.innerHTML = "";
 
     // ✅ 統計は filtered ベースで全件集計
     const shown = filtered.length;
@@ -628,11 +634,10 @@ function setViewMode(mode) {
     const ownedCount = filtered.reduce((sum, c) => sum + (c.owned ?? 0), 0);
     const ratio = shown > 0 ? Math.round((ownedTypes / shown) * 100) : 0;
 
-    if (viewMode === "table") {
+  if (viewMode === "table") {
       previewArea.style.display = "none";
       tableArea.style.display = "";
-
-        displayCards.forEach(card => {
+  displayCards.forEach(card => {
           const bloomText = card.card_type === "Buzzホロメン" ? "1stBuzz" : card.bloom;
           const row = document.createElement("tr");
           row.innerHTML = `
@@ -650,22 +655,22 @@ function setViewMode(mode) {
           tbody.appendChild(row);
         });      // ✅ フィルター後全件の統計を表示
       document.getElementById("countDisplay").textContent =
-        `所持枚数：${ownedCount} / 表示：${shown}種類 / 所持種類数：${ownedTypes}(${ratio}%)`;
+        `所持枚数：${ownedCount} / 表示：${displayCards.length}/${shown}種類 / 所持種類数：${ownedTypes}(${ratio}%)`;
       document.getElementById("typeDisplay").textContent = ``;
       return;
     }
 
     // ✅ 簡易モードはそのまま
-    tableArea.style.display = "none";
-    previewArea.innerHTML = "";
-    previewArea.style.display = "block";
+  tableArea.style.display = "none";
+  previewArea.innerHTML = "";
+  previewArea.style.display = "block";
 
     const container = document.createElement("div");
     const isMobile = document.body.classList.contains("mobile-layout");
     const columns = isMobile ? 4 : Math.floor(window.innerWidth / 160);
     const cardWidth = isMobile ? Math.floor((window.innerWidth - 32) / columns) : 160;
 
-    displayCards.forEach(card => {
+  displayCards.forEach(card => {
       const box = document.createElement("div");
       box.style.width = `${cardWidth}px`;
 
@@ -695,12 +700,13 @@ function setViewMode(mode) {
       container.appendChild(box);
     });
 
-    previewArea.appendChild(container);
+  previewArea.appendChild(container);
 
     // ✅ 統計表示（簡易モードも全件ベース）
     document.getElementById("countDisplay").textContent =
-      `所持枚数：${ownedCount} / 表示：${shown}種類 / 所持種類数：${ownedTypes}(${ratio}%)`;
+      `所持枚数：${ownedCount} / 表示：${displayCards.length}/${shown}種類 / 所持種類数：${ownedTypes}(${ratio}%)`;
     document.getElementById("typeDisplay").textContent = "";
+  // 旧: さらに表示ボタン制御は削除済
   }
 
   function updateOwned(id, value) {
@@ -861,28 +867,33 @@ function setViewMode(mode) {
 
   window.addEventListener("resize", updateMobileLayout);
 
+  // 旧: 手動ボタンは廃止。無限スクロールのみで追加ロード。
+
+  // 無限スクロール - スロットリング
+  let lastAutoLoadTime = 0;
   window.addEventListener("scroll", () => {
-    if (viewMode === "compact" || viewMode === "table") {
-      const bottom = window.innerHeight + window.scrollY;
-      const docHeight = document.body.offsetHeight;
-      if (bottom >= docHeight - 200 && !isRendering) { // 200px手前で追加読み込み開始
-        renderLimit += 30; // 追加読み込み数を30に削減
-
-        // ローディング表示
-        const loadingIndicator = document.getElementById('loadingIndicator');
-        if (loadingIndicator) {
-          loadingIndicator.style.display = 'block';
-        }
-
-        renderTable();
-
-        // ローディング表示を非表示
-        setTimeout(() => {
-          if (loadingIndicator) {
-            loadingIndicator.style.display = 'none';
-          }
-        }, 500);
-      }
+    if (!enableAutoScroll) return;
+    if (viewMode !== "compact" && viewMode !== "table") return;
+    if (!hasMoreGlobal) return; // 追加対象なし
+    const now = Date.now();
+    if (now - lastAutoLoadTime < 200) return; // 最低間隔
+    const bottom = window.innerHeight + window.scrollY;
+    const docHeight = document.body.offsetHeight;
+    const nearBottom = bottom >= docHeight - 240;
+    if (nearBottom && !wasNearBottom && !isRendering) {
+      // 閾値外→内への遷移時のみロード
+      lastAutoLoadTime = now;
+      wasNearBottom = true;
+  renderLimit += 30;
+      autoLoadCount++;
+      const loadingIndicator = document.getElementById('loadingIndicator');
+      if (loadingIndicator) loadingIndicator.style.display = 'block';
+      renderTable();
+      setTimeout(()=>{
+        if (loadingIndicator) loadingIndicator.style.display = 'none';
+      },300);
+    } else if (!nearBottom) {
+      wasNearBottom = false; // ユーザーが少し離れたら再武装
     }
   });
 
@@ -1245,6 +1256,9 @@ window.onload = async () => {
 // --- グローバル公開は必ず一番最後で ---
 window.toggleViewMode = toggleViewMode;
 window.updateViewModeButton = updateViewModeButton;
+// window.loadMoreCards は廃止
+// 開発用: コンソールから無効化/有効化できる
+window.setAutoScrollEnabled = (v)=>{ enableAutoScroll = !!v; };
 
 // 戻る・進む時もlocalStorageのviewModeを再反映
 window.addEventListener("pageshow", () => {

@@ -1,27 +1,28 @@
 // Version Management Configuration
 // このファイルはバージョンアップ時に更新されます
 
-const APP_VERSION = "4.11.7";
-const VERSION_DESCRIPTION = "カード一覧: 表モードで収録列削除";
+const APP_VERSION = "4.11.10";
+const VERSION_DESCRIPTION = "カード一覧: 無限スクロール単独化 (ボタン削除)";
 
 // ✅ 各ページのバージョン情報を一元管理
 const PAGE_VERSIONS = {
   "index.html": "4.11.6",
   "binder_collection.html": "4.11.6",
   "collection_binder.html": "4.11.6",
-  "card_list.html": "4.11.7",
+  "card_list.html": "4.11.10",
   "holoca_skill_page.html": "4.11.6",
   "deck_builder.html": "4.11.6"
 };
 
 // ✅ 更新内容の詳細情報
 const UPDATE_DETAILS = {
-  title: "v4.11.7",
-  description: "カード一覧 表モードの列整理 (収録列削除)",
+  title: "v4.11.10",
+  description: "カード一覧 読み込みUX簡素化",
   changes: [
-    "カード一覧 表モード: 不要な収録列を削除し横スクロール/視認性改善",
-    "card_list.html バージョン 4.11.7",
-    "他ページは据え置き"
+    "『さらに表示』ボタンを完全削除し無限スクロールのみを採用",
+    "不要になった loadMoreCards / ボタン表示制御ロジックを削除",
+    "内部API: setAutoScrollEnabled(v) は継続 (デバッグ用途)",
+    "card_list.html バージョン 4.11.10"
   ]
 };
 
