@@ -3,7 +3,16 @@
 <!-- Version: 4.11.10 -->
 <head>
   <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <style>
+    /* ナビ矢印の連続タップでのズーム抑制と操作安定 */
+    .nav-arrow, .nav-arrow-mobile {
+      -webkit-user-select: none;
+      user-select: none;
+      touch-action: manipulation; /* Chrome/Edge */
+      -webkit-tap-highlight-color: rgba(0,0,0,0);
+    }
+  </style>
   <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
   <meta http-equiv="Pragma" content="no-cache">
   <meta http-equiv="Expires" content="0">
@@ -144,43 +153,52 @@
     </div>
 
     <!-- ✅ 画像ズーム表示モーダル -->
-    <div id="imageModal" onclick="hideImageModal()" onkeydown="if(event.key==='Escape'){hideImageModal()}" tabindex="0" role="dialog" aria-label="カード画像拡大表示" style="
+  <div id="imageModal" onkeydown="if(event.key==='Escape'){hideImageModal()}" tabindex="0" role="dialog" aria-label="カード画像拡大表示" style="
       display:none;
       position:fixed;
       top:0; left:0;
       width:100vw; height:100vh;
       background:rgba(0,0,0,1);
       z-index:1000;
-      cursor:zoom-out;
       overflow-y:auto;">
 
-      <!-- デスクトップ用レイアウト -->
-      <div class="modal-desktop" style="display:flex; height:100vh; align-items:center; justify-content:center; padding:5px;">
-        <div style="display:flex; width:98vw; height:96vh; background:rgba(40,40,40,0.98); border-radius:8px; overflow:hidden;">
-          <!-- 画像エリア（さらに大きく） -->
-          <div style="flex:1; display:flex; align-items:center; justify-content:center; min-width:75%; background:black;">
-            <img id="modalImage" src="" alt="カード画像拡大表示" style="width:100%; height:100%; object-fit:contain; min-height:90vh; background:black;" onclick="event.stopPropagation();">
+      <!-- デスクトップ用レイアウト (元のレイアウトへ復元) -->
+      <div class="modal-desktop" style="display:flex; height:100vh; align-items:center; justify-content:center; padding:4px 2px; /* v4.11.11 */">
+        <div style="display:flex; width:98vw; height:76vh; background:rgba(40,40,40,0.98); border-radius:12px; overflow:hidden; position:relative; /* v4.11.11 最終圧縮高さ */">
+          <!-- 画像エリア (min-width:75%) 背景クリックでは閉じない仕様 -->
+          <div id="modalImageContainerDesktop" style="flex:1; display:flex; align-items:center; justify-content:center; min-width:75%; background:black; position:relative;">
+            <!-- 左矢印 -->
+            <button class="nav-arrow nav-arrow-left" onclick="event.stopPropagation(); previousCardDetail();" aria-label="前のカード" style="position:absolute; left:20px; top:50%; transform:translateY(-50%); background:rgba(0,0,0,0.65); border:none; color:white; font-size:30px; cursor:pointer; border-radius:50%; width:50px; height:50px; z-index:10;">◀</button>
+            <!-- 画像 -->
+            <img id="modalImage" src="" alt="カード画像拡大表示" style="width:100%; height:100%; object-fit:contain; min-height:72vh; background:black; /* v4.11.11 最終min-height */" onclick="event.stopPropagation();">
+            <!-- 右矢印 -->
+            <button class="nav-arrow nav-arrow-right" onclick="event.stopPropagation(); nextCardDetail();" aria-label="次のカード" style="position:absolute; right:20px; top:50%; transform:translateY(-50%); background:rgba(0,0,0,0.65); border:none; color:white; font-size:30px; cursor:pointer; border-radius:50%; width:50px; height:50px; z-index:10;">▶</button>
+            <!-- 閉じる -->
+            <button onclick="event.stopPropagation(); hideImageModal();" aria-label="閉じる" style="position:absolute; top:10px; right:10px; background:rgba(0,0,0,0.7); border:none; color:white; font-size:22px; cursor:pointer; border-radius:50%; width:42px; height:42px; z-index:11;">✕</button>
           </div>
-          <!-- 情報エリア -->
-          <div id="cardInfoPanel" style="width:320px; padding:15px; color:white; overflow-y:auto; background:rgba(0,0,0,0.9); max-height:96vh;" onclick="event.stopPropagation();">
+          <!-- 情報エリア 固定幅320px -->
+          <div id="cardInfoPanel" style="width:320px; padding:14px; color:white; overflow-y:auto; background:rgba(0,0,0,0.9); max-height:76vh; /* v4.11.11 */" onclick="event.stopPropagation();">
             <div id="cardInfoContent"></div>
           </div>
         </div>
       </div>
 
-      <!-- モバイル用レイアウト -->
-      <div class="modal-mobile" style="display:none; flex-direction:column; height:100vh; padding:5px;">
-        <!-- 画像エリア（上部・さらに大きく） -->
-        <div style="flex:1; display:flex; align-items:center; justify-content:center; background:black; min-height:75%; border-radius:8px 8px 0 0;">
-          <img id="modalImageMobile" src="" alt="カード画像拡大表示" style="width:100%; height:100%; object-fit:contain; min-height:70vh; background:black;" onclick="event.stopPropagation();">
+      <!-- モバイル用レイアウト (元の 70% / 30% 構成へ復元) -->
+  <div class="modal-mobile" style="display:none; flex-direction:column; height:100vh; padding:6px 4px; /* v4.11.11 */">
+        <!-- 画像エリア（上部） -->
+  <div id="modalImageContainerMobile" style="flex:1; position:relative; display:flex; align-items:center; justify-content:center; background:black; min-height:52%; border-radius:12px 12px 0 0; /* v4.11.11 最終割合 */">
+          <button class="nav-arrow-mobile nav-arrow-left-mobile" onclick="event.stopPropagation(); previousCardDetail();" aria-label="前のカード" style="position:absolute; left:10px; top:50%; transform:translateY(-50%); background:rgba(0,0,0,0.65); border:none; color:white; font-size:24px; cursor:pointer; border-radius:50%; width:40px; height:40px; z-index:10;">◀</button>
+          <img id="modalImageMobile" src="" alt="カード画像拡大表示" style="width:100%; height:100%; object-fit:contain; background:black;" onclick="event.stopPropagation();">
+          <button class="nav-arrow-mobile nav-arrow-right-mobile" onclick="event.stopPropagation(); nextCardDetail();" aria-label="次のカード" style="position:absolute; right:10px; top:50%; transform:translateY(-50%); background:rgba(0,0,0,0.65); border:none; color:white; font-size:24px; cursor:pointer; border-radius:50%; width:40px; height:40px; z-index:10;">▶</button>
+          <button onclick="event.stopPropagation(); hideImageModal();" aria-label="閉じる" style="position:absolute; top:10px; right:10px; background:rgba(0,0,0,0.7); border:none; color:white; font-size:20px; cursor:pointer; border-radius:50%; width:38px; height:38px; z-index:11;">✕</button>
         </div>
         <!-- 情報エリア（下部） -->
-        <div id="cardInfoPanelMobile" style="background:rgba(0,0,0,0.95); color:white; padding:12px; max-height:25%; overflow-y:auto; border-top:1px solid #666; border-radius:0 0 8px 8px;" onclick="event.stopPropagation();">
+  <div id="cardInfoPanelMobile" style="background:rgba(0,0,0,0.95); color:white; padding:12px; max-height:48%; overflow-y:auto; border-top:1px solid #666; border-radius:0 0 12px 12px; /* v4.11.11 最終割合 */" onclick="event.stopPropagation();">
           <div id="cardInfoContentMobile"></div>
         </div>
       </div>
 
-      <div style="position:absolute; top:10px; right:20px; color:white; font-size:20px; cursor:pointer; z-index:1001; background:rgba(0,0,0,0.7); border-radius:50%; width:35px; height:35px; display:flex; align-items:center; justify-content:center;" onclick="hideImageModal()" aria-label="閉じる">✕</div>
+  <!-- 旧クローズボタン削除（各レイアウト内へ集約） -->
     </div>
 
     <!-- 画像一括ダウンロード確認ダイアログ -->
@@ -226,7 +244,7 @@
 </div>
 
   <script src="js/utils.js"></script>
-  <script src="js/card_list.js?v=4.11.10"></script>
+  <script src="js/card_list.js?v=4.11.11"></script>
   <!-- オフライン状態管理 -->
   <script src="js/offline-utils.js"></script>
 </body>

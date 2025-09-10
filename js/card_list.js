@@ -29,6 +29,9 @@ function updateViewModeButton() {
       let autoLoadCount = 0; // 連続自動追加回数
       let hasMoreGlobal = false; // 直近レンダー時に更に要素があるか
   let wasNearBottom = false; // 直前スクロールチェックで閾値内だったか
+  // ==== カード詳細ナビゲーション用（一覧ページ用） ====
+  let currentDisplayList = []; // 現在のフィルター・ソート後の全カード（renderLimit での表示制限前）
+  let currentModalIndex = -1;  // モーダルで現在表示中のカードのインデックス
 
       const ownedLabelMap = {
         owned: "所持あり",
@@ -316,7 +319,7 @@ function setViewMode(mode) {
         renderTable();
       }
 
-      function showImageModal(src, cardData = null) {
+  function showImageModal(src, cardData = null) {
         const modal = document.getElementById("imageModal");
         const isMobile = window.innerWidth <= 768;
 
@@ -336,55 +339,71 @@ function setViewMode(mode) {
 
         // カード情報を表示
         if (cardData) {
+          // 現在のカードインデックスを特定（フィルター後全体配列から）
+          if (currentDisplayList && currentDisplayList.length > 0 && cardData.id) {
+            const idx = currentDisplayList.findIndex(c => c.id === cardData.id);
+            currentModalIndex = idx;
+          } else {
+            currentModalIndex = -1;
+          }
           const infoContent = isMobile ?
             document.getElementById("cardInfoContentMobile") :
             document.getElementById("cardInfoContent");
 
-          const bloomText = cardData.card_type === "Buzzホロメン" ? "1stBuzz" : cardData.bloom;
-          const productText = cardData.product.includes(",") ?
-            cardData.product.replace(/,\s*/g, " / ") : cardData.product;
+          // ====== モバイル詳細レイアウト（バインダー準拠） ======
+          // Bloom 判定ロジック（バインダー側と揃える）
+          let bloomText = '不明';
+          if (cardData.bloom_level !== undefined && cardData.bloom_level !== null && cardData.bloom_level !== "") {
+            bloomText = cardData.bloom_level;
+          } else if (cardData.bloom !== undefined && cardData.bloom !== null && cardData.bloom !== "" && cardData.bloom !== "null") {
+            bloomText = cardData.bloom;
+          } else if (cardData.card_type === "Buzzホロメン") {
+            bloomText = "1stBuzz";
+          }
 
-          // スキル情報を取得
+          const productText = cardData.product ?
+            (cardData.product.includes(",") ? cardData.product.replace(/,\s*/g, " / ") : cardData.product) : "不明";
+
+          // スキル情報（フォントサイズ統一）
           const skillsHtml = cardData.skills && cardData.skills.length > 0 ?
             renderSkills(cardData.skills) : "<div style='font-size:13px; color:#aaa;'>スキルなし</div>";
 
+          // モバイル：グリッド＆バインダー風スタイル
           infoContent.innerHTML = `
-            <h3 style="margin-top:0; color:#4db6e6; font-size:18px;">${cardData.name}</h3>
+            <h3 style="margin-top:0; color:#667eea; font-size:16px; margin-bottom:12px;">${cardData.name}</h3>
 
-            <div style="margin-bottom:18px; font-size:14px;">
-              <div style="margin:6px 0;"><strong>🆔 カード番号:</strong> ${cardData.id}</div>
-              <div style="margin:6px 0;"><strong>🃏 カードタイプ:</strong> ${cardData.card_type}</div>
-              <div style="margin:6px 0;"><strong>✨ レアリティ:</strong> ${cardData.rarity}</div>
-              <div style="margin:6px 0;"><strong>🎨 色:</strong> ${cardData.color}</div>
-              <div style="margin:6px 0;"><strong>🌸 Bloom:</strong> ${bloomText}</div>
-              ${cardData.hp ? `<div style="margin:6px 0;"><strong>❤️ HP:</strong> ${cardData.hp}</div>` : ''}
-              <div style="margin:6px 0;"><strong>📦 収録商品:</strong> ${productText}</div>
-              <div style="margin:6px 0;"><strong>🃏 所持枚数:</strong> ${cardData.owned || 0}枚</div>
+            <div style="margin-bottom:15px; font-size:13px; line-height:1.4;">
+              <div style="margin-bottom:8px;"><strong>🆔 カード番号:</strong> ${cardData.id}</div>
+              <div style="margin-bottom:8px;"><strong>🃏 カードタイプ:</strong> ${cardData.card_type}</div>
+              <div style="display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 8px; margin-bottom:8px; font-size:12px;">
+                <div><strong>✨ レアリティ:</strong><br>${cardData.rarity}</div>
+                <div><strong>🎨 色:</strong><br>${cardData.color || '不明'}</div>
+                <div><strong>🌸 Bloom:</strong><br>${bloomText}</div>
+              </div>
+              ${cardData.hp ? `<div style=\"margin-bottom:8px;\"><strong>❤️ HP:</strong> ${cardData.hp}</div>` : ''}
+              <div style="margin-bottom:4px;"><strong>📦 収録商品:</strong> ${productText}</div>
+              <div style="margin-bottom:4px;"><strong>🃏 所持枚数:</strong> ${cardData.owned || 0}枚</div>
             </div>
 
             ${cardData.tags && cardData.tags.length > 0 ?
-              `<div style="margin:15px 0;">
-                <strong style="font-size:15px;">🏷️ タグ:</strong><br>
-                <div style="margin-top:8px;">
+              `<div style=\"margin:10px 0 18px 0;\">
+                <strong style=\"font-size:13px; color:#667eea;\">🏷️ タグ:</strong><br>
+                <div style=\"margin-top:6px;\">
                   ${cardData.tags.map(tag =>
-                    `<span style="background:#007acc; color:white; padding:3px 8px; border-radius:12px; margin:3px 4px 3px 0; display:inline-block; font-size:12px;">${tag}</span>`
+                    `<span style=\"background:#667eea; color:white; padding:3px 8px; border-radius:12px; margin:3px 4px 3px 0; display:inline-block; font-size:11px;\">${tag}</span>`
                   ).join('')}
                 </div>
               </div>` : ''
             }
 
-            <div style="margin:15px 0; border-top:1px solid #555; padding-top:15px;">
-              <strong style="font-size:15px; color:#4db6e6;">⚡ スキル:</strong><br>
-              <div style="margin-top:10px;">
+            <div style="margin:12px 0 30px 0; border-top:1px solid #555; padding-top:12px; padding-bottom:20px;">
+              <strong style="font-size:14px; color:#667eea;">⚡ スキル:</strong>
+              <div style="margin-top:8px; font-size:13px; padding-bottom:10px;">
                 ${skillsHtml}
               </div>
-            </div>
-
-            <div style="margin:20px 0; text-align:center;">
-              <a href="https://hololive-official-cardgame.com/cardlist/?id=${cardData.id}" target="_blank"
-                 style="color:#4db6e6; text-decoration:none; font-size:14px; padding:8px 16px; border:1px solid #4db6e6; border-radius:20px; display:inline-block;">
-                🔗 公式サイトで詳細を見る ↗
-              </a>
+              <div style="margin-top:10px; text-align:right;">
+                <a href="https://hololive-official-cardgame.com/cardlist/?id=${cardData.id}" target="_blank" style="font-size:12px; color:#8899ff; text-decoration:none;">公式サイト ↗</a>
+              </div>
             </div>
           `;
 
@@ -401,9 +420,13 @@ function setViewMode(mode) {
           if (infoPanel) infoPanel.style.display = "none";
         }
 
-        modal.style.display = "block";
-        modal.focus(); // フォーカスをモーダルに移動
-        document.body.style.overflow = "hidden"; // スクロールを無効化
+  modal.style.display = "block";
+  modal.focus(); // フォーカスをモーダルに移動
+  document.body.style.overflow = "hidden"; // スクロールを無効化
+  // ナビゲーション矢印の活性/非活性を更新
+  updateNavigationButtons();
+  // スワイプハンドラを再アタッチ
+  attachSwipeHandlers();
       }
 
       function hideImageModal() {
@@ -420,6 +443,125 @@ function setViewMode(mode) {
           if (panel) panel.style.display = "";
         });
       }
+
+      // ==== 前後ナビゲーション（一覧ページ用） ====
+      function updateNavigationButtons() {
+        const leftArrows = document.querySelectorAll('.nav-arrow-left, .nav-arrow-left-mobile');
+        const rightArrows = document.querySelectorAll('.nav-arrow-right, .nav-arrow-right-mobile');
+
+        const total = currentDisplayList.length;
+        const hasPrev = currentModalIndex > 0;
+        const hasNext = currentModalIndex >= 0 && currentModalIndex < total - 1;
+
+        leftArrows.forEach(a => {
+          a.style.opacity = hasPrev ? '1' : '0.25';
+          a.style.pointerEvents = hasPrev ? 'auto' : 'none';
+        });
+        rightArrows.forEach(a => {
+          a.style.opacity = hasNext ? '1' : '0.25';
+          a.style.pointerEvents = hasNext ? 'auto' : 'none';
+        });
+      }
+
+      function previousCardDetail() {
+        if (currentModalIndex <= 0) return; // 先頭
+        const newIndex = currentModalIndex - 1;
+        const nextCard = currentDisplayList[newIndex];
+        if (!nextCard) return;
+        showImageModal(nextCard.image, nextCard);
+      }
+
+      function nextCardDetail() {
+        if (currentModalIndex < 0) return;
+        if (currentModalIndex >= currentDisplayList.length - 1) return; // 末尾
+        const newIndex = currentModalIndex + 1;
+        const nextCard = currentDisplayList[newIndex];
+        if (!nextCard) return;
+        showImageModal(nextCard.image, nextCard);
+      }
+
+  // HTML の onclick から呼び出せるようにグローバルへ公開
+  window.previousCardDetail = previousCardDetail;
+  window.nextCardDetail = nextCardDetail;
+  window.showImageModal = showImageModal;
+
+      // ==== スワイプで前後カード移動（モバイル類似挙動）====
+      let touchStartX = 0; let touchStartY = 0; let touchMoved = false;
+      function handleModalTouchStart(e){
+        if(e.touches.length !== 1) return;
+        touchStartX = e.touches[0].clientX;
+        touchStartY = e.touches[0].clientY;
+        touchMoved = false;
+      }
+      function handleModalTouchMove(e){
+        if(!touchStartX) return;
+        const dx = e.touches[0].clientX - touchStartX;
+        const dy = e.touches[0].clientY - touchStartY;
+        if(Math.abs(dx) > 10 || Math.abs(dy) > 10) touchMoved = true;
+      }
+      function handleModalTouchEnd(e){
+        if(!touchStartX) return;
+        const endX = e.changedTouches[0].clientX;
+        const endY = e.changedTouches[0].clientY;
+        const diffX = touchStartX - endX;
+        const diffY = touchStartY - endY;
+        if(Math.abs(diffX) > 35 && Math.abs(diffY) < 60){
+          if(diffX > 0){ // 左へスワイプ → 次
+            nextCardDetail();
+          } else {
+            previousCardDetail();
+          }
+        }
+        touchStartX = 0; touchStartY = 0; touchMoved = false;
+      }
+      // モーダル画像領域へイベント登録（表示のたびに id が存在）
+      function attachSwipeHandlers(){
+        const cDesktop = document.getElementById('modalImageContainerDesktop');
+        const cMobile = document.getElementById('modalImageContainerMobile');
+        [cDesktop, cMobile].filter(Boolean).forEach(el => {
+          el.removeEventListener('touchstart', handleModalTouchStart);
+          el.removeEventListener('touchmove', handleModalTouchMove);
+          el.removeEventListener('touchend', handleModalTouchEnd);
+          el.addEventListener('touchstart', handleModalTouchStart, {passive:true});
+          el.addEventListener('touchmove', handleModalTouchMove, {passive:true});
+          el.addEventListener('touchend', handleModalTouchEnd, {passive:true});
+        });
+      }
+      window.attachSwipeHandlers = attachSwipeHandlers;
+
+      // ==== モバイル矢印ダブルタップによるブラウザ拡大防止 ==== 
+      (function enableFastMultiTapArrows(){
+        let lastTapTime = 0;
+        function isRight(btn){ return btn.classList.contains('nav-arrow-right') || btn.classList.contains('nav-arrow-right-mobile'); }
+        function isLeft(btn){ return btn.classList.contains('nav-arrow-left') || btn.classList.contains('nav-arrow-left-mobile'); }
+        function handle(ev){
+          const btn = ev.currentTarget;
+          const now = Date.now();
+          const delta = now - lastTapTime;
+          // 350ms 以内でもズームさせず遷移をトリガー
+          if(delta < 350){ ev.preventDefault(); ev.stopPropagation(); }
+          if(isRight(btn)) {
+            nextCardDetail();
+          } else if(isLeft(btn)) {
+            previousCardDetail();
+          }
+          lastTapTime = now;
+        }
+        function bind(){
+          document.querySelectorAll('.nav-arrow, .nav-arrow-mobile').forEach(btn=>{
+            btn.removeEventListener('touchend', handle);
+            btn.addEventListener('touchend', handle, {passive:false});
+            // click もフォールバック（PC）
+            btn.removeEventListener('click', handle);
+            btn.addEventListener('click', handle);
+          });
+        }
+        document.addEventListener('DOMContentLoaded', bind);
+        // モーダル再生成後にも確実に
+        setInterval(bind, 1200);
+      })();
+
+
 
       function setupFilters() {
         const raritySet = new Set(), colorSet = new Set(), bloomSet = new Set(), productSet = new Set(), tagSet = new Set(), cardTypeSet = new Set();
@@ -621,6 +763,8 @@ function setViewMode(mode) {
     });
 
   const sortedCards = sortCards(filtered);
+  // ナビゲーション用に全件保持（表示制限前）
+  currentDisplayList = sortedCards;
   const displayCards = sortedCards.slice(0, renderLimit); // ← 表示分だけ
   const hasMore = sortedCards.length > renderLimit;
   hasMoreGlobal = hasMore;
