@@ -1,23 +1,23 @@
 // Version Management Configuration
 // このファイルはバージョンアップ時に更新されます
 
-const APP_VERSION = "4.11.11"; // Consolidated single bump from 4.11.10
-const VERSION_DESCRIPTION = "カード一覧: モーダル操作 & 余白圧縮";
+const APP_VERSION = "4.12.0"; // Consolidated single bump from 4.11.10
+const VERSION_DESCRIPTION = "カードデータ大規模更新";
 
 // ✅ 各ページのバージョン情報を一元管理
 const PAGE_VERSIONS = {
-  "index.html": "4.11.6",
-  "binder_collection.html": "4.11.6",
-  "collection_binder.html": "4.11.6",
-  "card_list.html": "4.11.11",
-  "holoca_skill_page.html": "4.11.6",
-  "deck_builder.html": "4.11.6"
+  "index.html": "4.12.0",
+  "binder_collection.html": "4.12.0",
+  "collection_binder.html": "4.12.0",
+  "card_list.html": "4.12.0",
+  "holoca_skill_page.html": "4.12.0",
+  "deck_builder.html": "4.12.0"
 };
 
 // ✅ 更新内容の詳細情報
 const UPDATE_DETAILS = {
-  title: "v4.11.11",
-  description: "カード一覧 モーダル操作改善と上下余白最適化",
+  title: "v4.12.0",
+  description: "カードデータ大規模更新",
   changes: [
     "背景クリック無効化/高速連打ナビ安定化/スワイプ拡大",
     "上下余白段階的圧縮 → 最終: デスクトップ高さ76vh",
