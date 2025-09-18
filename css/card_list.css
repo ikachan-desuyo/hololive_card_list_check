@@ -8,6 +8,10 @@
    Theme Tokens
    =============================== */
 :root {
+/* Global base adjustments (iOS focus zoom mitigation) */
+html, body {
+  -webkit-text-size-adjust: 100%; /* Prevent automatic font inflation / zoom */
+}
   --btn-bg: linear-gradient(90deg, #fff 0%, #b6e0fe 100%);
   --btn-bg-hover: linear-gradient(90deg, #eaf6ff 0%, #00bfff 100%);
   --btn-color: #22334a;
@@ -598,6 +602,11 @@ h2 {
 
 .mobile-layout #nameSearch {
   min-width: 120px;
+  font-size:16px !important; /* Ensure >=16px */
+  line-height:1.3;
+  height:34px; /* Stable tap target height */
+  padding:6px 8px; /* Comfortable padding to avoid zoom heuristic */
+  -webkit-text-size-adjust: 100%;
 }
 
 .mobile-layout #sortMethod {
