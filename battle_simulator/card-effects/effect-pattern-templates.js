@@ -139,9 +139,7 @@ class EffectPatternTemplates {
           if (player.isFirstPlayer && (player.playerTurnCount || 0) <= 1) {
             return { success: false, reason: 'LIMITED制限により使用できません' };
           }
-          if (player.usedLimitedThisTurn) {
-            return { success: false, reason: 'LIMITED制限により使用できません' };
-          }
+          // fallback path no longer uses legacy player.usedLimitedThisTurn
         }
       }
     }
@@ -162,13 +160,7 @@ class EffectPatternTemplates {
     try {
       if (battleEngine.cardInteractionManager && typeof battleEngine.cardInteractionManager.recordLimitedEffectUsage === 'function') {
         battleEngine.cardInteractionManager.recordLimitedEffectUsage();
-        if (window.BATTLE_ENGINE_DEBUG) console.debug('[LIMITED] usage recorded via executeLimitedSupport (delegated) card', card.id);
-      } else {
-        const currentPlayer = battleEngine.gameState.currentPlayer;
-        const player = battleEngine.players[currentPlayer];
-        player.usedLimitedThisTurn = true;
-        if (player.gameState) player.gameState.usedLimitedThisTurn = true;
-        if (window.BATTLE_ENGINE_DEBUG) console.debug('[LIMITED] usage recorded via executeLimitedSupport (fallback) card', card.id);
+        if (window.BATTLE_ENGINE_DEBUG) console.debug('[LIMITED] usage recorded via executeLimitedSupport card', card.id);
       }
     } catch (e) {
       console.warn('[LIMITED] usage record failed in executeLimitedSupport', e);

@@ -424,15 +424,7 @@ class HandManager {
         const cim = this.battleEngine.cardInteractionManager;
         if (cim && typeof cim.recordLimitedEffectUsage === 'function') {
           cim.recordLimitedEffectUsage();
-          if (window.BATTLE_ENGINE_DEBUG) console.debug('[LIMITED] usage recorded via hand-manager fallback path (delegated)');
-        } else {
-          const playerId = this.battleEngine.gameState.currentPlayer;
-          const p = this.battleEngine.players[playerId];
-            if (!p.usedLimitedThisTurn) {
-              p.usedLimitedThisTurn = true;
-              if (p.gameState) p.gameState.usedLimitedThisTurn = true;
-              if (window.BATTLE_ENGINE_DEBUG) console.debug('[LIMITED] usage recorded via hand-manager fallback path (manual)');
-            }
+          if (window.BATTLE_ENGINE_DEBUG) console.debug('[LIMITED] usage recorded via hand-manager direct path');
         }
       } else {
         // フォールバック（旧来の方式）+ 先行1ターン目制限
@@ -451,24 +443,18 @@ class HandManager {
           }
           if (this.battleEngine.cardInteractionManager) {
             this.battleEngine.cardInteractionManager.recordLimitedEffectUsage();
-          } else {
-            player.usedLimitedThisTurn = true;
-            if (player.gameState) player.gameState.usedLimitedThisTurn = true;
           }
         } else {
           if (player.isFirstPlayer && (player.playerTurnCount || 0) <= 1) {
             this.showAlert('先行1ターン目はLIMITEDカードを使用できません', 'limited_first_turn');
             return;
           }
-          if (player.usedLimitedThisTurn) {
+          if (player.gameState?.usedLimitedThisTurn) {
             this.showAlert('このターンには既にLIMITEDカードを使用しています', 'limited_once');
             return;
           }
           if (this.battleEngine.cardInteractionManager) {
             this.battleEngine.cardInteractionManager.recordLimitedEffectUsage();
-          } else {
-            player.usedLimitedThisTurn = true;
-            if (player.gameState) player.gameState.usedLimitedThisTurn = true;
           }
         }
       }

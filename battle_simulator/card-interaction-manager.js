@@ -826,7 +826,7 @@ class CardInteractionManager {
 
     if (debug) {
       const smFlag = stateManager?.state?.players?.[currentPlayer]?.gameState?.usedLimitedThisTurn;
-      console.debug('[LIMITED] pre-check flags local=', player.usedLimitedThisTurn, 'gameStateLocal=', player.gameState?.usedLimitedThisTurn, 'smFlag=', smFlag);
+      console.debug('[LIMITED] pre-check flag smFlag=', smFlag);
     }
 
     // 統一ヘルパーで判定
@@ -854,15 +854,11 @@ class CardInteractionManager {
         this.showMessage('先行1ターン目はLIMITED効果を使用できません', 'warning');
         return false;
       }
-      if (player.usedLimitedThisTurn === true || player.gameState?.usedLimitedThisTurn) {
-        console.warn('[LIMITED] Blocked (fallback): already_used_this_turn');
-        this.showMessage('このターンには既にLIMITED効果を使用しています', 'warning');
-        return false;
-      }
+      // fallback path no longer uses local flag (only state manager path expected)
     }
-    // 最終防衛ライン：ここまで来た後に別経路で使用記録が立った場合を再確認
-    if (player.usedLimitedThisTurn === true || player.gameState?.usedLimitedThisTurn === true || stateManager?.state?.players?.[currentPlayer]?.gameState?.usedLimitedThisTurn === true) {
-      console.warn('[LIMITED] Blocked (post-check race)');
+    // 最終ガード： state manager flag only
+    if (stateManager?.state?.players?.[currentPlayer]?.gameState?.usedLimitedThisTurn === true) {
+      console.warn('[LIMITED] Blocked (already_used_final)');
       this.showMessage('このターンには既にLIMITED効果を使用しています', 'warning');
       return false;
     }
@@ -876,11 +872,6 @@ class CardInteractionManager {
     const currentPlayer = this.battleEngine.gameState.currentPlayer;
     const player = this.battleEngine.players[currentPlayer];
     
-    player.usedLimitedThisTurn = true;
-    if (player.gameState) {
-      player.gameState.usedLimitedThisTurn = true; // StateManager互換領域にも反映
-    }
-    // StateManager の正規状態にも反映（他箇所が stateManager.state 経由で参照する場合のズレ防止）
     if (this.battleEngine.stateManager) {
       try {
         this.battleEngine.stateManager.updateState('UPDATE_PLAYER_GAME_STATE', {
@@ -888,13 +879,13 @@ class CardInteractionManager {
           property: 'usedLimitedThisTurn',
           value: true
         });
+        if (window.BATTLE_ENGINE_DEBUG) {
+          const smFlag = this.battleEngine.stateManager.state.players[currentPlayer].gameState.usedLimitedThisTurn;
+          console.debug('[LIMITED] usage recorded smFlag=', smFlag);
+        }
       } catch (e) {
         console.warn('[LIMITED] StateManager update failed while recording usage', e);
       }
-    }
-    if (window.BATTLE_ENGINE_DEBUG) {
-      const smFlag = this.battleEngine.stateManager?.state?.players?.[currentPlayer]?.gameState?.usedLimitedThisTurn;
-      console.debug('[LIMITED] usage recorded (recordLimitedEffectUsage). local=', player.usedLimitedThisTurn, 'sm=', smFlag);
     }
   }
 

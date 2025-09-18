@@ -272,11 +272,8 @@ class HololiveCPULogic {
     cpu.hand.splice(handIndex, 1);
     cpu.archive.push(card);
     
-    if (card.card_type.includes('LIMITED')) {
-      cpu.usedLimitedThisTurn = true;
-      if (cpu.gameState) {
-        cpu.gameState.usedLimitedThisTurn = true;
-      }
+    if (card.card_type.includes('LIMITED') && this.battleEngine.cardInteractionManager) {
+      this.battleEngine.cardInteractionManager.recordLimitedEffectUsage();
     }
     
     

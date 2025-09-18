@@ -44,7 +44,7 @@ class HololiveStateManager {
     if (this.isFirstPlayerFirstTurn(playerId)) {
       return { canUse: false, reason: 'first_player_first_turn' };
     }
-    if (player.usedLimitedThisTurn === true || player.gameState?.usedLimitedThisTurn === true) {
+    if (player.gameState?.usedLimitedThisTurn === true) {
       return { canUse: false, reason: 'already_used_this_turn' };
     }
     if (window.BATTLE_ENGINE_DEBUG) {
@@ -329,10 +329,8 @@ class HololiveStateManager {
           if (player.gameState) {
             const oldFlag = player.gameState.collabMovedThisTurn;
             player.gameState.collabMovedThisTurn = false;
-            // バトンタッチ使用フラグもリセット
+            // バトンタッチ使用フラグもリセット（LIMITEDはエンドステップのみでリセット）
             player.gameState.batonTouchUsedThisTurn = false;
-            // LIMITED使用フラグもリセット（念のため二重リセット許容）
-            player.gameState.usedLimitedThisTurn = false;
           }
           
           // バトンタッチ使用時はターン1制限を解除
