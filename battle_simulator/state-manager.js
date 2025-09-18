@@ -647,13 +647,31 @@ class HololiveStateManager {
                     existingCard.cardState.bloomedThisTurn = true;
                   }
                   
+                  // 既存カードのダメージ/HP情報を解析
+                  const previousMaxHP = this.getMaxHP(existingCard);
+                  // cardState.damage 優先、なければ HPマップから算出
+                  let previousDamage = existingCard.cardState?.damage || 0;
+                  // HPマップが存在し、差分から damage を再計算できる場合は整合性を確保
+                  try {
+                    const playerHPMap = this.state.players[payload.player]?.cardHP || {};
+                    const existingKey = existingCard.cardState?.uniqueId || existingCard.id;
+                    const trackedCurrentHP = playerHPMap[existingKey];
+                    if (previousMaxHP && trackedCurrentHP !== undefined) {
+                      const calcDamage = Math.max(0, previousMaxHP - trackedCurrentHP);
+                      // 大きい方を採用（よりダメージが進んでいる値）
+                      if (calcDamage > previousDamage) previousDamage = calcDamage;
+                    }
+                  } catch (e) {
+                    console.warn('[Bloom HP Transfer] 旧カードHP解析中にエラー', e);
+                  }
+
                   const newCard = this.addCardState(payload.card, {
                     bloomedThisTurn: false, // 新しく配置されるカードはブルーム済みではない
                     playedTurn: newState.turn?.turnCount || 1,
                     bloomedFromCard: existingCard,
                     // 既存カードから状態を引き継ぎ
                     resting: existingCard.cardState?.resting || false,
-                    damage: existingCard.cardState?.damage || 0,
+                    damage: previousDamage,
                     yellCards: existingCard.yellCards || existingCard.cardState?.yellCards || [],
                     supportCards: existingCard.cardState?.supportCards || [],
                     stackedCards: [
@@ -670,6 +688,26 @@ class HololiveStateManager {
                   // エール引き継ぎを確実にする追加処理
                   if (existingCard.yellCards && existingCard.yellCards.length > 0) {
                     newCard.yellCards = [...existingCard.yellCards];
+                  }
+                  // 装備引き継ぎ
+                  if (existingCard.equipment) {
+                    newCard.equipment = JSON.parse(JSON.stringify(existingCard.equipment));
+                    if (existingCard.equipmentEffects) {
+                      newCard.equipmentEffects = JSON.parse(JSON.stringify(existingCard.equipmentEffects));
+                    }
+                  }
+                  // HPマップ転送（新カードの現在HP = 新最大HP - previousDamage, ただし最低1）
+                  try {
+                    const newMax = this.getMaxHP(newCard);
+                    const newCurrent = Math.max(1, newMax - previousDamage);
+                    const newKey = newCard.cardState?.uniqueId || newCard.id;
+                    if (!this.state.players[payload.player].cardHP) {
+                      this.state.players[payload.player].cardHP = {};
+                    }
+                    this.state.players[payload.player].cardHP[newKey] = newCurrent;
+                    console.log(`🌸 [Bloom HP Transfer] Back位置 ${payload.position}: ${existingCard.name} (${previousMaxHP - previousDamage}/${previousMaxHP}) → ${newCard.name} (${newCurrent}/${newMax})`);
+                  } catch (e) {
+                    console.warn('[Bloom HP Transfer] HP設定失敗', e);
                   }
                   
                   // 新しいカードの情報を確認
@@ -712,13 +750,25 @@ class HololiveStateManager {
                   existingCard.cardState.bloomedThisTurn = true;
                 }
                 
+                // HP/ダメージ計算
+                const prevCenterMax = this.getMaxHP(existingCard);
+                let prevCenterDamage = existingCard.cardState?.damage || 0;
+                try {
+                  const playerHPMap = this.state.players[payload.player]?.cardHP || {};
+                  const existingKey = existingCard.cardState?.uniqueId || existingCard.id;
+                  const trackedCurrentHP = playerHPMap[existingKey];
+                  if (prevCenterMax && trackedCurrentHP !== undefined) {
+                    const calcDamage = Math.max(0, prevCenterMax - trackedCurrentHP);
+                    if (calcDamage > prevCenterDamage) prevCenterDamage = calcDamage;
+                  }
+                } catch (e) { console.warn('[Bloom HP Transfer] center解析エラー', e); }
+
                 const newCard = this.addCardState(payload.card, {
-                  bloomedThisTurn: false, // 新しく配置されるカードはブルーム済みではない
+                  bloomedThisTurn: false,
                   playedTurn: newState.turn?.turnCount || 1,
                   bloomedFromCard: existingCard,
-                  // 既存カードから状態を引き継ぎ
                   resting: existingCard.cardState?.resting || false,
-                  damage: existingCard.cardState?.damage || 0,
+                  damage: prevCenterDamage,
                   yellCards: existingCard.yellCards || existingCard.cardState?.yellCards || [],
                   supportCards: existingCard.cardState?.supportCards || [],
                   stackedCards: [
@@ -736,6 +786,24 @@ class HololiveStateManager {
                 if (existingCard.yellCards && existingCard.yellCards.length > 0) {
                   newCard.yellCards = [...existingCard.yellCards];
                 }
+                // 装備引き継ぎ
+                if (existingCard.equipment) {
+                  newCard.equipment = JSON.parse(JSON.stringify(existingCard.equipment));
+                  if (existingCard.equipmentEffects) {
+                    newCard.equipmentEffects = JSON.parse(JSON.stringify(existingCard.equipmentEffects));
+                  }
+                }
+                // HPマップ転送
+                try {
+                  const newMax = this.getMaxHP(newCard);
+                  const newCurrent = Math.max(1, newMax - prevCenterDamage);
+                  const newKey = newCard.cardState?.uniqueId || newCard.id;
+                  if (!this.state.players[payload.player].cardHP) {
+                    this.state.players[payload.player].cardHP = {};
+                  }
+                  this.state.players[payload.player].cardHP[newKey] = newCurrent;
+                  console.log(`🌸 [Bloom HP Transfer] Center: ${existingCard.name} → ${newCard.name} (${newCurrent}/${newMax})`);
+                } catch (e) { console.warn('[Bloom HP Transfer] center HP設定失敗', e); }
                 
                 // 新しいカードの情報を確認
                 
@@ -778,13 +846,25 @@ class HololiveStateManager {
                   existingCard.cardState.bloomedThisTurn = true;
                 }
                 
+                // HP/ダメージ計算
+                const prevCollabMax = this.getMaxHP(existingCard);
+                let prevCollabDamage = existingCard.cardState?.damage || 0;
+                try {
+                  const playerHPMap = this.state.players[payload.player]?.cardHP || {};
+                  const existingKey = existingCard.cardState?.uniqueId || existingCard.id;
+                  const trackedCurrentHP = playerHPMap[existingKey];
+                  if (prevCollabMax && trackedCurrentHP !== undefined) {
+                    const calcDamage = Math.max(0, prevCollabMax - trackedCurrentHP);
+                    if (calcDamage > prevCollabDamage) prevCollabDamage = calcDamage;
+                  }
+                } catch (e) { console.warn('[Bloom HP Transfer] collab解析エラー', e); }
+
                 const newCard = this.addCardState(payload.card, {
-                  bloomedThisTurn: false, // 新しく配置されるカードはブルーム済みではない
+                  bloomedThisTurn: false,
                   playedTurn: newState.turn?.turnCount || 1,
                   bloomedFromCard: existingCard,
-                  // 既存カードから状態を引き継ぎ
                   resting: existingCard.cardState?.resting || false,
-                  damage: existingCard.cardState?.damage || 0,
+                  damage: prevCollabDamage,
                   yellCards: existingCard.yellCards || existingCard.cardState?.yellCards || [],
                   supportCards: existingCard.cardState?.supportCards || [],
                   stackedCards: [
@@ -802,6 +882,24 @@ class HololiveStateManager {
                 if (existingCard.yellCards && existingCard.yellCards.length > 0) {
                   newCard.yellCards = [...existingCard.yellCards];
                 }
+                // 装備引き継ぎ
+                if (existingCard.equipment) {
+                  newCard.equipment = JSON.parse(JSON.stringify(existingCard.equipment));
+                  if (existingCard.equipmentEffects) {
+                    newCard.equipmentEffects = JSON.parse(JSON.stringify(existingCard.equipmentEffects));
+                  }
+                }
+                // HPマップ転送
+                try {
+                  const newMax = this.getMaxHP(newCard);
+                  const newCurrent = Math.max(1, newMax - prevCollabDamage);
+                  const newKey = newCard.cardState?.uniqueId || newCard.id;
+                  if (!this.state.players[payload.player].cardHP) {
+                    this.state.players[payload.player].cardHP = {};
+                  }
+                  this.state.players[payload.player].cardHP[newKey] = newCurrent;
+                  console.log(`🌸 [Bloom HP Transfer] Collab: ${existingCard.name} → ${newCard.name} (${newCurrent}/${newMax})`);
+                } catch (e) { console.warn('[Bloom HP Transfer] collab HP設定失敗', e); }
                 
                 // 新しいカードの情報を確認
                 
@@ -823,7 +921,8 @@ class HololiveStateManager {
             }
             
             // 手札から配置した場合は手札から削除
-            if (player.cards.hand) {
+            if (player.cards.hand && payload.action !== 'bloom') {
+              // ブルーム時は手札削除を呼び出し元（hand-manager）が正確なインデックスで実施するため二重削除回避
               const handIndex = player.cards.hand.findIndex(handCard => 
                 handCard.id === payload.card.id || handCard.name === payload.card.name
               );
@@ -2847,15 +2946,20 @@ class HololiveStateManager {
    */
   getCurrentHP(card, playerId) {
     if (!card || !card.hp) return 0;
-    
-    const player = this.state.players[playerId];
-    if (!player || !player.cardHP) return this.getMaxHP(card);
-    
-    // uniqueIdがある場合はそれを使用、なければIDを使用
+    const max = this.getMaxHP(card);
     const cardKey = (card.cardState && card.cardState.uniqueId) ? card.cardState.uniqueId : card.id;
-    const currentHP = player.cardHP[cardKey];
-    
-    return currentHP !== undefined ? currentHP : this.getMaxHP(card);
+    const player = this.state.players[playerId];
+    if (player && player.cardHP && player.cardHP[cardKey] !== undefined) {
+      return player.cardHP[cardKey];
+    }
+    // 指定プレイヤーに無い場合は逆プレイヤーを参照（所有者探索）
+    const otherId = playerId === 1 ? 2 : 1;
+    const other = this.state.players[otherId];
+    if (other && other.cardHP && other.cardHP[cardKey] !== undefined) {
+      console.warn(`⚠️ [HP所有者再解決] cardKey=${cardKey} は player${otherId} に記録されていました (参照元 player${playerId})`);
+      return other.cardHP[cardKey];
+    }
+    return max; // どこにも記録が無ければ最大値（未ダメージ扱い）
   }
 
   /**
@@ -2864,33 +2968,34 @@ class HololiveStateManager {
    * @param {number} playerId - プレイヤーID
    * @param {number} newHP - 新しいHP値
    */
-  setCurrentHP(card, playerId, newHP) {
+  setCurrentHP(card, playerId, newHP, { force = false } = {}) {
     if (!card || !card.hp) return;
-    
     const player = this.state.players[playerId];
     if (!player) return;
-    
     if (!player.cardHP) {
       player.cardHP = {};
     }
-    
     const maxHP = this.getMaxHP(card);
-    const validHP = Math.max(0, Math.min(newHP, maxHP));
-    
-    // uniqueIdがある場合はそれを使用、なければIDを使用
+    const proposedHP = Math.max(0, Math.min(newHP, maxHP));
     const cardKey = (card.cardState && card.cardState.uniqueId) ? card.cardState.uniqueId : card.id;
-    player.cardHP[cardKey] = validHP;
-    
-    console.log(`🩹 [HP設定] ${card.name}: ${validHP}/${maxHP} (プレイヤー${playerId}) [${cardKey}]`);
-    
-    // ダメージイベントをログ出力（EventEmitter未実装のため）
+    const existing = player.cardHP[cardKey];
+    // 既にHPが記録されていて、forceでない場合はより低い（ダメージが進んでいる）値を優先保持
+    let finalHP = proposedHP;
+    if (existing !== undefined && !force) {
+      // 現HP < 提案値（上書きで回復してしまう）なら保持、それ以外は更新
+      if (existing < proposedHP) {
+        finalHP = existing; // 上書き回復を防止
+      }
+    }
+    player.cardHP[cardKey] = finalHP;
+    console.log(`🩹 [HP設定] ${card.name}: ${finalHP}/${maxHP} (プレイヤー${playerId}) [${cardKey}] force=${force}`);
     console.log(`📡 [StateManager] cardDamaged event:`, {
       playerId,
       card,
       cardKey,
-      currentHP: validHP,
+      currentHP: finalHP,
       maxHP,
-      isKnockOut: validHP === 0
+      isKnockOut: finalHP === 0
     });
   }
 
@@ -2955,7 +3060,7 @@ class HololiveStateManager {
     if (!card || !card.hp) return;
     
     const maxHP = this.getMaxHP(card);
-    this.setCurrentHP(card, playerId, maxHP);
+    this.setCurrentHP(card, playerId, maxHP, { force: true });
   }
 
   /**
@@ -2973,7 +3078,7 @@ class HololiveStateManager {
     areas.forEach(area => {
       const card = player.cards[area];
       if (card && card.hp) {
-        this.setCurrentHP(card, playerId, this.getMaxHP(card));
+        this.setCurrentHP(card, playerId, this.getMaxHP(card), { force: true });
       }
     });
     
@@ -2981,7 +3086,7 @@ class HololiveStateManager {
     if (player.cards.life && Array.isArray(player.cards.life)) {
       player.cards.life.forEach(card => {
         if (card && card.hp) {
-          this.setCurrentHP(card, playerId, this.getMaxHP(card));
+          this.setCurrentHP(card, playerId, this.getMaxHP(card), { force: true });
         }
       });
     }

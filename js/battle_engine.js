@@ -2770,7 +2770,8 @@ class HololiveBattleEngine {
     // HPがあるホロメンカードの場合、HP初期化
     if (card && card.hp && card.card_type && card.card_type.includes('ホロメン')) {
       const playerId = player === this.players[1] ? 1 : 2;
-      this.stateManager.setCurrentHP(card, playerId, this.stateManager.getMaxHP(card));
+  // 初期配置時は強制的に最大HPを設定（以前の参照が残っていても上書き）
+  this.stateManager.setCurrentHP(card, playerId, this.stateManager.getMaxHP(card), { force: true });
       console.log(`💚 [HP初期化] ${card.name}: ${card.hp}HP`);
     }
   }
