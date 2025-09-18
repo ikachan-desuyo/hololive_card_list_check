@@ -418,8 +418,14 @@ class CardInteractionManager {
         this.markEffectAsUsed(card, position);
         
         // サポートカードの自動アーカイブ処理
+        // 装備可能なサポート（ファン / ツール / マスコット）は装備モードに移行するため即時アーカイブしない
         if (position === 'hand' && card.card_type?.includes('サポート')) {
-          this.moveCardToArchive(card, position);
+          const isEquippable = ['ファン','ツール','マスコット'].some(t => card.card_type.includes(t));
+          if (!isEquippable) {
+            this.moveCardToArchive(card, position);
+          } else {
+            console.log('🛠 装備可能サポート: 自動アーカイブをスキップ (装備モード経由)');
+          }
         }
         
         this.showMessage(result.message || 'カード効果を発動しました', 'success');

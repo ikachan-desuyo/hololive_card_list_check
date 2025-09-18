@@ -46,50 +46,26 @@ const cardEffect_hBP04_101 = {
         return stageHolomens.length > 0;
       },
       effect: async function(card, battleEngine) {
-        console.log('🍡 だいふくの装備処理開始');
-        
-        // ドラッグ&ドロップと同じ処理を実行
+        console.log('🍡 だいふくの装備処理開始 (装備モード経由 - 遅延)');
         const currentPlayer = battleEngine.gameState?.currentPlayer ?? battleEngine.currentPlayer ?? 0;
         const player = battleEngine.players[currentPlayer];
-        
-        // カードIDで手札のインデックスを探す
-        const handIndex = player.hand.findIndex(handCard => 
-          handCard.id === card.id || handCard.number === card.number || handCard.name === card.name
-        );
-        
-        console.log('🍡 [だいふく] 手札検索:', {
-          cardId: card.id,
-          cardName: card.name,
-          handSize: player.hand.length,
-          foundIndex: handIndex
-        });
-        
+        const handIndex = player.hand.findIndex(handCard => handCard.id === card.id || handCard.number === card.number || handCard.name === card.name);
         if (handIndex === -1) {
-          return {
-            success: false,
-            message: '手札にカードが見つかりません'
-          };
+          return { success: false, message: '手札にカードが見つかりません' };
         }
-        
-        // 実際の手札のカードオブジェクトを取得
-        const actualCard = player.hand[handIndex];
-        
-        // ドラッグ&ドロップと同じ処理: placeCardFromHandWithSwap を呼び出し
-        if (battleEngine.handManager) {
-          // サポートタイプのドロップゾーンを模倣
-          const dropZone = { type: 'support' };
-          battleEngine.handManager.placeCardFromHandWithSwap(actualCard, handIndex, dropZone);
-          
-          return {
-            success: true,
-            message: '装備処理を開始しました'
-          };
-        } else {
-          return {
-            success: false,
-            message: '装備システムが利用できません'
-          };
+        if (!battleEngine.handManager) {
+          return { success: false, message: '装備システムが利用できません' };
         }
+        setTimeout(() => {
+          try {
+            if (battleEngine?.handManager) {
+              battleEngine.handManager.showSupportCardEquipmentDialog(player.hand[handIndex], handIndex);
+            }
+          } catch (e) {
+            console.warn('だいふく 装備モード開始エラー:', e);
+          }
+        }, 0);
+        return { success: true, message: '装備対象を選択してください' };
       }
     }
   }

@@ -1053,34 +1053,20 @@ class CardDisplayManager {
       return;
     }
     
-    // エリア別の効果発動可能性チェック
+    // エリア別の効果発動可能性チェック（装備カードのドラッグ&ドロップは廃止しボタンのみ）
     if (areaId === 'hand') {
-      // 手札：サポートカードのみ効果発動可能
+      // 手札：サポートカードのみ効果発動可能（装備カードはボタンから装備モードへ）
       const isSupport = card.card_type?.includes('サポート');
-      
       if (!isSupport) {
         return;
       }
-      
-      // 装備可能なサポートカード（ファン・ツール・マスコット）にドラッグ機能を追加
-      const isEquippableSupport = card.card_type?.includes('ファン') || 
-                                  card.card_type?.includes('ツール') || 
-                                  card.card_type?.includes('マスコット');
-      
-      if (isEquippableSupport) {
-        this.addSupportCardDragAndDrop(cardElement, card);
-      }
     } else if (['center', 'collab', 'backs', 'back1', 'back2', 'back3', 'back4', 'back5'].includes(areaId)) {
-      // フィールド：ホロメンカードの効果発動可能
+      // フィールド：ホロメンでない場合は効果ボタン不要
       const isHolomen = card.card_type?.includes('ホロメン');
       if (!isHolomen) {
         return;
       }
-      
-      // ホロメンカードにサポートカードのドロップターゲット機能を追加
-      if (isPlayerCard) {
-        this.addSupportCardDropTarget(cardElement, card, areaId);
-      }
+      // 装備カードドロップターゲットは削除（装備はクリック/ボタン操作のみ）
     } else if (areaId === 'oshi') {
       // 推しホロメン：カードは常に表示、効果ボタンのみ条件チェック
       
@@ -1444,25 +1430,8 @@ class CardDisplayManager {
    * @param {Object} card - カード情報
    */
   addSupportCardDragAndDrop(cardElement, card) {
-    cardElement.draggable = true;
-    cardElement.style.cursor = 'grab';
-    
-    cardElement.addEventListener('dragstart', (e) => {
-      cardElement.style.cursor = 'grabbing';
-      e.dataTransfer.setData('application/json', JSON.stringify({
-        type: 'support-equipment',
-        card: card,
-        sourceElement: cardElement
-      }));
-      
-      // ドラッグ中にホロメンをハイライト
-      this.highlightEquipmentTargets();
-    });
-    
-    cardElement.addEventListener('dragend', (e) => {
-      cardElement.style.cursor = 'grab';
-      this.clearEquipmentTargetHighlight();
-    });
+    // 装備カードのドラッグ機能は廃止（互換性のため関数は残すが空実装）
+    // 既存コードが呼び出しても何もしない
   }
 
   /**
@@ -1472,27 +1441,7 @@ class CardDisplayManager {
    * @param {string} areaId - エリアID
    */
   addSupportCardDropTarget(cardElement, card, areaId) {
-    cardElement.addEventListener('dragover', (e) => {
-      e.preventDefault();
-      const dragData = this.getDragData(e);
-      if (dragData?.type === 'support-equipment') {
-        cardElement.classList.add('equipment-drop-target');
-      }
-    });
-    
-    cardElement.addEventListener('dragleave', (e) => {
-      cardElement.classList.remove('equipment-drop-target');
-    });
-    
-    cardElement.addEventListener('drop', (e) => {
-      e.preventDefault();
-      cardElement.classList.remove('equipment-drop-target');
-      
-      const dragData = this.getDragData(e);
-      if (dragData?.type === 'support-equipment') {
-        this.handleSupportCardDrop(dragData.card, card);
-      }
-    });
+    // 装備カードのドロップターゲット機能は廃止
   }
 
   /**
@@ -1512,27 +1461,16 @@ class CardDisplayManager {
    * 装備可能なホロメンをハイライト
    */
   highlightEquipmentTargets() {
-    // フィールドのホロメンカードのみをハイライト（推しホロメンは除外）
-    const fieldAreas = ['.center', '.collab', '.back-slot'];
-    
-    fieldAreas.forEach(areaSelector => {
-      const holomenElements = document.querySelectorAll(`.battle-player ${areaSelector} .card[data-card-type*="ホロメン"]`);
-      holomenElements.forEach(element => {
-        element.classList.add('equipment-potential-target');
-      });
-    });
+    // 廃止: ドラッグハイライトは不要
   }
 
   /**
    * 装備ターゲットのハイライトをクリア
    */
   clearEquipmentTargetHighlight() {
-    document.querySelectorAll('.equipment-potential-target').forEach(element => {
-      element.classList.remove('equipment-potential-target');
-    });
-    document.querySelectorAll('.equipment-drop-target').forEach(element => {
-      element.classList.remove('equipment-drop-target');
-    });
+    // 廃止: ハイライトクラス除去のみ安全対策として維持
+    document.querySelectorAll('.equipment-potential-target').forEach(el => el.classList.remove('equipment-potential-target'));
+    document.querySelectorAll('.equipment-drop-target').forEach(el => el.classList.remove('equipment-drop-target'));
   }
 
   /**
@@ -1541,24 +1479,8 @@ class CardDisplayManager {
    * @param {Object} targetHolomem - 装備対象ホロメン
    */
   handleSupportCardDrop(supportCard, targetHolomem) {
-    // 推しホロメンへの装備を明示的にブロック
-    if (targetHolomem.card_type === '推しホロメン') {
-      alert('推しホロメンにはサポートカードを装備できません');
-      return;
-    }
-    
-    // HandManagerの装備確認モーダルを使用
-    if (this.battleEngine.handManager) {
-      // 手札からカードのインデックスを取得
-      const handIndex = this.battleEngine.players[1].hand.findIndex(card => card.id === supportCard.id);
-      if (handIndex === -1) {
-        alert('手札にカードが見つかりません');
-        return;
-      }
-      
-      // 装備確認モーダルを表示
-      this.battleEngine.handManager.showEquipmentConfirmation(targetHolomem, supportCard, handIndex);
-    }
+    // ドラッグ経由の装備は廃止
+    console.warn('handleSupportCardDrop は廃止されました（ボタンから装備してください）');
   }
 
   /**
