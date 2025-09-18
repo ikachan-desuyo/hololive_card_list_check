@@ -1280,6 +1280,30 @@ class CardDisplayManager {
     }
     
     console.log(`✅ [効果発動] CardInteractionManager確認OK`);
+
+    // LIMITED使用前チェック（早期ブロック）
+    try {
+      const cim = this.battleEngine.cardInteractionManager;
+      const isLimitedCard = cim && typeof cim.isLimitedCard === 'function' ? cim.isLimitedCard(card) : card.card_type?.includes('LIMITED');
+      if (isLimitedCard) {
+        const stateManager = this.battleEngine.stateManager;
+        if (stateManager && typeof stateManager.canUseLimitedNow === 'function') {
+          const check = stateManager.canUseLimitedNow(this.battleEngine.gameState.currentPlayer);
+          if (!check.canUse) {
+            if (check.reason === 'first_player_first_turn') {
+              alert('先行1ターン目はLIMITEDカードの効果を使用できません');
+            } else if (check.reason === 'already_used_this_turn') {
+              alert('このターンには既にLIMITED効果を使用しています');
+            } else {
+              alert('LIMITEDカードの効果を現在使用できません');
+            }
+            return;
+          }
+        }
+      }
+    } catch (e) {
+      console.warn('LIMITED事前チェック中にエラー:', e);
+    }
     
     try {
       // 推しホロメンの場合は専用処理

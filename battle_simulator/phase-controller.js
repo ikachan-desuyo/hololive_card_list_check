@@ -295,8 +295,11 @@ class PhaseController {
       });
     }
     
-    // 4. LIMITED効果の使用回数をリセット
+    // 4. LIMITED効果の使用回数をリセット（player直下と gameState の両方）
     player.usedLimitedThisTurn = false;
+    if (player.gameState) {
+      player.gameState.usedLimitedThisTurn = false;
+    }
     
     // UI更新
     this.battleEngine.updateUI();

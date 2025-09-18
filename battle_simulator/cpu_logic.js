@@ -197,9 +197,21 @@ class HololiveCPULogic {
           return false;
         }
       } else {
-        // フォールバック（旧来の方式）
-        if (cpu.usedLimitedThisTurn) {
-          return false;
+        // フォールバック（旧来の方式） + 先行1ターン目制限
+        const stateManager = this.battleEngine.stateManager;
+        if (stateManager && typeof stateManager.canUseLimitedNow === 'function') {
+          const check = stateManager.canUseLimitedNow(2); // CPUはプレイヤーID 2
+          if (!check.canUse) {
+            return false; // 理由は不要（ログ簡略）
+          }
+        } else {
+          // 最低限のガード
+            if (cpu.isFirstPlayer && (cpu.playerTurnCount || 0) <= 1) {
+              return false;
+            }
+            if (cpu.usedLimitedThisTurn) {
+              return false;
+            }
         }
       }
     }
@@ -262,6 +274,9 @@ class HololiveCPULogic {
     
     if (card.card_type.includes('LIMITED')) {
       cpu.usedLimitedThisTurn = true;
+      if (cpu.gameState) {
+        cpu.gameState.usedLimitedThisTurn = true;
+      }
     }
     
     

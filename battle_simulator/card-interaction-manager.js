@@ -11,6 +11,21 @@ class CardInteractionManager {
   }
 
   /**
+   * LIMITEDカード判定（効果メタ + card_type + 名前）
+   */
+  isLimitedCard(card) {
+    if (!card) return false;
+    const typeMatch = card.card_type?.includes('LIMITED');
+    const nameMatch = (card.name && /LIMITED/i.test(card.name));
+    // 効果定義側の limited フラグ
+    let effectLimited = false;
+    if (window.cardEffects && window.cardEffects[card.id]?.effects) {
+      effectLimited = Object.values(window.cardEffects[card.id].effects).some(e => e.limited === true);
+    }
+    return !!(typeMatch || nameMatch || effectLimited);
+  }
+
+  /**
    * カードインタラクションの初期化
    */
   initializeCardInteractions() {
@@ -369,8 +384,9 @@ class CardInteractionManager {
       // 最初の手動効果を発動（複数ある場合は選択UIが必要）
       const effect = manualEffects[0];
       
-      // LIMITED制限チェック（ダブルチェック）
-      if (effect.limited && !this.canUseLimitedEffect(card, position)) {
+      // LIMITED制限チェック（効果に limited フラグがなくてもカードタイプがLIMITEDなら適用）
+      const isLimitedCard = card.card_type?.includes('LIMITED');
+      if ((effect.limited || isLimitedCard) && !this.canUseLimitedEffect(card, position)) {
         return; // 制限により発動不可
       }
       
@@ -394,7 +410,7 @@ class CardInteractionManager {
       
       if (result && result.success !== false) {
         // LIMITED効果の使用回数をカウント
-        if (effect.limited) {
+        if (effect.limited || isLimitedCard) {
           this.recordLimitedEffectUsage();
         }
         
@@ -593,8 +609,9 @@ class CardInteractionManager {
         const isManual = !isAutomatic && !isSnowFlowerOrUuu && (effect.timing === 'manual' || effect.timing === 'activate' || effect.timing === 'gift');
         
         if (isManual) {
-          // LIMITED制限チェック（システム側で統一処理）
-          if (effect.limited && !this.canUseLimitedEffect(card, position)) {
+          // LIMITED制限チェック（効果にlimitedが無くてもカードタイプがLIMITEDなら適用）
+          const isLimitedCard = card.card_type?.includes('LIMITED');
+          if ((effect.limited || isLimitedCard) && !this.canUseLimitedEffect(card, position)) {
             return false;
           }
           
@@ -799,29 +816,56 @@ class CardInteractionManager {
     const currentPlayer = this.battleEngine.gameState.currentPlayer;
     const player = this.battleEngine.players[currentPlayer];
     
-    // usedLimitedThisTurnの型を強制修正（数値0をfalseに変換）
-    if (typeof player.usedLimitedThisTurn !== 'boolean') {
-      Object.defineProperty(player, 'usedLimitedThisTurn', {
-        value: false,
-        writable: true,
-        enumerable: true,
-        configurable: true
-      });
+    const stateManager = this.battleEngine.stateManager;
+    const debug = window.BATTLE_ENGINE_DEBUG;
+    const limitedDetected = this.isLimitedCard(card);
+    if (!limitedDetected) {
+      if (debug) console.debug('[LIMITED] 判定: false (cardId:', card.id, ')');
+      return true; // LIMITEDでなければ制限なし
     }
-    
-    // 1ターンに1回制限（フラグベース）
-    if (player.usedLimitedThisTurn === true) {
-      this.showMessage('LIMITED効果は1ターンに1回しか使用できません', 'warning');
+
+    if (debug) {
+      const smFlag = stateManager?.state?.players?.[currentPlayer]?.gameState?.usedLimitedThisTurn;
+      console.debug('[LIMITED] pre-check flags local=', player.usedLimitedThisTurn, 'gameStateLocal=', player.gameState?.usedLimitedThisTurn, 'smFlag=', smFlag);
+    }
+
+    // 統一ヘルパーで判定
+    if (stateManager && typeof stateManager.canUseLimitedNow === 'function') {
+      const check = stateManager.canUseLimitedNow(currentPlayer);
+      if (debug) console.debug('[LIMITED] canUseLimitedNow=', check, 'playerTurnCount= ', stateManager.state.turn.playerTurnCount[currentPlayer]);
+      if (!check.canUse) {
+        if (check.reason === 'first_player_first_turn') {
+          console.warn('[LIMITED] Blocked: first_player_first_turn');
+          this.showMessage('先行1ターン目はLIMITED効果を使用できません', 'warning');
+        } else if (check.reason === 'already_used_this_turn') {
+          console.warn('[LIMITED] Blocked: already_used_this_turn');
+          this.showMessage('このターンには既にLIMITED効果を使用しています', 'warning');
+        } else {
+          console.warn('[LIMITED] Blocked: generic reason');
+          this.showMessage('LIMITED効果を現在使用できません', 'warning');
+        }
+        return false;
+      }
+    } else {
+      // フォールバック（念のため）
+      const playerTurnCount = (stateManager?.state?.turn?.playerTurnCount?.[currentPlayer]) || 0;
+      if (player.isFirstPlayer && playerTurnCount <= 1) {
+        console.warn('[LIMITED] Blocked (fallback): first_player_first_turn');
+        this.showMessage('先行1ターン目はLIMITED効果を使用できません', 'warning');
+        return false;
+      }
+      if (player.usedLimitedThisTurn === true || player.gameState?.usedLimitedThisTurn) {
+        console.warn('[LIMITED] Blocked (fallback): already_used_this_turn');
+        this.showMessage('このターンには既にLIMITED効果を使用しています', 'warning');
+        return false;
+      }
+    }
+    // 最終防衛ライン：ここまで来た後に別経路で使用記録が立った場合を再確認
+    if (player.usedLimitedThisTurn === true || player.gameState?.usedLimitedThisTurn === true || stateManager?.state?.players?.[currentPlayer]?.gameState?.usedLimitedThisTurn === true) {
+      console.warn('[LIMITED] Blocked (post-check race)');
+      this.showMessage('このターンには既にLIMITED効果を使用しています', 'warning');
       return false;
     }
-    
-    // 先行プレイヤーの最初のターン（個人ターン1回目）のみ使用不可
-    const playerTurnCount = this.battleEngine.stateManager.getStateByPath(`turn.playerTurnCount.${currentPlayer}`) || 0;
-    if (player.isFirstPlayer === true && playerTurnCount <= 1) {
-      this.showMessage('先行プレイヤーの最初のターンではLIMITED効果は使用できません', 'warning');
-      return false;
-    }
-    
     return true;
   }
 
@@ -833,6 +877,25 @@ class CardInteractionManager {
     const player = this.battleEngine.players[currentPlayer];
     
     player.usedLimitedThisTurn = true;
+    if (player.gameState) {
+      player.gameState.usedLimitedThisTurn = true; // StateManager互換領域にも反映
+    }
+    // StateManager の正規状態にも反映（他箇所が stateManager.state 経由で参照する場合のズレ防止）
+    if (this.battleEngine.stateManager) {
+      try {
+        this.battleEngine.stateManager.updateState('UPDATE_PLAYER_GAME_STATE', {
+          player: currentPlayer,
+          property: 'usedLimitedThisTurn',
+          value: true
+        });
+      } catch (e) {
+        console.warn('[LIMITED] StateManager update failed while recording usage', e);
+      }
+    }
+    if (window.BATTLE_ENGINE_DEBUG) {
+      const smFlag = this.battleEngine.stateManager?.state?.players?.[currentPlayer]?.gameState?.usedLimitedThisTurn;
+      console.debug('[LIMITED] usage recorded (recordLimitedEffectUsage). local=', player.usedLimitedThisTurn, 'sm=', smFlag);
+    }
   }
 
   /**

@@ -320,6 +320,12 @@ class HololivePlacementController {
     const positionRule = rules.allowedPlacements[normalizedPosition];
     
     if (!positionRule) {
+      // 開発用警告: 意図しないポジションID
+      if (window && window.warnLog) {
+        window.warnLog(`⚠️ 未定義の配置ポジションにアクセス: ${position} (正規化: ${normalizedPosition})`);
+      } else {
+        console.warn('[PlacementController] 未定義の配置ポジション:', position, '=>', normalizedPosition);
+      }
       return {
         allowed: false,
         reason: '無効な配置位置です'
@@ -523,7 +529,7 @@ class HololivePlacementController {
     const currentPhase = this.gameState.currentPhase;
     const isDebutPhase = this.gameState.debutPlacementPhase;
     
-    // 1. フェーズチェック（準備ステップのDebut配置時、メインステップ時のみ交換可能）
+    // 1. フェーズチェック（公式仕様: Debut配置フェーズ / メインステップのみ）
     if (!isDebutPhase && currentPhase !== 3) {
       return {
         valid: false,
@@ -578,6 +584,10 @@ class HololivePlacementController {
       // カード名から基本キャラクター名を抽出して比較
       const sourceName = this.extractCharacterName(sourceCard.name);
       const targetName = this.extractCharacterName(targetCard.name);
+      // デバッグログ（必要に応じて無効化可能）
+      if (window && window.debugLog) {
+        window.debugLog('[BloomCheck] raw=', sourceCard.name, targetCard.name, 'normalized=', sourceName, targetName);
+      }
       
       return sourceName === targetName;
     }
@@ -590,9 +600,17 @@ class HololivePlacementController {
    * @returns {string} キャラクター名
    */
   extractCharacterName(cardName) {
-    // 例: "紫咲シオン" -> "紫咲シオン", "雪花ラミィ" -> "雪花ラミィ"
-    // より複雑なパターンがある場合は、ここでロジックを拡張
-    return cardName.trim();
+    if (!cardName || typeof cardName !== 'string') return '';
+    let name = cardName;
+    // 前後空白除去
+    name = name.trim();
+    // 全角・半角スペース除去（内部差異も合わせる）
+    name = name.replace(/[\s　]+/g, '');
+    // 末尾括弧付きバージョン/派生表記 (例: 「(Debut)」「（1st）」など) を削除
+    name = name.replace(/[（(][^)）]*[)）]$/g, '');
+    // 記号類（#、☆、★ 等）が末尾に単独付与されている場合は除去（キャラ本体名ではない想定）
+    name = name.replace(/[★☆#]+$/g, '');
+    return name;
   }
 
   /**

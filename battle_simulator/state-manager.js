@@ -14,6 +14,46 @@ class HololiveStateManager {
   }
 
   /**
+   * 先行プレイヤーの最初のターンか判定
+   * @param {number} playerId
+   * @returns {boolean}
+   */
+  isFirstPlayerFirstTurn(playerId) {
+    try {
+      const turnState = this.state.turn;
+      if (!turnState || !turnState.firstPlayer) return false;
+      if (turnState.firstPlayer !== playerId) return false;
+      // グローバル turnCount が 1 の間のみ「先行1ターン目」とみなす（個別カウント不使用）
+      return (turnState.turnCount === 1);
+    } catch (e) {
+      return false;
+    }
+  }
+
+  /**
+   * LIMITED効果を現在使用可能か統一判定
+   * (1) 先行プレイヤーの最初のターンは禁止
+   * (2) 1ターン1回制限（usedLimitedThisTurn）
+   * @param {number} playerId
+   * @returns {{canUse:boolean, reason:string|null}}
+   */
+  canUseLimitedNow(playerId) {
+    const players = this.battleEngine ? this.battleEngine.players : null;
+    const player = players ? players[playerId] : null;
+    if (!player) return { canUse: false, reason: 'player_not_found' };
+    if (this.isFirstPlayerFirstTurn(playerId)) {
+      return { canUse: false, reason: 'first_player_first_turn' };
+    }
+    if (player.usedLimitedThisTurn === true || player.gameState?.usedLimitedThisTurn === true) {
+      return { canUse: false, reason: 'already_used_this_turn' };
+    }
+    if (window.BATTLE_ENGINE_DEBUG) {
+      console.debug('[LIMITED][canUseLimitedNow] OK playerId=', playerId, 'turnCount=', this.state.turn.turnCount, 'firstPlayer=', this.state.turn.firstPlayer);
+    }
+    return { canUse: true, reason: null };
+  }
+
+  /**
    * 初期状態の作成
    */
   createInitialState() {
@@ -291,6 +331,8 @@ class HololiveStateManager {
             player.gameState.collabMovedThisTurn = false;
             // バトンタッチ使用フラグもリセット
             player.gameState.batonTouchUsedThisTurn = false;
+            // LIMITED使用フラグもリセット（念のため二重リセット許容）
+            player.gameState.usedLimitedThisTurn = false;
           }
           
           // バトンタッチ使用時はターン1制限を解除
@@ -1604,11 +1646,21 @@ class HololiveStateManager {
       };
     }
 
-    // 1. 同名カード要件チェック
-    if (card.name !== targetCard.name) {
+    // 1. 同名カード要件チェック（正規化名比較も実施）
+    const normalize = (name) => {
+      if (!name || typeof name !== 'string') return '';
+      let n = name.trim();
+      n = n.replace(/[\s　]+/g, '');
+      n = n.replace(/[（(][^)）]*[)）]$/g, '');
+      n = n.replace(/[★☆#]+$/g, '');
+      return n;
+    };
+    const rawMismatch = card.name !== targetCard.name;
+    const normMismatch = normalize(card.name) !== normalize(targetCard.name);
+    if (normMismatch) {
       return {
         valid: false,
-        reason: 'ブルームは同名のホロメンカード同士でのみ可能です'
+        reason: rawMismatch ? 'ブルームは同名（表記揺れ含む）のホロメンのみ可能です' : '内部正規化後の名称不一致によりブルーム不可'
       };
     }
 
@@ -1745,8 +1797,21 @@ class HololiveStateManager {
       return false;
     }
     
-    // 同名チェック
-    if (card.name !== targetCard.name) {
+    // 正規化名称で比較（placement-controller と同等ロジックをこちらにも複製）
+    const normalize = (name) => {
+      if (!name || typeof name !== 'string') return '';
+      let n = name.trim();
+      n = n.replace(/[\s　]+/g, '');
+      n = n.replace(/[（(][^)）]*[)）]$/g, '');
+      n = n.replace(/[★☆#]+$/g, '');
+      return n;
+    };
+    const rawSource = card.name;
+    const rawTarget = targetCard.name;
+    const normSource = normalize(rawSource);
+    const normTarget = normalize(rawTarget);
+
+    if (normSource !== normTarget) {
       return false;
     }
     
@@ -1794,6 +1859,34 @@ class HololiveStateManager {
     const gameState = this.getState();
     const currentTurn = gameState.turn.turnCount;
     const playerTurnCount = gameState.turn.playerTurnCount[playerId] || 0;
+    const currentPhase = gameState.turn.currentPhase;
+    const debutPlacementPhase = gameState.game?.debutPlacementPhase || this.state.debutPlacementPhase || false;
+
+    if (window && window.debugLog) {
+      window.debugLog('[canBloom] attempt', {
+        source: { name: card?.name, level: card?.bloom_level, hp: card?.hp },
+        target: { name: targetCard?.name, level: targetCard?.bloom_level, hp: targetCard?.hp },
+        phase: currentPhase,
+        debutPlacementPhase,
+        turn: currentTurn,
+        playerTurnCount
+      });
+    }
+
+    // フェーズ制限: メインステップ（phase 3）のみ許可（Debut配置フェーズ中は通常ブルーム不可）
+    if (!debutPlacementPhase && currentPhase !== 3) {
+      return {
+        valid: false,
+        reason: 'ブルームはメインステップでのみ可能です'
+      };
+    }
+    // Debut配置特別フェーズ中はブルーム禁止（初期配置のみ）
+    if (debutPlacementPhase) {
+      return {
+        valid: false,
+        reason: 'Debut配置フェーズ中はブルームできません'
+      };
+    }
     
     // 1. 基本的な互換性チェック
     const compatibilityCheck = this.checkBloomCompatibility(card, targetCard, playerId);

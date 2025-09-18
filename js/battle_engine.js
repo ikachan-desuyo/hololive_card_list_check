@@ -5,6 +5,12 @@
 
 class HololiveBattleEngine {
   constructor() {
+    window.BATTLE_ENGINE_BUILD = 'back-slot-mapping-v1.1';
+    window.BATTLE_ENGINE_DEBUG = false; // true にすると詳細ログ再開
+    if (window.BATTLE_ENGINE_DEBUG) {
+      console.log('🛠 BattleEngine Script Load Patch: back-slot mapping v1.1');
+    }
+    window.getBattleEngineVersion = () => window.BATTLE_ENGINE_BUILD;
     // 状態管理の初期化（最優先）
     this.stateManager = new HololiveStateManager(this);
     
@@ -24,6 +30,8 @@ class HololiveBattleEngine {
     // 重複ドロップイベント防止機能
     this.lastDropTime = 0;
     this.isDropProcessing = false;
+  // 直前にホバーしていたドロップゾーン情報（unknownフォールバック用）
+  this.lastHoveredDropZone = null;
     
     // フェーズ管理をPhaseControllerに移譲
     // this.phaseInProgress と this.phaseNames は PhaseController で管理
@@ -104,6 +112,15 @@ class HololiveBattleEngine {
       window.infoPanelManager = new InfoPanelManager();
     }
     this.infoPanelManager = window.infoPanelManager;
+
+    if (window.BATTLE_ENGINE_DEBUG) {
+      // DOM 安定後の一度だけのバージョン確認ログ
+      setTimeout(() => {
+        try {
+          console.log('🔍 BattleEngine runtime version check:', window.getBattleEngineVersion && window.getBattleEngineVersion());
+        } catch(_) {}
+      }, 500);
+    }
   }
 
   /**
@@ -690,6 +707,13 @@ class HololiveBattleEngine {
     
     // サポートカード効果エリアを作成
     this.createSupportDropZone();
+
+    if (window.BATTLE_ENGINE_DEBUG) {
+      // 自己診断（デバッグ時のみ）
+      setTimeout(() => {
+        try { this.selfTestBackSlotMapping(); } catch(err) { console.warn('[SelfTest] back-slot mapping test failed', err); }
+      }, 300);
+    }
   }
 
   // setupHandArea メソッドを削除（HandManagerに移動）
@@ -2243,12 +2267,31 @@ class HololiveBattleEngine {
   handleDragOver(e) {
     e.preventDefault();
     e.dataTransfer.dropEffect = 'move';
+    // dragover は頻繁に発火するので軽量に lastHoveredDropZone を更新
+    if (this.draggedCard && this.draggedCard.card) {
+      try {
+        const info = this.getDropZoneInfo(e.target);
+        if (info.type !== 'unknown') {
+          this.lastHoveredDropZone = info;
+        }
+      } catch(_) {}
+    }
   }
 
   handleDragEnter(e) {
     e.preventDefault();
     if (this.draggedCard && this.isValidDropTarget(e.target, this.draggedCard.card)) {
       e.target.classList.add('drop-zone-hover');
+      // フォールバック用に最後にホバーしたゾーンを記録
+      try {
+        const hz = this.getDropZoneInfo(e.target);
+        if (hz && hz.type && hz.type !== 'unknown') {
+          this.lastHoveredDropZone = hz;
+          console.log('[DragEnter] lastHoveredDropZone更新:', hz);
+        }
+      } catch (err) {
+        console.warn('[DragEnter] lastHoveredDropZone取得失敗', err);
+      }
     }
   }
 
@@ -2288,8 +2331,89 @@ class HololiveBattleEngine {
       }
       
       const card = droppedData.card;
-      const dropZone = this.getDropZoneInfo(e.target);
-      
+      let dropZone = this.getDropZoneInfo(e.target);
+
+      if (dropZone.type === 'unknown') {
+        console.log('⚠️ ドロップ先がunknown。フォールバック処理開始');
+        // 1) 直前ホバー情報
+        if (this.lastHoveredDropZone && this.lastHoveredDropZone.type !== 'unknown') {
+          console.log('✅ フォールバック: lastHoveredDropZoneを使用', this.lastHoveredDropZone);
+          dropZone = this.lastHoveredDropZone;
+        } else {
+          // 2) 座標から再判定
+            try {
+              const ptEl = document.elementFromPoint(e.clientX, e.clientY);
+              if (ptEl) {
+                const alt = this.getDropZoneInfo(ptEl);
+                if (alt.type !== 'unknown') {
+                  console.log('✅ フォールバック: elementFromPointで特定', alt);
+                  dropZone = alt;
+                } else {
+                  // elementsFromPoint (複数) を利用
+                  if (document.elementsFromPoint) {
+                    const stack = document.elementsFromPoint(e.clientX, e.clientY);
+                    for (const el of stack) {
+                      const alt2 = this.getDropZoneInfo(el);
+                      if (alt2.type !== 'unknown') {
+                        console.log('✅ フォールバック: elementsFromPoint stack から特定', alt2);
+                        dropZone = alt2;
+                        break;
+                      }
+                    }
+                  }
+                }
+              }
+            } catch (err) {
+              console.warn('[handleDrop] elementFromPoint再判定失敗', err);
+            }
+          // 3) 祖先探索
+          if (dropZone.type === 'unknown') {
+            let cur = e.target.parentElement;
+            while (cur && dropZone.type === 'unknown') {
+              const ancInfo = this.getDropZoneInfo(cur);
+              if (ancInfo.type !== 'unknown') {
+                console.log('✅ フォールバック: 祖先から特定', ancInfo);
+                dropZone = ancInfo;
+                break;
+              }
+              cur = cur.parentElement;
+            }
+          }
+          // 4) バックスロットの最終フォールバック（プレイヤー側でハイライトされている最初の back-slot を拾う）
+          if (dropZone.type === 'unknown') {
+            const highlightedBack = document.querySelector('.battle-player .back-slot.drop-zone-active');
+            if (highlightedBack) {
+              const slotIndex = parseInt(highlightedBack.getAttribute('data-slot')) || 0;
+              console.log('✅ フォールバック: ハイライトback-slot利用 index:', slotIndex);
+              dropZone = { type: 'back', index: slotIndex };
+            }
+          }
+          // 5) バックスロットの座標判定（全スロット矩形を走査してヒット）
+          if (dropZone.type === 'unknown') {
+            try {
+              const rectX = e.clientX;
+              const rectY = e.clientY;
+              const allBacks = document.querySelectorAll('.battle-player .back-slot');
+              for (const slot of allBacks) {
+                const r = slot.getBoundingClientRect();
+                if (rectX >= r.left && rectX <= r.right && rectY >= r.top && rectY <= r.bottom) {
+                  const slotIndex = parseInt(slot.getAttribute('data-slot')) || 0;
+                  console.log('✅ フォールバック: バウンディング矩形ヒット index:', slotIndex);
+                  dropZone = { type: 'back', index: slotIndex };
+                  break;
+                }
+              }
+            } catch(err) {
+              console.warn('[handleDrop] バウンディング矩形走査失敗', err);
+            }
+          }
+        }
+      }
+
+      if (window.BATTLE_ENGINE_DEBUG && dropZone.type === 'unknown') {
+        console.log('❓ [handleDrop] 未特定ターゲット (debug mode)');
+      }
+
       console.log('ドロップ先:', dropZone);
       console.log('ドラッグ元:', droppedData.source);
       
@@ -2305,7 +2429,13 @@ class HololiveBattleEngine {
         return;
       }
       
-      // 配置制御チェック
+      // 配置制御チェック（unknown なら早期中断）
+      if (dropZone.type === 'unknown') {
+        console.log('❌ ドロップ先判定できず: 最終フォールバック失敗 (placement check 前で中断)');
+        this.showAlert('配置できません: ドロップ先を認識できません (再試行してください)', 'unknown_drop_zone');
+        return; // finally でクリーンアップ
+      }
+
       if (this.placementController && dropZone.type !== 'support') {
         // バックスロットの場合は具体的なポジション名を作成
         let positionName = dropZone.type;
@@ -2352,6 +2482,7 @@ class HololiveBattleEngine {
       this.draggedPlacedCard = null;
       this.isDropProcessing = false;
       console.log('🔄 [handleDrop] 処理完了、フラグリセット');
+      this.lastHoveredDropZone = null;
     }
   }
 
@@ -2654,6 +2785,23 @@ class HololiveBattleEngine {
     }
   }
 
+  /**
+   * 自己診断: バックスロットおよび配置済みカードに対して getDropZoneInfo の戻り値を検証
+   * - プレイヤー側 .battle-player 内の .back-slot と その子.card を走査
+   * - 結果をコンソールにまとめて表示
+   */
+  selfTestBackSlotMapping() {
+    if (!window.BATTLE_ENGINE_DEBUG) return;
+    console.log('🧪 [SelfTest] back-slot mapping start');
+    const backSlots = document.querySelectorAll('.battle-player .back-slot');
+    backSlots.forEach(slot => {
+      const slotIndex = slot.getAttribute('data-slot');
+      const slotInfo = this.getDropZoneInfo(slot);
+      console.log(`🧪 [SelfTest] slot[data-slot=${slotIndex}] =>`, slotInfo);
+    });
+    console.log('🧪 [SelfTest] back-slot mapping end');
+  }
+
   // バックスロットへの配置可能性チェック
   canPlaceCardInBackSlot(card, slotIndex) {
     const player = this.players[1];
@@ -2709,15 +2857,16 @@ class HololiveBattleEngine {
         return { type: 'oshi', index: 0, element: target };
       }
       
+      // バック個別スロット (back1..back5) を明示対応
+      if (/^back[1-5]$/.test(areaId)) {
+        const idx = parseInt(areaId.replace('back',''), 10) - 1;
+        return { type: 'back', index: idx, element: target };
+      }
       switch (areaId) {
-        case 'collab':
-          return { type: 'collab', index: 0, element: target };
-        case 'center':
-          return { type: 'center', index: 0, element: target };
-        case 'backs':
-          return { type: 'back', index: areaIndex, element: target };
-        default:
-          return { type: 'unknown' };
+        case 'collab': return { type: 'collab', index: 0, element: target };
+        case 'center': return { type: 'center', index: 0, element: target };
+        case 'backs': return { type: 'back', index: areaIndex, element: target };
+        default: return { type: 'unknown' };
       }
     }
     
@@ -2775,7 +2924,13 @@ class HololiveBattleEngine {
     if (target.classList.contains('support-drop-zone')) {
       return { type: 'support' };
     }
-    
+    // unknown になる直前の診断ログ（頻繁に呼ばれる可能性があるので簡潔に）
+    if (window.BATTLE_ENGINE_DEBUG) {
+      try {
+        const cls = target.className || '';
+        console.log('[getDropZoneInfo] unknown target tag=', target.tagName?.toLowerCase(), 'classes=', cls);
+      } catch(_) {}
+    }
     return { type: 'unknown' };
   }
 

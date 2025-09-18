@@ -420,13 +420,57 @@ class HandManager {
           window.debugLog('LIMITED制限により使用できません');
           return;
         }
-      } else {
-        // フォールバック（旧来の方式）
-        if (player.usedLimitedThisTurn) {
-          window.debugLog('このターンには既にLIMITEDカードを使用しています');
-          return;
+        // card-interaction-manager の発動経路を通らず直接使用するケースでも使用済みを明示
+        const cim = this.battleEngine.cardInteractionManager;
+        if (cim && typeof cim.recordLimitedEffectUsage === 'function') {
+          cim.recordLimitedEffectUsage();
+          if (window.BATTLE_ENGINE_DEBUG) console.debug('[LIMITED] usage recorded via hand-manager fallback path (delegated)');
+        } else {
+          const playerId = this.battleEngine.gameState.currentPlayer;
+          const p = this.battleEngine.players[playerId];
+            if (!p.usedLimitedThisTurn) {
+              p.usedLimitedThisTurn = true;
+              if (p.gameState) p.gameState.usedLimitedThisTurn = true;
+              if (window.BATTLE_ENGINE_DEBUG) console.debug('[LIMITED] usage recorded via hand-manager fallback path (manual)');
+            }
         }
-        player.usedLimitedThisTurn = true;
+      } else {
+        // フォールバック（旧来の方式）+ 先行1ターン目制限
+        const stateManager = this.battleEngine.stateManager;
+        if (stateManager && typeof stateManager.canUseLimitedNow === 'function') {
+          const check = stateManager.canUseLimitedNow(this.battleEngine.gameState.currentPlayer);
+          if (!check.canUse) {
+            if (check.reason === 'first_player_first_turn') {
+              this.showAlert('先行1ターン目はLIMITEDカードを使用できません', 'limited_first_turn');
+            } else if (check.reason === 'already_used_this_turn') {
+              this.showAlert('このターンには既にLIMITEDカードを使用しています', 'limited_once');
+            } else {
+              this.showAlert('LIMITEDカードを使用できません', 'limited_generic');
+            }
+            return;
+          }
+          if (this.battleEngine.cardInteractionManager) {
+            this.battleEngine.cardInteractionManager.recordLimitedEffectUsage();
+          } else {
+            player.usedLimitedThisTurn = true;
+            if (player.gameState) player.gameState.usedLimitedThisTurn = true;
+          }
+        } else {
+          if (player.isFirstPlayer && (player.playerTurnCount || 0) <= 1) {
+            this.showAlert('先行1ターン目はLIMITEDカードを使用できません', 'limited_first_turn');
+            return;
+          }
+          if (player.usedLimitedThisTurn) {
+            this.showAlert('このターンには既にLIMITEDカードを使用しています', 'limited_once');
+            return;
+          }
+          if (this.battleEngine.cardInteractionManager) {
+            this.battleEngine.cardInteractionManager.recordLimitedEffectUsage();
+          } else {
+            player.usedLimitedThisTurn = true;
+            if (player.gameState) player.gameState.usedLimitedThisTurn = true;
+          }
+        }
       }
     }
     

@@ -125,9 +125,23 @@ class EffectPatternTemplates {
           return { success: false, reason: 'LIMITED制限により使用できません' };
         }
       } else {
-        // フォールバック（旧来の方式）
-        if (!this.checkLimitedRestriction(card, battleEngine)) {
-          return { success: false, reason: 'LIMITED制限により使用できません' };
+        // フォールバック（旧来の方式） + 先行1ターン目制限
+        const stateManager = battleEngine.stateManager;
+        if (stateManager && typeof stateManager.canUseLimitedNow === 'function') {
+          const check = stateManager.canUseLimitedNow(battleEngine.gameState.currentPlayer);
+          if (!check.canUse) {
+            return { success: false, reason: 'LIMITED制限により使用できません' };
+          }
+        } else {
+          // 最低限の簡易チェック（旧互換）
+          const currentPlayer = battleEngine.gameState.currentPlayer;
+          const player = battleEngine.players[currentPlayer];
+          if (player.isFirstPlayer && (player.playerTurnCount || 0) <= 1) {
+            return { success: false, reason: 'LIMITED制限により使用できません' };
+          }
+          if (player.usedLimitedThisTurn) {
+            return { success: false, reason: 'LIMITED制限により使用できません' };
+          }
         }
       }
     }
@@ -138,11 +152,29 @@ class EffectPatternTemplates {
     }
 
     // 基本的なLIMITED効果（効果なし、アーカイブのみ）
-    return {
+    const result = {
       success: true,
       message: `${card.name}を使用しました`,
       effect: 'basic_limited'
     };
+
+    // 使用フラグを確実に記録（パターン経由でも 1 ターン 1 回制限を厳守）
+    try {
+      if (battleEngine.cardInteractionManager && typeof battleEngine.cardInteractionManager.recordLimitedEffectUsage === 'function') {
+        battleEngine.cardInteractionManager.recordLimitedEffectUsage();
+        if (window.BATTLE_ENGINE_DEBUG) console.debug('[LIMITED] usage recorded via executeLimitedSupport (delegated) card', card.id);
+      } else {
+        const currentPlayer = battleEngine.gameState.currentPlayer;
+        const player = battleEngine.players[currentPlayer];
+        player.usedLimitedThisTurn = true;
+        if (player.gameState) player.gameState.usedLimitedThisTurn = true;
+        if (window.BATTLE_ENGINE_DEBUG) console.debug('[LIMITED] usage recorded via executeLimitedSupport (fallback) card', card.id);
+      }
+    } catch (e) {
+      console.warn('[LIMITED] usage record failed in executeLimitedSupport', e);
+    }
+
+    return result;
   }
 
   /**
