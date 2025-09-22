@@ -446,6 +446,82 @@ class CardInteractionManager {
   }
 
   /**
+   * 特定タイプの効果を直接実行（ブルーム/コラボ用の自動発動パス）
+   * @param {Object} card - カード
+   * @param {('bloom'|'collab')} effectType - 実行する効果タイプ
+   * @param {string} position - カードの位置
+   */
+  async executeSpecificEffect(card, effectType, position) {
+    try {
+      const cardEffect = window.cardEffects?.[card.id] || (card.number ? window.cardEffects?.[card.number] : null);
+      if (!cardEffect) {
+        this.showMessage('このカードには効果がありません', 'info');
+        return;
+      }
+
+      // 新形式: effects内に { type: 'bloom'|'collab' } を持つ項目がある前提
+      let targetEffect = null;
+      if (cardEffect.effects) {
+        // まずは effects.bloomEffect/collabEffect を優先
+        if (effectType === 'bloom' && cardEffect.effects.bloomEffect) {
+          targetEffect = cardEffect.effects.bloomEffect;
+        } else if (effectType === 'collab' && cardEffect.effects.collabEffect) {
+          targetEffect = cardEffect.effects.collabEffect;
+        }
+        // 見つからなければ type マッチで探す
+        if (!targetEffect) {
+          targetEffect = Object.values(cardEffect.effects).find(e => e?.type === effectType);
+        }
+      }
+
+      if (!targetEffect) {
+        // 後方互換: トップレベルに {bloomEffect|collabEffect} がある場合
+        const legacyKey = effectType === 'bloom' ? 'bloomEffect' : 'collabEffect';
+        if (cardEffect[legacyKey]) {
+          targetEffect = cardEffect[legacyKey];
+        }
+      }
+      if (!targetEffect) {
+        this.showMessage(`${effectType === 'bloom' ? 'ブルーム' : 'コラボ'}効果が見つかりません`, 'info');
+        return;
+      }
+
+      // 条件チェック（存在すれば）
+      if (typeof targetEffect.condition === 'function') {
+        try {
+          const ok = targetEffect.condition(card, this.battleEngine.gameState, this.battleEngine);
+          if (!ok) {
+            this.showMessage('効果の発動条件を満たしていません', 'warning');
+            return;
+          }
+        } catch (condErr) {
+          console.error('🚨 [CardInteraction] 条件チェックエラー:', condErr);
+          this.showMessage('効果の発動条件チェック中にエラーが発生しました', 'error');
+          return;
+        }
+      }
+
+      // 実行
+      if (typeof targetEffect.effect === 'function') {
+        const result = await targetEffect.effect(card, this.battleEngine);
+        if (result && result.success !== false) {
+          this.showMessage(result.message || '効果を発動しました', 'success');
+          // UI更新
+          this.battleEngine.updateUI();
+        } else {
+          const messageType = this.determineMessageType(result);
+          this.showMessage(result?.message || '効果を発動できませんでした', messageType);
+        }
+      } else {
+        console.warn(`[CardInteraction] 指定効果にeffect関数がありません type=${effectType}`);
+      }
+    } catch (error) {
+      console.error('🚨 [CardInteraction] executeSpecificEffect error:', error);
+      this.showMessage('効果の発動中にエラーが発生しました: ' + error.message, 'error');
+    }
+  }
+
+  /**
    * ヘルパーメソッド群
    */
   isPlayerCard(card, position) {

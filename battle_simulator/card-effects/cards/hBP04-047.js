@@ -39,51 +39,33 @@ const cardEffect_hBP04_047 = {
       },
       effect: async (card, battleEngine) => {
         console.log(`❄️ [コラボエフェクト] ${card.name || 'hBP04-047'}の「fleur」が発動可能！`);
-        
-        return new Promise((resolve) => {
-          battleEngine.modalUI.showCardEffectModal({
-            cardName: card.name || '雪花ラミィ',
-            effectName: 'fleur',
-            effectDescription: '自分の〈雪民〉が付いている〈雪花ラミィ〉がいる時、相手のホロメン1人に特殊ダメージ20を与える。ただし、ダウンしても相手のライフは減らない。',
-            effectType: 'collab'
-          }, async (confirmed) => {
-            if (!confirmed) {
-              resolve({
-                success: false,
-                message: 'コラボエフェクトの発動をキャンセルしました'
-              });
-              return;
-            }
-            
-            try {
-              console.log(`❄️ [コラボエフェクト] 「fleur」を実行中...`);
-              
-              const currentPlayer = battleEngine.gameState.currentPlayer;
-              const opponentPlayer = currentPlayer === 0 ? 1 : 0;
-              const utils = new CardEffectUtils(battleEngine);
-              
-              // 相手のホロメン1人に特殊ダメージ20を与える
-              // TODO: 特殊ダメージ（ライフダメージなし）の実装
-              console.log(`⚡ [特殊ダメージ] 相手のホロメンに特殊ダメージ20（ライフダメージなし）`);
-              
-              // UI更新
-              utils.updateDisplay();
-              
-              resolve({
-                success: true,
-                message: `${card.name || 'hBP04-047'}のコラボエフェクト「fleur」で相手のホロメンに特殊ダメージ20！`,
-                specialDamage: 20,
-                target: 'opponent_holomem'
-              });
-            } catch (error) {
-              console.error('コラボエフェクト実行エラー:', error);
-              resolve({
-                success: false,
-                message: 'コラボエフェクトの実行中にエラーが発生しました'
-              });
-            }
-          });
-        });
+
+        try {
+          console.log(`❄️ [コラボエフェクト] 「fleur」を実行中...`);
+
+          const currentPlayer = battleEngine.gameState.currentPlayer;
+          const utils = new CardEffectUtils(battleEngine);
+
+          // 相手のホロメン1人に特殊ダメージ20を与える
+          // TODO: 特殊ダメージ（ライフダメージなし）の実装
+          console.log(`⚡ [特殊ダメージ] 相手のホロメンに特殊ダメージ20（ライフダメージなし）`);
+
+          // UI更新
+          utils.updateDisplay();
+
+          return {
+            success: true,
+            message: `${card.name || 'hBP04-047'}のコラボエフェクト「fleur」で相手のホロメンに特殊ダメージ20！`,
+            specialDamage: 20,
+            target: 'opponent_holomem'
+          };
+        } catch (error) {
+          console.error('コラボエフェクト実行エラー:', error);
+          return {
+            success: false,
+            message: 'コラボエフェクトの実行中にエラーが発生しました'
+          };
+        }
       }
     },
     

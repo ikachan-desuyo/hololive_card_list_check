@@ -508,6 +508,25 @@ class ModalUI {
    */
   showCardEffectModal(options, callback) {
     const { cardName, effectName, effectDescription, effectType } = options;
+    // コラボ/ブルーム確認は PerformanceManager 側で一本化しているため、ここでは常にUIを出さず自動承認
+    try {
+      if (effectType === 'collab' || effectType === 'bloom') {
+        console.warn(`[ModalUI] ${effectType} confirmation is centralized. Auto-confirm without rendering generic modal.`);
+        if (typeof callback === 'function') callback(true);
+        return;
+      }
+      // 念のため、中央確認アクティブ状態でも汎用モーダルは出さない
+      const pmDialog = document.getElementById('effect-confirmation-dialog');
+      const flag = (typeof window !== 'undefined') ? window.__EFFECT_CONFIRM_ACTIVE__ : null;
+      const centralizedActive = !!(pmDialog || flag);
+      // effectTypeが省略/異なる場合でも、中央確認がアクティブなら汎用モーダルは出さない
+      if (centralizedActive && (effectType === 'collab' || effectType === 'bloom' || (flag && (flag.type === 'collab' || flag.type === 'bloom')))) {
+        const t = (flag && flag.type) || effectType || 'effect';
+        console.warn(`[ModalUI] ${t} confirmation is centralized in PerformanceManager. Auto-confirm and skip duplicate modal.`);
+        if (typeof callback === 'function') callback(true);
+        return;
+      }
+    } catch (_) {}
     
     // 効果タイプに応じたアイコンと色
     const typeConfig = {

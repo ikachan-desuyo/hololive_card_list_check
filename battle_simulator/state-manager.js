@@ -717,18 +717,17 @@ class HololiveStateManager {
                 // ブルーム完了フラグを設定
                 this.bloomCompleted = true;
                 
-                // ブルーム効果チェック（center配置時）
+                // ブルーム効果チェック（統一: performanceManager）
                 setTimeout(() => {
-                  console.log(`🌸 [StateManager] ブルーム効果チェック開始: handManager=${!!this.battleEngine.handManager}`);
-                  if (this.battleEngine.handManager && this.battleEngine.handManager.checkAndTriggerBloomEffects) {
-                    console.log(`🌸 [StateManager] ブルーム効果チェック実行中...`);
-                    this.battleEngine.handManager.checkAndTriggerBloomEffects(
-                      newCard, 
-                      payload.player, 
-                      payload.position
+                  console.log(`🌸 [StateManager] ブルーム効果確認UI: performanceManager=${!!this.battleEngine.performanceManager}`);
+                  if (this.battleEngine.performanceManager && this.battleEngine.performanceManager.showBloomEffectConfirmation) {
+                    this.battleEngine.performanceManager.showBloomEffectConfirmation(
+                      newCard,
+                      payload.position,
+                      payload.player
                     );
                   } else {
-                    console.warn(`❌ [StateManager] handManagerまたはcheckAndTriggerBloomEffectsが存在しません`);
+                    console.warn(`❌ [StateManager] performanceManagerまたはshowBloomEffectConfirmationが存在しません`);
                   }
                 }, 500);
               } else {
@@ -812,19 +811,17 @@ class HololiveStateManager {
                 // ブルーム完了フラグを設定
                 this.bloomCompleted = true;
                 
-                // ブルーム効果チェック（center配置時）
+                // ブルーム効果チェック（統一: performanceManager）
                 setTimeout(() => {
-                  console.log(`🌸 [StateManager] センターブルーム効果チェック開始: handManager=${!!this.battleEngine.handManager}`);
-                  if (this.battleEngine.handManager && this.battleEngine.handManager.checkAndTriggerBloomEffects) {
-                    console.log(`🌸 [StateManager] センターブルーム効果チェック実行中...`);
-                    // ブルーム効果チェックには新しく配置されたカード（上に重ねられたカード）を渡す
-                    this.battleEngine.handManager.checkAndTriggerBloomEffects(
-                      newCard, 
-                      payload.player, 
-                      'center'
+                  console.log(`🌸 [StateManager] センターブルーム効果確認UI: performanceManager=${!!this.battleEngine.performanceManager}`);
+                  if (this.battleEngine.performanceManager && this.battleEngine.performanceManager.showBloomEffectConfirmation) {
+                    this.battleEngine.performanceManager.showBloomEffectConfirmation(
+                      newCard,
+                      'center',
+                      payload.player
                     );
                   } else {
-                    console.warn(`❌ [StateManager] handManagerまたはcheckAndTriggerBloomEffectsが存在しません`);
+                    console.warn(`❌ [StateManager] performanceManagerまたはshowBloomEffectConfirmationが存在しません`);
                   }
                 }, 500);
               } else {
@@ -907,6 +904,20 @@ class HololiveStateManager {
                 
                 // ブルーム完了フラグを設定
                 this.bloomCompleted = true;
+
+                // ブルーム効果チェック（統一: performanceManager）
+                setTimeout(() => {
+                  console.log(`🌸 [StateManager] コラボブルーム効果確認UI: performanceManager=${!!this.battleEngine.performanceManager}`);
+                  if (this.battleEngine.performanceManager && this.battleEngine.performanceManager.showBloomEffectConfirmation) {
+                    this.battleEngine.performanceManager.showBloomEffectConfirmation(
+                      newCard,
+                      'collab',
+                      payload.player
+                    );
+                  } else {
+                    console.warn(`❌ [StateManager] performanceManagerまたはshowBloomEffectConfirmationが存在しません`);
+                  }
+                }, 500);
               } else {
                 // 通常配置
                 const newCard = this.addCardState(payload.card, {
@@ -967,32 +978,15 @@ class HololiveStateManager {
         break;
 
       case 'ADD_BLOOM_HISTORY':
-        // ブルーム履歴の追加
+        // ブルーム履歴の追加（UIトリガーはPLACE_CARDで統一済みのため、履歴のみ管理）
         if (payload.player && payload.position) {
           const player = newState.players[payload.player];
           if (player && !player.bloomedThisTurn.includes(payload.position)) {
             player.bloomedThisTurn.push(payload.position);
-            
-            // カードにブルームターン情報を記録
             const card = player.stage?.[payload.position] || player[payload.position];
             if (card) {
               card.bloomedTurn = newState.turn.turnCount;
               card.bloomEffectUsed = false; // 効果未使用にリセット
-              
-              // ブルームエフェクト自動モーダル表示（ブルーム直後）
-              setTimeout(() => {
-                console.log(`🌸 [StateManager] バックポジションブルーム効果チェック開始: handManager=${!!this.battleEngine.handManager}`);
-                if (this.battleEngine.handManager && this.battleEngine.handManager.checkAndTriggerBloomEffects) {
-                  console.log(`🌸 [StateManager] バックポジションブルーム効果チェック実行中...`);
-                  this.battleEngine.handManager.checkAndTriggerBloomEffects(
-                    card, 
-                    payload.player, 
-                    payload.position
-                  );
-                } else {
-                  console.warn(`❌ [StateManager] handManagerまたはcheckAndTriggerBloomEffectsが存在しません`);
-                }
-              }, 500);
             }
           }
         }

@@ -39,87 +39,68 @@ const cardEffect_hBP04_044 = {
       },
       effect: async (card, battleEngine) => {
         console.log(`🌸 [コラボエフェクト] ${card.name || 'hBP04-044'}の「Snow flower」が発動可能！`);
-        
-        return new Promise((resolve) => {
-          battleEngine.modalUI.showCardEffectModal({
-            cardName: card.name || '雪花ラミィ',
-            effectName: 'Snow flower',
-            effectDescription: '自分の〈雪民〉が付いている〈雪花ラミィ〉がいない時、自分のデッキから、〈雪民〉1枚を公開し、自分の〈雪花ラミィ〉に付ける。そしてデッキをシャッフルする。',
-            effectType: 'collab'
-          }, async (confirmed) => {
-            if (!confirmed) {
-              resolve({
-                success: false,
-                message: 'コラボエフェクトの発動をキャンセルしました'
-              });
-              return;
-            }
-            
-            try {
-              console.log(`🌸 [コラボエフェクト] 「Snow flower」を実行中...`);
-              
-              const currentPlayer = battleEngine.gameState.currentPlayer;
-              const utils = new CardEffectUtils(battleEngine);
-              
-              // デッキから〈雪民〉を選択
-              const selectionResult = await utils.selectCardsFromDeck(currentPlayer, {
-                count: 1,
-                description: '〈雪民〉を選択してください',
-                allowLess: true,
-                customFilter: [
-                  (card) => card.name && card.name.includes('雪民')
-                ]
-              });
 
-              if (!selectionResult.success || selectionResult.cards.length === 0) {
-                resolve({
-                  success: false,
-                  message: 'デッキに〈雪民〉が見つかりませんでした'
-                });
-                return;
-              }
+        try {
+          console.log(`🌸 [コラボエフェクト] 「Snow flower」を実行中...`);
 
-              const yukiminCard = selectionResult.cards[0];
-              
-              // 〈雪花ラミィ〉を選択して〈雪民〉を付ける
-              const stageHolomens = utils.getStageHolomens(currentPlayer);
-              const lamiis = stageHolomens.filter(h => h.card.name && h.card.name.includes('雪花ラミィ'));
-              
-              if (lamiis.length === 0) {
-                resolve({
-                  success: false,
-                  message: 'ステージに〈雪花ラミィ〉がいません'
-                });
-                return;
-              }
-              
-              // TODO: 複数の雪花ラミィがいる場合の選択UI
-              const targetLamii = lamiis[0]; // 仮で最初の雪花ラミィを選択
-              
-              // 〈雪民〉を〈雪花ラミィ〉に付ける
-              if (!targetLamii.card.yellCards) {
-                targetLamii.card.yellCards = [];
-              }
-              targetLamii.card.yellCards.push(yukiminCard);
-              
-              // UI更新
-              utils.updateDisplay();
-              
-              resolve({
-                success: true,
-                message: `${card.name || 'hBP04-044'}のコラボエフェクト「Snow flower」で〈雪民〉を〈雪花ラミィ〉に付けました`,
-                attachedYell: yukiminCard,
-                targetHolomem: targetLamii.card
-              });
-            } catch (error) {
-              console.error('コラボエフェクト実行エラー:', error);
-              resolve({
-                success: false,
-                message: 'コラボエフェクトの実行中にエラーが発生しました'
-              });
-            }
+          const currentPlayer = battleEngine.gameState.currentPlayer;
+          const utils = new CardEffectUtils(battleEngine);
+
+          // デッキから〈雪民〉を選択
+          const selectionResult = await utils.selectCardsFromDeck(currentPlayer, {
+            count: 1,
+            description: '〈雪民〉を選択してください',
+            allowLess: true,
+            customFilter: [
+              (card) => card.name && card.name.includes('雪民')
+            ]
           });
-        });
+
+          if (!selectionResult.success || selectionResult.cards.length === 0) {
+            return {
+              success: false,
+              message: 'デッキに〈雪民〉が見つかりませんでした'
+            };
+          }
+
+          const yukiminCard = selectionResult.cards[0];
+
+          // 〈雪花ラミィ〉を選択して〈雪民〉を付ける
+          const stageHolomens = utils.getStageHolomens(currentPlayer);
+          const lamiis = stageHolomens.filter(h => h.card.name && h.card.name.includes('雪花ラミィ'));
+
+          if (lamiis.length === 0) {
+            return {
+              success: false,
+              message: 'ステージに〈雪花ラミィ〉がいません'
+            };
+          }
+
+          // TODO: 複数の雪花ラミィがいる場合の選択UI
+          const targetLamii = lamiis[0]; // 仮で最初の雪花ラミィを選択
+
+          // 〈雪民〉を〈雪花ラミィ〉に付ける
+          if (!targetLamii.card.yellCards) {
+            targetLamii.card.yellCards = [];
+          }
+          targetLamii.card.yellCards.push(yukiminCard);
+
+          // UI更新
+          utils.updateDisplay();
+
+          return {
+            success: true,
+            message: `${card.name || 'hBP04-044'}のコラボエフェクト「Snow flower」で〈雪民〉を〈雪花ラミィ〉に付けました`,
+            attachedYell: yukiminCard,
+            targetHolomem: targetLamii.card
+          };
+        } catch (error) {
+          console.error('コラボエフェクト実行エラー:', error);
+          return {
+            success: false,
+            message: 'コラボエフェクトの実行中にエラーが発生しました'
+          };
+        }
       }
     },
     

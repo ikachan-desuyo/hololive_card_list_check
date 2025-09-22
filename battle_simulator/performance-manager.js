@@ -1318,8 +1318,13 @@ class PerformanceManager {
     }
 
     const cardEffect = window.cardEffects[card.id];
-    const hasBloomEffect = cardEffect.bloomEffect || 
-      (cardEffect.effects && Object.values(cardEffect.effects).some(e => e.name?.includes('ブルーム')));
+    // 型・トリガーで厳密に検出（名称には「ブルーム」が含まれないケースが多い）
+    const hasBloomEffect = !!(
+      cardEffect.bloomEffect ||
+      (cardEffect.effects && Object.values(cardEffect.effects).some(e =>
+        e?.type === 'bloom' || e?.auto_trigger === 'on_bloom' || e?.timing === 'on_bloom'
+      ))
+    );
 
     if (!hasBloomEffect) {
       console.log(`❌ [Performance] ブルームエフェクトなし: ${card.name}`);
@@ -1357,8 +1362,13 @@ class PerformanceManager {
     }
 
     const cardEffect = window.cardEffects[card.id];
-    const hasCollabEffect = cardEffect.collabEffect || 
-      (cardEffect.effects && Object.values(cardEffect.effects).some(e => e.name?.includes('コラボ')));
+    // 型・トリガーで検出
+    const hasCollabEffect = !!(
+      cardEffect.collabEffect ||
+      (cardEffect.effects && Object.values(cardEffect.effects).some(e =>
+        e?.type === 'collab' || e?.auto_trigger === 'on_collab' || e?.timing === 'on_collab'
+      ))
+    );
 
     if (!hasCollabEffect) {
       console.log(`❌ [Performance] コラボエフェクトなし: ${card.name}`);
@@ -1388,11 +1398,38 @@ class PerformanceManager {
    * @param {number} playerId - プレイヤーID
    */
   showEffectConfirmationDialog(card, effectType, position, playerId) {
+    // 既存の確認ダイアログがある場合は重複表示を防止
+    const existing = document.getElementById('effect-confirmation-dialog');
+    if (existing) {
+      console.warn(`⚠️ [Performance] ${effectType} 確認ダイアログが既に表示中のため、新規作成をスキップ`);
+      return;
+    }
+
+    // もし汎用効果モーダル（card-effect-modal）が既に開いていたら先に閉じる（競合回避）
+    try {
+      const generic = document.getElementById('card-effect-modal');
+      if (generic) {
+        console.warn('[Performance] 既存の汎用 効果発動確認 モーダルをクローズして中央確認に統一');
+        generic.remove();
+      }
+    } catch (_) {}
+
+    // 重複抑止用のグローバルフラグを先に設定（モーダル生成より前にセットして競合抑止）
+    try {
+      window.__EFFECT_CONFIRM_ACTIVE__ = {
+        type: effectType,
+        cardId: card.id || '',
+        startedAt: Date.now()
+      };
+    } catch (_) {}
+
     const effectName = effectType === 'bloom' ? 'ブルームエフェクト' : 'コラボエフェクト';
     
-    // 確認ダイアログを作成
+  // 確認ダイアログを作成
     const confirmDialog = document.createElement('div');
     confirmDialog.id = 'effect-confirmation-dialog';
+    confirmDialog.dataset.effectType = effectType;
+    confirmDialog.dataset.cardId = card.id || '';
     confirmDialog.style.cssText = `
       position: fixed;
       top: 50%;
@@ -1475,6 +1512,7 @@ class PerformanceManager {
 
     activateButton.addEventListener('click', () => {
       confirmDialog.remove();
+      try { window.__EFFECT_CONFIRM_ACTIVE__ = null; } catch(_) {}
       if (effectType === 'bloom') {
         this.executeBloomEffect(card, position, playerId);
       } else {
@@ -1508,12 +1546,22 @@ class PerformanceManager {
 
     skipButton.addEventListener('click', () => {
       confirmDialog.remove();
+      try { window.__EFFECT_CONFIRM_ACTIVE__ = null; } catch(_) {}
       console.log(`⏭️ [Performance] ${effectName}をスキップ: ${card.name}`);
     });
 
     buttonContainer.appendChild(activateButton);
     buttonContainer.appendChild(skipButton);
     confirmDialog.appendChild(buttonContainer);
+
+    // 重複抑止用のグローバルフラグを設定
+    try {
+      window.__EFFECT_CONFIRM_ACTIVE__ = {
+        type: effectType,
+        cardId: card.id || '',
+        startedAt: Date.now()
+      };
+    } catch (_) {}
 
     document.body.appendChild(confirmDialog);
   }
@@ -1524,7 +1572,7 @@ class PerformanceManager {
    * @param {string} position - ポジション
    * @param {number} playerId - プレイヤーID
    */
-  executeBloomEffect(card, position, playerId) {
+  async executeBloomEffect(card, position, playerId) {
     console.log(`🌸 [Performance] ブルームエフェクト実行: ${card.name}`);
     
     // ブルームエフェクト使用済みフラグを設定
@@ -1532,7 +1580,12 @@ class PerformanceManager {
     
     // CardInteractionManagerでエフェクト発動
     if (this.battleEngine.cardInteractionManager) {
-      this.battleEngine.cardInteractionManager.activateCardEffect(card, position);
+      if (typeof this.battleEngine.cardInteractionManager.executeSpecificEffect === 'function') {
+        await this.battleEngine.cardInteractionManager.executeSpecificEffect(card, 'bloom', position);
+      } else {
+        // フォールバック（従来の手動効果ルート）
+        this.battleEngine.cardInteractionManager.activateCardEffect(card, position);
+      }
     }
     
     this.showPerformanceMessage(`${card.name}のブルームエフェクトを発動しました！`);
@@ -1544,7 +1597,7 @@ class PerformanceManager {
    * @param {string} position - ポジション
    * @param {number} playerId - プレイヤーID
    */
-  executeCollabEffect(card, position, playerId) {
+  async executeCollabEffect(card, position, playerId) {
     console.log(`🤝 [Performance] コラボエフェクト実行: ${card.name}`);
     
     // コラボエフェクト使用済みフラグを設定
@@ -1552,7 +1605,11 @@ class PerformanceManager {
     
     // CardInteractionManagerでエフェクト発動
     if (this.battleEngine.cardInteractionManager) {
-      this.battleEngine.cardInteractionManager.activateCardEffect(card, position);
+      if (typeof this.battleEngine.cardInteractionManager.executeSpecificEffect === 'function') {
+        await this.battleEngine.cardInteractionManager.executeSpecificEffect(card, 'collab', position);
+      } else {
+        this.battleEngine.cardInteractionManager.activateCardEffect(card, position);
+      }
     }
     
     this.showPerformanceMessage(`${card.name}のコラボエフェクトを発動しました！`);
