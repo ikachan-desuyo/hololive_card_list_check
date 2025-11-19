@@ -16,7 +16,7 @@ const PAGE_VERSIONS = {
 
 // ✅ 更新内容の詳細情報
 const UPDATE_DETAILS = {
-  title: "v4.12.0",
+  title: "v4.13.0",
   description: "カードデータ大規模更新",
   changes: [
     "背景クリック無効化/高速連打ナビ安定化/スワイプ拡大",
