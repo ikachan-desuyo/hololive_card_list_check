@@ -1,17 +1,17 @@
 // Version Management Configuration
 // このファイルはバージョンアップ時に更新されます
 
-const APP_VERSION = "4.12.0"; // Consolidated single bump from 4.11.10
+const APP_VERSION = "4.13.0"; // Consolidated single bump from 4.11.10
 const VERSION_DESCRIPTION = "カードデータ大規模更新";
 
 // ✅ 各ページのバージョン情報を一元管理
 const PAGE_VERSIONS = {
-  "index.html": "4.12.0",
-  "binder_collection.html": "4.12.0",
-  "collection_binder.html": "4.12.0",
-  "card_list.html": "4.12.0",
-  "holoca_skill_page.html": "4.12.0",
-  "deck_builder.html": "4.12.0"
+  "index.html": "4.13.0",
+  "binder_collection.html": "4.13.0",
+  "collection_binder.html": "4.13.0",
+  "card_list.html": "4.13.0",
+  "holoca_skill_page.html": "4.13.0",
+  "deck_builder.html": "4.13.0"
 };
 
 // ✅ 更新内容の詳細情報
