@@ -1,22 +1,22 @@
 // Version Management Configuration
 // このファイルはバージョンアップ時に更新されます
 
-const APP_VERSION = "4.15.0"; // Consolidated single bump from 4.11.10
+const APP_VERSION = "4.16.0"; // Consolidated single bump from 4.11.10
 const VERSION_DESCRIPTION = "カードデータ大規模更新";
 
 // ✅ 各ページのバージョン情報を一元管理
 const PAGE_VERSIONS = {
-  "index.html": "4.15.0",
-  "binder_collection.html": "4.15.0",
-  "collection_binder.html": "4.15.0",
-  "card_list.html": "4.15.0",
-  "holoca_skill_page.html": "4.15.0",
-  "deck_builder.html": "4.15.0"
+  "index.html": "4.16.0",
+  "binder_collection.html": "4.16.0",
+  "collection_binder.html": "4.16.0",
+  "card_list.html": "4.16.0",
+  "holoca_skill_page.html": "4.16.0",
+  "deck_builder.html": "4.16.0"
 };
 
 // ✅ 更新内容の詳細情報
 const UPDATE_DETAILS = {
-  title: "v4.15.0",
+  title: "v4.16.0",
   description: "カードデータ大規模更新",
   changes: [
     "背景クリック無効化/高速連打ナビ安定化/スワイプ拡大",
