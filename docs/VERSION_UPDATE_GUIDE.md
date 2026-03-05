@@ -9,7 +9,7 @@ node update-version.js [新しいバージョン] "[説明]"
 
 # 例
 node update-version.js 4.11.5 "バグ修正とパフォーマンス改善"
-node update-version.js 4.12.0 "新機能：カード検索機能の追加"
+node update-version.js 4.16.0 "新機能：カード検索機能の追加"
 ```
 
 ### スクリプトが自動で更新するファイル
