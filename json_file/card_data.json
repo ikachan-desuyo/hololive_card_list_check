@@ -33378,6 +33378,4104 @@
     "color": "黄",
     "id": "hY06-001_C"
   },
+  "hBP01-024_HR": {
+    "number": "hBP01-024",
+    "name": "ベスティア・ゼータ",
+    "image_url": "https://hololive-official-cardgame.com/wp-content/images/cardlist/hBP07/hBP01-024_HR.png",
+    "image_alt": "ベスティア・ゼータ",
+    "card_type": "ホロメン",
+    "tags": [
+      "ID",
+      "ID3期生"
+    ],
+    "rarity": "HR",
+    "product": "ブースターパック「ディーヴァフィーバー」",
+    "color": "白",
+    "hp": "100",
+    "bloom_level": "Debut",
+    "baton_touch": "無色",
+    "skills": [
+      {
+        "type": "アーツ",
+        "name": "ミッションスタート",
+        "dmg": "30",
+        "icons": {
+          "main": [
+            "any"
+          ]
+        }
+      }
+    ],
+    "id": "hBP01-024_HR"
+  },
+  "hBP01-044_HR": {
+    "number": "hBP01-044",
+    "name": "AZKi",
+    "image_url": "https://hololive-official-cardgame.com/wp-content/images/cardlist/hBP07/hBP01-044_HR.png",
+    "image_alt": "AZKi",
+    "card_type": "ホロメン",
+    "tags": [
+      "JP",
+      "0期生",
+      "歌"
+    ],
+    "rarity": "HR",
+    "product": "ブースターパック「ディーヴァフィーバー」",
+    "color": "緑",
+    "hp": "100",
+    "bloom_level": "Debut",
+    "baton_touch": "無色",
+    "skills": [
+      {
+        "type": "アーツ",
+        "name": "こんあずき～",
+        "dmg": "20",
+        "icons": {
+          "main": [
+            "any"
+          ]
+        }
+      }
+    ],
+    "id": "hBP01-044_HR"
+  },
+  "hBP01-092_HR": {
+    "number": "hBP01-092",
+    "name": "オーロ・クロニー",
+    "image_url": "https://hololive-official-cardgame.com/wp-content/images/cardlist/hBP07/hBP01-092_HR.png",
+    "image_alt": "オーロ・クロニー",
+    "card_type": "ホロメン",
+    "tags": [
+      "EN",
+      "Promise"
+    ],
+    "rarity": "HR",
+    "product": "ブースターパック「ディーヴァフィーバー」",
+    "color": "青",
+    "hp": "70",
+    "bloom_level": "Debut",
+    "baton_touch": "無色",
+    "skills": [
+      {
+        "type": "アーツ",
+        "name": "クロにちは～",
+        "dmg": "10",
+        "description": "このホロメンのエール1枚を、自分の他の#Promiseを持つホロメンに付け替えられる。",
+        "icons": {
+          "main": [
+            "blue"
+          ]
+        }
+      }
+    ],
+    "id": "hBP01-092_HR"
+  },
+  "hBP03-025_02_HR": {
+    "number": "hBP03-025",
+    "name": "さくらみこ",
+    "image_url": "https://hololive-official-cardgame.com/wp-content/images/cardlist/hBP07/hBP03-025_02_HR.png",
+    "image_alt": "さくらみこ",
+    "card_type": "ホロメン",
+    "tags": [
+      "JP",
+      "0期生",
+      "ベイビー"
+    ],
+    "rarity": "HR",
+    "product": "ブースターパック「ディーヴァフィーバー」",
+    "color": "赤",
+    "hp": "100",
+    "bloom_level": "Debut",
+    "baton_touch": "無色",
+    "skills": [
+      {
+        "type": "アーツ",
+        "name": "にゃっはろ～",
+        "dmg": "30",
+        "icons": {
+          "main": [
+            "any"
+          ]
+        }
+      }
+    ],
+    "id": "hBP03-025_02_HR"
+  },
+  "hBP03-067_HR": {
+    "number": "hBP03-067",
+    "name": "角巻わため",
+    "image_url": "https://hololive-official-cardgame.com/wp-content/images/cardlist/hBP07/hBP03-067_HR.png",
+    "image_alt": "角巻わため",
+    "card_type": "ホロメン",
+    "tags": [
+      "JP",
+      "4期生",
+      "ケモミミ",
+      "歌"
+    ],
+    "rarity": "HR",
+    "product": "ブースターパック「ディーヴァフィーバー」",
+    "color": "黄",
+    "hp": "110",
+    "bloom_level": "Debut",
+    "baton_touch": "無色",
+    "skills": [
+      {
+        "type": "アーツ",
+        "name": "こんばんドドド～！",
+        "dmg": "30",
+        "icons": {
+          "main": [
+            "any"
+          ]
+        }
+      }
+    ],
+    "id": "hBP03-067_HR"
+  },
+  "hBP04-054_HR": {
+    "number": "hBP04-054",
+    "name": "ラプラス・ダークネス",
+    "image_url": "https://hololive-official-cardgame.com/wp-content/images/cardlist/hBP07/hBP04-054_HR.png",
+    "image_alt": "ラプラス・ダークネス",
+    "card_type": "ホロメン",
+    "tags": [
+      "JP",
+      "秘密結社holoX",
+      "シューター"
+    ],
+    "rarity": "HR",
+    "product": "ブースターパック「ディーヴァフィーバー」",
+    "color": "紫",
+    "hp": "100",
+    "bloom_level": "Debut",
+    "skills": [
+      {
+        "type": "アーツ",
+        "name": "貴様ら、刮目せよ！！",
+        "dmg": "30",
+        "icons": {
+          "main": [
+            "any"
+          ]
+        }
+      }
+    ],
+    "id": "hBP04-054_HR"
+  },
+  "hBP07-001_OUR": {
+    "number": "hBP07-001",
+    "name": "角巻わため",
+    "image_url": "https://hololive-official-cardgame.com/wp-content/images/cardlist/hBP07/hBP07-001_OUR.png",
+    "image_alt": "角巻わため",
+    "card_type": "推しホロメン",
+    "rarity": "OUR",
+    "product": "ブースターパック「ディーヴァフィーバー」",
+    "color": "白",
+    "life": 5,
+    "skills": [
+      {
+        "type": "推しスキル",
+        "text": "[ホロパワー：-6]角ドリルしたろか？[ターンに1回]このターンの間、自分のステージの〈角巻わため〉全員のアーツ+100。"
+      }
+    ],
+    "id": "hBP07-001_OUR"
+  },
+  "hBP07-002_OUR": {
+    "number": "hBP07-002",
+    "name": "ベスティア・ゼータ",
+    "image_url": "https://hololive-official-cardgame.com/wp-content/images/cardlist/hBP07/hBP07-002_OUR.png",
+    "image_alt": "ベスティア・ゼータ",
+    "card_type": "推しホロメン",
+    "rarity": "OUR",
+    "product": "ブースターパック「ディーヴァフィーバー」",
+    "color": "白",
+    "life": 5,
+    "skills": [
+      {
+        "type": "推しスキル",
+        "text": "[ホロパワー：-3]Good Luck, holoh3ro![ターンに1回]自分のステージのホロメン1人を選ぶ。このターンの間、選んだホロメンのアーツ+50。そのホロメンが#ID3期生を持つBuzzホロメンなら、かわりに、そのホロメンのアーツ+80。"
+      },
+      {
+        "type": "SP推しスキル",
+        "text": "[ホロパワー：-2]不可能なんてないんだから！[ゲームに1回]自分のアーカイブの[マスコットとファン]を好きな枚数選び、自分の#ID3期生を持つホロメン１人に付ける。3枚以上付けたなら、このターンの間、そのホロメンのアーツ+100。"
+      }
+    ],
+    "id": "hBP07-002_OUR"
+  },
+  "hBP07-002_SEC": {
+    "number": "hBP07-002",
+    "name": "ベスティア・ゼータ",
+    "image_url": "https://hololive-official-cardgame.com/wp-content/images/cardlist/hBP07/hBP07-002_SEC.png",
+    "image_alt": "ベスティア・ゼータ",
+    "card_type": "推しホロメン",
+    "rarity": "SEC",
+    "product": "ブースターパック「ディーヴァフィーバー」",
+    "color": "白",
+    "life": 5,
+    "skills": [
+      {
+        "type": "推しスキル",
+        "text": "[ホロパワー：-3]Good Luck, holoh3ro![ターンに1回]自分のステージのホロメン1人を選ぶ。このターンの間、選んだホロメンのアーツ+50。そのホロメンが#ID3期生を持つBuzzホロメンなら、かわりに、そのホロメンのアーツ+80。"
+      },
+      {
+        "type": "SP推しスキル",
+        "text": "[ホロパワー：-2]不可能なんてないんだから！[ゲームに1回]自分のアーカイブの[マスコットとファン]を好きな枚数選び、自分の#ID3期生を持つホロメン１人に付ける。3枚以上付けたなら、このターンの間、そのホロメンのアーツ+100。"
+      }
+    ],
+    "id": "hBP07-002_SEC"
+  },
+  "hBP07-003_OUR": {
+    "number": "hBP07-003",
+    "name": "大神ミオ",
+    "image_url": "https://hololive-official-cardgame.com/wp-content/images/cardlist/hBP07/hBP07-003_OUR.png",
+    "image_alt": "大神ミオ",
+    "card_type": "推しホロメン",
+    "rarity": "OUR",
+    "product": "ブースターパック「ディーヴァフィーバー」",
+    "color": "緑",
+    "life": 5,
+    "skills": [
+      {
+        "type": "推しスキル",
+        "text": "[ホロパワー：-1]神札の導き[ターンに1回]自分のデッキの上から2枚を見る。その中から、カード1枚を手札に加える。そして残ったカードをデッキの上に戻す。"
+      },
+      {
+        "type": "SP推しスキル",
+        "text": "[ホロパワー：-2]みんなのママ[ゲームに1回]自分のデッキの上から6枚を見る。その中から、カード3枚を手札に加える。そして残ったカードを好きな順でデッキの上に戻す。その後、自分のホロメン全員のHP50回復。"
+      }
+    ],
+    "id": "hBP07-003_OUR"
+  },
+  "hBP07-003_SEC": {
+    "number": "hBP07-003",
+    "name": "大神ミオ",
+    "image_url": "https://hololive-official-cardgame.com/wp-content/images/cardlist/hBP07/hBP07-003_SEC.png",
+    "image_alt": "大神ミオ",
+    "card_type": "推しホロメン",
+    "rarity": "SEC",
+    "product": "ブースターパック「ディーヴァフィーバー」",
+    "color": "緑",
+    "life": 5,
+    "skills": [
+      {
+        "type": "推しスキル",
+        "text": "[ホロパワー：-1]神札の導き[ターンに1回]自分のデッキの上から2枚を見る。その中から、カード1枚を手札に加える。そして残ったカードをデッキの上に戻す。"
+      },
+      {
+        "type": "SP推しスキル",
+        "text": "[ホロパワー：-2]みんなのママ[ゲームに1回]自分のデッキの上から6枚を見る。その中から、カード3枚を手札に加える。そして残ったカードを好きな順でデッキの上に戻す。その後、自分のホロメン全員のHP50回復。"
+      }
+    ],
+    "id": "hBP07-003_SEC"
+  },
+  "hBP07-004_OUR": {
+    "number": "hBP07-004",
+    "name": "赤井はあと",
+    "image_url": "https://hololive-official-cardgame.com/wp-content/images/cardlist/hBP07/hBP07-004_OUR.png",
+    "image_alt": "赤井はあと",
+    "card_type": "推しホロメン",
+    "rarity": "OUR",
+    "product": "ブースターパック「ディーヴァフィーバー」",
+    "color": "赤",
+    "life": 5,
+    "skills": [
+      {
+        "type": "推しスキル",
+        "text": "[ホロパワー：-2]ワールドワイドな最強アイドル！[ターンに1回]自分のバックポジションのDebutホロメンの〈赤井はあと〉1人をデッキの下に戻す。その後、自分のステージの〈赤井はあと〉1人を選ぶ。このターンの間、選んだホロメンのアーツ+50。"
+      }
+    ],
+    "id": "hBP07-004_OUR"
+  },
+  "hBP07-005_OUR": {
+    "number": "hBP07-005",
+    "name": "オーロ・クロニー",
+    "image_url": "https://hololive-official-cardgame.com/wp-content/images/cardlist/hBP07/hBP07-005_OUR.png",
+    "image_alt": "オーロ・クロニー",
+    "card_type": "推しホロメン",
+    "rarity": "OUR",
+    "product": "ブースターパック「ディーヴァフィーバー」",
+    "color": "青",
+    "life": 5,
+    "skills": [
+      {
+        "type": "推しスキル",
+        "text": "[ホロパワー：-2]忘却の輪の上で[ターンに1回]自分のデッキを下から2枚引いた後、手札1枚をアーカイブする。"
+      },
+      {
+        "type": "SP推しスキル",
+        "text": "[ホロパワー：-4]時間の典獄[ゲームに1回]自分のセンターホロメンが2ndの〈オーロ・クロニー〉なら、このターンの後に、もう1回自分のターンを開始する。"
+      }
+    ],
+    "id": "hBP07-005_OUR"
+  },
+  "hBP07-006_OUR": {
+    "number": "hBP07-006",
+    "name": "AZKi",
+    "image_url": "https://hololive-official-cardgame.com/wp-content/images/cardlist/hBP07/hBP07-006_OUR.png",
+    "image_alt": "AZKi",
+    "card_type": "推しホロメン",
+    "rarity": "OUR",
+    "product": "ブースターパック「ディーヴァフィーバー」",
+    "color": "紫",
+    "life": 5,
+    "skills": [
+      {
+        "type": "推しスキル",
+        "text": "[ホロパワー：-1]行くよ、開拓者。[ターンに1回]直前の相手のターンに自分のホロメンがダウンしていたなら、自分のデッキから、イベント1枚を公開し、手札に加える。そしてデッキをシャッフルする。"
+      }
+    ],
+    "id": "hBP07-006_OUR"
+  },
+  "hBP07-006_SEC": {
+    "number": "hBP07-006",
+    "name": "AZKi",
+    "image_url": "https://hololive-official-cardgame.com/wp-content/images/cardlist/hBP07/hBP07-006_SEC.png",
+    "image_alt": "AZKi",
+    "card_type": "推しホロメン",
+    "rarity": "SEC",
+    "product": "ブースターパック「ディーヴァフィーバー」",
+    "color": "紫",
+    "life": 5,
+    "skills": [
+      {
+        "type": "推しスキル",
+        "text": "[ホロパワー：-1]行くよ、開拓者。[ターンに1回]直前の相手のターンに自分のホロメンがダウンしていたなら、自分のデッキから、イベント1枚を公開し、手札に加える。そしてデッキをシャッフルする。"
+      }
+    ],
+    "id": "hBP07-006_SEC"
+  },
+  "hBP07-007_OUR": {
+    "number": "hBP07-007",
+    "name": "桃鈴ねね",
+    "image_url": "https://hololive-official-cardgame.com/wp-content/images/cardlist/hBP07/hBP07-007_OUR.png",
+    "image_alt": "桃鈴ねね",
+    "card_type": "推しホロメン",
+    "rarity": "OUR",
+    "product": "ブースターパック「ディーヴァフィーバー」",
+    "color": "黄",
+    "life": 5,
+    "skills": [
+      {
+        "type": "推しスキル",
+        "text": "[ホロパワー：-2]スーパーねぽらぼエナジー[ターンに1回]自分のアーカイブのエールを自分の#5期生を持つ2ndホロメン全員に1枚ずつ送る。"
+      },
+      {
+        "type": "SP推しスキル",
+        "text": "[ホロパワー：-1]ねねちの大・暴・走！[ゲームに1回]自分のデッキから、Debutホロメンの〈桃鈴ねね〉1～4枚を公開し、ステージに出す。そしてデッキをシャッフルする。"
+      }
+    ],
+    "id": "hBP07-007_OUR"
+  },
+  "hBP07-007_SEC": {
+    "number": "hBP07-007",
+    "name": "桃鈴ねね",
+    "image_url": "https://hololive-official-cardgame.com/wp-content/images/cardlist/hBP07/hBP07-007_SEC.png",
+    "image_alt": "桃鈴ねね",
+    "card_type": "推しホロメン",
+    "rarity": "SEC",
+    "product": "ブースターパック「ディーヴァフィーバー」",
+    "color": "黄",
+    "life": 5,
+    "skills": [
+      {
+        "type": "推しスキル",
+        "text": "[ホロパワー：-2]スーパーねぽらぼエナジー[ターンに1回]自分のアーカイブのエールを自分の#5期生を持つ2ndホロメン全員に1枚ずつ送る。"
+      },
+      {
+        "type": "SP推しスキル",
+        "text": "[ホロパワー：-1]ねねちの大・暴・走！[ゲームに1回]自分のデッキから、Debutホロメンの〈桃鈴ねね〉1～4枚を公開し、ステージに出す。そしてデッキをシャッフルする。"
+      }
+    ],
+    "id": "hBP07-007_SEC"
+  },
+  "hBP07-009_S": {
+    "number": "hBP07-009",
+    "name": "角巻わため",
+    "image_url": "https://hololive-official-cardgame.com/wp-content/images/cardlist/hBP07/hBP07-009_S.png",
+    "image_alt": "角巻わため",
+    "card_type": "ホロメン",
+    "tags": [
+      "JP",
+      "4期生",
+      "ケモミミ",
+      "歌"
+    ],
+    "rarity": "S",
+    "product": "ブースターパック「ディーヴァフィーバー」",
+    "color": "白",
+    "hp": "130",
+    "bloom_level": "Debut",
+    "baton_touch": "無色",
+    "skills": [
+      {
+        "type": "アーツ",
+        "name": "ガブガブ！",
+        "dmg": "20+",
+        "description": "[センターポジション限定]このアーツ+20。",
+        "icons": {
+          "main": [
+            "white"
+          ]
+        }
+      }
+    ],
+    "id": "hBP07-009_S"
+  },
+  "hBP07-010_S": {
+    "number": "hBP07-010",
+    "name": "角巻わため",
+    "image_url": "https://hololive-official-cardgame.com/wp-content/images/cardlist/hBP07/hBP07-010_S.png",
+    "image_alt": "角巻わため",
+    "card_type": "ホロメン",
+    "tags": [
+      "JP",
+      "4期生",
+      "ケモミミ",
+      "歌"
+    ],
+    "rarity": "S",
+    "product": "ブースターパック「ディーヴァフィーバー」",
+    "color": "白",
+    "hp": "170",
+    "bloom_level": "1st",
+    "baton_touch": "無色",
+    "skills": [
+      {
+        "type": "キーワード",
+        "subtype": "コラボエフェクト",
+        "name": "みんなー！ 楽しむぞおおー！！！！！",
+        "description": "自分のデッキの上から1枚をホロパワーにする。その後、自分のホロパワーを見る。その中から1枚を手札に加える。そしてホロパワーをシャッフルする。"
+      },
+      {
+        "type": "アーツ",
+        "name": "みんなの声聞けるかなー？？？？？？？",
+        "dmg": "40",
+        "icons": {
+          "main": [
+            "white"
+          ]
+        }
+      }
+    ],
+    "id": "hBP07-010_S"
+  },
+  "hBP07-011_S": {
+    "number": "hBP07-011",
+    "name": "角巻わため",
+    "image_url": "https://hololive-official-cardgame.com/wp-content/images/cardlist/hBP07/hBP07-011_S.png",
+    "image_alt": "角巻わため",
+    "card_type": "ホロメン",
+    "tags": [
+      "JP",
+      "4期生",
+      "ケモミミ",
+      "歌"
+    ],
+    "rarity": "S",
+    "product": "ブースターパック「ディーヴァフィーバー」",
+    "color": "白",
+    "hp": "140",
+    "bloom_level": "1st",
+    "baton_touch": "無色",
+    "skills": [
+      {
+        "type": "キーワード",
+        "subtype": "ブルームエフェクト",
+        "name": "グルグルシープ",
+        "description": "自分のデッキから、1stホロメンの〈角巻わため〉1枚を公開し、手札に加える。そしてデッキをシャッフルする。自分のブルームエフェクト「グルグルシープ」はターンに1回しか使えない。"
+      },
+      {
+        "type": "アーツ",
+        "name": "これボタン弾けちゃうよぉ",
+        "dmg": "70",
+        "description": "このホロメンに白エールが2枚以上付いているなら、このアーツに必要な無色-1。",
+        "icons": {
+          "main": [
+            "any",
+            "any",
+            "any"
+          ]
+        }
+      }
+    ],
+    "id": "hBP07-011_S"
+  },
+  "hBP07-012_SR": {
+    "number": "hBP07-012",
+    "name": "角巻わため",
+    "image_url": "https://hololive-official-cardgame.com/wp-content/images/cardlist/hBP07/hBP07-012_SR.png",
+    "image_alt": "角巻わため",
+    "card_type": "ホロメン",
+    "tags": [
+      "JP",
+      "4期生",
+      "ケモミミ",
+      "歌"
+    ],
+    "rarity": "SR",
+    "product": "ブースターパック「ディーヴァフィーバー」",
+    "color": "白",
+    "hp": "190",
+    "bloom_level": "1st",
+    "baton_touch": "無色",
+    "skills": [
+      {
+        "type": "キーワード",
+        "subtype": "ブルームエフェクト",
+        "name": "わたビーーーーーーーム！！！！！！",
+        "description": "相手のセンターホロメンかコラボホロメンに特殊ダメージ30を与える。その後、相手は、自身のデッキを1枚引く。"
+      },
+      {
+        "type": "アーツ",
+        "name": "わたキャノンもだ！",
+        "dmg": "20",
+        "description": "自分のデッキを1枚引く。",
+        "icons": {
+          "main": [
+            "any"
+          ]
+        }
+      }
+    ],
+    "id": "hBP07-012_SR"
+  },
+  "hBP07-013_S": {
+    "number": "hBP07-013",
+    "name": "角巻わため",
+    "image_url": "https://hololive-official-cardgame.com/wp-content/images/cardlist/hBP07/hBP07-013_S.png",
+    "image_alt": "角巻わため",
+    "card_type": "ホロメン",
+    "tags": [
+      "JP",
+      "4期生",
+      "ケモミミ",
+      "歌"
+    ],
+    "rarity": "S",
+    "product": "ブースターパック「ディーヴァフィーバー」",
+    "color": "白",
+    "hp": "210",
+    "bloom_level": "2nd",
+    "baton_touch": "無色",
+    "skills": [
+      {
+        "type": "キーワード",
+        "subtype": "コラボエフェクト",
+        "name": "はばないすでーい！！！",
+        "description": "このターンの間、自分のステージの〈角巻わため〉全員のアーツ+20。その後、自分のセンターホロメンにエールが6枚以上付いているなら、自分のデッキを2枚引く。"
+      },
+      {
+        "type": "アーツ",
+        "name": "センキューオーバーシープ！",
+        "dmg": "90+",
+        "description": "このホロメンに付いている〈わためいと〉1枚につき、このアーツ+50。",
+        "icons": {
+          "main": [
+            "any",
+            "any"
+          ],
+          "tokkou": [
+            "紫+50"
+          ]
+        }
+      }
+    ],
+    "id": "hBP07-013_S"
+  },
+  "hBP07-014_SR": {
+    "number": "hBP07-014",
+    "name": "角巻わため",
+    "image_url": "https://hololive-official-cardgame.com/wp-content/images/cardlist/hBP07/hBP07-014_SR.png",
+    "image_alt": "角巻わため",
+    "card_type": "ホロメン",
+    "tags": [
+      "JP",
+      "4期生",
+      "ケモミミ",
+      "歌"
+    ],
+    "rarity": "SR",
+    "product": "ブースターパック「ディーヴァフィーバー」",
+    "color": "白",
+    "hp": "200",
+    "bloom_level": "2nd",
+    "baton_touch": "無色",
+    "skills": [
+      {
+        "type": "キーワード",
+        "subtype": "ギフト",
+        "name": "キュートセクシー",
+        "description": "このホロメンに重なっているホロメン1枚につき、このホロメンのHP+10。"
+      },
+      {
+        "type": "アーツ",
+        "name": "脳天直撃わためハンマー！",
+        "dmg": "160",
+        "description": "[センターポジション限定]このアーツで相手のホロメンをダウンさせた時、与えたダメージが残りHPをオーバーしていたなら、相手の2ndホロメン1人に、オーバーしたダメージと同じ数値の特殊ダメージを与える。",
+        "icons": {
+          "main": [
+            "white",
+            "white",
+            "any"
+          ],
+          "tokkou": [
+            "赤+50"
+          ]
+        }
+      }
+    ],
+    "id": "hBP07-014_SR"
+  },
+  "hBP07-014_UR": {
+    "number": "hBP07-014",
+    "name": "角巻わため",
+    "image_url": "https://hololive-official-cardgame.com/wp-content/images/cardlist/hBP07/hBP07-014_UR.png",
+    "image_alt": "角巻わため",
+    "card_type": "ホロメン",
+    "tags": [
+      "JP",
+      "4期生",
+      "ケモミミ",
+      "歌"
+    ],
+    "rarity": "UR",
+    "product": "ブースターパック「ディーヴァフィーバー」",
+    "color": "白",
+    "hp": "200",
+    "bloom_level": "2nd",
+    "baton_touch": "無色",
+    "skills": [
+      {
+        "type": "キーワード",
+        "subtype": "ギフト",
+        "name": "キュートセクシー",
+        "description": "このホロメンに重なっているホロメン1枚につき、このホロメンのHP+10。"
+      },
+      {
+        "type": "アーツ",
+        "name": "脳天直撃わためハンマー！",
+        "dmg": "160",
+        "description": "[センターポジション限定]このアーツで相手のホロメンをダウンさせた時、与えたダメージが残りHPをオーバーしていたなら、相手の2ndホロメン1人に、オーバーしたダメージと同じ数値の特殊ダメージを与える。",
+        "icons": {
+          "main": [
+            "white",
+            "white",
+            "any"
+          ],
+          "tokkou": [
+            "赤+50"
+          ]
+        }
+      }
+    ],
+    "id": "hBP07-014_UR"
+  },
+  "hBP07-016_S": {
+    "number": "hBP07-016",
+    "name": "ベスティア・ゼータ",
+    "image_url": "https://hololive-official-cardgame.com/wp-content/images/cardlist/hBP07/hBP07-016_S.png",
+    "image_alt": "ベスティア・ゼータ",
+    "card_type": "ホロメン",
+    "tags": [
+      "ID",
+      "ID3期生"
+    ],
+    "rarity": "S",
+    "product": "ブースターパック「ディーヴァフィーバー」",
+    "color": "白",
+    "hp": "120",
+    "bloom_level": "Debut",
+    "baton_touch": "無色",
+    "skills": [
+      {
+        "type": "キーワード",
+        "subtype": "ギフト",
+        "name": "Pat the BAZO",
+        "description": "このホロメンにマスコットが付いているなら、このホロメンのHP+30。"
+      },
+      {
+        "type": "アーツ",
+        "name": "So, Tell Me Your Secrets?",
+        "dmg": "20",
+        "icons": {
+          "main": [
+            "white"
+          ]
+        }
+      }
+    ],
+    "id": "hBP07-016_S"
+  },
+  "hBP07-017_S": {
+    "number": "hBP07-017",
+    "name": "ベスティア・ゼータ",
+    "image_url": "https://hololive-official-cardgame.com/wp-content/images/cardlist/hBP07/hBP07-017_S.png",
+    "image_alt": "ベスティア・ゼータ",
+    "card_type": "ホロメン",
+    "tags": [
+      "ID",
+      "ID3期生"
+    ],
+    "rarity": "S",
+    "product": "ブースターパック「ディーヴァフィーバー」",
+    "color": "白",
+    "hp": "170",
+    "bloom_level": "1st",
+    "baton_touch": "無色",
+    "skills": [
+      {
+        "type": "キーワード",
+        "subtype": "ギフト",
+        "name": "holoh3ro Shopping",
+        "description": "[センターポジション限定]自分の#ID3期生を持つBuzzホロメンがコラボした時、自分のステージのホロメン1人を選ぶ。このターンの間、選んだホロメンのアーツ+30。"
+      },
+      {
+        "type": "アーツ",
+        "name": "みんなと一緒にいる時間が好き",
+        "dmg": "50",
+        "icons": {
+          "main": [
+            "any",
+            "any"
+          ]
+        }
+      }
+    ],
+    "id": "hBP07-017_S"
+  },
+  "hBP07-018_S": {
+    "number": "hBP07-018",
+    "name": "ベスティア・ゼータ",
+    "image_url": "https://hololive-official-cardgame.com/wp-content/images/cardlist/hBP07/hBP07-018_S.png",
+    "image_alt": "ベスティア・ゼータ",
+    "card_type": "ホロメン",
+    "tags": [
+      "ID",
+      "ID3期生"
+    ],
+    "rarity": "S",
+    "product": "ブースターパック「ディーヴァフィーバー」",
+    "color": "白",
+    "hp": "160",
+    "bloom_level": "1st",
+    "baton_touch": "無色",
+    "skills": [
+      {
+        "type": "キーワード",
+        "subtype": "コラボエフェクト",
+        "name": "Horse Doko?",
+        "description": "自分のデッキの上から1枚を公開する。公開したカードがサポートカードなら、そのカードを手札に加える。サポートカード以外なら、そのカードをデッキの上に戻す。"
+      },
+      {
+        "type": "アーツ",
+        "name": "うまみ～うまみ～♪",
+        "dmg": "30+",
+        "description": "このターンに自分がイベントを使っていたなら、このアーツ+30。",
+        "icons": {
+          "main": [
+            "white"
+          ]
+        }
+      }
+    ],
+    "id": "hBP07-018_S"
+  },
+  "hBP07-019_SR": {
+    "number": "hBP07-019",
+    "name": "ベスティア・ゼータ",
+    "image_url": "https://hololive-official-cardgame.com/wp-content/images/cardlist/hBP07/hBP07-019_SR.png",
+    "image_alt": "ベスティア・ゼータ",
+    "card_type": "Buzzホロメン",
+    "tags": [
+      "ID",
+      "ID3期生"
+    ],
+    "rarity": "SR",
+    "product": "ブースターパック「ディーヴァフィーバー」",
+    "color": "白",
+    "hp": "230",
+    "bloom_level": "1st",
+    "baton_touch": "無色",
+    "skills": [
+      {
+        "type": "キーワード",
+        "subtype": "ブルームエフェクト",
+        "name": "準備万端！",
+        "description": "自分のデッキから、[〈BAZO〉か〈Zecretary〉]1枚を公開し、自分の〈ベスティア・ゼータ〉に付ける。そしてデッキをシャッフルする。"
+      },
+      {
+        "type": "アーツ",
+        "name": "ホロライブID初代ダンスクイーン",
+        "dmg": "50",
+        "description": "このホロメンにマスコットかファンが付いているなら、自分のデッキを1枚引く。",
+        "icons": {
+          "main": [
+            "white",
+            "any"
+          ]
+        }
+      }
+    ],
+    "id": "hBP07-019_SR"
+  },
+  "hBP07-020_S": {
+    "number": "hBP07-020",
+    "name": "ベスティア・ゼータ",
+    "image_url": "https://hololive-official-cardgame.com/wp-content/images/cardlist/hBP07/hBP07-020_S.png",
+    "image_alt": "ベスティア・ゼータ",
+    "card_type": "ホロメン",
+    "tags": [
+      "ID",
+      "ID3期生"
+    ],
+    "rarity": "S",
+    "product": "ブースターパック「ディーヴァフィーバー」",
+    "color": "白",
+    "hp": "200",
+    "bloom_level": "2nd",
+    "baton_touch": "無色",
+    "skills": [
+      {
+        "type": "キーワード",
+        "subtype": "コラボエフェクト",
+        "name": "Ya ya ya ya ya～!",
+        "description": "サイコロを1回振る。奇数なら、相手のセンターポジションの2ndホロメンの残りHPを100にする。"
+      },
+      {
+        "type": "アーツ",
+        "name": "もっとパフォーマンスしたい！",
+        "dmg": "100",
+        "icons": {
+          "main": [
+            "white",
+            "white"
+          ],
+          "tokkou": [
+            "赤+50"
+          ]
+        }
+      }
+    ],
+    "id": "hBP07-020_S"
+  },
+  "hBP07-021_SR": {
+    "number": "hBP07-021",
+    "name": "ベスティア・ゼータ",
+    "image_url": "https://hololive-official-cardgame.com/wp-content/images/cardlist/hBP07/hBP07-021_SR.png",
+    "image_alt": "ベスティア・ゼータ",
+    "card_type": "ホロメン",
+    "tags": [
+      "ID",
+      "ID3期生"
+    ],
+    "rarity": "SR",
+    "product": "ブースターパック「ディーヴァフィーバー」",
+    "color": "白",
+    "hp": "200",
+    "bloom_level": "2nd",
+    "baton_touch": "無色",
+    "skills": [
+      {
+        "type": "キーワード",
+        "subtype": "ブルームエフェクト",
+        "name": "任務手伝ってくれる？",
+        "description": "自分のアーカイブの[〈BAZO〉か〈Zecretary〉]1枚を自分のホロメンに付ける。"
+      },
+      {
+        "type": "アーツ",
+        "name": "最高のシークレットエージェント",
+        "dmg": "160+",
+        "description": "自分のステージに#ID3期生を持つBuzzホロメンがいるなら、このアーツ+40。",
+        "icons": {
+          "main": [
+            "white",
+            "white",
+            "any",
+            "any"
+          ],
+          "tokkou": [
+            "紫+50"
+          ]
+        }
+      }
+    ],
+    "id": "hBP07-021_SR"
+  },
+  "hBP07-021_UR": {
+    "number": "hBP07-021",
+    "name": "ベスティア・ゼータ",
+    "image_url": "https://hololive-official-cardgame.com/wp-content/images/cardlist/hBP07/hBP07-021_UR.png",
+    "image_alt": "ベスティア・ゼータ",
+    "card_type": "ホロメン",
+    "tags": [
+      "ID",
+      "ID3期生"
+    ],
+    "rarity": "UR",
+    "product": "ブースターパック「ディーヴァフィーバー」",
+    "color": "白",
+    "hp": "200",
+    "bloom_level": "2nd",
+    "baton_touch": "無色",
+    "skills": [
+      {
+        "type": "キーワード",
+        "subtype": "ブルームエフェクト",
+        "name": "任務手伝ってくれる？",
+        "description": "自分のアーカイブの[〈BAZO〉か〈Zecretary〉]1枚を自分のホロメンに付ける。"
+      },
+      {
+        "type": "アーツ",
+        "name": "最高のシークレットエージェント",
+        "dmg": "160+",
+        "description": "自分のステージに#ID3期生を持つBuzzホロメンがいるなら、このアーツ+40。",
+        "icons": {
+          "main": [
+            "white",
+            "white",
+            "any",
+            "any"
+          ],
+          "tokkou": [
+            "紫+50"
+          ]
+        }
+      }
+    ],
+    "id": "hBP07-021_UR"
+  },
+  "hBP07-022_SR": {
+    "number": "hBP07-022",
+    "name": "白銀ノエル",
+    "image_url": "https://hololive-official-cardgame.com/wp-content/images/cardlist/hBP07/hBP07-022_SR.png",
+    "image_alt": "白銀ノエル",
+    "card_type": "ホロメン",
+    "tags": [
+      "JP",
+      "3期生",
+      "お酒"
+    ],
+    "rarity": "SR",
+    "product": "ブースターパック「ディーヴァフィーバー」",
+    "color": "白",
+    "hp": "220",
+    "bloom_level": "2nd",
+    "baton_touch": "無色",
+    "skills": [
+      {
+        "type": "キーワード",
+        "subtype": "ギフト",
+        "name": "筋肉は裏切らない！",
+        "description": "[コラボポジション限定]相手のターンで、自分の#3期生を持つセンターホロメンがダウンした時、そのホロメンを含め重なっているホロメンすべてを手札に戻す。"
+      },
+      {
+        "type": "アーツ",
+        "name": "元気もりもりさんでーまっする",
+        "dmg": "50",
+        "description": "自分の#3期生を持つホロメン1人を選ぶ。このターンの間、選んだホロメンのアーツに必要な無色-1。そのホロメンが2ndホロメンの〈白銀ノエル〉なら、かわりに、そのアーツに必要な無色-2。",
+        "icons": {
+          "main": [
+            "white"
+          ],
+          "tokkou": [
+            "紫+50"
+          ]
+        }
+      }
+    ],
+    "id": "hBP07-022_SR"
+  },
+  "hBP07-024_S": {
+    "number": "hBP07-024",
+    "name": "大神ミオ",
+    "image_url": "https://hololive-official-cardgame.com/wp-content/images/cardlist/hBP07/hBP07-024_S.png",
+    "image_alt": "大神ミオ",
+    "card_type": "ホロメン",
+    "tags": [
+      "JP",
+      "ゲーマーズ",
+      "ケモミミ",
+      "料理"
+    ],
+    "rarity": "S",
+    "product": "ブースターパック「ディーヴァフィーバー」",
+    "color": "緑",
+    "hp": "130",
+    "bloom_level": "Debut",
+    "baton_touch": "無色",
+    "skills": [
+      {
+        "type": "キーワード",
+        "subtype": "ギフト",
+        "name": "ウチの大切な家族",
+        "description": "[ターンに1回]このホロメンに〈ミオファ〉が付いた時、自分のデッキを1枚引く。"
+      },
+      {
+        "type": "アーツ",
+        "name": "今日もいっぱい笑っていこう",
+        "dmg": "10+",
+        "description": "自分のデッキの上から1枚をアーカイブできる。アーカイブしたカードがサポートカードなら、このアーツ+30。",
+        "icons": {
+          "main": [
+            "green"
+          ]
+        }
+      }
+    ],
+    "id": "hBP07-024_S"
+  },
+  "hBP07-025_S": {
+    "number": "hBP07-025",
+    "name": "大神ミオ",
+    "image_url": "https://hololive-official-cardgame.com/wp-content/images/cardlist/hBP07/hBP07-025_S.png",
+    "image_alt": "大神ミオ",
+    "card_type": "ホロメン",
+    "tags": [
+      "JP",
+      "ゲーマーズ",
+      "ケモミミ",
+      "料理"
+    ],
+    "rarity": "S",
+    "product": "ブースターパック「ディーヴァフィーバー」",
+    "color": "緑",
+    "hp": "170",
+    "bloom_level": "1st",
+    "baton_touch": "無色",
+    "skills": [
+      {
+        "type": "キーワード",
+        "subtype": "コラボエフェクト",
+        "name": "抹茶パフェ～！きゅんです",
+        "description": "自分のサポートカードが付いている#ゲーマーズを持つホロメン1人を選ぶ。このターンの間、選んだホロメンのアーツ+20。"
+      },
+      {
+        "type": "アーツ",
+        "name": "ゲーマーズカフェへようこそ",
+        "dmg": "20",
+        "description": "自分のアーカイブのエール1枚を自分の#ゲーマーズを持つホロメンに送る。",
+        "icons": {
+          "main": [
+            "any"
+          ]
+        }
+      }
+    ],
+    "id": "hBP07-025_S"
+  },
+  "hBP07-026_S": {
+    "number": "hBP07-026",
+    "name": "大神ミオ",
+    "image_url": "https://hololive-official-cardgame.com/wp-content/images/cardlist/hBP07/hBP07-026_S.png",
+    "image_alt": "大神ミオ",
+    "card_type": "ホロメン",
+    "tags": [
+      "JP",
+      "ゲーマーズ",
+      "ケモミミ",
+      "料理"
+    ],
+    "rarity": "S",
+    "product": "ブースターパック「ディーヴァフィーバー」",
+    "color": "緑",
+    "hp": "140",
+    "bloom_level": "1st",
+    "baton_touch": "無色",
+    "skills": [
+      {
+        "type": "キーワード",
+        "subtype": "ブルームエフェクト",
+        "name": "早く来ないかな…",
+        "description": "自分のデッキから、[〈ハトタウロス〉か〈ミオファ〉]1枚を公開し、手札に加える。そしてデッキをシャッフルする。"
+      },
+      {
+        "type": "アーツ",
+        "name": "ちょっとお洒落な感じでしょ？",
+        "dmg": "40",
+        "icons": {
+          "main": [
+            "any"
+          ]
+        }
+      }
+    ],
+    "id": "hBP07-026_S"
+  },
+  "hBP07-027_SR": {
+    "number": "hBP07-027",
+    "name": "大神ミオ",
+    "image_url": "https://hololive-official-cardgame.com/wp-content/images/cardlist/hBP07/hBP07-027_SR.png",
+    "image_alt": "大神ミオ",
+    "card_type": "ホロメン",
+    "tags": [
+      "JP",
+      "ゲーマーズ",
+      "ケモミミ",
+      "料理"
+    ],
+    "rarity": "SR",
+    "product": "ブースターパック「ディーヴァフィーバー」",
+    "color": "緑",
+    "hp": "160",
+    "bloom_level": "1st",
+    "baton_touch": "無色",
+    "skills": [
+      {
+        "type": "キーワード",
+        "subtype": "ブルームエフェクト",
+        "name": "ハートの女王の采配",
+        "description": "このホロメン以外の自分のバックホロメン1人を選ぶ。このターンの間、選んだホロメンのアーツ+30。"
+      },
+      {
+        "type": "アーツ",
+        "name": "女王陛下と呼びなさい",
+        "dmg": "70",
+        "description": "[センターポジション限定]このアーツで相手のホロメンをダウンさせた時、自分のデッキを1枚引く。",
+        "icons": {
+          "main": [
+            "green",
+            "green"
+          ]
+        }
+      }
+    ],
+    "id": "hBP07-027_SR"
+  },
+  "hBP07-028_S": {
+    "number": "hBP07-028",
+    "name": "大神ミオ",
+    "image_url": "https://hololive-official-cardgame.com/wp-content/images/cardlist/hBP07/hBP07-028_S.png",
+    "image_alt": "大神ミオ",
+    "card_type": "ホロメン",
+    "tags": [
+      "JP",
+      "ゲーマーズ",
+      "ケモミミ",
+      "料理"
+    ],
+    "rarity": "S",
+    "product": "ブースターパック「ディーヴァフィーバー」",
+    "color": "緑",
+    "hp": "200",
+    "bloom_level": "2nd",
+    "baton_touch": "無色",
+    "skills": [
+      {
+        "type": "キーワード",
+        "subtype": "コラボエフェクト",
+        "name": "金瞳の綺羅星",
+        "description": "自分のデッキの上から2枚を見る。その中から、カード1枚を手札に加える。そして残ったカードをデッキの上に戻す。"
+      },
+      {
+        "type": "アーツ",
+        "name": "天まで届け、みんなの願い",
+        "dmg": "90+",
+        "description": "自分のデッキの上から1枚をアーカイブできる。アーカイブしたカードがサポートカードなら、このアーツ+50。",
+        "icons": {
+          "main": [
+            "green",
+            "any"
+          ],
+          "tokkou": [
+            "青+50"
+          ]
+        }
+      }
+    ],
+    "id": "hBP07-028_S"
+  },
+  "hBP07-029_SR": {
+    "number": "hBP07-029",
+    "name": "大神ミオ",
+    "image_url": "https://hololive-official-cardgame.com/wp-content/images/cardlist/hBP07/hBP07-029_SR.png",
+    "image_alt": "大神ミオ",
+    "card_type": "ホロメン",
+    "tags": [
+      "JP",
+      "ゲーマーズ",
+      "ケモミミ",
+      "料理"
+    ],
+    "rarity": "SR",
+    "product": "ブースターパック「ディーヴァフィーバー」",
+    "color": "緑",
+    "hp": "200",
+    "bloom_level": "2nd",
+    "baton_touch": "無色",
+    "skills": [
+      {
+        "type": "キーワード",
+        "subtype": "ギフト",
+        "name": "緑の地母神",
+        "description": "[ターンに1回]相手のターンで、このホロメンがダメージを受けた時、このホロメンにサポートカードが付いているなら、このホロメンのHP50回復。"
+      },
+      {
+        "type": "アーツ",
+        "name": "Upright Leading",
+        "dmg": "130+",
+        "description": "自分のデッキの上から1枚をアーカイブできる。アーカイブしたカードがホロメンなら、自分のエールデッキの上から1枚を自分のホロメンに送る。サポートカードなら、このアーツ+50。",
+        "icons": {
+          "main": [
+            "any",
+            "any",
+            "any"
+          ],
+          "tokkou": [
+            "黄+50"
+          ]
+        }
+      }
+    ],
+    "id": "hBP07-029_SR"
+  },
+  "hBP07-029_UR": {
+    "number": "hBP07-029",
+    "name": "大神ミオ",
+    "image_url": "https://hololive-official-cardgame.com/wp-content/images/cardlist/hBP07/hBP07-029_UR.png",
+    "image_alt": "大神ミオ",
+    "card_type": "ホロメン",
+    "tags": [
+      "JP",
+      "ゲーマーズ",
+      "ケモミミ",
+      "料理"
+    ],
+    "rarity": "UR",
+    "product": "ブースターパック「ディーヴァフィーバー」",
+    "color": "緑",
+    "hp": "200",
+    "bloom_level": "2nd",
+    "baton_touch": "無色",
+    "skills": [
+      {
+        "type": "キーワード",
+        "subtype": "ギフト",
+        "name": "緑の地母神",
+        "description": "[ターンに1回]相手のターンで、このホロメンがダメージを受けた時、このホロメンにサポートカードが付いているなら、このホロメンのHP50回復。"
+      },
+      {
+        "type": "アーツ",
+        "name": "Upright Leading",
+        "dmg": "130+",
+        "description": "自分のデッキの上から1枚をアーカイブできる。アーカイブしたカードがホロメンなら、自分のエールデッキの上から1枚を自分のホロメンに送る。サポートカードなら、このアーツ+50。",
+        "icons": {
+          "main": [
+            "any",
+            "any",
+            "any"
+          ],
+          "tokkou": [
+            "黄+50"
+          ]
+        }
+      }
+    ],
+    "id": "hBP07-029_UR"
+  },
+  "hBP07-030_SR": {
+    "number": "hBP07-030",
+    "name": "風真いろは",
+    "image_url": "https://hololive-official-cardgame.com/wp-content/images/cardlist/hBP07/hBP07-030_SR.png",
+    "image_alt": "風真いろは",
+    "card_type": "ホロメン",
+    "tags": [
+      "JP",
+      "秘密結社holoX"
+    ],
+    "rarity": "SR",
+    "product": "ブースターパック「ディーヴァフィーバー」",
+    "color": "緑",
+    "hp": "210",
+    "bloom_level": "2nd",
+    "baton_touch": "無色",
+    "skills": [
+      {
+        "type": "キーワード",
+        "subtype": "ブルームエフェクト",
+        "name": "holoRêve -いろは-",
+        "description": "BuzzホロメンからBloomした時、自分のホロメン1人のHP100回復。"
+      },
+      {
+        "type": "アーツ",
+        "name": "たくさんの宝物",
+        "dmg": "100",
+        "description": "このホロメンのエール2枚をアーカイブできる：自分のデッキを2枚引く。",
+        "icons": {
+          "main": [
+            "green",
+            "green"
+          ],
+          "tokkou": [
+            "黄+50"
+          ]
+        }
+      }
+    ],
+    "id": "hBP07-030_SR"
+  },
+  "hBP07-031_SR": {
+    "number": "hBP07-031",
+    "name": "アイラニ・イオフィフティーン",
+    "image_url": "https://hololive-official-cardgame.com/wp-content/images/cardlist/hBP07/hBP07-031_SR.png",
+    "image_alt": "アイラニ・イオフィフティーン",
+    "card_type": "Buzzホロメン",
+    "tags": [
+      "ID",
+      "ID1期生",
+      "絵"
+    ],
+    "rarity": "SR",
+    "product": "ブースターパック「ディーヴァフィーバー」",
+    "color": "緑",
+    "hp": "240",
+    "bloom_level": "1st",
+    "baton_touch": "無色",
+    "skills": [
+      {
+        "type": "キーワード",
+        "subtype": "ブルームエフェクト",
+        "name": "この輝きが私達！",
+        "description": "自分のホロパワーの上から2枚をアーカイブできる：自分のデッキを2枚引く。"
+      },
+      {
+        "type": "アーツ",
+        "name": "ひとつになる声",
+        "dmg": "50",
+        "description": "自分の推しホロメンの色が緑か青か黄なら、自分のデッキの上から1枚をホロパワーにする。",
+        "icons": {
+          "main": [
+            "green",
+            "any"
+          ]
+        }
+      }
+    ],
+    "id": "hBP07-031_SR"
+  },
+  "hBP07-033_S": {
+    "number": "hBP07-033",
+    "name": "輪堂千速",
+    "image_url": "https://hololive-official-cardgame.com/wp-content/images/cardlist/hBP07/hBP07-033_S.png",
+    "image_alt": "輪堂千速",
+    "card_type": "ホロメン",
+    "tags": [
+      "DEV_IS",
+      "FLOW",
+      "GLOW"
+    ],
+    "rarity": "S",
+    "product": "ブースターパック「ディーヴァフィーバー」",
+    "color": "緑",
+    "hp": "160",
+    "bloom_level": "1st",
+    "baton_touch": "無色",
+    "skills": [
+      {
+        "type": "キーワード",
+        "subtype": "ブルームエフェクト",
+        "name": "ティールマーメイド",
+        "description": "自分のこのターンにBloomした#FLOW GLOWを持つホロメン1人を選ぶ。このターンの間、選んだホロメンのアーツ+30。"
+      },
+      {
+        "type": "アーツ",
+        "name": "～Something blue～ 千速",
+        "dmg": "50",
+        "icons": {
+          "main": [
+            "green",
+            "any"
+          ]
+        }
+      }
+    ],
+    "id": "hBP07-033_S"
+  },
+  "hBP07-034_SR": {
+    "number": "hBP07-034",
+    "name": "輪堂千速",
+    "image_url": "https://hololive-official-cardgame.com/wp-content/images/cardlist/hBP07/hBP07-034_SR.png",
+    "image_alt": "輪堂千速",
+    "card_type": "ホロメン",
+    "tags": [
+      "DEV_IS",
+      "FLOW",
+      "GLOW"
+    ],
+    "rarity": "SR",
+    "product": "ブースターパック「ディーヴァフィーバー」",
+    "color": "緑",
+    "hp": "190",
+    "bloom_level": "1st",
+    "baton_touch": "無色",
+    "skills": [
+      {
+        "type": "キーワード",
+        "subtype": "ブルームエフェクト",
+        "name": "ぶいぶい走らせるぞ！！！",
+        "description": "自分のステージのエール1枚をアーカイブできる：自分のデッキから、#FLOW GLOWを持つ[Debutホロメンか1stホロメンかSpotホロメン]1枚を公開し、手札に加える。そしてデッキをシャッフルする。"
+      },
+      {
+        "type": "アーツ",
+        "name": "どっちが速いｶﾅ？！？！？！",
+        "dmg": "20+",
+        "description": "このホロメンに〈ふぐ太郎〉が付いているなら、このアーツ+10。",
+        "icons": {
+          "main": [
+            "any"
+          ]
+        }
+      }
+    ],
+    "id": "hBP07-034_SR"
+  },
+  "hBP07-035_SR": {
+    "number": "hBP07-035",
+    "name": "輪堂千速",
+    "image_url": "https://hololive-official-cardgame.com/wp-content/images/cardlist/hBP07/hBP07-035_SR.png",
+    "image_alt": "輪堂千速",
+    "card_type": "ホロメン",
+    "tags": [
+      "DEV_IS",
+      "FLOW",
+      "GLOW"
+    ],
+    "rarity": "SR",
+    "product": "ブースターパック「ディーヴァフィーバー」",
+    "color": "緑",
+    "hp": "190",
+    "bloom_level": "2nd",
+    "baton_touch": "無色",
+    "skills": [
+      {
+        "type": "キーワード",
+        "subtype": "コラボエフェクト",
+        "name": "Give Me Hype!!",
+        "description": "このターンに自分の#FLOW GLOWを持つホロメンがBloomした回数1回につき、自分のエールデッキの上から1枚をこのホロメンに送る。"
+      },
+      {
+        "type": "アーツ",
+        "name": "サージングエキゾースト",
+        "dmg": "160",
+        "description": "このホロメンのエールを数えて、そのすべてを好きな順でエールデッキの下に戻す。その後、自分の手札がこの能力で戻したエールの枚数と同じになるまで、自分のデッキを引く。",
+        "icons": {
+          "main": [
+            "green",
+            "green",
+            "any",
+            "any"
+          ],
+          "tokkou": [
+            "青+50"
+          ]
+        }
+      }
+    ],
+    "id": "hBP07-035_SR"
+  },
+  "hBP07-035_UR": {
+    "number": "hBP07-035",
+    "name": "輪堂千速",
+    "image_url": "https://hololive-official-cardgame.com/wp-content/images/cardlist/hBP07/hBP07-035_UR.png",
+    "image_alt": "輪堂千速",
+    "card_type": "ホロメン",
+    "tags": [
+      "DEV_IS",
+      "FLOW",
+      "GLOW"
+    ],
+    "rarity": "UR",
+    "product": "ブースターパック「ディーヴァフィーバー」",
+    "color": "緑",
+    "hp": "190",
+    "bloom_level": "2nd",
+    "baton_touch": "無色",
+    "skills": [
+      {
+        "type": "キーワード",
+        "subtype": "コラボエフェクト",
+        "name": "Give Me Hype!!",
+        "description": "このターンに自分の#FLOW GLOWを持つホロメンがBloomした回数1回につき、自分のエールデッキの上から1枚をこのホロメンに送る。"
+      },
+      {
+        "type": "アーツ",
+        "name": "サージングエキゾースト",
+        "dmg": "160",
+        "description": "このホロメンのエールを数えて、そのすべてを好きな順でエールデッキの下に戻す。その後、自分の手札がこの能力で戻したエールの枚数と同じになるまで、自分のデッキを引く。",
+        "icons": {
+          "main": [
+            "green",
+            "green",
+            "any",
+            "any"
+          ],
+          "tokkou": [
+            "青+50"
+          ]
+        }
+      }
+    ],
+    "id": "hBP07-035_UR"
+  },
+  "hBP07-037_S": {
+    "number": "hBP07-037",
+    "name": "赤井はあと",
+    "image_url": "https://hololive-official-cardgame.com/wp-content/images/cardlist/hBP07/hBP07-037_S.png",
+    "image_alt": "赤井はあと",
+    "card_type": "ホロメン",
+    "tags": [
+      "JP",
+      "1期生",
+      "料理"
+    ],
+    "rarity": "S",
+    "product": "ブースターパック「ディーヴァフィーバー」",
+    "color": "赤",
+    "hp": "100",
+    "bloom_level": "Debut",
+    "baton_touch": "無色",
+    "skills": [
+      {
+        "type": "キーワード",
+        "subtype": "コラボエフェクト",
+        "name": "ちゃまと旅する！",
+        "description": "自分のセンターホロメンが〈赤井はあと〉なら、自分のデッキを1枚引く。"
+      },
+      {
+        "type": "アーツ",
+        "name": "旅はまだ、始まったばかり。",
+        "dmg": "20",
+        "icons": {
+          "main": [
+            "any"
+          ]
+        }
+      }
+    ],
+    "id": "hBP07-037_S"
+  },
+  "hBP07-038_S": {
+    "number": "hBP07-038",
+    "name": "赤井はあと",
+    "image_url": "https://hololive-official-cardgame.com/wp-content/images/cardlist/hBP07/hBP07-038_S.png",
+    "image_alt": "赤井はあと",
+    "card_type": "ホロメン",
+    "tags": [
+      "JP",
+      "1期生",
+      "料理"
+    ],
+    "rarity": "S",
+    "product": "ブースターパック「ディーヴァフィーバー」",
+    "color": "赤",
+    "hp": "150",
+    "bloom_level": "1st",
+    "baton_touch": "無色",
+    "skills": [
+      {
+        "type": "キーワード",
+        "subtype": "ブルームエフェクト",
+        "name": "幻獣グルメハンター",
+        "description": "サイコロを1回振る。奇数なら、相手のセンターホロメンに特殊ダメージ20を与える。偶数なら、自分のデッキを1枚引く。"
+      },
+      {
+        "type": "アーツ",
+        "name": "hololiveEN0",
+        "dmg": "30",
+        "description": "このターンの間、自分のステージの#ENを持つホロメン全員のアーツ+20。",
+        "icons": {
+          "main": [
+            "any"
+          ]
+        }
+      }
+    ],
+    "id": "hBP07-038_S"
+  },
+  "hBP07-039_S": {
+    "number": "hBP07-039",
+    "name": "赤井はあと",
+    "image_url": "https://hololive-official-cardgame.com/wp-content/images/cardlist/hBP07/hBP07-039_S.png",
+    "image_alt": "赤井はあと",
+    "card_type": "ホロメン",
+    "tags": [
+      "JP",
+      "1期生",
+      "料理"
+    ],
+    "rarity": "S",
+    "product": "ブースターパック「ディーヴァフィーバー」",
+    "color": "赤",
+    "hp": "160",
+    "bloom_level": "1st",
+    "baton_touch": "無色",
+    "skills": [
+      {
+        "type": "キーワード",
+        "subtype": "ギフト",
+        "name": "血ゃ舞ってる奴いる！？",
+        "description": "[ターンに1回]自分のターンで、自分の〈赤井はあと〉がステージからデッキに戻った時、自分のアーカイブのエール1枚をこのホロメンに送れる。"
+      },
+      {
+        "type": "アーツ",
+        "name": "俺の名は〝ちゃまお〟漢の中の漢だ！",
+        "dmg": "50",
+        "description": "相手のセンターホロメンに特殊ダメージ20を与える。",
+        "icons": {
+          "main": [
+            "red",
+            "any"
+          ]
+        }
+      }
+    ],
+    "id": "hBP07-039_S"
+  },
+  "hBP07-040_SR": {
+    "number": "hBP07-040",
+    "name": "赤井はあと",
+    "image_url": "https://hololive-official-cardgame.com/wp-content/images/cardlist/hBP07/hBP07-040_SR.png",
+    "image_alt": "赤井はあと",
+    "card_type": "ホロメン",
+    "tags": [
+      "JP",
+      "1期生",
+      "料理"
+    ],
+    "rarity": "SR",
+    "product": "ブースターパック「ディーヴァフィーバー」",
+    "color": "赤",
+    "hp": "170",
+    "bloom_level": "1st",
+    "baton_touch": "無色",
+    "skills": [
+      {
+        "type": "キーワード",
+        "subtype": "コラボエフェクト",
+        "name": "Haachama ♥ Restaurant",
+        "description": "自分のバックポジションのDebutホロメンの〈赤井はあと〉1人をデッキの下に戻せる：自分のデッキから、Buzz以外の[1stホロメンか2ndホロメン]1枚を公開し、手札に加える。そしてデッキをシャッフルする。"
+      },
+      {
+        "type": "アーツ",
+        "name": "当店自慢のはあとんバーガー！",
+        "dmg": "40",
+        "icons": {
+          "main": [
+            "red"
+          ]
+        }
+      }
+    ],
+    "id": "hBP07-040_SR"
+  },
+  "hBP07-041_S": {
+    "number": "hBP07-041",
+    "name": "赤井はあと",
+    "image_url": "https://hololive-official-cardgame.com/wp-content/images/cardlist/hBP07/hBP07-041_S.png",
+    "image_alt": "赤井はあと",
+    "card_type": "ホロメン",
+    "tags": [
+      "JP",
+      "1期生",
+      "料理"
+    ],
+    "rarity": "S",
+    "product": "ブースターパック「ディーヴァフィーバー」",
+    "color": "赤",
+    "hp": "200",
+    "bloom_level": "2nd",
+    "baton_touch": "無色",
+    "skills": [
+      {
+        "type": "キーワード",
+        "subtype": "コラボエフェクト",
+        "name": "EVERYBODY SAY HENTAI",
+        "description": "相手のコラボホロメンに特殊ダメージ50を与える。"
+      },
+      {
+        "type": "アーツ",
+        "name": "万物に愛されちゃま計画",
+        "dmg": "80+",
+        "description": "自分のステージのエールすべてが赤エールなら、このアーツ+20。",
+        "icons": {
+          "main": [
+            "red",
+            "any"
+          ],
+          "tokkou": [
+            "緑+50"
+          ]
+        }
+      }
+    ],
+    "id": "hBP07-041_S"
+  },
+  "hBP07-042_SR": {
+    "number": "hBP07-042",
+    "name": "赤井はあと",
+    "image_url": "https://hololive-official-cardgame.com/wp-content/images/cardlist/hBP07/hBP07-042_SR.png",
+    "image_alt": "赤井はあと",
+    "card_type": "ホロメン",
+    "tags": [
+      "JP",
+      "1期生",
+      "料理"
+    ],
+    "rarity": "SR",
+    "product": "ブースターパック「ディーヴァフィーバー」",
+    "color": "赤",
+    "hp": "200",
+    "bloom_level": "2nd",
+    "baton_touch": "無色",
+    "skills": [
+      {
+        "type": "アーツ",
+        "name": "純心タランテラ",
+        "dmg": "80",
+        "description": "相手のセンターホロメンとコラボホロメンに特殊ダメージ40を与える。",
+        "icons": {
+          "main": [
+            "red",
+            "red"
+          ],
+          "tokkou": [
+            "紫+50"
+          ]
+        }
+      },
+      {
+        "type": "アーツ",
+        "name": "幸せへの旅路",
+        "dmg": "140+",
+        "description": "このターンに自分のホロメンがステージからデッキに戻っていたなら、このアーツ+50。",
+        "icons": {
+          "main": [
+            "red",
+            "any",
+            "any"
+          ],
+          "tokkou": [
+            "紫+50"
+          ]
+        }
+      }
+    ],
+    "id": "hBP07-042_SR"
+  },
+  "hBP07-042_UR": {
+    "number": "hBP07-042",
+    "name": "赤井はあと",
+    "image_url": "https://hololive-official-cardgame.com/wp-content/images/cardlist/hBP07/hBP07-042_UR.png",
+    "image_alt": "赤井はあと",
+    "card_type": "ホロメン",
+    "tags": [
+      "JP",
+      "1期生",
+      "料理"
+    ],
+    "rarity": "UR",
+    "product": "ブースターパック「ディーヴァフィーバー」",
+    "color": "赤",
+    "hp": "200",
+    "bloom_level": "2nd",
+    "baton_touch": "無色",
+    "skills": [
+      {
+        "type": "アーツ",
+        "name": "純心タランテラ",
+        "dmg": "80",
+        "description": "相手のセンターホロメンとコラボホロメンに特殊ダメージ40を与える。",
+        "icons": {
+          "main": [
+            "red",
+            "red"
+          ],
+          "tokkou": [
+            "紫+50"
+          ]
+        }
+      },
+      {
+        "type": "アーツ",
+        "name": "幸せへの旅路",
+        "dmg": "140+",
+        "description": "このターンに自分のホロメンがステージからデッキに戻っていたなら、このアーツ+50。",
+        "icons": {
+          "main": [
+            "red",
+            "any",
+            "any"
+          ],
+          "tokkou": [
+            "紫+50"
+          ]
+        }
+      }
+    ],
+    "id": "hBP07-042_UR"
+  },
+  "hBP07-043_SR": {
+    "number": "hBP07-043",
+    "name": "さくらみこ",
+    "image_url": "https://hololive-official-cardgame.com/wp-content/images/cardlist/hBP07/hBP07-043_SR.png",
+    "image_alt": "さくらみこ",
+    "card_type": "ホロメン",
+    "tags": [
+      "JP",
+      "0期生",
+      "ベイビー"
+    ],
+    "rarity": "SR",
+    "product": "ブースターパック「ディーヴァフィーバー」",
+    "color": "赤",
+    "hp": "210",
+    "bloom_level": "2nd",
+    "baton_touch": "無色",
+    "skills": [
+      {
+        "type": "キーワード",
+        "subtype": "コラボエフェクト",
+        "name": "holoRêve -みこ-",
+        "description": "3か5を選ぶ。このターンの間、自分の推しホロメンの〈さくらみこ〉と自分のステージの〈さくらみこ〉の能力でサイコロを振る時、そのサイコロの目の数すべてを選んだ数として扱う。"
+      },
+      {
+        "type": "アーツ",
+        "name": "桜は花に顕る",
+        "dmg": "70+",
+        "description": "このホロメンに付いている〈35P〉1枚につき、このアーツ+70し、自分のデッキを1枚引く。",
+        "icons": {
+          "main": [
+            "red",
+            "red",
+            "red",
+            "any"
+          ],
+          "tokkou": [
+            "紫+50"
+          ]
+        }
+      }
+    ],
+    "id": "hBP07-043_SR"
+  },
+  "hBP07-044_SR": {
+    "number": "hBP07-044",
+    "name": "尾丸ポルカ",
+    "image_url": "https://hololive-official-cardgame.com/wp-content/images/cardlist/hBP07/hBP07-044_SR.png",
+    "image_alt": "尾丸ポルカ",
+    "card_type": "ホロメン",
+    "tags": [
+      "JP",
+      "5期生",
+      "ケモミミ"
+    ],
+    "rarity": "SR",
+    "product": "ブースターパック「ディーヴァフィーバー」",
+    "color": "赤",
+    "hp": "200",
+    "bloom_level": "2nd",
+    "baton_touch": "無色",
+    "skills": [
+      {
+        "type": "キーワード",
+        "subtype": "ギフト",
+        "name": "The Show Must Go On",
+        "description": "[センターポジション・コラボポジション限定]相手のターンで、自分のファンが付いているBuzzホロメンがダウンした時、自分の推しホロメンが〈尾丸ポルカ〉なら、自分の減るライフ-1。"
+      },
+      {
+        "type": "アーツ",
+        "name": "スタッフファーストです！",
+        "dmg": "120",
+        "description": "自分のデッキの上から2枚をアーカイブする。その後、自分のアーカイブのスタッフ1枚を手札に戻せる。",
+        "icons": {
+          "main": [
+            "red",
+            "red"
+          ],
+          "tokkou": [
+            "紫+50"
+          ]
+        }
+      }
+    ],
+    "id": "hBP07-044_SR"
+  },
+  "hBP07-045_SR": {
+    "number": "hBP07-045",
+    "name": "ハコス・ベールズ",
+    "image_url": "https://hololive-official-cardgame.com/wp-content/images/cardlist/hBP07/hBP07-045_SR.png",
+    "image_alt": "ハコス・ベールズ",
+    "card_type": "Buzzホロメン",
+    "tags": [
+      "EN",
+      "Promise",
+      "ケモミミ"
+    ],
+    "rarity": "SR",
+    "product": "ブースターパック「ディーヴァフィーバー」",
+    "color": "赤",
+    "hp": "230",
+    "bloom_level": "1st",
+    "baton_touch": "無色",
+    "skills": [
+      {
+        "type": "キーワード",
+        "subtype": "ギフト",
+        "name": "テンション上がってきた！",
+        "description": "[センターポジション・コラボポジション限定]自分のSP推しスキルを使った時、自分のデッキの上から1枚をホロパワーにする。"
+      },
+      {
+        "type": "アーツ",
+        "name": "キミがいないと楽しくないもん",
+        "dmg": "20+",
+        "description": "自分の手札1枚につき、このアーツ+20。",
+        "icons": {
+          "main": [
+            "red",
+            "any"
+          ]
+        }
+      }
+    ],
+    "id": "hBP07-045_SR"
+  },
+  "hBP07-047_S": {
+    "number": "hBP07-047",
+    "name": "エリザベス・ローズ・ブラッドフレイム",
+    "image_url": "https://hololive-official-cardgame.com/wp-content/images/cardlist/hBP07/hBP07-047_S.png",
+    "image_alt": "エリザベス・ローズ・ブラッドフレイム",
+    "card_type": "ホロメン",
+    "tags": [
+      "EN",
+      "Justice",
+      "歌"
+    ],
+    "rarity": "S",
+    "product": "ブースターパック「ディーヴァフィーバー」",
+    "color": "赤",
+    "hp": "120",
+    "bloom_level": "1st",
+    "baton_touch": "無色",
+    "skills": [
+      {
+        "type": "キーワード",
+        "subtype": "コラボエフェクト",
+        "name": "…Very well.",
+        "description": "自分の推しホロメンが〈エリザベス・ローズ・ブラッドフレイム〉なら、自分のデッキの上から1枚をホロパワーにする。"
+      },
+      {
+        "type": "アーツ",
+        "name": "さあ、かかってくるといい",
+        "dmg": "50",
+        "icons": {
+          "main": [
+            "red"
+          ]
+        }
+      }
+    ],
+    "id": "hBP07-047_S"
+  },
+  "hBP07-048_SR": {
+    "number": "hBP07-048",
+    "name": "エリザベス・ローズ・ブラッドフレイム",
+    "image_url": "https://hololive-official-cardgame.com/wp-content/images/cardlist/hBP07/hBP07-048_SR.png",
+    "image_alt": "エリザベス・ローズ・ブラッドフレイム",
+    "card_type": "ホロメン",
+    "tags": [
+      "EN",
+      "Justice",
+      "歌"
+    ],
+    "rarity": "SR",
+    "product": "ブースターパック「ディーヴァフィーバー」",
+    "color": "赤",
+    "hp": "260",
+    "bloom_level": "1st",
+    "baton_touch": "無色",
+    "skills": [
+      {
+        "type": "キーワード",
+        "subtype": "ギフト",
+        "name": "Queen of Impersonation",
+        "description": "このホロメンは、自分のステージの#ENを持つホロメン全員のアーツを、すべて使える（アーツを使うためのエールは必要）。"
+      },
+      {
+        "type": "アーツ",
+        "name": "Because I love people's voices",
+        "dmg": "60",
+        "description": "自分のアーカイブの#ENを持つホロメン1枚を手札に戻す。",
+        "icons": {
+          "main": [
+            "red",
+            "any"
+          ]
+        }
+      }
+    ],
+    "id": "hBP07-048_SR"
+  },
+  "hBP07-049_SR": {
+    "number": "hBP07-049",
+    "name": "エリザベス・ローズ・ブラッドフレイム",
+    "image_url": "https://hololive-official-cardgame.com/wp-content/images/cardlist/hBP07/hBP07-049_SR.png",
+    "image_alt": "エリザベス・ローズ・ブラッドフレイム",
+    "card_type": "ホロメン",
+    "tags": [
+      "EN",
+      "Justice",
+      "歌"
+    ],
+    "rarity": "SR",
+    "product": "ブースターパック「ディーヴァフィーバー」",
+    "color": "赤",
+    "hp": "210",
+    "bloom_level": "2nd",
+    "baton_touch": "無色",
+    "skills": [
+      {
+        "type": "キーワード",
+        "subtype": "ギフト",
+        "name": "絢爛のアインザッツ",
+        "description": "[センターポジション・コラボポジション限定]自分のホロメンが相手のホロメンをダウンさせた時、自分のホロメン1人を選ぶ。このターンの間、選んだホロメン1人のアーツに必要な無色-2。"
+      },
+      {
+        "type": "アーツ",
+        "name": "不撓のコンチェルタート",
+        "dmg": "130+",
+        "description": "自分のライフが4以下なら、このアーツ+30。自分のライフが2以下なら、かわりに、このアーツ+60。",
+        "icons": {
+          "main": [
+            "red",
+            "any",
+            "any"
+          ],
+          "tokkou": [
+            "黄+50"
+          ]
+        }
+      }
+    ],
+    "id": "hBP07-049_SR"
+  },
+  "hBP07-049_UR": {
+    "number": "hBP07-049",
+    "name": "エリザベス・ローズ・ブラッドフレイム",
+    "image_url": "https://hololive-official-cardgame.com/wp-content/images/cardlist/hBP07/hBP07-049_UR.png",
+    "image_alt": "エリザベス・ローズ・ブラッドフレイム",
+    "card_type": "ホロメン",
+    "tags": [
+      "EN",
+      "Justice",
+      "歌"
+    ],
+    "rarity": "UR",
+    "product": "ブースターパック「ディーヴァフィーバー」",
+    "color": "赤",
+    "hp": "210",
+    "bloom_level": "2nd",
+    "baton_touch": "無色",
+    "skills": [
+      {
+        "type": "キーワード",
+        "subtype": "ギフト",
+        "name": "絢爛のアインザッツ",
+        "description": "[センターポジション・コラボポジション限定]自分のホロメンが相手のホロメンをダウンさせた時、自分のホロメン1人を選ぶ。このターンの間、選んだホロメン1人のアーツに必要な無色-2。"
+      },
+      {
+        "type": "アーツ",
+        "name": "不撓のコンチェルタート",
+        "dmg": "130+",
+        "description": "自分のライフが4以下なら、このアーツ+30。自分のライフが2以下なら、かわりに、このアーツ+60。",
+        "icons": {
+          "main": [
+            "red",
+            "any",
+            "any"
+          ],
+          "tokkou": [
+            "黄+50"
+          ]
+        }
+      }
+    ],
+    "id": "hBP07-049_UR"
+  },
+  "hBP07-051_S": {
+    "number": "hBP07-051",
+    "name": "オーロ・クロニー",
+    "image_url": "https://hololive-official-cardgame.com/wp-content/images/cardlist/hBP07/hBP07-051_S.png",
+    "image_alt": "オーロ・クロニー",
+    "card_type": "ホロメン",
+    "tags": [
+      "EN",
+      "Promise"
+    ],
+    "rarity": "S",
+    "product": "ブースターパック「ディーヴァフィーバー」",
+    "color": "青",
+    "hp": "130",
+    "bloom_level": "Debut",
+    "baton_touch": "無色",
+    "skills": [
+      {
+        "type": "キーワード",
+        "subtype": "コラボエフェクト",
+        "name": "TAKE YOUR TIME",
+        "description": "自分のステージのエール1枚をこのホロメン以外の自分の#Promiseを持つホロメンに付け替えられる。"
+      },
+      {
+        "type": "アーツ",
+        "name": "Check This Out Yo 🕶️",
+        "dmg": "30",
+        "icons": {
+          "main": [
+            "any"
+          ]
+        }
+      }
+    ],
+    "id": "hBP07-051_S"
+  },
+  "hBP07-052_S": {
+    "number": "hBP07-052",
+    "name": "オーロ・クロニー",
+    "image_url": "https://hololive-official-cardgame.com/wp-content/images/cardlist/hBP07/hBP07-052_S.png",
+    "image_alt": "オーロ・クロニー",
+    "card_type": "ホロメン",
+    "tags": [
+      "EN",
+      "Promise"
+    ],
+    "rarity": "S",
+    "product": "ブースターパック「ディーヴァフィーバー」",
+    "color": "青",
+    "hp": "160",
+    "bloom_level": "1st",
+    "baton_touch": "無色",
+    "skills": [
+      {
+        "type": "キーワード",
+        "subtype": "コラボエフェクト",
+        "name": "お時間ですわ！",
+        "description": "自分のアーカイブのマスコット1枚をこのホロメンに付けられる。"
+      },
+      {
+        "type": "アーツ",
+        "name": "私の新キャッチフレーズ。どうだい？",
+        "dmg": "30+",
+        "description": "自分のステージに〈オーロ・クロニー〉以外の#Promiseを持つホロメンがいるなら、このアーツ+10。",
+        "icons": {
+          "main": [
+            "any"
+          ]
+        }
+      }
+    ],
+    "id": "hBP07-052_S"
+  },
+  "hBP07-053_S": {
+    "number": "hBP07-053",
+    "name": "オーロ・クロニー",
+    "image_url": "https://hololive-official-cardgame.com/wp-content/images/cardlist/hBP07/hBP07-053_S.png",
+    "image_alt": "オーロ・クロニー",
+    "card_type": "ホロメン",
+    "tags": [
+      "EN",
+      "Promise"
+    ],
+    "rarity": "S",
+    "product": "ブースターパック「ディーヴァフィーバー」",
+    "color": "青",
+    "hp": "150",
+    "bloom_level": "1st",
+    "baton_touch": "無色",
+    "skills": [
+      {
+        "type": "キーワード",
+        "subtype": "ブルームエフェクト",
+        "name": "時を超えた約束",
+        "description": "自分のステージの#Promiseを持つホロメン1人を選ぶ。このターンの間、選んだホロメンのアーツ+20。"
+      },
+      {
+        "type": "アーツ",
+        "name": "Everlasting Flower",
+        "dmg": "50",
+        "description": "自分のエールデッキの上から1枚を自分の#Promiseを持つホロメンに送る。",
+        "icons": {
+          "main": [
+            "blue",
+            "any"
+          ]
+        }
+      }
+    ],
+    "id": "hBP07-053_S"
+  },
+  "hBP07-054_SR": {
+    "number": "hBP07-054",
+    "name": "オーロ・クロニー",
+    "image_url": "https://hololive-official-cardgame.com/wp-content/images/cardlist/hBP07/hBP07-054_SR.png",
+    "image_alt": "オーロ・クロニー",
+    "card_type": "Buzzホロメン",
+    "tags": [
+      "EN",
+      "Promise"
+    ],
+    "rarity": "SR",
+    "product": "ブースターパック「ディーヴァフィーバー」",
+    "color": "青",
+    "hp": "250",
+    "bloom_level": "1st",
+    "baton_touch": "無色",
+    "skills": [
+      {
+        "type": "アーツ",
+        "name": "I'm pretty shy…uwu",
+        "dmg": "50",
+        "description": "自分のエールデッキの上から1枚を自分の#Promiseを持つBuzzホロメンに送る。",
+        "icons": {
+          "main": [
+            "blue"
+          ]
+        }
+      }
+    ],
+    "id": "hBP07-054_SR"
+  },
+  "hBP07-055_S": {
+    "number": "hBP07-055",
+    "name": "オーロ・クロニー",
+    "image_url": "https://hololive-official-cardgame.com/wp-content/images/cardlist/hBP07/hBP07-055_S.png",
+    "image_alt": "オーロ・クロニー",
+    "card_type": "ホロメン",
+    "tags": [
+      "EN",
+      "Promise"
+    ],
+    "rarity": "S",
+    "product": "ブースターパック「ディーヴァフィーバー」",
+    "color": "青",
+    "hp": "190",
+    "bloom_level": "2nd",
+    "baton_touch": "無色",
+    "skills": [
+      {
+        "type": "キーワード",
+        "subtype": "ブルームエフェクト",
+        "name": "約束の未来へ",
+        "description": "自分のステージの#Promiseを持つホロメン1人を選ぶ。このターンの間、選んだホロメンのアーツ+50。"
+      },
+      {
+        "type": "アーツ",
+        "name": "Life Goes On",
+        "dmg": "90",
+        "icons": {
+          "main": [
+            "blue",
+            "any"
+          ],
+          "tokkou": [
+            "白+50"
+          ]
+        }
+      }
+    ],
+    "id": "hBP07-055_S"
+  },
+  "hBP07-056_SR": {
+    "number": "hBP07-056",
+    "name": "オーロ・クロニー",
+    "image_url": "https://hololive-official-cardgame.com/wp-content/images/cardlist/hBP07/hBP07-056_SR.png",
+    "image_alt": "オーロ・クロニー",
+    "card_type": "ホロメン",
+    "tags": [
+      "EN",
+      "Promise"
+    ],
+    "rarity": "SR",
+    "product": "ブースターパック「ディーヴァフィーバー」",
+    "color": "青",
+    "hp": "200",
+    "bloom_level": "2nd",
+    "baton_touch": "無色",
+    "skills": [
+      {
+        "type": "キーワード",
+        "subtype": "ギフト",
+        "name": "時界を統べし者",
+        "description": "[センターポジション限定]自分のパフォーマンスステップが開始する時、このホロメン以外の自分の〈オーロ・クロニー〉1人を、このホロメンに重なっているホロメンを使ってBloomできる。"
+      },
+      {
+        "type": "アーツ",
+        "name": "You're not ready for me.",
+        "dmg": "80+",
+        "description": "このホロメンのエール1枚を自分の他の#Promiseを持つホロメンに付け替えられる。その後、自分の推しホロメンが〈オーロ・クロニー〉なら、このアーツ+100。",
+        "icons": {
+          "main": [
+            "blue",
+            "blue",
+            "any",
+            "any"
+          ],
+          "tokkou": [
+            "赤+50"
+          ]
+        }
+      }
+    ],
+    "id": "hBP07-056_SR"
+  },
+  "hBP07-056_UR": {
+    "number": "hBP07-056",
+    "name": "オーロ・クロニー",
+    "image_url": "https://hololive-official-cardgame.com/wp-content/images/cardlist/hBP07/hBP07-056_UR.png",
+    "image_alt": "オーロ・クロニー",
+    "card_type": "ホロメン",
+    "tags": [
+      "EN",
+      "Promise"
+    ],
+    "rarity": "UR",
+    "product": "ブースターパック「ディーヴァフィーバー」",
+    "color": "青",
+    "hp": "200",
+    "bloom_level": "2nd",
+    "baton_touch": "無色",
+    "skills": [
+      {
+        "type": "キーワード",
+        "subtype": "ギフト",
+        "name": "時界を統べし者",
+        "description": "[センターポジション限定]自分のパフォーマンスステップが開始する時、このホロメン以外の自分の〈オーロ・クロニー〉1人を、このホロメンに重なっているホロメンを使ってBloomできる。"
+      },
+      {
+        "type": "アーツ",
+        "name": "You're not ready for me.",
+        "dmg": "80+",
+        "description": "このホロメンのエール1枚を自分の他の#Promiseを持つホロメンに付け替えられる。その後、自分の推しホロメンが〈オーロ・クロニー〉なら、このアーツ+100。",
+        "icons": {
+          "main": [
+            "blue",
+            "blue",
+            "any",
+            "any"
+          ],
+          "tokkou": [
+            "赤+50"
+          ]
+        }
+      }
+    ],
+    "id": "hBP07-056_UR"
+  },
+  "hBP07-057_SR": {
+    "number": "hBP07-057",
+    "name": "猫又おかゆ",
+    "image_url": "https://hololive-official-cardgame.com/wp-content/images/cardlist/hBP07/hBP07-057_SR.png",
+    "image_alt": "猫又おかゆ",
+    "card_type": "ホロメン",
+    "tags": [
+      "JP",
+      "ゲーマーズ",
+      "ケモミミ"
+    ],
+    "rarity": "SR",
+    "product": "ブースターパック「ディーヴァフィーバー」",
+    "color": "青",
+    "hp": "200",
+    "bloom_level": "2nd",
+    "baton_touch": "無色",
+    "skills": [
+      {
+        "type": "キーワード",
+        "subtype": "コラボエフェクト",
+        "name": "君と遊ぶとドキドキしちゃう…",
+        "description": "相手のホロメン1人に特殊ダメージ30を与える。"
+      },
+      {
+        "type": "アーツ",
+        "name": "おりゃー！！油断したでしょ～",
+        "dmg": "100",
+        "description": "自分の推しホロメンが〈猫又おかゆ〉で、相手のHPが100以上減っているバックホロメンがいるなら、相手のホロメン1人に特殊ダメージ50を与える。",
+        "icons": {
+          "main": [
+            "blue",
+            "blue",
+            "any"
+          ],
+          "tokkou": [
+            "赤+50"
+          ]
+        }
+      }
+    ],
+    "id": "hBP07-057_SR"
+  },
+  "hBP07-058_SR": {
+    "number": "hBP07-058",
+    "name": "こぼ・かなえる",
+    "image_url": "https://hololive-official-cardgame.com/wp-content/images/cardlist/hBP07/hBP07-058_SR.png",
+    "image_alt": "こぼ・かなえる",
+    "card_type": "ホロメン",
+    "tags": [
+      "ID",
+      "ID3期生"
+    ],
+    "rarity": "SR",
+    "product": "ブースターパック「ディーヴァフィーバー」",
+    "color": "青",
+    "hp": "160",
+    "bloom_level": "1st",
+    "baton_touch": "無色",
+    "skills": [
+      {
+        "type": "キーワード",
+        "subtype": "ブルームエフェクト",
+        "name": "Happy For You",
+        "description": "自分のエールデッキから、自分のステージの#ID3期生を持つホロメン1人と同色のエール1枚を公開し、自分のホロメンに送る。そしてエールデッキをシャッフルする。"
+      },
+      {
+        "type": "アーツ",
+        "name": "MANTAP LEE!!",
+        "dmg": "60",
+        "description": "相手のHPが減っているバックホロメンが3人以上いるなら、自分のデッキを2枚引く。",
+        "icons": {
+          "main": [
+            "blue",
+            "any",
+            "any"
+          ]
+        }
+      }
+    ],
+    "id": "hBP07-058_SR"
+  },
+  "hBP07-060_S": {
+    "number": "hBP07-060",
+    "name": "シオリ・ノヴェラ",
+    "image_url": "https://hololive-official-cardgame.com/wp-content/images/cardlist/hBP07/hBP07-060_S.png",
+    "image_alt": "シオリ・ノヴェラ",
+    "card_type": "ホロメン",
+    "tags": [
+      "EN",
+      "Advent"
+    ],
+    "rarity": "S",
+    "product": "ブースターパック「ディーヴァフィーバー」",
+    "color": "青",
+    "hp": "190",
+    "bloom_level": "1st",
+    "baton_touch": "無色",
+    "skills": [
+      {
+        "type": "アーツ",
+        "name": "食料解剖",
+        "dmg": "10",
+        "icons": {
+          "main": [
+            "any"
+          ]
+        }
+      },
+      {
+        "type": "アーツ",
+        "name": "Don't Let Her Cook!",
+        "dmg": "50",
+        "description": "このアーツは、自分のアーカイブにサポートカードが4枚以上なければ使えない。",
+        "icons": {
+          "main": [
+            "blue"
+          ]
+        }
+      }
+    ],
+    "id": "hBP07-060_S"
+  },
+  "hBP07-061_SR": {
+    "number": "hBP07-061",
+    "name": "シオリ・ノヴェラ",
+    "image_url": "https://hololive-official-cardgame.com/wp-content/images/cardlist/hBP07/hBP07-061_SR.png",
+    "image_alt": "シオリ・ノヴェラ",
+    "card_type": "ホロメン",
+    "tags": [
+      "EN",
+      "Advent"
+    ],
+    "rarity": "SR",
+    "product": "ブースターパック「ディーヴァフィーバー」",
+    "color": "青",
+    "hp": "140",
+    "bloom_level": "1st",
+    "baton_touch": "無色",
+    "skills": [
+      {
+        "type": "キーワード",
+        "subtype": "ブルームエフェクト",
+        "name": "A New Chapter Begins!",
+        "description": "自分の推しホロメンが〈シオリ・ノヴェラ〉なら、自分のデッキの上から4枚を見る。その中から、サポートカード1枚を公開し、手札に加える。そして残ったカードを好きな順でデッキの下に戻す。"
+      },
+      {
+        "type": "アーツ",
+        "name": "逃がす訳がないでしょう？",
+        "dmg": "20",
+        "description": "相手のバックホロメン1人に特殊ダメージ20を与える。",
+        "icons": {
+          "main": [
+            "blue"
+          ]
+        }
+      }
+    ],
+    "id": "hBP07-061_SR"
+  },
+  "hBP07-062_SR": {
+    "number": "hBP07-062",
+    "name": "シオリ・ノヴェラ",
+    "image_url": "https://hololive-official-cardgame.com/wp-content/images/cardlist/hBP07/hBP07-062_SR.png",
+    "image_alt": "シオリ・ノヴェラ",
+    "card_type": "ホロメン",
+    "tags": [
+      "EN",
+      "Advent"
+    ],
+    "rarity": "SR",
+    "product": "ブースターパック「ディーヴァフィーバー」",
+    "color": "青",
+    "hp": "200",
+    "bloom_level": "2nd",
+    "baton_touch": "無色",
+    "skills": [
+      {
+        "type": "キーワード",
+        "subtype": "コラボエフェクト",
+        "name": "A New Crime & A New Me",
+        "description": "自分の手札のサポートカード2枚をアーカイブできる：自分のステージのホロメン1人を選ぶ。このターンの間、選んだホロメンのアーツ+50。"
+      },
+      {
+        "type": "アーツ",
+        "name": "解き放たれた禁断の知識",
+        "dmg": "60+",
+        "description": "自分のアーカイブのエール1枚を自分の#Adventを持つホロメンに送る。その後、自分の推しホロメンが〈シオリ・ノヴェラ〉で、このホロメンにエールが4枚以上付いているなら、このアーツ+100。",
+        "icons": {
+          "main": [
+            "blue"
+          ],
+          "tokkou": [
+            "赤+50"
+          ]
+        }
+      }
+    ],
+    "id": "hBP07-062_SR"
+  },
+  "hBP07-062_UR": {
+    "number": "hBP07-062",
+    "name": "シオリ・ノヴェラ",
+    "image_url": "https://hololive-official-cardgame.com/wp-content/images/cardlist/hBP07/hBP07-062_UR.png",
+    "image_alt": "シオリ・ノヴェラ",
+    "card_type": "ホロメン",
+    "tags": [
+      "EN",
+      "Advent"
+    ],
+    "rarity": "UR",
+    "product": "ブースターパック「ディーヴァフィーバー」",
+    "color": "青",
+    "hp": "200",
+    "bloom_level": "2nd",
+    "baton_touch": "無色",
+    "skills": [
+      {
+        "type": "キーワード",
+        "subtype": "コラボエフェクト",
+        "name": "A New Crime & A New Me",
+        "description": "自分の手札のサポートカード2枚をアーカイブできる：自分のステージのホロメン1人を選ぶ。このターンの間、選んだホロメンのアーツ+50。"
+      },
+      {
+        "type": "アーツ",
+        "name": "解き放たれた禁断の知識",
+        "dmg": "60+",
+        "description": "自分のアーカイブのエール1枚を自分の#Adventを持つホロメンに送る。その後、自分の推しホロメンが〈シオリ・ノヴェラ〉で、このホロメンにエールが4枚以上付いているなら、このアーツ+100。",
+        "icons": {
+          "main": [
+            "blue"
+          ],
+          "tokkou": [
+            "赤+50"
+          ]
+        }
+      }
+    ],
+    "id": "hBP07-062_UR"
+  },
+  "hBP07-064_S": {
+    "number": "hBP07-064",
+    "name": "AZKi",
+    "image_url": "https://hololive-official-cardgame.com/wp-content/images/cardlist/hBP07/hBP07-064_S.png",
+    "image_alt": "AZKi",
+    "card_type": "ホロメン",
+    "tags": [
+      "JP",
+      "0期生",
+      "歌"
+    ],
+    "rarity": "S",
+    "product": "ブースターパック「ディーヴァフィーバー」",
+    "color": "紫",
+    "hp": "130",
+    "bloom_level": "Debut",
+    "baton_touch": "無色",
+    "skills": [
+      {
+        "type": "アーツ",
+        "name": "ゆっくりしにおいで♡",
+        "dmg": "20",
+        "description": "自分のデッキから、〈開拓者〉1枚を公開し、自分の〈AZKi〉に付ける。そしてデッキをシャッフルする。",
+        "icons": {
+          "main": [
+            "any"
+          ]
+        }
+      }
+    ],
+    "id": "hBP07-064_S"
+  },
+  "hBP07-065_S": {
+    "number": "hBP07-065",
+    "name": "AZKi",
+    "image_url": "https://hololive-official-cardgame.com/wp-content/images/cardlist/hBP07/hBP07-065_S.png",
+    "image_alt": "AZKi",
+    "card_type": "ホロメン",
+    "tags": [
+      "JP",
+      "0期生",
+      "歌"
+    ],
+    "rarity": "S",
+    "product": "ブースターパック「ディーヴァフィーバー」",
+    "color": "紫",
+    "hp": "190",
+    "bloom_level": "1st",
+    "baton_touch": "無色",
+    "skills": [
+      {
+        "type": "アーツ",
+        "name": "盛り上がっていこう！",
+        "dmg": "30",
+        "description": "自分のデッキを1枚引いた後、手札1枚をアーカイブする。",
+        "icons": {
+          "main": [
+            "any"
+          ]
+        }
+      },
+      {
+        "type": "アーツ",
+        "name": "みんなの声聞かせてええええええ！！！",
+        "dmg": "120",
+        "icons": {
+          "main": [
+            "purple",
+            "any",
+            "any",
+            "any"
+          ]
+        }
+      }
+    ],
+    "id": "hBP07-065_S"
+  },
+  "hBP07-066_S": {
+    "number": "hBP07-066",
+    "name": "AZKi",
+    "image_url": "https://hololive-official-cardgame.com/wp-content/images/cardlist/hBP07/hBP07-066_S.png",
+    "image_alt": "AZKi",
+    "card_type": "ホロメン",
+    "tags": [
+      "JP",
+      "0期生",
+      "歌"
+    ],
+    "rarity": "S",
+    "product": "ブースターパック「ディーヴァフィーバー」",
+    "color": "紫",
+    "hp": "170",
+    "bloom_level": "1st",
+    "baton_touch": "無色",
+    "skills": [
+      {
+        "type": "キーワード",
+        "subtype": "コラボエフェクト",
+        "name": "仮想世界の伴走する歌姫",
+        "description": "自分のホロメン1人のHP30回復。その後、自分のステージのホロメン1人を選ぶ。このターンの間、選んだホロメンのアーツ+10。"
+      },
+      {
+        "type": "アーツ",
+        "name": "音楽と歌うことが大好き！",
+        "dmg": "40",
+        "icons": {
+          "main": [
+            "any"
+          ]
+        }
+      }
+    ],
+    "id": "hBP07-066_S"
+  },
+  "hBP07-067_SR": {
+    "number": "hBP07-067",
+    "name": "AZKi",
+    "image_url": "https://hololive-official-cardgame.com/wp-content/images/cardlist/hBP07/hBP07-067_SR.png",
+    "image_alt": "AZKi",
+    "card_type": "ホロメン",
+    "tags": [
+      "JP",
+      "0期生",
+      "歌"
+    ],
+    "rarity": "SR",
+    "product": "ブースターパック「ディーヴァフィーバー」",
+    "color": "紫",
+    "hp": "150",
+    "bloom_level": "1st",
+    "baton_touch": "無色",
+    "skills": [
+      {
+        "type": "キーワード",
+        "subtype": "ブルームエフェクト",
+        "name": "ROMANTiC NiGHT",
+        "description": "自分のデッキの上から4枚を見る。その中から、〈AZKi〉1枚を公開し、手札に加える。そして残ったカードを好きな順でデッキの下に戻す。"
+      },
+      {
+        "type": "アーツ",
+        "name": "君と二人きりの夜",
+        "dmg": "40",
+        "description": "自分の手札1枚をアーカイブできる：相手のセンターホロメンかコラボホロメンに特殊ダメージ20を与える。",
+        "icons": {
+          "main": [
+            "purple",
+            "any"
+          ]
+        }
+      }
+    ],
+    "id": "hBP07-067_SR"
+  },
+  "hBP07-068_S": {
+    "number": "hBP07-068",
+    "name": "AZKi",
+    "image_url": "https://hololive-official-cardgame.com/wp-content/images/cardlist/hBP07/hBP07-068_S.png",
+    "image_alt": "AZKi",
+    "card_type": "ホロメン",
+    "tags": [
+      "JP",
+      "0期生",
+      "歌"
+    ],
+    "rarity": "S",
+    "product": "ブースターパック「ディーヴァフィーバー」",
+    "color": "紫",
+    "hp": "210",
+    "bloom_level": "2nd",
+    "baton_touch": "無色",
+    "skills": [
+      {
+        "type": "キーワード",
+        "subtype": "コラボエフェクト",
+        "name": "共に歩んできた軌跡",
+        "description": "このターンの間、自分のステージの異なるカード名の#0期生を持つホロメン1人につき、このホロメンのアーツ+20。"
+      },
+      {
+        "type": "アーツ",
+        "name": "ホワイトデーのお返し、待ってるね",
+        "dmg": "100",
+        "icons": {
+          "main": [
+            "any",
+            "any"
+          ],
+          "tokkou": [
+            "黄+50"
+          ]
+        }
+      }
+    ],
+    "id": "hBP07-068_S"
+  },
+  "hBP07-069_SR": {
+    "number": "hBP07-069",
+    "name": "AZKi",
+    "image_url": "https://hololive-official-cardgame.com/wp-content/images/cardlist/hBP07/hBP07-069_SR.png",
+    "image_alt": "AZKi",
+    "card_type": "ホロメン",
+    "tags": [
+      "JP",
+      "0期生",
+      "歌"
+    ],
+    "rarity": "SR",
+    "product": "ブースターパック「ディーヴァフィーバー」",
+    "color": "紫",
+    "hp": "220",
+    "bloom_level": "2nd",
+    "baton_touch": "無色",
+    "skills": [
+      {
+        "type": "アーツ",
+        "name": "君と新たな開拓の地へ",
+        "dmg": "140",
+        "description": "自分のデッキを2枚引く。",
+        "icons": {
+          "main": [
+            "purple",
+            "any",
+            "any"
+          ],
+          "tokkou": [
+            "緑+50"
+          ]
+        }
+      },
+      {
+        "type": "アーツ",
+        "name": "紡いだ軌跡 すべてに捧ぐ歌",
+        "dmg": "200",
+        "description": "自分の推しホロメンが〈AZKi〉なら、自分のホロパワーの上から4枚をアーカイブできる：自分のアーカイブに〈フロンティアスピリット〉が4枚あるなら、相手のライフ-1。",
+        "icons": {
+          "main": [
+            "purple",
+            "purple",
+            "purple",
+            "any"
+          ],
+          "tokkou": [
+            "緑+50"
+          ]
+        }
+      }
+    ],
+    "id": "hBP07-069_SR"
+  },
+  "hBP07-069_UR": {
+    "number": "hBP07-069",
+    "name": "AZKi",
+    "image_url": "https://hololive-official-cardgame.com/wp-content/images/cardlist/hBP07/hBP07-069_UR.png",
+    "image_alt": "AZKi",
+    "card_type": "ホロメン",
+    "tags": [
+      "JP",
+      "0期生",
+      "歌"
+    ],
+    "rarity": "UR",
+    "product": "ブースターパック「ディーヴァフィーバー」",
+    "color": "紫",
+    "hp": "220",
+    "bloom_level": "2nd",
+    "baton_touch": "無色",
+    "skills": [
+      {
+        "type": "アーツ",
+        "name": "君と新たな開拓の地へ",
+        "dmg": "140",
+        "description": "自分のデッキを2枚引く。",
+        "icons": {
+          "main": [
+            "purple",
+            "any",
+            "any"
+          ],
+          "tokkou": [
+            "緑+50"
+          ]
+        }
+      },
+      {
+        "type": "アーツ",
+        "name": "紡いだ軌跡 すべてに捧ぐ歌",
+        "dmg": "200",
+        "description": "自分の推しホロメンが〈AZKi〉なら、自分のホロパワーの上から4枚をアーカイブできる：自分のアーカイブに〈フロンティアスピリット〉が4枚あるなら、相手のライフ-1。",
+        "icons": {
+          "main": [
+            "purple",
+            "purple",
+            "purple",
+            "any"
+          ],
+          "tokkou": [
+            "緑+50"
+          ]
+        }
+      }
+    ],
+    "id": "hBP07-069_UR"
+  },
+  "hBP07-070_SR": {
+    "number": "hBP07-070",
+    "name": "癒月ちょこ",
+    "image_url": "https://hololive-official-cardgame.com/wp-content/images/cardlist/hBP07/hBP07-070_SR.png",
+    "image_alt": "癒月ちょこ",
+    "card_type": "ホロメン",
+    "tags": [
+      "JP",
+      "2期生",
+      "料理"
+    ],
+    "rarity": "SR",
+    "product": "ブースターパック「ディーヴァフィーバー」",
+    "color": "紫",
+    "hp": "150",
+    "bloom_level": "1st",
+    "baton_touch": "無色",
+    "skills": [
+      {
+        "type": "キーワード",
+        "subtype": "ブルームエフェクト",
+        "name": "今日のご飯、何がいーい？",
+        "description": "自分のデッキの上から3枚を見る。その中から、#料理を持つホロメン1枚を公開し、手札に加える。そして残ったカードを好きな順でデッキの下に戻す。"
+      },
+      {
+        "type": "アーツ",
+        "name": "がんばって美味しいの作るね♡",
+        "dmg": "30",
+        "description": "自分の#料理を持つホロメンを1人選ぶ。このターンに自分が使っていた#食べ物を持つイベント1枚につき、このターンの間、選んだホロメンのアーツに必要な無色-1。",
+        "icons": {
+          "main": [
+            "purple"
+          ]
+        }
+      }
+    ],
+    "id": "hBP07-070_SR"
+  },
+  "hBP07-071_S": {
+    "number": "hBP07-071",
+    "name": "ラプラス・ダークネス",
+    "image_url": "https://hololive-official-cardgame.com/wp-content/images/cardlist/hBP07/hBP07-071_S.png",
+    "image_alt": "ラプラス・ダークネス",
+    "card_type": "ホロメン",
+    "tags": [
+      "JP",
+      "秘密結社holoX",
+      "シューター"
+    ],
+    "rarity": "S",
+    "product": "ブースターパック「ディーヴァフィーバー」",
+    "color": "紫",
+    "hp": "120",
+    "bloom_level": "Debut",
+    "skills": [
+      {
+        "type": "キーワード",
+        "subtype": "コラボエフェクト",
+        "name": "おい、お前",
+        "description": "自分のデッキの上から5枚を見る。その中から、Debutの紫ホロメン1枚を公開し、手札に加える。そして残ったカードを好きな順でデッキの下に戻す。"
+      },
+      {
+        "type": "アーツ",
+        "name": "手作りの朝ごはんを要求する",
+        "dmg": "30",
+        "icons": {
+          "main": [
+            "purple"
+          ]
+        }
+      }
+    ],
+    "id": "hBP07-071_S"
+  },
+  "hBP07-072_S": {
+    "number": "hBP07-072",
+    "name": "ラプラス・ダークネス",
+    "image_url": "https://hololive-official-cardgame.com/wp-content/images/cardlist/hBP07/hBP07-072_S.png",
+    "image_alt": "ラプラス・ダークネス",
+    "card_type": "ホロメン",
+    "tags": [
+      "JP",
+      "秘密結社holoX",
+      "シューター"
+    ],
+    "rarity": "S",
+    "product": "ブースターパック「ディーヴァフィーバー」",
+    "color": "紫",
+    "hp": "150",
+    "bloom_level": "1st",
+    "baton_touch": "無色",
+    "skills": [
+      {
+        "type": "キーワード",
+        "subtype": "ブルームエフェクト",
+        "name": "Secret Love -La+-",
+        "description": "自分のステージの#秘密結社holoXを持つホロメン1人を選び、サイコロを3回振る。このターンの間、この能力で奇数が出た回数1回につき、選んだホロメンのアーツ+10。"
+      },
+      {
+        "type": "アーツ",
+        "name": "吾輩との秘密だぞ",
+        "dmg": "60",
+        "icons": {
+          "main": [
+            "purple",
+            "any"
+          ]
+        }
+      }
+    ],
+    "id": "hBP07-072_S"
+  },
+  "hBP07-073_SR": {
+    "number": "hBP07-073",
+    "name": "ラプラス・ダークネス",
+    "image_url": "https://hololive-official-cardgame.com/wp-content/images/cardlist/hBP07/hBP07-073_SR.png",
+    "image_alt": "ラプラス・ダークネス",
+    "card_type": "ホロメン",
+    "tags": [
+      "JP",
+      "秘密結社holoX",
+      "シューター",
+      "歌"
+    ],
+    "rarity": "SR",
+    "product": "ブースターパック「ディーヴァフィーバー」",
+    "color": "紫",
+    "hp": "170",
+    "bloom_level": "1st",
+    "baton_touch": "無色",
+    "skills": [
+      {
+        "type": "キーワード",
+        "subtype": "コラボエフェクト",
+        "name": "ライブだー！！！！！！！！！",
+        "description": "このターンの間、このホロメンのアーツに必要な無色-2。"
+      },
+      {
+        "type": "アーツ",
+        "name": "吾輩の歌聴いてくれる奴いるううう！？！？",
+        "dmg": "30",
+        "description": "自分のデッキから、〈ラプラス・ダークネス〉1枚を公開し、手札に加える。そしてデッキをシャッフルする。",
+        "icons": {
+          "main": [
+            "any",
+            "any"
+          ]
+        }
+      }
+    ],
+    "id": "hBP07-073_SR"
+  },
+  "hBP07-074_SR": {
+    "number": "hBP07-074",
+    "name": "ラプラス・ダークネス",
+    "image_url": "https://hololive-official-cardgame.com/wp-content/images/cardlist/hBP07/hBP07-074_SR.png",
+    "image_alt": "ラプラス・ダークネス",
+    "card_type": "ホロメン",
+    "tags": [
+      "JP",
+      "秘密結社holoX",
+      "シューター",
+      "歌"
+    ],
+    "rarity": "SR",
+    "product": "ブースターパック「ディーヴァフィーバー」",
+    "color": "紫",
+    "hp": "200",
+    "bloom_level": "2nd",
+    "baton_touch": "無色",
+    "skills": [
+      {
+        "type": "キーワード",
+        "subtype": "ブルームエフェクト",
+        "name": "ラッシュ行きます",
+        "description": "自分のデッキの上から3枚を見る。その中から、ホロメンを好きな枚数公開し、公開したホロメンを手札に加える。そして残ったカードを好きな順でデッキの下に戻す。"
+      },
+      {
+        "type": "アーツ",
+        "name": "吾輩の歌を聴けえええええええ！！！！",
+        "dmg": "110+",
+        "description": "自分のセンターホロメンの色が紫なら、このアーツ+40。",
+        "icons": {
+          "main": [
+            "purple",
+            "any",
+            "any"
+          ],
+          "tokkou": [
+            "緑+50"
+          ]
+        }
+      }
+    ],
+    "id": "hBP07-074_SR"
+  },
+  "hBP07-074_UR": {
+    "number": "hBP07-074",
+    "name": "ラプラス・ダークネス",
+    "image_url": "https://hololive-official-cardgame.com/wp-content/images/cardlist/hBP07/hBP07-074_UR.png",
+    "image_alt": "ラプラス・ダークネス",
+    "card_type": "ホロメン",
+    "tags": [
+      "JP",
+      "秘密結社holoX",
+      "シューター",
+      "歌"
+    ],
+    "rarity": "UR",
+    "product": "ブースターパック「ディーヴァフィーバー」",
+    "color": "紫",
+    "hp": "200",
+    "bloom_level": "2nd",
+    "baton_touch": "無色",
+    "skills": [
+      {
+        "type": "キーワード",
+        "subtype": "ブルームエフェクト",
+        "name": "ラッシュ行きます",
+        "description": "自分のデッキの上から3枚を見る。その中から、ホロメンを好きな枚数公開し、公開したホロメンを手札に加える。そして残ったカードを好きな順でデッキの下に戻す。"
+      },
+      {
+        "type": "アーツ",
+        "name": "吾輩の歌を聴けえええええええ！！！！",
+        "dmg": "110+",
+        "description": "自分のセンターホロメンの色が紫なら、このアーツ+40。",
+        "icons": {
+          "main": [
+            "purple",
+            "any",
+            "any"
+          ],
+          "tokkou": [
+            "緑+50"
+          ]
+        }
+      }
+    ],
+    "id": "hBP07-074_UR"
+  },
+  "hBP07-075_SR": {
+    "number": "hBP07-075",
+    "name": "古石ビジュー",
+    "image_url": "https://hololive-official-cardgame.com/wp-content/images/cardlist/hBP07/hBP07-075_SR.png",
+    "image_alt": "古石ビジュー",
+    "card_type": "ホロメン",
+    "tags": [
+      "EN",
+      "Advent",
+      "ベイビー"
+    ],
+    "rarity": "SR",
+    "product": "ブースターパック「ディーヴァフィーバー」",
+    "color": "紫",
+    "hp": "200",
+    "bloom_level": "2nd",
+    "baton_touch": "無色",
+    "skills": [
+      {
+        "type": "キーワード",
+        "subtype": "ギフト",
+        "name": "闇夜のハンター",
+        "description": "このホロメンのアーツの対象が自分のアーカイブのエールと同色の相手のホロメンなら、このホロメンのアーツダメージは軽減されない。"
+      },
+      {
+        "type": "アーツ",
+        "name": "CODE:81800",
+        "dmg": "70+",
+        "description": "このホロメンにエールが3枚以上付いているなら、お互いのアーカイブのエール1枚につき、このアーツ+10。",
+        "icons": {
+          "main": [
+            "purple"
+          ],
+          "tokkou": [
+            "青+50"
+          ]
+        }
+      }
+    ],
+    "id": "hBP07-075_SR"
+  },
+  "hBP07-076_SR": {
+    "number": "hBP07-076",
+    "name": "ネリッサ・レイヴンクロフト",
+    "image_url": "https://hololive-official-cardgame.com/wp-content/images/cardlist/hBP07/hBP07-076_SR.png",
+    "image_alt": "ネリッサ・レイヴンクロフト",
+    "card_type": "ホロメン",
+    "tags": [
+      "EN",
+      "Advent",
+      "歌",
+      "トリ"
+    ],
+    "rarity": "SR",
+    "product": "ブースターパック「ディーヴァフィーバー」",
+    "color": "紫",
+    "hp": "260",
+    "bloom_level": "1st",
+    "baton_touch": "無色",
+    "skills": [
+      {
+        "type": "キーワード",
+        "subtype": "コラボエフェクト",
+        "name": "SUGOISUGOIDEKAI",
+        "description": "自分の推しホロメンが〈ネリッサ・レイヴンクロフト〉なら、自分のデッキを1枚引き、自分の手札1枚をホロパワーにする。"
+      },
+      {
+        "type": "アーツ",
+        "name": "あら、捕まえられちゃった！",
+        "dmg": "50+",
+        "description": "自分のホロパワー1枚をアーカイブできる：このアーツ+30。",
+        "icons": {
+          "main": [
+            "purple",
+            "any"
+          ]
+        }
+      }
+    ],
+    "id": "hBP07-076_SR"
+  },
+  "hBP07-078_S": {
+    "number": "hBP07-078",
+    "name": "桃鈴ねね",
+    "image_url": "https://hololive-official-cardgame.com/wp-content/images/cardlist/hBP07/hBP07-078_S.png",
+    "image_alt": "桃鈴ねね",
+    "card_type": "ホロメン",
+    "tags": [
+      "JP",
+      "5期生",
+      "歌",
+      "絵"
+    ],
+    "rarity": "S",
+    "product": "ブースターパック「ディーヴァフィーバー」",
+    "color": "黄",
+    "hp": "110",
+    "bloom_level": "Debut",
+    "baton_touch": "無色",
+    "skills": [
+      {
+        "type": "キーワード",
+        "subtype": "コラボエフェクト",
+        "name": "君もこっちにおいで～！",
+        "description": "自分のデッキの上から5枚を見る。その中から、〈ねっ子〉1枚を公開し、手札に加える。そして残ったカードを好きな順でデッキの下に戻す。"
+      },
+      {
+        "type": "アーツ",
+        "name": "ねねと一緒に楽しもう！！",
+        "dmg": "20",
+        "icons": {
+          "main": [
+            "any"
+          ]
+        }
+      }
+    ],
+    "id": "hBP07-078_S"
+  },
+  "hBP07-079_S": {
+    "number": "hBP07-079",
+    "name": "桃鈴ねね",
+    "image_url": "https://hololive-official-cardgame.com/wp-content/images/cardlist/hBP07/hBP07-079_S.png",
+    "image_alt": "桃鈴ねね",
+    "card_type": "ホロメン",
+    "tags": [
+      "JP",
+      "5期生",
+      "歌",
+      "絵"
+    ],
+    "rarity": "S",
+    "product": "ブースターパック「ディーヴァフィーバー」",
+    "color": "黄",
+    "hp": "150",
+    "bloom_level": "1st",
+    "baton_touch": "無色",
+    "skills": [
+      {
+        "type": "キーワード",
+        "subtype": "ブルームエフェクト",
+        "name": "ねねちライブスタート！",
+        "description": "自分のアーカイブのエール1枚をこのホロメンに送れる。"
+      },
+      {
+        "type": "アーツ",
+        "name": "ご自由にお使いください！",
+        "dmg": "30",
+        "description": "自分のデッキから、〈やめなー〉1枚を公開し、自分のホロメンに付ける。そしてデッキをシャッフルする。",
+        "icons": {
+          "main": [
+            "any"
+          ]
+        }
+      }
+    ],
+    "id": "hBP07-079_S"
+  },
+  "hBP07-080_S": {
+    "number": "hBP07-080",
+    "name": "桃鈴ねね",
+    "image_url": "https://hololive-official-cardgame.com/wp-content/images/cardlist/hBP07/hBP07-080_S.png",
+    "image_alt": "桃鈴ねね",
+    "card_type": "ホロメン",
+    "tags": [
+      "JP",
+      "5期生",
+      "歌",
+      "絵"
+    ],
+    "rarity": "S",
+    "product": "ブースターパック「ディーヴァフィーバー」",
+    "color": "黄",
+    "hp": "140",
+    "bloom_level": "1st",
+    "baton_touch": "無色",
+    "skills": [
+      {
+        "type": "キーワード",
+        "subtype": "ギフト",
+        "name": "オレンジアイドル！",
+        "description": "[ターンに1回]自分の推しホロメンが〈桃鈴ねね〉なら、自分のメインステップに使える：自分のアーカイブの〈ねっ子〉1枚をこのホロメンに付ける。"
+      },
+      {
+        "type": "アーツ",
+        "name": "さいくーにくぅわいい",
+        "dmg": "40",
+        "icons": {
+          "main": [
+            "yellow"
+          ]
+        }
+      }
+    ],
+    "id": "hBP07-080_S"
+  },
+  "hBP07-081_SR": {
+    "number": "hBP07-081",
+    "name": "桃鈴ねね",
+    "image_url": "https://hololive-official-cardgame.com/wp-content/images/cardlist/hBP07/hBP07-081_SR.png",
+    "image_alt": "桃鈴ねね",
+    "card_type": "ホロメン",
+    "tags": [
+      "JP",
+      "5期生",
+      "歌",
+      "絵"
+    ],
+    "rarity": "SR",
+    "product": "ブースターパック「ディーヴァフィーバー」",
+    "color": "黄",
+    "hp": "180",
+    "bloom_level": "1st",
+    "baton_touch": "無色",
+    "skills": [
+      {
+        "type": "キーワード",
+        "subtype": "コラボエフェクト",
+        "name": "桃鈴ねねは昆虫博士になる！",
+        "description": "自分のホロパワーが4枚以上で、相手のコラボホロメンがいないなら、相手は、自身のバックホロメン1人をコラボポジションに移動させる（移動はコラボとしては扱わない）。"
+      },
+      {
+        "type": "アーツ",
+        "name": "君のハートをブルロック！",
+        "dmg": "30",
+        "description": "このホロメンに〈ギラファノコギリクワガタ〉が付いているなら、このアーツダメージは、アーツの対象のホロメンのかわりに、相手のセンターホロメンとコラボホロメンに与える。",
+        "icons": {
+          "main": [
+            "yellow",
+            "yellow"
+          ]
+        }
+      }
+    ],
+    "id": "hBP07-081_SR"
+  },
+  "hBP07-082_S": {
+    "number": "hBP07-082",
+    "name": "桃鈴ねね",
+    "image_url": "https://hololive-official-cardgame.com/wp-content/images/cardlist/hBP07/hBP07-082_S.png",
+    "image_alt": "桃鈴ねね",
+    "card_type": "ホロメン",
+    "tags": [
+      "JP",
+      "5期生",
+      "歌",
+      "絵"
+    ],
+    "rarity": "S",
+    "product": "ブースターパック「ディーヴァフィーバー」",
+    "color": "黄",
+    "hp": "200",
+    "bloom_level": "2nd",
+    "baton_touch": "無色",
+    "skills": [
+      {
+        "type": "キーワード",
+        "subtype": "コラボエフェクト",
+        "name": "ねぽらぼが最強です！！！！！！！！！！！！！",
+        "description": "自分のデッキから、#5期生を持つ2ndホロメン1枚を公開し、手札に加える。そしてデッキをシャッフルする。"
+      },
+      {
+        "type": "アーツ",
+        "name": "アチョ～～～！",
+        "dmg": "50",
+        "icons": {
+          "main": [
+            "any"
+          ],
+          "tokkou": [
+            "青+50"
+          ]
+        }
+      }
+    ],
+    "id": "hBP07-082_S"
+  },
+  "hBP07-083_SR": {
+    "number": "hBP07-083",
+    "name": "桃鈴ねね",
+    "image_url": "https://hololive-official-cardgame.com/wp-content/images/cardlist/hBP07/hBP07-083_SR.png",
+    "image_alt": "桃鈴ねね",
+    "card_type": "ホロメン",
+    "tags": [
+      "JP",
+      "5期生",
+      "歌",
+      "絵"
+    ],
+    "rarity": "SR",
+    "product": "ブースターパック「ディーヴァフィーバー」",
+    "color": "黄",
+    "hp": "200",
+    "bloom_level": "2nd",
+    "baton_touch": "無色",
+    "skills": [
+      {
+        "type": "キーワード",
+        "subtype": "ブルームエフェクト",
+        "name": "みんなのエナジードリンク",
+        "description": "[センターポジション限定]次の相手のターン終了時まで、お互いのステージのホロメン全員のアーツ+40。さらに、自分のステージの2ndホロメンの〈桃鈴ねね〉全員のアーツ+60。"
+      },
+      {
+        "type": "アーツ",
+        "name": "オーバーチアリーディング",
+        "dmg": "100",
+        "description": "相手の[センターホロメンかコラボホロメン]のエール1枚をエールデッキの下に戻す。",
+        "icons": {
+          "main": [
+            "yellow",
+            "any",
+            "any"
+          ],
+          "tokkou": [
+            "赤+50"
+          ]
+        }
+      }
+    ],
+    "id": "hBP07-083_SR"
+  },
+  "hBP07-083_UR": {
+    "number": "hBP07-083",
+    "name": "桃鈴ねね",
+    "image_url": "https://hololive-official-cardgame.com/wp-content/images/cardlist/hBP07/hBP07-083_UR.png",
+    "image_alt": "桃鈴ねね",
+    "card_type": "ホロメン",
+    "tags": [
+      "JP",
+      "5期生",
+      "歌",
+      "絵"
+    ],
+    "rarity": "UR",
+    "product": "ブースターパック「ディーヴァフィーバー」",
+    "color": "黄",
+    "hp": "200",
+    "bloom_level": "2nd",
+    "baton_touch": "無色",
+    "skills": [
+      {
+        "type": "キーワード",
+        "subtype": "ブルームエフェクト",
+        "name": "みんなのエナジードリンク",
+        "description": "[センターポジション限定]次の相手のターン終了時まで、お互いのステージのホロメン全員のアーツ+40。さらに、自分のステージの2ndホロメンの〈桃鈴ねね〉全員のアーツ+60。"
+      },
+      {
+        "type": "アーツ",
+        "name": "オーバーチアリーディング",
+        "dmg": "100",
+        "description": "相手の[センターホロメンかコラボホロメン]のエール1枚をエールデッキの下に戻す。",
+        "icons": {
+          "main": [
+            "yellow",
+            "any",
+            "any"
+          ],
+          "tokkou": [
+            "赤+50"
+          ]
+        }
+      }
+    ],
+    "id": "hBP07-083_UR"
+  },
+  "hBP07-084_SR": {
+    "number": "hBP07-084",
+    "name": "夏色まつり",
+    "image_url": "https://hololive-official-cardgame.com/wp-content/images/cardlist/hBP07/hBP07-084_SR.png",
+    "image_alt": "夏色まつり",
+    "card_type": "ホロメン",
+    "tags": [
+      "JP",
+      "1期生",
+      "シューター"
+    ],
+    "rarity": "SR",
+    "product": "ブースターパック「ディーヴァフィーバー」",
+    "color": "黄",
+    "hp": "210",
+    "bloom_level": "2nd",
+    "baton_touch": "無色",
+    "skills": [
+      {
+        "type": "キーワード",
+        "subtype": "ギフト",
+        "name": "一緒にゲームしよ",
+        "description": "相手のターンで、このホロメンがダウンした時、自分のアーカイブのLIMITEDのサポートカード1枚をデッキの下に戻せる。戻したなら、このホロメンをアーカイブするかわりに手札に戻す。"
+      },
+      {
+        "type": "アーツ",
+        "name": "やっぱり、FPSとか？",
+        "dmg": "90",
+        "description": "自分のアーカイブのエール1枚を自分のホロメンに送る。",
+        "icons": {
+          "main": [
+            "yellow",
+            "any"
+          ],
+          "tokkou": [
+            "青+50"
+          ]
+        }
+      }
+    ],
+    "id": "hBP07-084_SR"
+  },
+  "hBP07-085_SR": {
+    "number": "hBP07-085",
+    "name": "不知火フレア",
+    "image_url": "https://hololive-official-cardgame.com/wp-content/images/cardlist/hBP07/hBP07-085_SR.png",
+    "image_alt": "不知火フレア",
+    "card_type": "ホロメン",
+    "tags": [
+      "JP",
+      "3期生",
+      "ハーフエルフ"
+    ],
+    "rarity": "SR",
+    "product": "ブースターパック「ディーヴァフィーバー」",
+    "color": "黄",
+    "hp": "170",
+    "bloom_level": "1st",
+    "baton_touch": "無色",
+    "skills": [
+      {
+        "type": "キーワード",
+        "subtype": "ギフト",
+        "name": "私のとっておき！",
+        "description": "自分のターンで、このホロメンがコラボポジションに移動した時、自分のデッキの上から3枚を見る。その中から、〈不知火フレア〉1枚を公開し、手札に加える。そして残ったカードをアーカイブする。"
+      },
+      {
+        "type": "アーツ",
+        "name": "元気いっぱいカラフルパフェ",
+        "dmg": "20+",
+        "description": "自分の推しホロメンが〈不知火フレア〉なら、自分の〈不知火フレア〉1人を選ぶ。このターンの間、選んだホロメンのエール1枚につき、選んだホロメンのアーツ+20。",
+        "icons": {
+          "main": [
+            "yellow"
+          ]
+        }
+      }
+    ],
+    "id": "hBP07-085_SR"
+  },
+  "hBP07-086_SR": {
+    "number": "hBP07-086",
+    "name": "ジジ・ムリン",
+    "image_url": "https://hololive-official-cardgame.com/wp-content/images/cardlist/hBP07/hBP07-086_SR.png",
+    "image_alt": "ジジ・ムリン",
+    "card_type": "ホロメン",
+    "tags": [
+      "EN",
+      "Justice"
+    ],
+    "rarity": "SR",
+    "product": "ブースターパック「ディーヴァフィーバー」",
+    "color": "黄",
+    "hp": "210",
+    "bloom_level": "2nd",
+    "baton_touch": "無色",
+    "skills": [
+      {
+        "type": "キーワード",
+        "subtype": "コラボエフェクト",
+        "name": "執念のチェイサー",
+        "description": "自分の〈ジジ・ムリン〉1人を選ぶ。このターンの間、選んだホロメンのアーツは、相手のHPが減っているバックホロメンも対象にできる。"
+      },
+      {
+        "type": "アーツ",
+        "name": "追撃のライオット",
+        "dmg": "160+",
+        "description": "このアーツの対象が、相手のHPが減っているホロメンなら、このアーツ+30。",
+        "icons": {
+          "main": [
+            "yellow",
+            "yellow",
+            "any"
+          ],
+          "tokkou": [
+            "青+50"
+          ]
+        }
+      }
+    ],
+    "id": "hBP07-086_SR"
+  },
+  "hBP07-088_S": {
+    "number": "hBP07-088",
+    "name": "虎金妃笑虎",
+    "image_url": "https://hololive-official-cardgame.com/wp-content/images/cardlist/hBP07/hBP07-088_S.png",
+    "image_alt": "虎金妃笑虎",
+    "card_type": "ホロメン",
+    "tags": [
+      "DEV_IS",
+      "FLOW",
+      "GLOW"
+    ],
+    "rarity": "S",
+    "product": "ブースターパック「ディーヴァフィーバー」",
+    "color": "黄",
+    "hp": "160",
+    "bloom_level": "1st",
+    "baton_touch": "無色",
+    "skills": [
+      {
+        "type": "キーワード",
+        "subtype": "ギフト",
+        "name": "虎の威",
+        "description": "自分のバックポジションの#FLOW GLOWを持つ1stホロメン全員は相手から特殊ダメージを受けない。"
+      },
+      {
+        "type": "アーツ",
+        "name": "みんなが居るから幸せだ！",
+        "dmg": "50+",
+        "description": "このターンに自分のステージのエールがアーカイブされていたなら、このアーツ+30。",
+        "icons": {
+          "main": [
+            "yellow",
+            "any"
+          ]
+        }
+      }
+    ],
+    "id": "hBP07-088_S"
+  },
+  "hBP07-089_SR": {
+    "number": "hBP07-089",
+    "name": "虎金妃笑虎",
+    "image_url": "https://hololive-official-cardgame.com/wp-content/images/cardlist/hBP07/hBP07-089_SR.png",
+    "image_alt": "虎金妃笑虎",
+    "card_type": "ホロメン",
+    "tags": [
+      "DEV_IS",
+      "FLOW",
+      "GLOW"
+    ],
+    "rarity": "SR",
+    "product": "ブースターパック「ディーヴァフィーバー」",
+    "color": "黄",
+    "hp": "180",
+    "bloom_level": "1st",
+    "baton_touch": "無色",
+    "skills": [
+      {
+        "type": "キーワード",
+        "subtype": "ブルームエフェクト",
+        "name": "っしゃ反撃抜刀",
+        "description": "直前の相手のターンに自分の#FLOW GLOWを持つホロメンがダウンしていたなら、自分のデッキを2枚引く。自分のブルームエフェクト「っしゃ反撃抜刀」はターンに1回しか使えない。"
+      },
+      {
+        "type": "アーツ",
+        "name": "スッゲーワクワクするしょ！！",
+        "dmg": "50",
+        "icons": {
+          "main": [
+            "yellow"
+          ]
+        }
+      }
+    ],
+    "id": "hBP07-089_SR"
+  },
+  "hBP07-090_SR": {
+    "number": "hBP07-090",
+    "name": "虎金妃笑虎",
+    "image_url": "https://hololive-official-cardgame.com/wp-content/images/cardlist/hBP07/hBP07-090_SR.png",
+    "image_alt": "虎金妃笑虎",
+    "card_type": "ホロメン",
+    "tags": [
+      "DEV_IS",
+      "FLOW",
+      "GLOW"
+    ],
+    "rarity": "SR",
+    "product": "ブースターパック「ディーヴァフィーバー」",
+    "color": "黄",
+    "hp": "210",
+    "bloom_level": "2nd",
+    "baton_touch": "無色",
+    "skills": [
+      {
+        "type": "キーワード",
+        "subtype": "コラボエフェクト",
+        "name": "ここで終わっちゃう虎じゃないんだ！",
+        "description": "自分のアーカイブのエール2枚を#FLOW GLOWを持つ自分のホロメン1人に送れる。"
+      },
+      {
+        "type": "アーツ",
+        "name": "ぶち上げる気合いだ！",
+        "dmg": "80+",
+        "description": "このホロメンのエール1枚につき、このアーツ+20。",
+        "icons": {
+          "main": [
+            "yellow",
+            "yellow"
+          ],
+          "tokkou": [
+            "白+50"
+          ]
+        }
+      }
+    ],
+    "id": "hBP07-090_SR"
+  },
+  "hBP07-090_UR": {
+    "number": "hBP07-090",
+    "name": "虎金妃笑虎",
+    "image_url": "https://hololive-official-cardgame.com/wp-content/images/cardlist/hBP07/hBP07-090_UR.png",
+    "image_alt": "虎金妃笑虎",
+    "card_type": "ホロメン",
+    "tags": [
+      "DEV_IS",
+      "FLOW",
+      "GLOW"
+    ],
+    "rarity": "UR",
+    "product": "ブースターパック「ディーヴァフィーバー」",
+    "color": "黄",
+    "hp": "210",
+    "bloom_level": "2nd",
+    "baton_touch": "無色",
+    "skills": [
+      {
+        "type": "キーワード",
+        "subtype": "コラボエフェクト",
+        "name": "ここで終わっちゃう虎じゃないんだ！",
+        "description": "自分のアーカイブのエール2枚を#FLOW GLOWを持つ自分のホロメン1人に送れる。"
+      },
+      {
+        "type": "アーツ",
+        "name": "ぶち上げる気合いだ！",
+        "dmg": "80+",
+        "description": "このホロメンのエール1枚につき、このアーツ+20。",
+        "icons": {
+          "main": [
+            "yellow",
+            "yellow"
+          ],
+          "tokkou": [
+            "白+50"
+          ]
+        }
+      }
+    ],
+    "id": "hBP07-090_UR"
+  },
+  "hBP07-091_S": {
+    "number": "hBP07-091",
+    "name": "ライブスタッフ",
+    "image_url": "https://hololive-official-cardgame.com/wp-content/images/cardlist/hBP07/hBP07-091_S.png",
+    "image_alt": "ライブスタッフ",
+    "card_type": "サポート・スタッフ",
+    "rarity": "S",
+    "product": "ブースターパック「ディーヴァフィーバー」",
+    "skills": [
+      {
+        "type": "サポート効果",
+        "name": "このカードは、自分のステージのエール1枚をアーカイブしなければ使えない。\n\n自分のアーカイブのファン1枚を自分のホロメンに付ける。付けたなら、自分のアーカイブのホロメン1枚を手札に戻す。"
+      }
+    ],
+    "id": "hBP07-091_S"
+  },
+  "hBP07-092_S": {
+    "number": "hBP07-092",
+    "name": "アーカイブパソコン",
+    "image_url": "https://hololive-official-cardgame.com/wp-content/images/cardlist/hBP07/hBP07-092_S.png",
+    "image_alt": "アーカイブパソコン",
+    "card_type": "サポート・アイテム・LIMITED",
+    "rarity": "S",
+    "product": "ブースターパック「ディーヴァフィーバー」",
+    "skills": [
+      {
+        "type": "サポート効果",
+        "name": "自分のアーカイブのホロメン1～3枚をデッキに戻してシャッフルする。その後、自分のデッキを2枚引く。\n\nLIMITED：ターンに1枚しか使えない。"
+      }
+    ],
+    "id": "hBP07-092_S"
+  },
+  "hBP07-093_S": {
+    "number": "hBP07-093",
+    "name": "うまみー！",
+    "image_url": "https://hololive-official-cardgame.com/wp-content/images/cardlist/hBP07/hBP07-093_S.png",
+    "image_alt": "うまみー！",
+    "card_type": "サポート・イベント",
+    "rarity": "S",
+    "product": "ブースターパック「ディーヴァフィーバー」",
+    "skills": [
+      {
+        "type": "サポート効果",
+        "name": "自分のコラボポジションの〈ベスティア・ゼータ〉を選ぶ。このターンの間、選んだホロメンのアーツ+40。その後、サイコロを1回振る。6以外なら、このカードをデッキに戻してシャッフルする。 \n自分の〈うまみー！〉はターンに1回しか使えない。"
+      }
+    ],
+    "id": "hBP07-093_S"
+  },
+  "hBP07-095_S": {
+    "number": "hBP07-095",
+    "name": "クロスインパクト",
+    "image_url": "https://hololive-official-cardgame.com/wp-content/images/cardlist/hBP07/hBP07-095_S.png",
+    "image_alt": "クロスインパクト",
+    "card_type": "サポート・イベント・LIMITED",
+    "rarity": "S",
+    "product": "ブースターパック「ディーヴァフィーバー」",
+    "skills": [
+      {
+        "type": "サポート効果",
+        "name": "このカードは、お互いのセンターホロメンが2ndホロメンでなければ使えない。\n\nお互いにサイコロを1回振る。自分の出た目の数が相手以上なら、このターンの間、自分のセンターホロメンのアーツ+100。自分の出た目の数が相手より小さいなら、自分のエールデッキの上から1枚を自分のホロメンに送る。\n\nLIMITED：ターンに1枚しか使えない。"
+      }
+    ],
+    "id": "hBP07-095_S"
+  },
+  "hBP07-096_S": {
+    "number": "hBP07-096",
+    "name": "ちゃま旅",
+    "image_url": "https://hololive-official-cardgame.com/wp-content/images/cardlist/hBP07/hBP07-096_S.png",
+    "image_alt": "ちゃま旅",
+    "card_type": "サポート・イベント",
+    "rarity": "S",
+    "product": "ブースターパック「ディーヴァフィーバー」",
+    "skills": [
+      {
+        "type": "サポート効果",
+        "name": "自分のバックポジションの〈赤井はあと〉1人を選ぶ。選んだホロメンを含め重なっているホロメンすべてを好きな順でデッキの下に戻す。このターンの間、自分の〈赤井はあと〉全員のアーツに必要な無色-1。"
+      }
+    ],
+    "id": "hBP07-096_S"
+  },
+  "hBP07-098_S": {
+    "number": "hBP07-098",
+    "name": "ビッグゴッドミオーンの占い",
+    "image_url": "https://hololive-official-cardgame.com/wp-content/images/cardlist/hBP07/hBP07-098_S.png",
+    "image_alt": "ビッグゴッドミオーンの占い",
+    "card_type": "サポート・イベント・LIMITED",
+    "rarity": "S",
+    "product": "ブースターパック「ディーヴァフィーバー」",
+    "skills": [
+      {
+        "type": "サポート効果",
+        "name": "このカードは、自分の推しホロメンが〈大神ミオ〉でなければ使えない。\n\n自分のデッキの上から3枚を公開する。このターンの間、この能力で公開したサポートカード1枚につき、自分のステージのホロメン全員のアーツ+20。そして公開したカードを好きな順でデッキの上に戻す。\n\nLIMITED：ターンに1枚しか使えない。"
+      }
+    ],
+    "id": "hBP07-098_S"
+  },
+  "hBP07-099_S": {
+    "number": "hBP07-099",
+    "name": "ブヒー！",
+    "image_url": "https://hololive-official-cardgame.com/wp-content/images/cardlist/hBP07/hBP07-099_S.png",
+    "image_alt": "ブヒー！",
+    "card_type": "サポート・イベント・LIMITED",
+    "rarity": "S",
+    "product": "ブースターパック「ディーヴァフィーバー」",
+    "skills": [
+      {
+        "type": "サポート効果",
+        "name": "自分のデッキを2枚引く。その後、直前の相手のターンに自分のホロメンがダウンしていたなら、自分のステージのホロメン1人を選ぶ。このターンの間、選んだホロメンのアーツ+20。さらに、直前の相手のターンにダウンしていた自分のホロメンが〈ラプラス・ダークネス〉なら、自分のデッキを2枚引く。\n\nLIMITED：ターンに1枚しか使えない。"
+      }
+    ],
+    "id": "hBP07-099_S"
+  },
+  "hBP07-101_S": {
+    "number": "hBP07-101",
+    "name": "ASMRマイク",
+    "image_url": "https://hololive-official-cardgame.com/wp-content/images/cardlist/hBP07/hBP07-101_S.png",
+    "image_alt": "ASMRマイク",
+    "card_type": "サポート・ツール",
+    "tags": [
+      "Buzzグッズ"
+    ],
+    "rarity": "S",
+    "product": "ブースターパック「ディーヴァフィーバー」",
+    "skills": [
+      {
+        "type": "サポート効果",
+        "name": "◆Buzzホロメンに付いていたら能力追加\nこのホロメンのアーツに必要な無色-1。\n\nツールは、自分のホロメン1人につき1枚だけ付けられる。"
+      }
+    ],
+    "id": "hBP07-101_S"
+  },
+  "hBP07-102_S": {
+    "number": "hBP07-102",
+    "name": "角巻わためのハンマー",
+    "image_url": "https://hololive-official-cardgame.com/wp-content/images/cardlist/hBP07/hBP07-102_S.png",
+    "image_alt": "角巻わためのハンマー",
+    "card_type": "サポート・ツール",
+    "rarity": "S",
+    "product": "ブースターパック「ディーヴァフィーバー」",
+    "skills": [
+      {
+        "type": "サポート効果",
+        "name": "このツールが付いている〈角巻わため〉のアーツ+20。\n\n◆2ndの〈角巻わため〉に付いていたら能力追加\n■[センターポジション限定]このホロメンのアーツ+30。\n■[センターポジション限定]このホロメンがアーツを使った時、サイコロを1回振る。3か5なら、このホロメン以外の自分のホロメン1人に特殊ダメージ50を与える。\n\nツールは、自分のホロメン1人につき1枚だけ付けられる。"
+      }
+    ],
+    "id": "hBP07-102_S"
+  },
+  "hBP07-103_S": {
+    "number": "hBP07-103",
+    "name": "ギラファノコギリクワガタ",
+    "image_url": "https://hololive-official-cardgame.com/wp-content/images/cardlist/hBP07/hBP07-103_S.png",
+    "image_alt": "ギラファノコギリクワガタ",
+    "card_type": "サポート・ツール",
+    "rarity": "S",
+    "product": "ブースターパック「ディーヴァフィーバー」",
+    "skills": [
+      {
+        "type": "サポート効果",
+        "name": "このツールが付いている〈桃鈴ねね〉のアーツ+20。\n\n◆1st以上の〈桃鈴ねね〉に付いていたら能力追加\nこのホロメンのアーツダメージは軽減されない。\n\nツールは、自分のホロメン1人につき1枚だけ付けられる。"
+      }
+    ],
+    "id": "hBP07-103_S"
+  },
+  "hBP07-104_S": {
+    "number": "hBP07-104",
+    "name": "Thorn",
+    "image_url": "https://hololive-official-cardgame.com/wp-content/images/cardlist/hBP07/hBP07-104_S.png",
+    "image_alt": "Thorn",
+    "card_type": "サポート・ツール",
+    "rarity": "S",
+    "product": "ブースターパック「ディーヴァフィーバー」",
+    "skills": [
+      {
+        "type": "サポート効果",
+        "name": "このツールが付いている〈エリザベス・ローズ・ブラッドフレイム〉のアーツ+20。\n\n◆2ndの〈エリザベス・ローズ・ブラッドフレイム〉に付いていたら能力追加\nこのホロメンのHPが減っているなら、このホロメンのアーツ+20。\n\nツールは、自分のホロメン1人につき1枚だけ付けられる。"
+      }
+    ],
+    "id": "hBP07-104_S"
+  },
+  "hBP07-105_S": {
+    "number": "hBP07-105",
+    "name": "BAZO",
+    "image_url": "https://hololive-official-cardgame.com/wp-content/images/cardlist/hBP07/hBP07-105_S.png",
+    "image_alt": "BAZO",
+    "card_type": "サポート・マスコット",
+    "rarity": "S",
+    "product": "ブースターパック「ディーヴァフィーバー」",
+    "skills": [
+      {
+        "type": "サポート効果",
+        "name": "このマスコットが付いているホロメンのアーツ+10。\n\n◆〈ベスティア・ゼータ〉に付いていたら能力追加\nこのホロメンがアーツを使った時、自分のアーカイブのファン1枚を手札に戻す。\n\nマスコットは、自分のホロメン1人につき1枚だけ付けられる。"
+      }
+    ],
+    "id": "hBP07-105_S"
+  },
+  "hBP07-106_S": {
+    "number": "hBP07-106",
+    "name": "ハトタウロス",
+    "image_url": "https://hololive-official-cardgame.com/wp-content/images/cardlist/hBP07/hBP07-106_S.png",
+    "image_alt": "ハトタウロス",
+    "card_type": "サポート・マスコット",
+    "tags": [
+      "白上'sキャラクター"
+    ],
+    "rarity": "S",
+    "product": "ブースターパック「ディーヴァフィーバー」",
+    "skills": [
+      {
+        "type": "サポート効果",
+        "name": "このマスコットが付いているホロメンのHP+20。\n\n◆〈大神ミオ〉に付いていたら能力追加\nこのホロメンがコラボした時、このホロメンに付いている〈ハトタウロス〉1枚をデッキの上に戻せる：自分のアーカイブのホロメン1枚を手札に戻す。\n\nマスコットは、自分のホロメン1人につき1枚だけ付けられる。"
+      }
+    ],
+    "id": "hBP07-106_S"
+  },
+  "hBP07-107_S": {
+    "number": "hBP07-107",
+    "name": "Boros",
+    "image_url": "https://hololive-official-cardgame.com/wp-content/images/cardlist/hBP07/hBP07-107_S.png",
+    "image_alt": "Boros",
+    "card_type": "サポート・マスコット",
+    "rarity": "S",
+    "product": "ブースターパック「ディーヴァフィーバー」",
+    "skills": [
+      {
+        "type": "サポート効果",
+        "name": "このマスコットが付いているホロメンのHP+20。\n\n◆〈オーロ・クロニー〉に付いていたら能力追加\nこのゲーム中に、自分の〈オーロ・クロニー〉のSP推しスキル「時間の典獄」を使っていたなら、このホロメンのアーツ+20。\n\nマスコットは、自分のホロメン1人につき1枚だけ付けられる。"
+      }
+    ],
+    "id": "hBP07-107_S"
+  },
+  "hBP07-108_S": {
+    "number": "hBP07-108",
+    "name": "Zecretary",
+    "image_url": "https://hololive-official-cardgame.com/wp-content/images/cardlist/hBP07/hBP07-108_S.png",
+    "image_alt": "Zecretary",
+    "card_type": "サポート・ファン",
+    "rarity": "S",
+    "product": "ブースターパック「ディーヴァフィーバー」",
+    "skills": [
+      {
+        "type": "サポート効果",
+        "name": "■このファンが付いているホロメンがアーツを使う時、自分の推しホロメンが〈ベスティア・ゼータ〉なら、このファンを白エールとしても扱う。\n■相手のターンで、このファンが付いているホロメンがダメージを受けた時、このファンをアーカイブする。\n\nこのファンは、自分の〈ベスティア・ゼータ〉だけに付けられ、1人につき何枚でも付けられる。"
+      }
+    ],
+    "id": "hBP07-108_S"
+  },
+  "hBP07-109_S": {
+    "number": "hBP07-109",
+    "name": "Kronies",
+    "image_url": "https://hololive-official-cardgame.com/wp-content/images/cardlist/hBP07/hBP07-109_S.png",
+    "image_alt": "Kronies",
+    "card_type": "サポート・ファン",
+    "rarity": "S",
+    "product": "ブースターパック「ディーヴァフィーバー」",
+    "skills": [
+      {
+        "type": "サポート効果",
+        "name": "このファンが付いているホロメンのアーツ+10。\n\nこのファンは、自分の〈オーロ・クロニー〉だけに付けられ、1人につき何枚でも付けられる。"
+      }
+    ],
+    "id": "hBP07-109_S"
+  },
+  "hBP07-110_S": {
+    "number": "hBP07-110",
+    "name": "ねっ子",
+    "image_url": "https://hololive-official-cardgame.com/wp-content/images/cardlist/hBP07/hBP07-110_S.png",
+    "image_alt": "ねっ子",
+    "card_type": "サポート・ファン",
+    "rarity": "S",
+    "product": "ブースターパック「ディーヴァフィーバー」",
+    "skills": [
+      {
+        "type": "サポート効果",
+        "name": "[ターンに1回]このファンが付いているホロメンのBloomレベルが上がった時、自分のデッキを1枚引く。\n\nこのファンは、自分の〈桃鈴ねね〉だけに付けられ、1人につき何枚でも付けられる。"
+      }
+    ],
+    "id": "hBP07-110_S"
+  },
   "hBP06-084_S": {
     "number": "hBP06-084",
     "name": "AIこより",
@@ -37175,6 +41273,37 @@
       }
     ],
     "id": "hBP06-096_P"
+  },
+  "hBP07-009_P": {
+    "number": "hBP07-009",
+    "name": "角巻わため",
+    "image_url": "https://hololive-official-cardgame.com/wp-content/images/cardlist/hBP07/hBP07-009_P.png",
+    "image_alt": "角巻わため",
+    "card_type": "ホロメン",
+    "tags": [
+      "JP",
+      "4期生",
+      "ケモミミ",
+      "歌"
+    ],
+    "rarity": "P",
+    "product": "PRカード",
+    "color": "白",
+    "hp": "130",
+    "skills": [
+      {
+        "type": "アーツ",
+        "name": "ガブガブ！",
+        "dmg": "20+",
+        "description": "[センターポジション限定]このアーツ+20。",
+        "icons": {
+          "main": [
+            "white"
+          ]
+        }
+      }
+    ],
+    "id": "hBP07-009_P"
   },
   "hPR-002": {
     "number": "hPR-002",
@@ -60909,6 +65038,72 @@
       }
     ],
     "id": "hSD09-007_P"
+  },
+  "hY01-012_SY": {
+    "number": "hY01-012",
+    "name": "白エール",
+    "image_url": "https://hololive-official-cardgame.com/wp-content/images/cardlist/hBP07/hY01-012_SY.png",
+    "image_alt": "白エール",
+    "card_type": "エール",
+    "rarity": "SY",
+    "product": "ブースターパック「ディーヴァフィーバー」",
+    "color": "白",
+    "id": "hY01-012_SY"
+  },
+  "hY02-010_SY": {
+    "number": "hY02-010",
+    "name": "緑エール",
+    "image_url": "https://hololive-official-cardgame.com/wp-content/images/cardlist/hBP07/hY02-010_SY.png",
+    "image_alt": "緑エール",
+    "card_type": "エール",
+    "rarity": "SY",
+    "product": "ブースターパック「ディーヴァフィーバー」",
+    "color": "緑",
+    "id": "hY02-010_SY"
+  },
+  "hY03-014_SY": {
+    "number": "hY03-014",
+    "name": "赤エール",
+    "image_url": "https://hololive-official-cardgame.com/wp-content/images/cardlist/hBP07/hY03-014_SY.png",
+    "image_alt": "赤エール",
+    "card_type": "エール",
+    "rarity": "SY",
+    "product": "ブースターパック「ディーヴァフィーバー」",
+    "color": "赤",
+    "id": "hY03-014_SY"
+  },
+  "hY04-011_SY": {
+    "number": "hY04-011",
+    "name": "青エール",
+    "image_url": "https://hololive-official-cardgame.com/wp-content/images/cardlist/hBP07/hY04-011_SY.png",
+    "image_alt": "青エール",
+    "card_type": "エール",
+    "rarity": "SY",
+    "product": "ブースターパック「ディーヴァフィーバー」",
+    "color": "青",
+    "id": "hY04-011_SY"
+  },
+  "hY05-009_SY": {
+    "number": "hY05-009",
+    "name": "紫エール",
+    "image_url": "https://hololive-official-cardgame.com/wp-content/images/cardlist/hBP07/hY05-009_SY.png",
+    "image_alt": "紫エール",
+    "card_type": "エール",
+    "rarity": "SY",
+    "product": "ブースターパック「ディーヴァフィーバー」",
+    "color": "紫",
+    "id": "hY05-009_SY"
+  },
+  "hY06-009_SY": {
+    "number": "hY06-009",
+    "name": "黄エール",
+    "image_url": "https://hololive-official-cardgame.com/wp-content/images/cardlist/hBP07/hY06-009_SY.png",
+    "image_alt": "黄エール",
+    "card_type": "エール",
+    "rarity": "SY",
+    "product": "ブースターパック「ディーヴァフィーバー」",
+    "color": "黄",
+    "id": "hY06-009_SY"
   },
   "hY01-010_SY": {
     "number": "hY01-010",
