@@ -562,6 +562,25 @@ body.dragging, body.dragging * { cursor: grabbing !important; }
   100% { opacity: 0; transform: translate(-50%, -50%) scale(1); }
 }
 
+/* ===== ホームへ戻る ===== */
+#home-button {
+  position: absolute;
+  top: 10px;
+  left: 10px;
+  width: 40px;
+  height: 40px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 1.2em;
+  background: rgba(14, 16, 38, 0.9);
+  border: 1px solid #34386b;
+  border-radius: 50%;
+  text-decoration: none;
+  z-index: 45;
+}
+#home-button:hover { border-color: var(--accent); }
+
 /* ===== 設定ボタン・パネル ===== */
 #settings-button {
   position: absolute;
