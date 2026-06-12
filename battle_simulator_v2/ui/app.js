@@ -556,6 +556,11 @@ function render() {
   renderHand(document.getElementById('hand'), s.players[handPlayer].hand, handPlayer, hooks);
   renderOppHand(document.getElementById('opp-hand'), s.players[1 - handPlayer].hand.length);
 
+  // ホットシート: 下の手札が誰のものかを明示する（切り替わりに気づけるように）
+  const ownerTag = document.getElementById('hand-owner');
+  ownerTag.textContent = `🖐 ${s.players[handPlayer].name} の手札（${s.players[handPlayer].hand.length}枚）`;
+  ownerTag.className = handPlayer === 0 ? 'p1' : 'p2';
+
   wireDnD();
   renderStatus(s, handPlayer);
   renderActions(s);

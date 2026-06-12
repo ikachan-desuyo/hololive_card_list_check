@@ -336,6 +336,26 @@ export async function runTests() {
     assertEq(e.effectiveHp(lamy), 110, 'HP90+20=110になっていない');
   });
 
+  await testAsync('相手の手札ステップで自分の手札が増えない', async () => {
+    const e = await setupMainStep(deckMap, 21); // P1(先攻)のメインステップ
+    // P1のターンを終わらせてP2のターンへ
+    e.apply('pass'); // メイン → パフォーマンス（先攻1Tはスキップ）→ エンド → ターン2
+    const p0 = e.state.players[0];
+    const p1 = e.state.players[1];
+    // ターン2（P2）の手札ステップ直前まで進める
+    let guard = 0;
+    while (e.state.pending && !(e.state.turnPlayer === 1 && e.state.step === 'draw') && guard++ < 50) {
+      e.apply(e.state.pending.options[0].id);
+    }
+    assertEq(e.state.step, 'draw', 'P2の手札ステップに到達しない');
+    const p0Before = p0.hand.length;
+    const p1Before = p1.hand.length;
+    // 手札ステップの「間」を進めてドローを実行させる
+    e.apply('ok');
+    assertEq(p0.hand.length, p0Before, 'P2のドローでP1の手札が変化した');
+    assertEq(p1.hand.length, p1Before + 1, 'P2の手札が1枚増えていない');
+  });
+
   await testAsync('ターン修正: アーツ+20がエンドステップで消滅する', async () => {
     const e = await setupMainStep(deckMap, 15);
     const p = e.state.players[0];
