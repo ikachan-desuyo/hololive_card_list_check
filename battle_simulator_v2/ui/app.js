@@ -187,6 +187,8 @@ function setupDnDListeners() {
     if (!src) return;
     currentDragSrc = src;
     e.dataTransfer.effectAllowed = 'move';
+    // ドラッグ中は装飾要素のヒット判定を切る（css: body.dragging）
+    document.body.classList.add('dragging');
     // ドロップ可能な場所をハイライト
     const dsts = new Set(dndMap.filter((x) => x.dnd.src === src).flatMap((x) => x.dnd.dsts));
     for (const el of document.querySelectorAll('[data-drop]')) {
@@ -196,6 +198,7 @@ function setupDnDListeners() {
 
   screen.addEventListener('dragend', () => {
     currentDragSrc = null;
+    document.body.classList.remove('dragging');
     for (const el of document.querySelectorAll('.drop-ok')) el.classList.remove('drop-ok');
   });
 
@@ -216,8 +219,10 @@ function setupDnDListeners() {
     const key = findDropKey(e.target, dsts);
     if (!key) return;
     const matched = candidates.filter((x) => x.dnd.dsts.includes(key));
-    const src = currentDragSrc;
     currentDragSrc = null;
+    // 再描画で dragend が発火しないことがあるため、ここでも後始末する
+    document.body.classList.remove('dragging');
+    for (const el of document.querySelectorAll('.drop-ok')) el.classList.remove('drop-ok');
     if (matched.length === 1) {
       engine.apply(matched[0].opt.id);
     } else if (matched.length > 1) {
@@ -359,12 +364,34 @@ const hooks = {
   onArchive: (sideIdx) => showArchive(sideIdx),
 };
 
+let lastTurnKey = null;
+
+/** ターンが切り替わったら中央に大きく通知 + ターン側の盤面を発光 */
+function notifyTurnChange(s) {
+  const sides = [document.getElementById('side-player'), document.getElementById('side-opponent')];
+  sides[s.turnPlayer]?.classList.add('turn-active');
+  sides[1 - s.turnPlayer]?.classList.remove('turn-active');
+
+  if (s.phase !== 'playing') return;
+  const key = `${s.turn}:${s.turnPlayer}`;
+  if (key === lastTurnKey) return;
+  const isFirstRender = lastTurnKey === null;
+  lastTurnKey = key;
+  if (isFirstRender && s.turn > 1) return; // リロード直後などは出さない
+  const toast = document.getElementById('turn-toast');
+  toast.textContent = `ターン${s.turn} ─ ${s.players[s.turnPlayer].name} のターン`;
+  toast.classList.remove('show');
+  void toast.offsetWidth; // アニメーション再生のためリフロー
+  toast.classList.add('show');
+}
+
 function render() {
   if (!engine) return;
   const s = engine.state;
 
   renderSide(document.getElementById('side-player'), s.players[0], 0, hooks);
   renderSide(document.getElementById('side-opponent'), s.players[1], 1, hooks);
+  notifyTurnChange(s);
 
   const handPlayer = s.pending ? s.pending.player : s.turnPlayer;
   renderHand(document.getElementById('hand'), s.players[handPlayer].hand, handPlayer, hooks);

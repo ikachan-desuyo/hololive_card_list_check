@@ -158,11 +158,11 @@ export function renderSide(container, p, sideIdx, hooks) {
   container.innerHTML = '';
   container.dataset.drop = `${sideIdx}:zone:table`; // サポート使用などの「場に出す」ドロップ先
 
-  // ライフ（裏向き・少しずつ重ねて表示）
+  // ライフ（カード自体は横向き、縦に少しずつ重ねて表示）
   const life = zoneEl('life', 'ライフ', container);
   for (let i = 0; i < p.life.length; i++) {
-    const c = el('div', 'life-card', life);
-    c.style.backgroundImage = `url(${SLEEVE})`;
+    const slot = el('div', 'life-slot', life);
+    el('div', 'life-inner', slot);
   }
 
   const collab = zoneEl('collab', 'コラボ', container, `${sideIdx}:zone:collab`);

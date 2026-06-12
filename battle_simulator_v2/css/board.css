@@ -3,13 +3,21 @@
  * CSS 3D transform で「奥行きのあるテーブル」を表現する。
  * 相手の盤面は奥（小さく・上方）に見え、スクロール無しで全体が見える。
  * 相手側のカードは相手向き（こちらからは逆さに見える）— 実卓の再現。
+ *
+ * D&D の注意:
+ *   - 盤上カードのホバーで transform による移動はしない（カーソル下から要素が
+ *     逃げて hover が点滅し、ドラッグ判定と競合するため）。発光・明度のみ。
+ *   - ドラッグ中（body.dragging）は装飾要素（ミニカード等）の pointer-events を
+ *     切って、ドロップ判定を本体に通す。
  */
 
 * { box-sizing: border-box; }
 
 :root {
-  --card-w: 72px;
-  --card-h: 100px;
+  --card-w: 92px;
+  --card-h: 128px;
+  --mini-w: 38px;
+  --mini-h: 53px;
   --accent: #6ec3ff;
   --sleeve: url('../../images/card_sleeve.jpg');
 }
@@ -24,6 +32,8 @@ html, body {
 }
 
 #app { height: 100%; display: flex; flex-direction: column; }
+#game-screen { user-select: none; }
+#game-screen img { -webkit-user-drag: none; }
 
 /* ===== セットアップ画面 ===== */
 #setup-screen {
@@ -67,8 +77,8 @@ html, body {
   position: absolute;
   inset: 0;
   right: 320px;
-  perspective: 1300px;
-  perspective-origin: 50% 32%;
+  perspective: 1400px;
+  perspective-origin: 50% 30%;
   overflow: hidden;
 }
 
@@ -76,13 +86,13 @@ html, body {
   position: absolute;
   left: 50%;
   top: 50%;
-  width: 980px;
-  height: 760px;
-  transform: translate(-50%, -54%) rotateX(36deg);
+  width: 1060px;
+  height: 800px;
+  transform: translate(-50%, -53%) rotateX(34deg);
   transform-style: preserve-3d;
   background:
     linear-gradient(180deg, rgba(120, 130, 255, 0.10), rgba(40, 40, 90, 0.18) 50%, rgba(120, 130, 255, 0.10)),
-    repeating-linear-gradient(90deg, transparent 0 119px, rgba(255,255,255,0.03) 119px 120px);
+    repeating-linear-gradient(90deg, transparent 0 131px, rgba(255,255,255,0.03) 131px 132px);
   border: 2px solid rgba(140, 150, 255, 0.35);
   border-radius: 18px;
   box-shadow: 0 60px 120px rgba(0, 0, 0, 0.6), inset 0 0 80px rgba(90, 100, 220, 0.15);
@@ -102,15 +112,23 @@ html, body {
   left: 0; right: 0;
   height: 50%;
   transform-style: preserve-3d;
+  transition: background 0.4s ease, box-shadow 0.4s ease;
+  border-radius: 16px;
 }
 .side.player { bottom: 0; }
 .side.opponent { top: 0; transform: rotate(180deg); }
+
+/* 現在のターンプレイヤー側をほんのり発光させる */
+.side.turn-active {
+  background: rgba(110, 195, 255, 0.06);
+  box-shadow: inset 0 0 70px rgba(110, 195, 255, 0.14);
+}
 
 /* ゾーン配置（プレイシート準拠） */
 .zone {
   position: absolute;
   display: flex;
-  gap: 18px;
+  gap: 16px;
   align-items: center;
   justify-content: center;
   min-width: var(--card-w);
@@ -123,41 +141,42 @@ html, body {
   position: absolute;
   bottom: 2px;
   right: 4px;
-  font-size: 9px;
+  font-size: 10px;
   color: rgba(190, 200, 255, 0.45);
   pointer-events: none;
 }
 
-.zone.life      { left: 14px;  top: 24px;  flex-direction: column; gap: 0; border-style: solid; min-height: 120px; justify-content: flex-start; padding-top: 8px; }
-.zone.revealed  { left: 150px; top: 28px;  border-color: rgba(255, 220, 120, 0.7); border-style: solid; box-shadow: 0 0 18px rgba(255, 220, 120, 0.25); }
-.zone.collab    { left: 300px; top: 28px; }
-.zone.center    { left: 420px; top: 28px; }
-.zone.oshi      { left: 560px; top: 28px; }
-.zone.holopower { left: 700px; top: 14px;  min-height: 70px; }
-.zone.deck      { left: 820px; top: 28px; }
-.zone.backs     { left: 240px; top: 172px; min-width: 500px; min-height: 112px; }
-.zone.cheerdeck { left: 14px;  top: 252px; }
-.zone.archive   { left: 820px; top: 172px; }
+.zone.life      { left: 12px;  top: 26px;  flex-direction: column; gap: 0; border-style: solid; min-width: 70px; min-height: 130px; justify-content: flex-start; padding-top: 8px; }
+.zone.revealed  { left: 150px; top: 30px;  border-color: rgba(255, 220, 120, 0.7); border-style: solid; box-shadow: 0 0 18px rgba(255, 220, 120, 0.25); }
+.zone.collab    { left: 295px; top: 30px; }
+.zone.center    { left: 425px; top: 30px; }
+.zone.oshi      { left: 555px; top: 30px; }
+.zone.holopower { left: 690px; top: 30px;  min-width: 78px; min-height: 105px; }
+.zone.deck      { left: 925px; top: 30px; }
+.zone.backs     { left: 225px; top: 208px; min-width: 560px; min-height: 142px; }
+.zone.cheerdeck { left: 12px;  top: 252px; }
+.zone.archive   { left: 925px; top: 208px; }
 
 /* ===== カード ===== */
 .card {
   width: var(--card-w);
   height: var(--card-h);
-  border-radius: 5px;
+  border-radius: 6px;
   background: #20223f;
   border: 1px solid rgba(255, 255, 255, 0.18);
   position: relative;
-  transition: transform 0.15s ease, box-shadow 0.15s ease;
+  transition: filter 0.12s ease, box-shadow 0.12s ease;
   flex-shrink: 0;
 }
 .card img {
   width: 100%; height: 100%;
   object-fit: cover;
-  border-radius: 5px;
+  border-radius: 6px;
   display: block;
   pointer-events: none;
 }
-.card:hover { transform: translateZ(26px) scale(1.06); z-index: 30; }
+/* 盤上カードのホバーは「動かない」発光のみ（D&Dとの競合防止） */
+.scene .card:hover { filter: brightness(1.18); z-index: 30; }
 .card.facedown {
   background-image: var(--sleeve);
   background-size: cover;
@@ -171,12 +190,11 @@ html, body {
   width: var(--card-w);
   height: var(--card-h);
   flex-shrink: 0;
-  transition: transform 0.15s ease;
   cursor: pointer;
 }
 .holomem-group.rested { transform: rotate(90deg) scale(0.92); }
 .holomem-group .holomem-main { position: relative; }
-.holomem-group:hover .holomem-main { transform: translateZ(26px) scale(1.06); }
+.holomem-group:hover .holomem-main { filter: brightness(1.18); }
 
 /* Bloom元のカード: 上端を少しずつ見せて厚みを表現（ホバーでさらに広げる） */
 .stack-under {
@@ -184,16 +202,16 @@ html, body {
   top: 0; left: 0;
   transition: transform 0.2s ease;
 }
-.holomem-group:hover .stack-under { transform: translateY(-26px) !important; }
-.holomem-group:hover .stack-under:nth-last-child(3) { transform: translateY(-48px) !important; }
-.holomem-group:hover .stack-under:nth-last-child(4) { transform: translateY(-70px) !important; }
+.holomem-group:hover .stack-under { transform: translateY(-30px) !important; }
+.holomem-group:hover .stack-under:nth-last-child(3) { transform: translateY(-56px) !important; }
+.holomem-group:hover .stack-under:nth-last-child(4) { transform: translateY(-82px) !important; }
 
 /* 付いているエール/サポートのミニカード */
 .mini-card {
   position: absolute;
-  width: 32px;
-  height: 45px;
-  border-radius: 3px;
+  width: var(--mini-w);
+  height: var(--mini-h);
+  border-radius: 4px;
   border: 1px solid rgba(255, 255, 255, 0.35);
   background: #20223f;
   box-shadow: 0 2px 6px rgba(0, 0, 0, 0.5);
@@ -202,22 +220,32 @@ html, body {
 .mini-card img {
   width: 100%; height: 100%;
   object-fit: cover;
-  border-radius: 3px;
+  border-radius: 4px;
   display: block;
   pointer-events: none;
 }
-.mini-card:hover { transform: scale(1.9) !important; z-index: 50 !important; }
+.mini-card:hover { transform: scale(1.7) !important; z-index: 50 !important; }
+
+/* ドラッグ中は装飾のヒット判定を切り、ドロップ先の本体に通す */
+body.dragging .mini-card,
+body.dragging .stack-under,
+body.dragging .badge,
+body.dragging .pile-count { pointer-events: none; }
+body.dragging .scene .card:hover,
+body.dragging .holomem-group:hover .holomem-main { filter: none; }
+body.dragging .holomem-group:hover .stack-under { transform: none !important; }
+body.dragging [data-drop].drop-ok { z-index: 60; }
 
 /* バッジ */
 .badge {
   position: absolute;
-  font-size: 10px;
+  font-size: 11px;
   border-radius: 8px;
-  padding: 1px 5px;
+  padding: 1px 6px;
   pointer-events: none;
 }
-.badge.damage { top: -7px; right: -6px; background: #c62828; color: #fff; font-weight: bold; }
-.badge.cheers-more { bottom: -14px; left: -16px; background: #00695c; color: #fff; z-index: 5; }
+.badge.damage { top: -8px; right: -7px; background: #c62828; color: #fff; font-weight: bold; }
+.badge.cheers-more { bottom: -16px; left: -18px; background: #00695c; color: #fff; z-index: 5; }
 
 /* 相手側でもバッジ・枚数・ラベルは読める向きに戻す（カードは相手向きのまま） */
 .side.opponent .badge,
@@ -228,50 +256,61 @@ html, body {
 .pile {
   width: var(--card-w);
   height: var(--card-h);
-  border-radius: 5px;
+  border-radius: 6px;
   background-size: cover;
   background-position: center;
   border: 1px solid #5560a8;
   position: relative;
   flex-shrink: 0;
 }
-.pile.small { width: 58px; height: 80px; }
+.pile.small { width: 66px; height: 92px; }
 .pile.empty { background-image: none !important; background: rgba(30, 32, 64, 0.4); border-style: dashed; box-shadow: none !important; }
 .pile-count {
   position: absolute;
-  bottom: 3px;
-  right: 3px;
+  bottom: 4px;
+  right: 4px;
   background: rgba(8, 9, 22, 0.85);
   color: #cdd4ff;
-  font-size: 12px;
+  font-size: 13px;
   font-weight: bold;
   border-radius: 6px;
-  padding: 1px 6px;
+  padding: 1px 7px;
   pointer-events: none;
 }
 .pile.archive-pile { cursor: pointer; border-color: #8a55a8; }
 .pile.archive-pile img {
   width: 100%; height: 100%;
   object-fit: cover;
-  border-radius: 5px;
+  border-radius: 6px;
   display: block;
   pointer-events: none;
   filter: grayscale(0.4) brightness(0.85);
 }
 .pile.archive-pile:hover { outline: 2px solid #b07ad1; }
 
-/* ライフ: 横向きの裏面カードを少しずつ重ねる */
-.life-card {
-  width: 56px;
-  height: 40px;
-  border-radius: 4px;
+/* ライフ: カード自体を横向き（90度回転）にして縦に重ねる */
+.life-slot {
+  width: 64px;
+  height: 46px;
+  position: relative;
+  margin-top: -24px;
+  flex-shrink: 0;
+}
+.life-slot:first-child { margin-top: 0; }
+.life-slot .life-inner {
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  width: 46px;
+  height: 64px;
+  transform: translate(-50%, -50%) rotate(90deg);
+  background-image: var(--sleeve);
   background-size: cover;
   background-position: center;
   border: 1px solid #5560a8;
-  margin-top: -22px;
-  box-shadow: 0 -2px 4px rgba(0, 0, 0, 0.45);
+  border-radius: 4px;
+  box-shadow: -2px 0 4px rgba(0, 0, 0, 0.45);
 }
-.life-card:first-child { margin-top: 0; }
 
 /* 公開中のカード */
 .revealed-card { box-shadow: 0 0 16px rgba(255, 220, 120, 0.7); }
@@ -299,16 +338,16 @@ html, body {
 /* ===== 手札 ===== */
 #hand {
   position: absolute;
-  bottom: 6px;
+  bottom: 8px;
   left: 50%;
   transform: translateX(calc(-50% - 160px));
   display: flex;
   gap: 8px;
   z-index: 20;
-  max-width: 70%;
+  max-width: 72%;
 }
-#hand .card { width: 86px; height: 120px; cursor: pointer; }
-#hand .card:hover { transform: translateY(-22px) scale(1.12); }
+#hand .card { width: 104px; height: 145px; cursor: pointer; transition: transform 0.15s ease, filter 0.12s ease; }
+#hand .card:hover { transform: translateY(-24px) scale(1.1); }
 
 #opp-hand {
   position: absolute;
@@ -320,12 +359,42 @@ html, body {
   z-index: 20;
 }
 #opp-hand .mini-back {
-  width: 34px; height: 48px;
+  width: 36px; height: 50px;
   border-radius: 3px;
   background-size: cover;
   background-position: center;
   border: 1px solid #5560a8;
-  transform: rotate(180deg);
+}
+
+/* ===== ターン切り替え通知 ===== */
+#turn-toast {
+  position: absolute;
+  left: calc(50% - 160px);
+  top: 42%;
+  transform: translate(-50%, -50%);
+  background: rgba(10, 12, 32, 0.92);
+  border: 2px solid var(--accent);
+  border-radius: 14px;
+  padding: 22px 56px;
+  font-size: 2em;
+  font-weight: bold;
+  color: #fff;
+  z-index: 80;
+  pointer-events: none;
+  opacity: 0;
+  display: none;
+  box-shadow: 0 0 60px rgba(110, 195, 255, 0.45);
+}
+#turn-toast.show {
+  display: block;
+  animation: toast-inout 2s ease forwards;
+}
+@keyframes toast-inout {
+  0% { opacity: 0; transform: translate(-50%, -50%) scale(0.8); }
+  15% { opacity: 1; transform: translate(-50%, -50%) scale(1.05); }
+  25% { transform: translate(-50%, -50%) scale(1); }
+  75% { opacity: 1; }
+  100% { opacity: 0; transform: translate(-50%, -50%) scale(1); }
 }
 
 /* ===== サイドパネル ===== */
