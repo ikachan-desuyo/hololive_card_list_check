@@ -43,6 +43,8 @@
 - 定義の書式・フック一覧は `core/effects/registry.js` の冒頭コメントが正本
 - 効果は**ジェネレータ関数** `*run(ctx)` で書く。プレイヤー選択は `yield ctx.chooseCard(...)` / `ctx.chooseHolomem(...)` / `ctx.confirm(...)`
 - 共通処理は `core/effects/context.js` のプリミティブ（draw / searchDeck系 / rollDice / dealSpecialDamage / heal / attachCheer / addTurnModifier 等）を必ず使う。新しい共通処理が必要なら context.js に追加する
+- **規模感**: ユニークカード1,052種、うち効果実装が必要なのは874種（2026-06時点）。この規模が前提
+- **カード固有の知識（効果・AI評価とも）は cards/<番号>.js に集約**。エンジン・heuristic.js にカード番号を直書きしない。AI評価は `ai.supportValue` 等の任意ブロック（無ければテキストパターンの汎用評価にフォールバック）
 - 装着カード（マスコット/ファン/ツール）の常時修正は `attached.artsPlus/hpPlus/specialDmgPlus`（毎回動的計算なので後始末不要）。ターン限定の修正は `ctx.addTurnModifier`（エンドステップで自動消滅）
 - **カードがどの領域にも属さない瞬間を作らないこと**（テストの保存則が落ちる）。デッキを「見る」時は `ctx.lookTopDeck`（解決領域に置く）を使う
 

@@ -269,36 +269,36 @@ export class HeuristicAI {
   }
 
   /**
-   * サポートカードの価値評価（カード固有の知識）。
-   * 自分のデッキ・手札の構成は自分の公開情報なので参照してよい
-   * （デッキの順序は見ない。存在チェックのみ）。
+   * サポートカードの価値評価。
+   * 重要: カード固有の知識をこのファイルに書かないこと（実装対象は874種ある）。
+   *   1. カード定義（cards/<番号>.js）の ai.supportValue があればそれを使う
+   *   2. なければカードテキストのパターンから汎用評価
    */
   _supportValue(engine, p, card) {
-    switch (card.number) {
-      case 'hSD01-016': // 春先のどか: 3枚ドロー
-        return 26 + Math.max(0, 6 - p.hand.length) * 4;
-      case 'hBP02-084': // みっころね24: 2枚ドロー+サイコロ
-        return 28 + Math.max(0, 6 - p.hand.length) * 3;
-      case 'hSD01-017': { // マネちゃん: 手札が機能していない時だけ価値がある
-        const useful = p.hand.filter((c) =>
-          c.kind === 'holomen' || engine.registry.get(c.number)?.support).length;
-        return p.hand.length >= 4 && useful <= 2 ? 35 : 0;
-      }
-      case 'hBP01-104': // ふつうのパソコン: 盤面が薄い時の展開
-        return engine._stageCount(p) < 4 ? 32 : 6;
-      case 'hBP02-076': { // カスタムパソコン: 対応する1stがデッキに残っている時のみ
-        const debuts = p.hand.filter((c) => c.kind === 'holomen' && c.bloomLevel === 'Debut');
-        const hasTarget = debuts.some((d) => p.deck.some((c) =>
-          c.kind === 'holomen' && c.bloomLevel === '1st' && !c.buzz && c.name === d.name));
-        return hasTarget ? 34 : 0;
-      }
-      case 'hBP02-075': // アイドルサインペン
-        return 24;
-      case 'hBP01-108': // じゃあ敵だね: 相手の布陣を乱す
-        return 18;
-      default:
-        return 15;
+    const def = engine.registry.get(card.number);
+    if (def?.ai?.supportValue) {
+      return def.ai.supportValue({ engine, player: p, card });
     }
+    return this._genericSupportValue(engine, p, card);
+  }
+
+  /** テキストパターンによる汎用評価（ai定義の無いカード向けフォールバック） */
+  _genericSupportValue(engine, p, card) {
+    const text = card.supportText || '';
+    let score = 12;
+    if (/[\d１２３４５６７８９]枚引/.test(text)) {
+      score = 24 + Math.max(0, 6 - p.hand.length) * 3; // ドロー系: 手札が少ないほど価値増
+    }
+    if (/デッキから/.test(text) && /(手札に加える|公開し)/.test(text)) {
+      score = Math.max(score, 26); // サーチ系
+    }
+    if (/ステージに出す/.test(text)) {
+      score = Math.max(score, engine._stageCount(p) < 4 ? 30 : 8); // 展開系
+    }
+    if (/交代/.test(text)) {
+      score = Math.max(score, 16); // 妨害・配置換え系
+    }
+    return score;
   }
 
   /** パフォーマンス: 倒せる相手を最優先、次に最大ダメージ */
