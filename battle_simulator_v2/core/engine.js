@@ -341,7 +341,9 @@ export class Engine {
       return;
     }
     this._drawCards(p, 1);
-    this.log(`${p.name}: 1枚ドロー`);
+    // TODO(CPU対戦実装時): 相手のドロー内容は隠す（現状はホットシートなので公開でよい）
+    const drawn = p.hand[p.hand.length - 1];
+    this.log(`${p.name}: 1枚ドロー（${drawn.name}）`);
     this._cheerStep();
   }
 

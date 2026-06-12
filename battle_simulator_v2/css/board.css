@@ -106,17 +106,23 @@ html, body {
   border-top: 1px dashed rgba(160, 170, 255, 0.4);
 }
 
-/* 各プレイヤーの盤面（相手側は180度回転 = カードは相手向きに見える） */
+/* 各プレイヤーの盤面（相手側は180度回転 = カードは相手向きに見える）
+ *
+ * カーソル点滅対策（重要）:
+ * テーブル(rotateX)とその子要素が全て同一Z平面にあると、3Dヒットテストが
+ * 「カード」と「背後のテーブル」の間で振動してカーソルが点滅する（Z-fighting）。
+ * → 各プレイヤー面を translateZ(2px) でテーブルから浮かせ、面の内部は
+ *   preserve-3d を付けずに平坦化（=安定した2Dヒットテスト）にする。
+ */
 .side {
   position: absolute;
   left: 0; right: 0;
   height: 50%;
-  transform-style: preserve-3d;
   transition: background 0.4s ease, box-shadow 0.4s ease;
   border-radius: 16px;
 }
-.side.player { bottom: 0; }
-.side.opponent { top: 0; transform: rotate(180deg); }
+.side.player { bottom: 0; transform: translateZ(2px); }
+.side.opponent { top: 0; transform: rotate(180deg) translateZ(2px); }
 
 /* 現在のターンプレイヤー側をほんのり発光させる */
 .side.turn-active {
@@ -416,6 +422,63 @@ body.dragging, body.dragging * { cursor: grabbing !important; }
   background-size: cover;
   background-position: center;
   border: 1px solid #5560a8;
+}
+
+/* ===== ステップ進行バー（常時表示） ===== */
+#step-bar {
+  position: absolute;
+  top: 10px;
+  left: calc(50% - 160px);
+  transform: translateX(-50%);
+  display: flex;
+  gap: 6px;
+  z-index: 25;
+  pointer-events: none;
+}
+.step-chip {
+  background: rgba(14, 16, 38, 0.85);
+  border: 1px solid #34386b;
+  border-radius: 12px;
+  padding: 3px 12px;
+  font-size: 0.78em;
+  color: #778;
+}
+.step-chip.active {
+  background: linear-gradient(135deg, #2a4a8f, #4a3a9f);
+  border-color: var(--accent);
+  color: #fff;
+  font-weight: bold;
+  box-shadow: 0 0 12px rgba(110, 195, 255, 0.5);
+}
+
+/* ===== ステップ切り替えトースト ===== */
+#step-toast {
+  position: absolute;
+  left: calc(50% - 160px);
+  top: 26%;
+  transform: translate(-50%, -50%);
+  background: rgba(10, 12, 32, 0.88);
+  border: 1px solid rgba(110, 195, 255, 0.6);
+  border-radius: 10px;
+  padding: 10px 34px;
+  font-size: 1.25em;
+  font-weight: bold;
+  color: #dfe8ff;
+  z-index: 79;
+  pointer-events: none;
+  opacity: 0;
+  display: none;
+  box-shadow: 0 0 30px rgba(110, 195, 255, 0.3);
+}
+#step-toast.show {
+  display: block;
+  animation: step-toast-inout 1s ease forwards;
+}
+@keyframes step-toast-inout {
+  0% { opacity: 0; transform: translate(-50%, -60%); }
+  18% { opacity: 1; transform: translate(-50%, -50%); }
+  80% { opacity: 1; }
+  100% { opacity: 0; transform: translate(-50%, -45%); }
 }
 
 /* ===== ターン切り替え通知 ===== */

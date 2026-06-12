@@ -172,7 +172,8 @@ function wireDnD() {
  * 判定は document.elementsFromPoint で行う（transform の影響を受けない）。
  */
 let dragState = null;       // { src, srcEl, candidates, dsts, startX, startY, started, ghost }
-let suppressNextClick = false;
+let dragEndedAt = 0;        // ドラッグ直後のclick抑止用（フラグだと再描画でclickが
+                            // 発生しなかった時に残留して次のクリックを呑むため時刻で判定）
 
 /** カーソル位置の要素列から、有効なドロップ先を探す */
 function dropTargetAt(x, y, dsts) {
@@ -190,7 +191,6 @@ function dropTargetAt(x, y, dsts) {
 function startDrag(e) {
   const st = dragState;
   st.started = true;
-  suppressNextClick = true;
   document.body.classList.add('dragging');
   // ドロップ可能な場所をハイライト
   for (const el of document.querySelectorAll('[data-drop]')) {
@@ -271,13 +271,15 @@ function setupDnDListeners() {
     if (!dragState) return;
     const st = dragState;
     dragState = null;
-    if (st.started) endDrag(st, e);
+    if (st.started) {
+      dragEndedAt = Date.now();
+      endDrag(st, e);
+    }
   });
 
   // ドラッグ直後の click はインスペクタ等を開かない（capture で握りつぶす）
   screen.addEventListener('click', (e) => {
-    if (suppressNextClick) {
-      suppressNextClick = false;
+    if (Date.now() - dragEndedAt < 150) {
       e.stopPropagation();
       e.preventDefault();
     }
@@ -418,6 +420,68 @@ const hooks = {
 
 let lastTurnKey = null;
 
+// ============ ステップ表示 ============
+
+/**
+ * ステップ切り替えトースト。
+ * エンジンは1回の操作で複数ステップを連続消化する（リセット→手札→エール等）ため、
+ * render時のstate差分では中間ステップを取りこぼす。ログの新規行からステップ行を
+ * 拾ってキューに積み、順番に短いトーストで流す。
+ */
+let lastLogLen = 0;
+const stepToastQueue = [];
+let stepToastActive = false;
+
+function enqueueStepToasts(s) {
+  const newLines = s.logs.slice(lastLogLen);
+  lastLogLen = s.logs.length;
+  for (const line of newLines) {
+    const m = /^【(.+?)】(.*)/.exec(line);
+    if (m) {
+      stepToastQueue.push(m[2].includes('スキップ') ? `${m[1]}（スキップ）` : m[1]);
+    } else if (/1枚ドロー/.test(line)) {
+      stepToastQueue.push(line.replace(/^.*?: /, '')); // 「1枚ドロー（カード名）」
+    }
+  }
+  pumpStepToast();
+}
+
+function pumpStepToast() {
+  if (stepToastActive || stepToastQueue.length === 0) return;
+  stepToastActive = true;
+  const t = document.getElementById('step-toast');
+  t.textContent = stepToastQueue.shift();
+  t.classList.remove('show');
+  void t.offsetWidth;
+  t.classList.add('show');
+  setTimeout(() => {
+    stepToastActive = false;
+    pumpStepToast();
+  }, 1000);
+}
+
+/** 常時表示のステップ進行バー */
+const STEP_ORDER = ['reset', 'draw', 'cheer', 'main', 'performance', 'end'];
+const STEP_SHORT = { reset: 'リセット', draw: '手札', cheer: 'エール', main: 'メイン', performance: 'パフォーマンス', end: 'エンド' };
+
+function renderStepBar(s) {
+  const bar = document.getElementById('step-bar');
+  bar.innerHTML = '';
+  if (s.phase === 'setup') {
+    const chip = document.createElement('span');
+    chip.className = 'step-chip active';
+    chip.textContent = 'セットアップ';
+    bar.appendChild(chip);
+    return;
+  }
+  for (const step of STEP_ORDER) {
+    const chip = document.createElement('span');
+    chip.className = 'step-chip' + (s.step === step ? ' active' : '');
+    chip.textContent = STEP_SHORT[step];
+    bar.appendChild(chip);
+  }
+}
+
 /** ターンが切り替わったら中央に大きく通知 + ターン側の盤面を発光 */
 function notifyTurnChange(s) {
   const sides = [document.getElementById('side-player'), document.getElementById('side-opponent')];
@@ -444,6 +508,8 @@ function render() {
   renderSide(document.getElementById('side-player'), s.players[0], 0, hooks);
   renderSide(document.getElementById('side-opponent'), s.players[1], 1, hooks);
   notifyTurnChange(s);
+  renderStepBar(s);
+  enqueueStepToasts(s);
 
   const handPlayer = s.pending ? s.pending.player : s.turnPlayer;
   renderHand(document.getElementById('hand'), s.players[handPlayer].hand, handPlayer, hooks);
