@@ -280,7 +280,7 @@
 <body>
   <div class="container">
     <h1>ホロライブカードゲーム<br>管理ツール
-  <span style="font-size: 0.4em; color: #999; display: block; margin-top: 5px; font-weight: normal;" id="versionDisplay">[v4.17.0]</span>
+  <span style="font-size: 0.4em; color: #999; display: block; margin-top: 5px; font-weight: normal;" id="versionDisplay">[v4.18.0]</span>
     </h1>
 
     <div class="menu-grid">
@@ -562,7 +562,7 @@
     // Store registration for manual update checks
     if ('serviceWorker' in navigator) {
       window.addEventListener('load', () => {
-        navigator.serviceWorker.register('./sw.js')
+        navigator.serviceWorker.register('./sw.js', { updateViaCache: 'none' })
           .then((registration) => {
             serviceWorkerRegistration = registration;
             // ... existing code above

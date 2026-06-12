@@ -1,10 +1,16 @@
 // Service Worker for offline caching with centralized version management
-// Version: 4.10.0-VERSION-SYNC-UPDATE
+// Version: 4.18.0
+// 注意: バージョンアップ時は sw-version.js と合わせてこのコメントも更新すること。
+// （SWの更新検知は sw.js 本体のバイト差分が最速・最確実。importScripts の
+//   sw-version.js だけの変更だと、環境によって検知がHTTPキャッシュのTTL分遅れる）
 
 // Import version configuration and utility functions
 importScripts('./sw-version.js', './sw-utils.js', './sw-handlers.js');
 
 const CACHE_NAME = `hololive-card-tool-v${APP_VERSION}-${VERSION_DESCRIPTION.replace(/\s+/g, '-')}`;
+// カード画像（外部URL）はバージョンに依存しない永続キャッシュに分離する。
+// CACHE_NAME に入れるとバージョンアップごとに数百枚の画像を再取得することになるため。
+const IMAGE_CACHE = 'hololive-card-images-v1';
 const urlsToCache = [
   './',
   './index.html',
@@ -80,7 +86,9 @@ self.addEventListener('install', function(event) {
     caches.open(CACHE_NAME)
       .then(function(cache) {
         console.log('%c📦 Service Worker: Caching files...', 'color: #2196F3;');
-        return cache.addAll(urlsToCache);
+        // cache:'reload' でブラウザHTTPキャッシュを迂回し、必ず最新を取得する
+        // （これが無いと、新バージョンのキャッシュに古い資産が入ることがある）
+        return cache.addAll(urlsToCache.map(u => new Request(u, { cache: 'reload' })));
       })
       .then(function() {
         console.log('%c✅ Service Worker: All files cached successfully', 'color: #4CAF50;');
@@ -103,7 +111,8 @@ self.addEventListener('activate', function(event) {
         console.log('Found caches:', cacheNames);
         return Promise.all(
           cacheNames.map(function(cacheName) {
-            if (cacheName !== CACHE_NAME) {
+            // 画像キャッシュ(IMAGE_CACHE)はバージョンをまたいで保持する
+            if (cacheName !== CACHE_NAME && cacheName !== IMAGE_CACHE) {
               console.log('%c🗑️ Service Worker: Deleting old cache:', cacheName, 'color: #F44336;');
               return caches.delete(cacheName);
             }
@@ -144,7 +153,7 @@ self.addEventListener('activate', function(event) {
 
             // 2. Add non-HTML assets (allow failures to continue)
           try {
-            await cache.addAll(otherAssets);
+            await cache.addAll(otherAssets.map(u => new Request(u, { cache: 'reload' })));
           } catch (e) {
             console.warn('⚠️ Some non-HTML assets failed to cache:', e);
           }
@@ -219,9 +228,9 @@ self.addEventListener('fetch', function(event) {
           // キャッシュになければネットワークから取得（no-corsモード）
           return fetch(event.request, { mode: 'no-cors' }).then(function(response) {
             if (response && response.type === 'opaque') {
-              // opaqueレスポンスをキャッシュに保存
+              // opaqueレスポンスを画像専用キャッシュに保存（バージョンをまたいで保持）
               const responseToCache = response.clone();
-              caches.open(CACHE_NAME).then(function(cache) {
+              caches.open(IMAGE_CACHE).then(function(cache) {
                 cache.put(event.request, responseToCache).then(() => {
                   console.log('🖼️ Successfully cached external image:', event.request.url);
                 }).catch((error) => {
