@@ -41,7 +41,8 @@ function parseArtCost(icons) {
 
 function parseOshiSkill(skill) {
   const text = skill.text || '';
-  const costMatch = /\[ホロパワー：-(\d+|X)\]/.exec(text);
+  // コスト表記は2形式ある: "[ホロパワー：-1]" と "[ホロパワー：2消費]"
+  const costMatch = /\[ホロパワー：-?(\d+|X)(?:消費)?\]/.exec(text);
   return {
     sp: skill.type === 'SP推しスキル',
     cost: costMatch ? (costMatch[1] === 'X' ? 'X' : Number(costMatch[1])) : 0,

@@ -297,8 +297,10 @@ export class EffectContext {
     // 「ライフは減らない」は、この特殊ダメージでダウンが確定した場合のみ適用する。
     // （ダウンに至らなかった場合にフラグを残すと、後から別のダメージで倒された時まで
     //   ライフが減らなくなってしまう）
-    if (opts.noLifeOnDown && targetEntry.holomem.damage >= this.engine.effectiveHp(targetEntry.holomem)) {
-      targetEntry.holomem.noLifeOnDown = true;
+    if (targetEntry.holomem.damage >= this.engine.effectiveHp(targetEntry.holomem)) {
+      if (opts.noLifeOnDown) targetEntry.holomem.noLifeOnDown = true;
+      // 「ダウンさせた時」トリガー（雪花ラミィSP推しスキル等）
+      this.engine._notifySourceDown(this.sourceHolomem, this.playerIdx);
     }
     this.log(
       `${targetEntry.top.name} に特殊ダメージ${total}` +
@@ -311,5 +313,47 @@ export class EffectContext {
   addTurnModifier(mod) {
     this.engine.state.modifiers.push({ duration: 'turn', ...mod });
     this.log(`継続効果: ${mod.description || mod.kind}`);
+  }
+
+  /**
+   * アーカイブのホロメンを使ってBloomさせるフロー（オリー推しスキル等）。
+   * Bloomの通常条件（同名・レベル遷移・HP>ダメージ・ターン制限 8.3）に従う。
+   * 使い方: const done = yield* ctx.bloomFromArchiveFlow({ targetFilter, optional });
+   */
+  *bloomFromArchiveFlow({ targetFilter = null, optional = false } = {}) {
+    const candidates = this.player.archive.filter((card) =>
+      card.kind === 'holomen' &&
+      this.holomems('self', targetFilter).some((e) => this.engine._canBloom(e.holomem, card)));
+    if (candidates.length === 0) {
+      this.log('アーカイブにBloomできるホロメンがいない');
+      return false;
+    }
+    const card = yield this.chooseCard({
+      cards: candidates,
+      title: 'アーカイブからBloomさせるホロメンカードを選択',
+      optional,
+      skipLabel: 'Bloomしない',
+    });
+    if (!card) return false;
+    const entry = yield this.chooseHolomem({
+      side: 'self',
+      filter: (e) => (!targetFilter || targetFilter(e)) && this.engine._canBloom(e.holomem, card),
+      title: `${card.name} でBloomさせるホロメンを選択`,
+    });
+    if (!entry) return false;
+    this.removeFromArchive(card);
+    entry.holomem.stack.unshift(card);
+    entry.holomem.bloomedTurn = this.state.turn;
+    this.log(`${entry.holomem.stack[1].name} → ${card.name}〔${card.bloomLevel}〕にBloom（アーカイブから）`);
+    // ブルームエフェクトも誘発する (13.3)
+    const def = this.engine.registry.get(card.number)?.bloomEffect;
+    if (def) {
+      this.log(`《ブルームエフェクト》${def.name}`);
+      yield* def.run(new EffectContext(this.engine, this.playerIdx, {
+        sourceCard: card,
+        sourceHolomem: entry.holomem,
+      }));
+    }
+    return true;
   }
 }

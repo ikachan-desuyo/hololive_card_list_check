@@ -463,6 +463,116 @@ export async function runTests() {
     assertEq(opt.target.zone, 'center', 'AIが倒せるセンターを狙っていない');
   });
 
+  // ---- AI判断の質 ----
+
+  await testAsync('AI: エールを撃てるホロメンに過剰投資しない', async () => {
+    const e = await setupMainStep(deckMap, 51);
+    const s = e.state;
+    const p0 = s.players[0];
+    // センター: 2ndラミィ（最大コスト3）に既に3枚 → これ以上は不要
+    p0.center = e._createHolomem(lib.get('hBP04-048_RR'), 1);
+    p0.center.cheers.push(...p0.cheerDeck.splice(0, 3));
+    // バック: エール0枚の1stラミィ（青1+無色1で50点アーツ）
+    p0.back = [e._createHolomem(lib.get('hBP04-047_R'), 1)];
+    s.pending = null;
+    e._cheerStep();
+    while (s.pending?.type === 'stepPause') e.apply('ok');
+    assertEq(s.pending?.type, 'attachCheer', 'エール送付の決定ポイントになっていない');
+    const ai = new HeuristicAI(0);
+    const id = ai.choose(e);
+    const opt = s.pending.options.find((o) => o.id === id);
+    assertEq(opt.pos.zone, 'back', '満タンのセンターではなくバックに送るべき');
+  });
+
+  await testAsync('AI: 利益のないBloomをしない / 利益のあるBloomは選ぶ', async () => {
+    const e = await setupMainStep(deckMap, 52);
+    const s = e.state;
+    s.turn = 3;
+    const p0 = s.players[0];
+    p0.turnCount = 2; // 最初のターン制限を回避
+    // センター: 1stラミィ hBP04-045（HP150・効果なし）
+    p0.center = e._createHolomem(lib.get('hBP04-045_C'), 1);
+    const ai = new HeuristicAI(0);
+    // ケース1: 同一カードへのBloom（利益ゼロ）→ 選ばない
+    p0.hand = [lib.get('hBP04-045_C')];
+    e._queueMainPending();
+    const id1 = ai.choose(e);
+    const opt1 = s.pending.options.find((o) => o.id === id1);
+    assert(opt1.kind !== 'bloom', '利益のない同一カードBloomを選んでしまった');
+    // ケース2: 2nd hBP04-048（HP190+ブルームエフェクト）へのBloom → 選ぶ
+    p0.hand = [lib.get('hBP04-048_RR')];
+    e._queueMainPending();
+    const id2 = ai.choose(e);
+    const opt2 = s.pending.options.find((o) => o.id === id2);
+    assertEq(opt2.kind, 'bloom', '利益のあるBloomを選ばなかった');
+  });
+
+  // ---- 推しスキル ----
+
+  await testAsync('推しスキル: ラミィSP（特殊ダメージ+100とダウン時2ドロー）', async () => {
+    const e = await setupMainStep(deckMap, 53);
+    const s = e.state;
+    const p0 = s.players[0];
+    const p1 = s.players[1];
+    p0.center = e._createHolomem(lib.get('hBP04-043_C'), 1); // 雪花ラミィ
+    p0.holoPower.push(...p0.deck.splice(0, 3));
+    p1.back.push(e._createHolomem(lib.get('hBP02-042_C'), 1));
+    e._queueMainPending();
+    const action = e.actions().find((a) => a.kind === 'oshiSkill');
+    assert(action, 'SP推しスキルがアクションに出ていない');
+    e.apply(action.id);
+    // 対象の雪花ラミィを選択
+    assertEq(s.pending?.type, 'effectChoice', '対象選択になっていない');
+    e.apply(s.pending.options[0].id);
+    assertEq(s.modifiers?.length ?? e.state.modifiers.length, 2, 'ターン修正が2件積まれていない');
+    // 特殊ダメージ+100の確認: ラミィから相手センターへ10点 → 110点になる
+    const ctx = new EffectContext(e, 0, { sourceHolomem: p0.center });
+    const target = { pos: { zone: 'center' }, holomem: p1.center, top: p1.center.stack[0] };
+    const handBefore = p0.hand.length;
+    const dmgBefore = p1.center.damage;
+    ctx.dealSpecialDamage(target, 10);
+    assert(p1.center.damage - dmgBefore >= 110, `特殊ダメージ+100が乗っていない（実際: ${p1.center.damage - dmgBefore}）`);
+    // ダウンしたはず → 2枚ドローのトリガー
+    assertEq(p0.hand.length, handBefore + 2, 'ダウンさせた時の2枚ドローが発動していない');
+  });
+
+  await testAsync('推しスキル: ラミィ「愛してる」（相手ターンのダウン時にファン回収）', async () => {
+    const e = await setupMainStep(deckMap, 54);
+    const s = e.state;
+    const p0 = s.players[0];
+    s.turnPlayer = 1; // 相手のターンにする
+    p0.center = e._createHolomem(lib.get('hBP04-043_C'), 1);
+    const yukimin = lib.get('hBP04-106_U');
+    p0.center.attachments.push(yukimin);
+    p0.back.push(e._createHolomem(lib.get('hBP02-042_C'), 1)); // 全滅回避
+    p0.holoPower.push(p0.deck.shift());
+    p0.usedOshiSkillThisTurn = false;
+    // センターを倒す
+    p0.center.damage = e.effectiveHp(p0.center);
+    s.pending = null;
+    e._checkTiming(() => {});
+    assertEq(s.pending?.type, 'effectChoice', '推しスキルの確認が出ていない');
+    const handBefore = p0.hand.length;
+    e.apply('yes');
+    assert(p0.hand.includes(yukimin), '雪民が手札に戻っていない');
+    assertEq(p0.holoPower.length, 0, 'ホロパワーのコストが払われていない');
+    // 残りのダウン処理（ライフ送り）を消化
+    let guard = 0;
+    while (s.pending && guard++ < 10) e.apply(s.pending.options[0].id);
+    assertEq(p0.hand.length, handBefore + 1, '手札が1枚（雪民）増えているはず');
+  });
+
+  // ---- 第2デッキ（あの青空のせいだ: オリー/イオフィ/レイネ）----
+
+  await testAsync('ランダムプレイアウト（あの青空のせいだ）×3シード', async () => {
+    const res2 = await fetch('../../battle_simulator/test_deck/' + encodeURIComponent('あの青空のせいだ.json'));
+    const deckMap2 = await res2.json();
+    for (const seed of [61, 62, 63]) {
+      const { engine, applies } = await randomPlayout(lib, deckMap2, seed);
+      assert(engine.state.phase === 'ended', `seed=${seed}: ${applies}手で決着しなかった`);
+    }
+  });
+
   // ---- 結果出力 ----
   const failed = results.filter((r) => !r.ok);
   const summary = `${results.length - failed.length}/${results.length} passed`;
