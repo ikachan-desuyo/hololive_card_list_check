@@ -531,6 +531,59 @@ body.dragging, body.dragging * { cursor: grabbing !important; }
   100% { opacity: 0; transform: translate(-50%, -45%); }
 }
 
+/* ===== サイコロ結果の大型表示 ===== */
+#dice-overlay {
+  position: absolute;
+  left: calc(50% - 160px);
+  top: 38%;
+  transform: translate(-50%, -50%);
+  display: none;
+  flex-direction: column;
+  align-items: center;
+  gap: 10px;
+  z-index: 85;
+  pointer-events: none;
+}
+#dice-overlay.show {
+  display: flex;
+  animation: dice-inout 2.2s ease forwards;
+}
+#dice-face {
+  width: 120px;
+  height: 120px;
+  background: linear-gradient(145deg, #ffffff, #dfe3f0);
+  border-radius: 20px;
+  border: 2px solid #aab;
+  box-shadow: 0 16px 50px rgba(0, 0, 0, 0.75), inset 0 -4px 10px rgba(0, 0, 0, 0.12);
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  grid-template-rows: repeat(3, 1fr);
+  padding: 18px;
+  gap: 6px;
+}
+#dice-face .pip {
+  background: radial-gradient(circle at 35% 35%, #444, #111);
+  border-radius: 50%;
+}
+#dice-face .pip.empty { background: transparent; }
+#dice-label {
+  background: rgba(10, 12, 32, 0.92);
+  border: 1px solid var(--accent);
+  border-radius: 10px;
+  padding: 5px 22px;
+  font-size: 1.2em;
+  font-weight: bold;
+  color: #fff;
+}
+@keyframes dice-inout {
+  0% { opacity: 0; transform: translate(-50%, -50%) scale(0.4) rotate(-25deg); }
+  12% { opacity: 1; transform: translate(-50%, -50%) scale(1.15) rotate(8deg); }
+  20% { transform: translate(-50%, -50%) scale(1) rotate(-3deg); }
+  26% { transform: translate(-50%, -50%) scale(1) rotate(0deg); }
+  82% { opacity: 1; }
+  100% { opacity: 0; transform: translate(-50%, -50%) scale(0.95); }
+}
+
 /* ===== ターン切り替え通知 ===== */
 #turn-toast {
   position: absolute;

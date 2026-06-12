@@ -489,9 +489,12 @@ function enqueueStepToasts(s) {
   lastLogLen = s.logs.length;
   for (const line of newLines) {
     const m = /^【(.+?)】(.*)/.exec(line);
-    if (m) {
+    const dice = /^🎲 サイコロ: (\d)/.exec(line);
+    if (dice) {
+      showDice(Number(dice[1])); // サイコロは専用の大型表示
+    } else if (m) {
       stepToastQueue.push(m[2].includes('スキップ') ? `${m[1]}（スキップ）` : m[1]);
-    } else if (/^.*?: 1枚ドロー/.test(line) || /^🎲/.test(line) || /特攻発動/.test(line)) {
+    } else if (/^.*?: 1枚ドロー/.test(line) || /特攻発動/.test(line)) {
       stepToastQueue.push(line.replace(/^.*?: /, ''));
     }
   }
@@ -510,6 +513,31 @@ function pumpStepToast() {
     stepToastActive = false;
     pumpStepToast();
   }, 1000);
+}
+
+/** サイコロの結果を中央に大きく表示（実物風のピップ描画） */
+const DICE_PIPS = {
+  1: [4],
+  2: [2, 6],
+  3: [2, 4, 6],
+  4: [0, 2, 6, 8],
+  5: [0, 2, 4, 6, 8],
+  6: [0, 2, 3, 5, 6, 8],
+};
+
+function showDice(value) {
+  const overlay = document.getElementById('dice-overlay');
+  const die = document.getElementById('dice-face');
+  die.innerHTML = '';
+  for (let cell = 0; cell < 9; cell++) {
+    const pip = document.createElement('div');
+    pip.className = DICE_PIPS[value]?.includes(cell) ? 'pip' : 'pip empty';
+    die.appendChild(pip);
+  }
+  document.getElementById('dice-label').textContent = `サイコロ: ${value}`;
+  overlay.classList.remove('show');
+  void overlay.offsetWidth; // アニメーション再生のためリフロー
+  overlay.classList.add('show');
 }
 
 /** 常時表示のステップ進行バー */
@@ -952,6 +980,15 @@ async function main() {
       engine.apply((active[0] || actions[0]).id);
     }
     console.log('✅ autostart 完了');
+  }
+
+  // 開発用: ?dicetest=N でサイコロ表示を静止表示（見た目確認用）
+  if (params.get('dicetest')) {
+    showDice(Number(params.get('dicetest')) || 6);
+    const overlay = document.getElementById('dice-overlay');
+    overlay.style.animation = 'none';
+    overlay.style.opacity = '1';
+    overlay.style.display = 'flex';
   }
 }
 
