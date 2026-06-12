@@ -160,7 +160,7 @@ html, body {
 /* 配置は公式プレイシート準拠（battle_simulator/docs/RULES_SPEC.md §13）:
    ライフ=左上から下へ / コラボ・センター・推し=上段 / ホロパワー=右上角(横向き) /
    デッキ=右端中段 / アーカイブ=右下 / エールデッキ=左下 / バック=下段中央 */
-.zone.life      { left: 10px;  top: 46px;  flex-direction: column; gap: 0; border-style: solid; min-width: 110px; min-height: 216px; justify-content: flex-start; padding-top: 8px; }
+.zone.life      { left: 10px;  top: 56px;  flex-direction: column; gap: 0; border-style: solid; min-width: 110px; min-height: 200px; justify-content: flex-start; padding-top: 8px; }
 .zone.revealed  { left: 150px; top: 30px;  border-color: rgba(255, 220, 120, 0.7); border-style: solid; box-shadow: 0 0 18px rgba(255, 220, 120, 0.25); }
 .zone.collab    { left: 280px; top: 30px; }
 .zone.center    { left: 460px; top: 30px; }
@@ -358,7 +358,7 @@ body.dragging [data-drop].drop-ok { z-index: 60; }
   width: 96px;
   height: 68px;
   position: relative;
-  margin-top: -42px; /* 上端だけ見せて重ねる */
+  margin-top: -46px; /* 上端だけ見せて重ねる */
   flex-shrink: 0;
 }
 .life-slot:first-child { margin-top: 0; }
