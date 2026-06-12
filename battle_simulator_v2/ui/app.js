@@ -11,6 +11,7 @@
 import { CardLibrary } from '../core/cards.js';
 import { Engine } from '../core/engine.js';
 import { EffectRegistry } from '../core/effects/registry.js';
+import { HeuristicAI } from '../core/ai/heuristic.js';
 import { STEP_NAMES } from '../core/constants.js';
 import { renderSide, renderHand, renderOppHand } from './board.js';
 
@@ -560,7 +561,11 @@ function render() {
   renderStepBar(s);
   enqueueStepToasts(s);
 
-  const handPlayer = s.pending ? s.pending.player : s.turnPlayer;
+  // 手札表示: 人間が1人だけなら常にその人の手札を固定表示（AIの手札は見せない）
+  const humans = [0, 1].filter((i) => !aiEnabled(i));
+  const handPlayer = humans.length === 1
+    ? humans[0]
+    : (s.pending ? s.pending.player : s.turnPlayer);
   renderHand(document.getElementById('hand'), s.players[handPlayer].hand, handPlayer, hooks);
   renderOppHand(document.getElementById('opp-hand'), s.players[1 - handPlayer].hand.length);
 
@@ -576,6 +581,7 @@ function render() {
   renderLog(s);
   renderResult(s);
   handleStepPause(s);
+  handleAI(s);
 }
 
 /**
@@ -587,7 +593,9 @@ function render() {
 function renderEffectChoiceModal(s) {
   const modal = document.getElementById('choice-modal');
   const bar = document.getElementById('choice-bar');
-  const isEffect = s.pending?.type === 'effectChoice';
+  let isEffect = s.pending?.type === 'effectChoice';
+  // AIの選択は表示しない（デッキサーチ候補などの非公開情報が見えてしまうため）
+  if (isEffect && aiEnabled(s.pending.player)) isEffect = false;
   const kind = isEffect ? s.pending.request?.kind : null;
 
   // --- 盤面クリック選択（chooseHolomem） ---
@@ -771,6 +779,38 @@ function setupPreview() {
   });
 }
 
+// ============ AI（CPU操作） ============
+
+const aiAgents = [null, null];
+let aiOverride = null; // URLパラメータによる一時上書き（保存しない）
+let aiTimer = null;
+const AI_DELAY_MS = 600;
+
+function aiEnabled(idx) {
+  if (aiOverride) return aiOverride[idx];
+  return !!(getSettings().aiPlayers || [false, false])[idx];
+}
+
+/** AI担当プレイヤーの決定ポイントを少し間を置いて自動で進める */
+function handleAI(s) {
+  if (!s.pending || s.phase === 'ended') return;
+  const idx = s.pending.player;
+  if (!aiEnabled(idx)) return;
+  if (aiTimer) return;
+  const pendingRef = s.pending;
+  aiTimer = setTimeout(() => {
+    aiTimer = null;
+    if (!engine || engine.state.pending !== pendingRef) return;
+    if (!aiAgents[idx]) aiAgents[idx] = new HeuristicAI(idx);
+    try {
+      const id = aiAgents[idx].choose(engine);
+      if (id != null) engine.apply(id);
+    } catch (e) {
+      console.error('AIの手の適用に失敗:', e);
+    }
+  }, AI_DELAY_MS);
+}
+
 // ============ 設定パネル ============
 
 let currentSeed = null;
@@ -796,6 +836,18 @@ function setupSettingsPanel() {
     if (!speed) return;
     saveSettings({ stepSpeed: speed });
     refreshSettingsUI();
+  });
+
+  // AI適用（CPUが操作するプレイヤーの切り替え）
+  document.getElementById('ai-buttons').addEventListener('click', (e) => {
+    const idx = e.target.dataset?.ai;
+    if (idx == null) return;
+    const current = getSettings().aiPlayers || [false, false];
+    current[Number(idx)] = !current[Number(idx)];
+    aiOverride = null; // 手動変更したらURL上書きは解除
+    saveSettings({ aiPlayers: current });
+    refreshSettingsUI();
+    if (engine) render(); // AIループを起動
   });
 
   // ログコピー
@@ -840,6 +892,9 @@ function refreshSettingsUI() {
   for (const btn of document.querySelectorAll('#pause-speed-buttons button')) {
     btn.classList.toggle('active', btn.dataset.speed === speed);
   }
+  for (const btn of document.querySelectorAll('#ai-buttons button')) {
+    btn.classList.toggle('active', aiEnabled(Number(btn.dataset.ai)));
+  }
   document.getElementById('seed-display').textContent = `シード値: ${currentSeed ?? '-'}`;
 }
 
@@ -876,8 +931,14 @@ async function main() {
   document.getElementById('restart-button').addEventListener('click', () => location.reload());
   console.log('✅ バトルシミュレーターv2 初期化完了');
 
-  // 開発・スモークテスト用: ?autostart=1&seed=42 で即ゲーム開始
+  // 開発用: ?ai=1|2|both でAI適用を一時的に上書き（設定には保存しない）
   const params = new URLSearchParams(location.search);
+  const aiParam = params.get('ai');
+  if (aiParam) {
+    aiOverride = [aiParam === '1' || aiParam === 'both', aiParam === '2' || aiParam === 'both'];
+  }
+
+  // 開発・スモークテスト用: ?autostart=1&seed=42 で即ゲーム開始
   if (params.get('autostart')) {
     if (params.get('seed')) document.getElementById('seed-input').value = params.get('seed');
     await startGame();

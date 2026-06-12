@@ -11,6 +11,7 @@ import { CardLibrary, CardKind } from '../core/cards.js';
 import { Engine } from '../core/engine.js';
 import { EffectRegistry } from '../core/effects/registry.js';
 import { EffectContext } from '../core/effects/context.js';
+import { HeuristicAI } from '../core/ai/heuristic.js';
 import { createRng } from '../core/rng.js';
 
 const results = [];
@@ -413,6 +414,53 @@ export async function runTests() {
     assertEq(e.effects.artsBonus(p.center, 0), 20, 'ターン修正が乗っていない');
     e.effects.expireTurnModifiers();
     assertEq(e.effects.artsBonus(p.center, 0), 0, 'ターン修正が消えていない');
+  });
+
+  // ---- AI ----
+
+  await testAsync('AI同士の対戦が決着する（3シード・保存則維持）', async () => {
+    for (const seed of [31, 32, 33]) {
+      const d0 = lib.buildGameDeck(deckMap);
+      const d1 = lib.buildGameDeck(deckMap);
+      const registry = await buildRegistry(lib, deckMap);
+      const e = new Engine({ decks: [d0, d1], seed, names: ['AI1', 'AI2'], registry });
+      e.start();
+      const ais = [new HeuristicAI(0), new HeuristicAI(1)];
+      let applies = 0;
+      while (e.state.phase !== 'ended' && applies < 4000) {
+        const pending = e.state.pending;
+        assert(pending, `seed=${seed}: pending が無いのに終わっていない`);
+        const id = ais[pending.player].choose(e);
+        e.apply(id);
+        applies++;
+      }
+      assert(e.state.phase === 'ended', `seed=${seed}: ${applies}手で決着しなかった`);
+      for (const p of e.state.players) {
+        assertEq(totalCards(p), 70, `seed=${seed}: ${p.name} のカード総数が崩れた`);
+      }
+    }
+  });
+
+  await testAsync('AI: 倒せる相手を優先して攻撃する（リーサル選択）', async () => {
+    const e = await setupMainStep(deckMap, 41);
+    const s = e.state;
+    s.turn = 3; // 先攻1ターン目のパフォーマンススキップを回避
+    const p0 = s.players[0];
+    const p1 = s.players[1];
+    // 自分のセンターにエールを持たせてアーツを撃てる状態にする
+    p0.center.cheers.push(...p0.cheerDeck.splice(0, 3));
+    // 相手: センターは残りHP10（倒せる）、バックは満タン
+    p1.back.push(e._createHolomem(lib.get('hBP02-042_C'), 1));
+    p1.center.damage = e.effectiveHp(p1.center) - 10;
+    // パフォーマンスステップに入る
+    s.pending = null;
+    e._performanceStep();
+    assert(s.pending?.type === 'performance', 'パフォーマンスの決定ポイントになっていない');
+    const ai = new HeuristicAI(0);
+    const id = ai.choose(e);
+    const opt = s.pending.options.find((o) => o.id === id);
+    assert(opt && opt.kind === 'art', `AIがアーツを選ばなかった (${id})`);
+    assertEq(opt.target.zone, 'center', 'AIが倒せるセンターを狙っていない');
   });
 
   // ---- 結果出力 ----
