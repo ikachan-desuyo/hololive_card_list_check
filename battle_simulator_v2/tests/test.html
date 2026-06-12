@@ -1,0 +1,40 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8">
+  <title>バトルシミュレーターv2 コアテスト</title>
+  <style>
+    body { font-family: 'Segoe UI', sans-serif; max-width: 900px; margin: 2em auto; background: #1b1b2f; color: #eee; }
+    .pass { color: #6ee76e; }
+    .fail { color: #ff6b6b; font-weight: bold; }
+    #summary { font-size: 1.3em; margin: 1em 0; }
+    li { margin: 4px 0; }
+  </style>
+</head>
+<body>
+  <h1>🧪 コアエンジン ルールテスト</h1>
+  <div id="summary">実行中...</div>
+  <ul id="results"></ul>
+  <script type="module">
+    import { runTests } from './test.js';
+    const ul = document.getElementById('results');
+    const summary = document.getElementById('summary');
+    runTests().then(({ results, failed }) => {
+      for (const r of results) {
+        const li = document.createElement('li');
+        li.className = r.ok ? 'pass' : 'fail';
+        li.textContent = (r.ok ? '✅ ' : '❌ ') + r.name + (r.error ? ` — ${r.error}` : '');
+        ul.appendChild(li);
+      }
+      summary.textContent = failed.length === 0
+        ? `✅ ALL TESTS PASSED (${results.length}件)`
+        : `❌ ${failed.length}件失敗 / ${results.length}件`;
+      summary.id = failed.length === 0 ? 'all-passed' : 'has-failures';
+    }).catch((e) => {
+      summary.textContent = '❌ テスト実行自体が失敗: ' + e.message;
+      summary.id = 'has-failures';
+      console.error('TESTS FAILED (runner error)', e);
+    });
+  </script>
+</body>
+</html>

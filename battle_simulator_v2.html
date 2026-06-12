@@ -1,0 +1,58 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>ホロライブTCG バトルシミュレーター v2</title>
+  <link rel="stylesheet" href="battle_simulator_v2/css/board.css">
+</head>
+<body>
+  <div id="app">
+
+    <!-- デッキ選択画面 -->
+    <div id="setup-screen">
+      <h1>⚔️ バトルシミュレーター v2</h1>
+      <label for="deck-p1">プレイヤー1 のデッキ</label>
+      <select id="deck-p1"></select>
+      <label for="deck-p2">プレイヤー2 のデッキ</label>
+      <select id="deck-p2"></select>
+      <label for="seed-input">シード値（空欄でランダム / 同じ値で同じ展開を再現）</label>
+      <input id="seed-input" type="number" placeholder="例: 42">
+      <button id="start-button">ゲーム開始</button>
+      <div id="setup-error"></div>
+    </div>
+
+    <!-- ゲーム画面 -->
+    <div id="game-screen">
+      <div class="scene">
+        <div class="table">
+          <div class="side opponent" id="side-opponent"></div>
+          <div class="side player" id="side-player"></div>
+        </div>
+      </div>
+
+      <div id="opp-hand"></div>
+      <div id="hand"></div>
+
+      <div id="side-panel">
+        <div id="status"></div>
+        <div id="actions"></div>
+        <div id="log"></div>
+      </div>
+
+      <div id="card-preview">
+        <img src="" alt="">
+        <div class="preview-name"></div>
+      </div>
+
+      <div id="result-overlay">
+        <div id="result-message"></div>
+        <button id="restart-button">もう一度</button>
+      </div>
+    </div>
+
+  </div>
+
+  <script type="module" src="battle_simulator_v2/ui/app.js"></script>
+</body>
+</html>

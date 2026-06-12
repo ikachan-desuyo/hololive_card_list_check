@@ -58,5 +58,26 @@ if ($dupInit -gt 1) { Write-Output "NG: 初期化が $dupInit 回実行されて
 if (-not $errors -and $completed -and $dupInit -le 1) { Write-Output "OK: 初期化完了・エラーなし・単一初期化" }
 
 Write-Output ""
+Write-Output "=== v2 コアエンジンテスト ==="
+$v2Profile = Join-Path $env:TEMP ("edge-smoke-v2-" + [guid]::NewGuid().ToString('N'))
+$v2Log = Join-Path $env:TEMP "battle_sim_v2_test_console.log"
+$v2Args = @(
+    '--headless', '--disable-gpu', '--no-first-run',
+    "--user-data-dir=$v2Profile",
+    '--enable-logging=stderr', '--v=0', '--virtual-time-budget=30000',
+    '--dump-dom', "http://localhost:$port/battle_simulator_v2/tests/test.html"
+)
+Start-Process -FilePath $edge -ArgumentList $v2Args -NoNewWindow -Wait `
+    -RedirectStandardOutput (Join-Path $env:TEMP 'battle_sim_v2_test_dom.html') -RedirectStandardError $v2Log | Out-Null
+Remove-Item -Recurse -Force $v2Profile -ErrorAction SilentlyContinue
+
+$v2Console = (Select-String -Path $v2Log -Pattern 'INFO:CONSOLE' | ForEach-Object { $_.Line })
+$v2Fails = $v2Console | Where-Object { $_ -match 'TEST FAIL|TESTS FAILED' }
+$v2Pass = $v2Console | Where-Object { $_ -match 'ALL TESTS PASSED' }
+if ($v2Pass) { Write-Output "OK: v2 コアテスト全合格" }
+elseif ($v2Fails) { Write-Output "NG: v2 テスト失敗:"; $v2Fails | ForEach-Object { Write-Output "  $_" } }
+else { Write-Output "NG: v2 テストの結果が確認できない（$v2Log を確認）" }
+
+Write-Output ""
 Write-Output "DOMダンプ: $domFile / 全ログ: $logFile"
 if ($serverStarted) { Write-Output "(http.server は起動したままです。不要なら python プロセスを終了してください)" }

@@ -16,7 +16,17 @@
 - `sw.js` + `sw-version.js` + `sw-utils.js` + `sw-handlers.js` — Service Worker。**JSファイルの追加・改名時は sw.js の STATIC_RESOURCES と sw-version.js のバージョンを更新**しないとキャッシュで反映されない
 - モジュールシステム不使用。各ファイルは class を定義して `window.XXX` に登録し、`<script>` タグの順序で依存を解決している
 
-## バトルシミュレーター（開発再開中）
+## バトルシミュレーター v2（現行の開発ライン）
+
+- 入口: `battle_simulator_v2.html` / コード: `battle_simulator_v2/`（**ES modules使用**。旧コードと違い window 登録はしない）
+- 構成: `core/`（DOM非依存のゲームエンジン）+ `ui/`（3D盤面・CSS 3D transform）+ `tests/`（ルールテスト）
+- ルールの実装根拠は `battle_simulator/docs/RULES_SPEC.md` の条番号をコメントに書く
+- カード個別効果は未実装（`TODO(効果未実装)` ログを出す）。効果システムが次の開発対象
+- テスト: `battle_simulator_v2/tests/test.html`（`scripts/tools/smoke-test-battle-sim.ps1` がヘッドレスで実行）
+- 開発用URLパラメータ: `?autostart=1&seed=42&autoplay=12` で自動開始・自動プレイ
+- エンジンは「決定ポイント」方式: `engine.actions()` で選択肢取得 → `engine.apply(id)`。乱数はシード固定可（Math.random 禁止）
+
+## バトルシミュレーター v1（参照用・凍結）
 
 - 入口: `battle_simulator.html`（スクリプト読み込み順がそのまま依存順）
 - 本体: `battle_simulator/` 配下のマネージャ群 + `js/battle_engine.js`（統括）
