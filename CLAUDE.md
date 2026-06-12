@@ -13,7 +13,16 @@
 - `index.html` — ランディング。各ツール（カード一覧 / スキル検索 / デッキビルダー / バインダー / バトルシミュレーター）へのリンク
 - `js/` — 各ページのスクリプト。`utils.js` `modal-ui.js` `deck_manager.js` はページ間共有
 - `json_file/card_data.json` — カードDB（カードID → カード情報）
-- `sw.js` + `sw-version.js` + `sw-utils.js` + `sw-handlers.js` — Service Worker。**JSファイルの追加・改名時は sw.js の STATIC_RESOURCES と sw-version.js のバージョンを更新**しないとキャッシュで反映されない
+- `sw.js` + `sw-version.js` + `sw-utils.js` + `sw-handlers.js` — Service Worker。**JSファイルの追加・改名時は sw.js の urlsToCache と sw-version.js のバージョンを更新**しないとキャッシュで反映されない
+
+### キャッシュ運用ルール（2026-06-13 整理）
+
+- **バージョンアップ時は sw-version.js と sw.js 先頭のバージョンコメントの両方を更新する**（sw.js 本体のバイト差分が最速の更新検知）
+- SW登録は全ページ `{ updateViaCache: 'none' }` 統一（無指定の register があると設定が戻るので追加時注意）
+- 新バージョンのキャッシュ取得は `cache: 'reload'` でHTTPキャッシュを迂回している（sw.js install/activate）
+- 外部カード画像は `IMAGE_CACHE`（バージョン非依存）に分離。activate の削除対象から除外されている
+- **battle_simulator_v2/ 配下は開発中のためSWキャッシュを常時バイパス**（sw.js fetch handler 冒頭）。
+  v2 を正式リリースしてオフライン対応する際は、このバイパスを外して urlsToCache に v2 ファイル一式を追加すること
 - モジュールシステム不使用。各ファイルは class を定義して `window.XXX` に登録し、`<script>` タグの順序で依存を解決している
 
 ## バトルシミュレーター v2（現行の開発ライン）

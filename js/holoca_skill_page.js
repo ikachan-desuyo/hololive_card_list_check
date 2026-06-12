@@ -446,7 +446,7 @@
     // Service Worker registration with enhanced update notification for mobile
     if ('serviceWorker' in navigator) {
       window.addEventListener('load', () => {
-        navigator.serviceWorker.register('./sw.js')
+        navigator.serviceWorker.register('./sw.js', { updateViaCache: 'none' })
           .then((registration) => {
 
             // Listen for messages from Service Worker
@@ -686,7 +686,7 @@ document.addEventListener('DOMContentLoaded', function() {
 
 // ✅ Service Worker登録
 if ('serviceWorker' in navigator) {
-  navigator.serviceWorker.register('./sw.js').then(function(registration) {
+  navigator.serviceWorker.register('./sw.js', { updateViaCache: 'none' }).then(function(registration) {
   }).catch(function(error) {
   });
 }
