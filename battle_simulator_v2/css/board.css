@@ -160,7 +160,8 @@ html, body {
 /* 配置は公式プレイシート準拠（battle_simulator/docs/RULES_SPEC.md §13）:
    ライフ=左上から下へ / コラボ・センター・推し=上段 / ホロパワー=右上角(横向き) /
    デッキ=右端中段 / アーカイブ=右下 / エールデッキ=左下 / バック=下段中央 */
-.zone.life      { left: 10px;  top: 56px;  flex-direction: column; gap: 0; border-style: solid; min-width: 110px; min-height: 200px; justify-content: flex-start; padding-top: 8px; }
+/* ライフのカード列は枠の中央に揃える（上に寄って下が空くのを防ぐ） */
+.zone.life      { left: 10px;  top: 56px;  flex-direction: column; gap: 0; border-style: solid; min-width: 110px; min-height: 200px; justify-content: center; }
 .zone.revealed  { left: 150px; top: 30px;  border-color: rgba(255, 220, 120, 0.7); border-style: solid; box-shadow: 0 0 18px rgba(255, 220, 120, 0.25); }
 .zone.collab    { left: 280px; top: 30px; }
 .zone.center    { left: 460px; top: 30px; }
