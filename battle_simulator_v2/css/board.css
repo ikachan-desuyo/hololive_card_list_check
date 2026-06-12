@@ -146,7 +146,7 @@ html, body {
   pointer-events: none;
 }
 
-.zone.life      { left: 12px;  top: 26px;  flex-direction: column; gap: 0; border-style: solid; min-width: 70px; min-height: 130px; justify-content: flex-start; padding-top: 8px; }
+.zone.life      { left: 10px;  top: 20px;  flex-direction: column; gap: 0; border-style: solid; min-width: 104px; min-height: 130px; justify-content: flex-start; padding-top: 8px; }
 .zone.revealed  { left: 150px; top: 30px;  border-color: rgba(255, 220, 120, 0.7); border-style: solid; box-shadow: 0 0 18px rgba(255, 220, 120, 0.25); }
 .zone.collab    { left: 295px; top: 30px; }
 .zone.center    { left: 425px; top: 30px; }
@@ -175,8 +175,9 @@ html, body {
   display: block;
   pointer-events: none;
 }
-/* 盤上カードのホバーは「動かない」発光のみ（D&Dとの競合防止） */
-.scene .card:hover { filter: brightness(1.18); z-index: 30; }
+/* 盤上カードのホバーは「動かない」発光のみ（D&Dとの競合防止。z-index変更も
+   preserve-3d 配下では描画順再ソート→hover喪失→点滅の原因になるため行わない） */
+.scene .card:hover { filter: brightness(1.18); }
 .card.facedown {
   background-image: var(--sleeve);
   background-size: cover;
@@ -224,7 +225,8 @@ html, body {
   display: block;
   pointer-events: none;
 }
-.mini-card:hover { transform: scale(1.7) !important; z-index: 50 !important; }
+/* ミニカードのホバーも動かさない（拡大表示は左下のプレビューに任せる） */
+.mini-card:hover { filter: brightness(1.3); outline: 1px solid var(--accent); }
 
 /* ドラッグ中は装飾のヒット判定を切り、ドロップ先の本体に通す */
 body.dragging .mini-card,
@@ -288,12 +290,13 @@ body.dragging [data-drop].drop-ok { z-index: 60; }
 }
 .pile.archive-pile:hover { outline: 2px solid #b07ad1; }
 
-/* ライフ: カード自体を横向き（90度回転）にして縦に重ねる */
+/* ライフ: カード自体を横向き（90度回転）にして縦に重ねる
+   最大6枚（推しのライフ上限）が入る前提で、カードサイズは盤上カードに近い大きさ */
 .life-slot {
-  width: 64px;
-  height: 46px;
+  width: 96px;
+  height: 68px;
   position: relative;
-  margin-top: -24px;
+  margin-top: -42px; /* 上端だけ見せて重ねる */
   flex-shrink: 0;
 }
 .life-slot:first-child { margin-top: 0; }
@@ -301,28 +304,29 @@ body.dragging [data-drop].drop-ok { z-index: 60; }
   position: absolute;
   left: 50%;
   top: 50%;
-  width: 46px;
-  height: 64px;
+  width: 68px;
+  height: 96px;
   transform: translate(-50%, -50%) rotate(90deg);
   background-image: var(--sleeve);
   background-size: cover;
   background-position: center;
   border: 1px solid #5560a8;
   border-radius: 4px;
-  box-shadow: -2px 0 4px rgba(0, 0, 0, 0.45);
+  box-shadow: -2px 0 5px rgba(0, 0, 0, 0.5);
 }
 
 /* 公開中のカード */
 .revealed-card { box-shadow: 0 0 16px rgba(255, 220, 120, 0.7); }
 
-/* ===== ドラッグ&ドロップ ===== */
+/* ===== ドラッグ&ドロップ（Pointer Events 自前実装） ===== */
 .can-drag {
   cursor: grab;
   outline: 2px solid rgba(110, 195, 255, 0.85);
   outline-offset: 1px;
   box-shadow: 0 0 14px rgba(110, 195, 255, 0.45);
+  touch-action: none; /* タッチでのスクロールとドラッグの競合防止 */
 }
-.can-drag:active { cursor: grabbing; }
+body.dragging, body.dragging * { cursor: grabbing !important; }
 [data-drop].drop-ok {
   outline: 3px dashed rgba(120, 255, 170, 0.9);
   outline-offset: 2px;
@@ -334,6 +338,27 @@ body.dragging [data-drop].drop-ok { z-index: 60; }
   50% { box-shadow: 0 0 22px rgba(120, 255, 170, 0.65); }
 }
 .side[data-drop].drop-ok { outline-offset: -6px; }
+/* ドラッグ中、カーソル直下の有効なドロップ先を強調 */
+[data-drop].drop-hover {
+  outline: 4px solid rgba(120, 255, 170, 1);
+  background-color: rgba(120, 255, 170, 0.22);
+  animation: none;
+}
+
+/* カーソルに追従するドラッグ中のカード */
+.drag-ghost {
+  position: fixed;
+  width: 92px;
+  height: 128px;
+  border-radius: 6px;
+  background-size: cover;
+  background-position: center;
+  border: 2px solid var(--accent);
+  box-shadow: 0 14px 40px rgba(0, 0, 0, 0.75);
+  z-index: 200;
+  pointer-events: none;
+  opacity: 0.92;
+}
 
 /* ===== 手札 ===== */
 #hand {
@@ -351,7 +376,7 @@ body.dragging [data-drop].drop-ok { z-index: 60; }
 
 #opp-hand {
   position: absolute;
-  top: 6px;
+  top: 96px; /* 相手盤面のすぐ近くに置く（離しすぎない） */
   left: 50%;
   transform: translateX(calc(-50% - 160px));
   display: flex;

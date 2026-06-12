@@ -155,81 +155,133 @@ function buildDndMap() {
 }
 
 let dndMap = [];
-let currentDragSrc = null;
 
 function wireDnD() {
   dndMap = buildDndMap();
   const srcs = new Set(dndMap.map((x) => x.dnd.src));
   for (const e of document.querySelectorAll('[data-src]')) {
-    if (srcs.has(e.dataset.src)) {
-      e.draggable = true;
-      e.classList.add('can-drag');
-    }
+    if (srcs.has(e.dataset.src)) e.classList.add('can-drag');
   }
 }
 
-/** ドロップ先要素から、現在のドラッグに合う drop キーを探す（内側→外側） */
-function findDropKey(target, dsts) {
-  let node = target;
-  while (node && node !== document.body) {
-    const key = node.dataset?.drop;
-    if (key && dsts.includes(key)) return key;
-    node = node.parentElement;
+/**
+ * 自前ドラッグ&ドロップ（Pointer Events ベース）
+ *
+ * HTML5 ネイティブ D&D は 3D transform 下でヒットテストが不安定（カーソル点滅・
+ * ドロップ不能）だったため使わない。pointerdown→move→up を自前で追跡し、
+ * 判定は document.elementsFromPoint で行う（transform の影響を受けない）。
+ */
+let dragState = null;       // { src, srcEl, candidates, dsts, startX, startY, started, ghost }
+let suppressNextClick = false;
+
+/** カーソル位置の要素列から、有効なドロップ先を探す */
+function dropTargetAt(x, y, dsts) {
+  for (const node of document.elementsFromPoint(x, y)) {
+    let n = node;
+    while (n && n !== document.body) {
+      const key = n.dataset?.drop;
+      if (key && dsts.includes(key)) return { el: n, key };
+      n = n.parentElement;
+    }
   }
   return null;
+}
+
+function startDrag(e) {
+  const st = dragState;
+  st.started = true;
+  suppressNextClick = true;
+  document.body.classList.add('dragging');
+  // ドロップ可能な場所をハイライト
+  for (const el of document.querySelectorAll('[data-drop]')) {
+    if (st.dsts.includes(el.dataset.drop)) el.classList.add('drop-ok');
+  }
+  // カーソルに追従するゴースト（掴んだカードの絵柄）
+  const ghost = document.createElement('div');
+  ghost.className = 'drag-ghost';
+  const img = st.srcEl.querySelector('img');
+  ghost.style.backgroundImage = img?.src ? `url(${img.src})` : 'var(--sleeve)';
+  document.body.appendChild(ghost);
+  st.ghost = ghost;
+  moveDrag(e);
+}
+
+function moveDrag(e) {
+  const st = dragState;
+  st.ghost.style.left = `${e.clientX - 46}px`;
+  st.ghost.style.top = `${e.clientY - 64}px`;
+  // ホバー中のドロップ先を強調
+  const hit = dropTargetAt(e.clientX, e.clientY, st.dsts);
+  for (const el of document.querySelectorAll('.drop-hover')) el.classList.remove('drop-hover');
+  if (hit) hit.el.classList.add('drop-hover');
+}
+
+function cleanupDrag(st) {
+  document.body.classList.remove('dragging');
+  for (const el of document.querySelectorAll('.drop-ok')) el.classList.remove('drop-ok');
+  for (const el of document.querySelectorAll('.drop-hover')) el.classList.remove('drop-hover');
+  st?.ghost?.remove();
+}
+
+function endDrag(st, e) {
+  const hit = dropTargetAt(e.clientX, e.clientY, st.dsts);
+  cleanupDrag(st);
+  if (!hit) return;
+  const matched = st.candidates.filter((x) => x.dnd.dsts.includes(hit.key));
+  if (matched.length === 1) {
+    engine.apply(matched[0].opt.id);
+  } else if (matched.length > 1) {
+    // 同じ移動で複数の選択肢（例: 複数アーツ）→ 小さな選択ポップアップ
+    showChooser(e.clientX, e.clientY, matched.map((x) => x.opt));
+  }
 }
 
 function setupDnDListeners() {
   const screen = document.getElementById('game-screen');
 
-  screen.addEventListener('dragstart', (e) => {
-    const src = e.target.closest?.('[data-src]')?.dataset.src;
-    if (!src) return;
-    currentDragSrc = src;
-    e.dataTransfer.effectAllowed = 'move';
-    // ドラッグ中は装飾要素のヒット判定を切る（css: body.dragging）
-    document.body.classList.add('dragging');
-    // ドロップ可能な場所をハイライト
-    const dsts = new Set(dndMap.filter((x) => x.dnd.src === src).flatMap((x) => x.dnd.dsts));
-    for (const el of document.querySelectorAll('[data-drop]')) {
-      if (dsts.has(el.dataset.drop)) el.classList.add('drop-ok');
+  screen.addEventListener('pointerdown', (e) => {
+    if (e.button !== 0) return;
+    const srcEl = e.target.closest?.('[data-src]');
+    if (!srcEl || !srcEl.classList.contains('can-drag')) return;
+    const src = srcEl.dataset.src;
+    const candidates = dndMap.filter((x) => x.dnd.src === src);
+    if (candidates.length === 0) return;
+    dragState = {
+      src, srcEl, candidates,
+      dsts: [...new Set(candidates.flatMap((x) => x.dnd.dsts))],
+      startX: e.clientX, startY: e.clientY,
+      started: false, ghost: null,
+    };
+  });
+
+  document.addEventListener('pointermove', (e) => {
+    if (!dragState) return;
+    if (!dragState.started) {
+      const dx = e.clientX - dragState.startX;
+      const dy = e.clientY - dragState.startY;
+      if (dx * dx + dy * dy < 36) return; // 6px動くまではクリック扱い
+      startDrag(e);
+    } else {
+      moveDrag(e);
     }
-  });
-
-  screen.addEventListener('dragend', () => {
-    currentDragSrc = null;
-    document.body.classList.remove('dragging');
-    for (const el of document.querySelectorAll('.drop-ok')) el.classList.remove('drop-ok');
-  });
-
-  screen.addEventListener('dragover', (e) => {
-    if (!currentDragSrc) return;
-    const dsts = dndMap.filter((x) => x.dnd.src === currentDragSrc).flatMap((x) => x.dnd.dsts);
-    if (findDropKey(e.target, dsts)) {
-      e.preventDefault();
-      e.dataTransfer.dropEffect = 'move';
-    }
-  });
-
-  screen.addEventListener('drop', (e) => {
-    if (!currentDragSrc) return;
     e.preventDefault();
-    const candidates = dndMap.filter((x) => x.dnd.src === currentDragSrc);
-    const dsts = candidates.flatMap((x) => x.dnd.dsts);
-    const key = findDropKey(e.target, dsts);
-    if (!key) return;
-    const matched = candidates.filter((x) => x.dnd.dsts.includes(key));
-    currentDragSrc = null;
-    // 再描画で dragend が発火しないことがあるため、ここでも後始末する
-    document.body.classList.remove('dragging');
-    for (const el of document.querySelectorAll('.drop-ok')) el.classList.remove('drop-ok');
-    if (matched.length === 1) {
-      engine.apply(matched[0].opt.id);
-    } else if (matched.length > 1) {
-      // 同じ移動で複数の選択肢（例: 複数アーツ）→ 小さな選択ポップアップ
-      showChooser(e.clientX, e.clientY, matched.map((x) => x.opt));
-    }
   });
+
+  document.addEventListener('pointerup', (e) => {
+    if (!dragState) return;
+    const st = dragState;
+    dragState = null;
+    if (st.started) endDrag(st, e);
+  });
+
+  // ドラッグ直後の click はインスペクタ等を開かない（capture で握りつぶす）
+  screen.addEventListener('click', (e) => {
+    if (suppressNextClick) {
+      suppressNextClick = false;
+      e.stopPropagation();
+      e.preventDefault();
+    }
+  }, true);
 }
 
 // ============ モーダル/ポップアップ ============
