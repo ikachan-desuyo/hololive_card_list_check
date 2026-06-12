@@ -10,6 +10,7 @@
 import { CardLibrary, CardKind } from '../core/cards.js';
 import { Engine } from '../core/engine.js';
 import { EffectRegistry } from '../core/effects/registry.js';
+import { EffectContext } from '../core/effects/context.js';
 import { createRng } from '../core/rng.js';
 
 const results = [];
@@ -354,6 +355,55 @@ export async function runTests() {
     e.apply('ok');
     assertEq(p0.hand.length, p0Before, 'P2のドローでP1の手札が変化した');
     assertEq(p1.hand.length, p1Before + 1, 'P2の手札が1枚増えていない');
+  });
+
+  await testAsync('特殊ダメージのダウン: 「ライフは減らない」の有無で2パターン', async () => {
+    // パターン1: 記載なしの特殊ダメージで倒す → ライフが減る
+    {
+      const e = await setupMainStep(deckMap, 17);
+      const p1 = e.state.players[1];
+      p1.back.push(e._createHolomem(lib.get('hBP02-042_C'), 1)); // ステージ全滅を避ける
+      const center = p1.center;
+      center.damage = e.effectiveHp(center) - 10;
+      const lifeBefore = p1.life.length;
+      const ctx = new EffectContext(e, 0, {});
+      ctx.dealSpecialDamage({ pos: { zone: 'center' }, holomem: center, top: center.stack[0] }, 10);
+      e._checkTiming(() => {});
+      let guard = 0;
+      while (e.state.pending && guard++ < 10) e.apply(e.state.pending.options[0].id);
+      assertEq(p1.life.length, lifeBefore - 1, '記載なしの特殊ダメージで倒したのにライフが減っていない');
+    }
+    // パターン2: 「ライフは減らない」記載ありで倒す → ライフは減らない
+    {
+      const e = await setupMainStep(deckMap, 17);
+      const p1 = e.state.players[1];
+      p1.back.push(e._createHolomem(lib.get('hBP02-042_C'), 1));
+      const center = p1.center;
+      center.damage = e.effectiveHp(center) - 10;
+      const lifeBefore = p1.life.length;
+      const ctx = new EffectContext(e, 0, {});
+      ctx.dealSpecialDamage({ pos: { zone: 'center' }, holomem: center, top: center.stack[0] }, 10, { noLifeOnDown: true });
+      e._checkTiming(() => {});
+      assertEq(p1.life.length, lifeBefore, '「ライフは減らない」なのにライフが減った');
+    }
+    // パターン3: 記載ありの特殊ダメージで倒れず、後から別のダメージで倒れた → ライフは減る
+    {
+      const e = await setupMainStep(deckMap, 17);
+      const p1 = e.state.players[1];
+      p1.back.push(e._createHolomem(lib.get('hBP02-042_C'), 1));
+      const center = p1.center;
+      const lifeBefore = p1.life.length;
+      const ctx = new EffectContext(e, 0, {});
+      // ダウンに至らない「ライフは減らない」特殊ダメージ
+      ctx.dealSpecialDamage({ pos: { zone: 'center' }, holomem: center, top: center.stack[0] }, 10, { noLifeOnDown: true });
+      assert(center.damage < e.effectiveHp(center), '前提が崩れている（この時点で倒れてはいけない）');
+      // その後、通常ダメージで倒す
+      center.damage = e.effectiveHp(center);
+      e._checkTiming(() => {});
+      let guard = 0;
+      while (e.state.pending && guard++ < 10) e.apply(e.state.pending.options[0].id);
+      assertEq(p1.life.length, lifeBefore - 1, '後から通常ダメージで倒したのにライフが減っていない（フラグの残留）');
+    }
   });
 
   await testAsync('ターン修正: アーツ+20がエンドステップで消滅する', async () => {

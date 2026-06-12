@@ -283,7 +283,8 @@ export class EffectContext {
 
   /**
    * 特殊ダメージを与える (5.22)
-   * opts.noLifeOnDown: 「ただし、ダウンしても相手のライフは減らない」
+   * opts.noLifeOnDown: 「ただし、ダウンしても相手のライフは減らない」と記載がある場合のみ true。
+   * 記載がない特殊ダメージでダウンした場合、ライフは通常どおり減る。
    * 付いているファン等の特殊ダメージ修正（雪民など）は自動で加算される。
    */
   dealSpecialDamage(targetEntry, amount, opts = {}) {
@@ -293,7 +294,12 @@ export class EffectContext {
       total += this.engine.effects.specialDamageBonus(this.sourceHolomem, targetEntry, this.playerIdx);
     }
     targetEntry.holomem.damage += total;
-    if (opts.noLifeOnDown) targetEntry.holomem.noLifeOnDown = true;
+    // 「ライフは減らない」は、この特殊ダメージでダウンが確定した場合のみ適用する。
+    // （ダウンに至らなかった場合にフラグを残すと、後から別のダメージで倒された時まで
+    //   ライフが減らなくなってしまう）
+    if (opts.noLifeOnDown && targetEntry.holomem.damage >= this.engine.effectiveHp(targetEntry.holomem)) {
+      targetEntry.holomem.noLifeOnDown = true;
+    }
     this.log(
       `${targetEntry.top.name} に特殊ダメージ${total}` +
       `${opts.noLifeOnDown ? '（ダウンしてもライフは減らない）' : ''}` +
