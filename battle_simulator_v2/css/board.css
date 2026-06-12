@@ -165,8 +165,8 @@ html, body {
   background: #20223f;
   border: 1px solid rgba(255, 255, 255, 0.18);
   position: relative;
-  transition: filter 0.12s ease, box-shadow 0.12s ease;
   flex-shrink: 0;
+  cursor: pointer;
 }
 .card img {
   width: 100%; height: 100%;
@@ -175,9 +175,22 @@ html, body {
   display: block;
   pointer-events: none;
 }
-/* 盤上カードのホバーは「動かない」発光のみ（D&Dとの競合防止。z-index変更も
-   preserve-3d 配下では描画順再ソート→hover喪失→点滅の原因になるため行わない） */
-.scene .card:hover { filter: brightness(1.18); }
+/*
+ * 盤上カードのホバー演出について（重要・カーソル点滅対策）:
+ * 3D変形(preserve-3d)配下では transform / z-index / filter のホバー変更が
+ * ヒットテストの再計算を引き起こし、hover⇔非hover が振動してカーソルが点滅する。
+ * そのため発光は「描画ジオメトリに影響しない」オーバーレイ擬似要素の背景色のみで行う。
+ */
+.card::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  border-radius: 6px;
+  background: rgba(255, 255, 255, 0);
+  transition: background 0.12s ease;
+  pointer-events: none;
+}
+.scene .card:hover::after { background: rgba(255, 255, 255, 0.16); }
 .card.facedown {
   background-image: var(--sleeve);
   background-size: cover;
@@ -195,7 +208,7 @@ html, body {
 }
 .holomem-group.rested { transform: rotate(90deg) scale(0.92); }
 .holomem-group .holomem-main { position: relative; }
-.holomem-group:hover .holomem-main { filter: brightness(1.18); }
+.holomem-group:hover .holomem-main::after { background: rgba(255, 255, 255, 0.16); }
 
 /* Bloom元のカード: 上端を少しずつ見せて厚みを表現（ホバーでさらに広げる） */
 .stack-under {
@@ -226,15 +239,25 @@ html, body {
   pointer-events: none;
 }
 /* ミニカードのホバーも動かさない（拡大表示は左下のプレビューに任せる） */
-.mini-card:hover { filter: brightness(1.3); outline: 1px solid var(--accent); }
+.mini-card { cursor: pointer; }
+.mini-card::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  border-radius: 4px;
+  background: rgba(255, 255, 255, 0);
+  pointer-events: none;
+}
+.mini-card:hover::after { background: rgba(255, 255, 255, 0.22); }
 
 /* ドラッグ中は装飾のヒット判定を切り、ドロップ先の本体に通す */
 body.dragging .mini-card,
 body.dragging .stack-under,
 body.dragging .badge,
 body.dragging .pile-count { pointer-events: none; }
-body.dragging .scene .card:hover,
-body.dragging .holomem-group:hover .holomem-main { filter: none; }
+body.dragging .scene .card:hover::after,
+body.dragging .holomem-group:hover .holomem-main::after,
+body.dragging .mini-card:hover::after { background: rgba(255, 255, 255, 0); }
 body.dragging .holomem-group:hover .stack-under { transform: none !important; }
 body.dragging [data-drop].drop-ok { z-index: 60; }
 
@@ -371,8 +394,12 @@ body.dragging, body.dragging * { cursor: grabbing !important; }
   z-index: 20;
   max-width: 72%;
 }
-#hand .card { width: 104px; height: 145px; cursor: pointer; transition: transform 0.15s ease, filter 0.12s ease; }
-#hand .card:hover { transform: translateY(-24px) scale(1.1); }
+/* 手札: カード本体（ヒット判定）は動かさず、絵柄(img)だけ持ち上げる
+   （カードごと動かすとカーソル下から逃げて hover が点滅するため） */
+#hand .card { width: 104px; height: 145px; background: transparent; border: none; }
+#hand .card img { transition: transform 0.15s ease; }
+#hand .card:hover img { transform: translateY(-26px) scale(1.12); }
+#hand .card::after { display: none; }
 
 #opp-hand {
   position: absolute;

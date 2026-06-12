@@ -1,8 +1,8 @@
 // Version Management Configuration
 // このファイルはバージョンアップ時に更新されます
 
-const APP_VERSION = "4.17.0"; // Consolidated single bump from 4.11.10
-const VERSION_DESCRIPTION = "カードデータ大規模更新";
+const APP_VERSION = "4.18.0"; // バトルシミュレーターv2 追加 + SWキャッシュ整理
+const VERSION_DESCRIPTION = "バトルシミュレーターv2";
 
 // ✅ 各ページのバージョン情報を一元管理
 const PAGE_VERSIONS = {
