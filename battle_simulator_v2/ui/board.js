@@ -110,10 +110,16 @@ function holomemEl(holomem, sideIdx, zone, index, hooks) {
     mini.dataset.previewName = att.name;
   });
 
-  // ダメージバッジ
+  // HPバッジ（残りHP/最大HP。残量に応じて色が変わる）
   if (holomem.damage > 0) {
+    const top = holomem.stack[0];
+    const maxHp = top.hp ?? 0;
+    const remain = Math.max(0, maxHp - holomem.damage);
     const b = el('div', 'badge damage', group);
-    b.textContent = holomem.damage;
+    b.textContent = `${remain}/${maxHp}`;
+    const ratio = maxHp > 0 ? remain / maxHp : 0;
+    if (ratio <= 0.3) b.classList.add('hp-low');
+    else if (ratio <= 0.6) b.classList.add('hp-mid');
     b.style.zIndex = String(lower.length + 2);
   }
 
@@ -128,7 +134,7 @@ function holomemEl(holomem, sideIdx, zone, index, hooks) {
         ...(holomem.cheers.length ? [{ label: `エール (${holomem.cheers.length})`, cards: holomem.cheers }] : []),
         ...(holomem.attachments.length ? [{ label: 'サポート', cards: holomem.attachments }] : []),
       ],
-      note: `累計ダメージ: ${holomem.damage} / HP ${holomem.stack[0].hp ?? '-'}${holomem.rested ? '（お休み中）' : ''}`,
+      note: `残りHP: ${Math.max(0, (holomem.stack[0].hp ?? 0) - holomem.damage)}/${holomem.stack[0].hp ?? '-'}（累計ダメージ${holomem.damage}）${holomem.rested ? '（お休み中）' : ''}`,
     });
   });
 

@@ -138,8 +138,10 @@ html, body {
   gap: 16px;
   align-items: center;
   justify-content: center;
-  min-width: var(--card-w);
-  min-height: var(--card-h);
+  /* box-sizing: border-box のため余白12px+枠2pxを加算しておく。
+     こうしないと空のゾーンだけ枠が一回り小さくなる（配置時にサイズが変わって見える） */
+  min-width: calc(var(--card-w) + 14px);
+  min-height: calc(var(--card-h) + 14px);
   border: 1px dashed rgba(150, 160, 230, 0.3);
   border-radius: 8px;
   padding: 6px;
@@ -158,12 +160,12 @@ html, body {
 /* 配置は公式プレイシート準拠（battle_simulator/docs/RULES_SPEC.md §13）:
    ライフ=左上から下へ / コラボ・センター・推し=上段 / ホロパワー=右上角(横向き) /
    デッキ=右端中段 / アーカイブ=右下 / エールデッキ=左下 / バック=下段中央 */
-.zone.life      { left: 10px;  top: 46px;  flex-direction: column; gap: 0; border-style: solid; min-width: 104px; min-height: 130px; justify-content: flex-start; padding-top: 8px; }
+.zone.life      { left: 10px;  top: 46px;  flex-direction: column; gap: 0; border-style: solid; min-width: 110px; min-height: 216px; justify-content: flex-start; padding-top: 8px; }
 .zone.revealed  { left: 150px; top: 30px;  border-color: rgba(255, 220, 120, 0.7); border-style: solid; box-shadow: 0 0 18px rgba(255, 220, 120, 0.25); }
-.zone.collab    { left: 295px; top: 30px; }
-.zone.center    { left: 425px; top: 30px; }
-.zone.oshi      { left: 555px; top: 30px; }
-.zone.holopower { left: 845px; top: 10px;  min-width: 112px; min-height: 80px; }
+.zone.collab    { left: 280px; top: 30px; }
+.zone.center    { left: 460px; top: 30px; }
+.zone.oshi      { left: 640px; top: 30px; }
+.zone.holopower { left: 845px; top: 10px;  min-width: 114px; min-height: 86px; }
 .zone.deck      { left: 925px; top: 96px; }
 .zone.backs     { left: 225px; top: 240px; min-width: 560px; min-height: 142px; }
 .zone.cheerdeck { left: 12px;  top: 258px; }
@@ -281,7 +283,10 @@ body.dragging [data-drop].drop-ok { z-index: 60; }
   padding: 1px 6px;
   pointer-events: none;
 }
-.badge.damage { top: -8px; right: -7px; background: #c62828; color: #fff; font-weight: bold; }
+/* HPバッジ: 残量に応じて 緑→橙→赤 */
+.badge.damage { top: -8px; right: -7px; background: #2e7d32; color: #fff; font-weight: bold; }
+.badge.damage.hp-mid { background: #ef6c00; }
+.badge.damage.hp-low { background: #c62828; }
 .badge.cheers-more { bottom: -16px; left: -18px; background: #00695c; color: #fff; z-index: 5; }
 
 /* 相手側でもバッジ・枚数・ラベルは読める向きに戻す（カードは相手向きのまま） */
