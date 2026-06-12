@@ -1,0 +1,309 @@
+/**
+ * カード効果の実行コンテキスト
+ *
+ * 効果はジェネレータ関数 `function* run(ctx)` として実装する。
+ * プレイヤーの選択が必要な箇所では ctx.chooseXxx(...) を yield する:
+ *
+ *   *run(ctx) {
+ *     const card = yield ctx.chooseCard({ cards, title: '手札に加えるカード' });
+ *     if (card) { ... }
+ *   }
+ *
+ * yield された選択要求はエンジンが決定ポイント（pending）に変換し、
+ * プレイヤーの選択後にジェネレータを再開する。
+ * 選択を伴わない操作（draw, rollDice 等）は普通のメソッド呼び出しでよい。
+ *
+ * ルール条番号は battle_simulator/docs/RULES_SPEC.md / 総合ルール ver.1.9.0 参照。
+ */
+
+import { COLORLESS } from '../constants.js';
+import { rollDie } from '../rng.js';
+
+export class EffectContext {
+  /**
+   * @param {Engine} engine
+   * @param {number} playerIdx 効果のコントローラー
+   * @param {object} opts { sourceCard, sourceHolomem, artName }
+   */
+  constructor(engine, playerIdx, opts = {}) {
+    this.engine = engine;
+    this.playerIdx = playerIdx;
+    this.sourceCard = opts.sourceCard || null;
+    this.sourceHolomem = opts.sourceHolomem || null;
+  }
+
+  get player() { return this.engine.state.players[this.playerIdx]; }
+  get opponent() { return this.engine.state.players[1 - this.playerIdx]; }
+  get state() { return this.engine.state; }
+
+  log(msg) { this.engine.log(msg); }
+
+  // ============ 参照ヘルパー ============
+
+  /** 自分/相手のステージのホロメン一覧 [{pos, holomem, top}] */
+  holomems(side = 'self', filter = null) {
+    const p = side === 'self' ? this.player : this.opponent;
+    const out = [];
+    for (const pos of this.engine._stagePositions(p)) {
+      const holomem = this.engine._holomemAt(p, pos);
+      const top = holomem.stack[0];
+      if (!filter || filter({ pos, holomem, top })) out.push({ pos, holomem, top });
+    }
+    return out;
+  }
+
+  /** 名前一致（〈名称〉参照。追加カード名は未対応） */
+  nameIs(card, name) {
+    return card.name === name;
+  }
+
+  /** タグ保持判定（#ID など。タグ表記は "ID" のように # 無しで格納されている） */
+  hasTag(card, tag) {
+    const t = tag.replace(/^#/, '');
+    return (card.tags || []).includes(t);
+  }
+
+  /** ステージ上の自分のエールの色一覧（重複なし） */
+  ownStageCheerColors() {
+    const colors = new Set();
+    for (const { holomem } of this.holomems('self')) {
+      for (const cheer of holomem.cheers) {
+        if (cheer.color && cheer.color !== COLORLESS) colors.add(cheer.color);
+      }
+    }
+    return [...colors];
+  }
+
+  // ============ 選択要求（yield して使う） ============
+
+  /**
+   * カードを1枚選ぶ。optional なら「選ばない」も可（null が返る）。
+   * cards: 正規化済みカードの配列
+   */
+  chooseCard({ cards, title, optional = false, skipLabel = '選ばない' }) {
+    return {
+      kind: 'chooseCard',
+      player: this.playerIdx,
+      title,
+      buildOptions: () => [
+        ...cards.map((c, i) => ({ id: `card_${i}`, label: c.name, card: c, value: c })),
+        ...(optional ? [{ id: 'skip', label: skipLabel, value: null }] : []),
+      ],
+    };
+  }
+
+  /** 自分/相手のホロメンを1人選ぶ（filter適用後）。optional 可 */
+  chooseHolomem({ side = 'self', filter = null, title, optional = false }) {
+    const entries = this.holomems(side, filter);
+    return {
+      kind: 'chooseHolomem',
+      player: this.playerIdx,
+      title,
+      buildOptions: () => [
+        ...entries.map((e, i) => ({
+          id: `mem_${e.pos.zone}_${e.pos.index}`,
+          label: `${e.top.name}（${e.pos.zone === 'center' ? 'センター' : e.pos.zone === 'collab' ? 'コラボ' : 'バック'}${side === 'opp' ? '/相手' : ''}）`,
+          value: e,
+          pos: e.pos,
+          side,
+        })),
+        ...(optional ? [{ id: 'skip', label: '選ばない', value: null }] : []),
+      ],
+    };
+  }
+
+  /** はい/いいえ の確認（任意効果「～できる」用） */
+  confirm(title, yesLabel = '発動する', noLabel = '発動しない') {
+    return {
+      kind: 'confirm',
+      player: this.playerIdx,
+      title,
+      buildOptions: () => [
+        { id: 'yes', label: yesLabel, value: true },
+        { id: 'no', label: noLabel, value: false },
+      ],
+    };
+  }
+
+  // ============ 基本操作（同期） ============
+
+  /** デッキからN枚引く (5.7) */
+  draw(n) {
+    const drawn = [];
+    for (let i = 0; i < n && this.player.deck.length > 0; i++) {
+      const c = this.player.deck.shift();
+      this.player.hand.push(c);
+      drawn.push(c);
+    }
+    this.log(`${this.player.name}: ${drawn.length}枚ドロー（${drawn.map((c) => c.name).join(' / ')}）`);
+    return drawn;
+  }
+
+  /** サイコロを1個振る (5.24) */
+  rollDice() {
+    const value = rollDie(this.engine.rng);
+    this.log(`🎲 サイコロ: ${value}`);
+    return value;
+  }
+
+  /** デッキをシャッフルする (5.6) */
+  shuffleDeck() {
+    this.engine._shuffle(this.player.deck);
+    this.log(`${this.player.name}: デッキをシャッフル`);
+  }
+
+  shuffleCheerDeck() {
+    this.engine._shuffle(this.player.cheerDeck);
+    this.log(`${this.player.name}: エールデッキをシャッフル`);
+  }
+
+  /** デッキ内の条件一致カード一覧（非公開領域なので「見つからない」選択も保証される） */
+  deckCards(filter) {
+    return this.player.deck.filter(filter);
+  }
+
+  /** デッキから特定カードを取り除く（移動前処理） */
+  removeFromDeck(card) {
+    const i = this.player.deck.indexOf(card);
+    if (i !== -1) this.player.deck.splice(i, 1);
+  }
+
+  removeFromHand(card) {
+    const i = this.player.hand.indexOf(card);
+    if (i !== -1) this.player.hand.splice(i, 1);
+  }
+
+  /** カードを手札に加える（公開ログ付き）。公開中(revealed)にあれば取り除く */
+  addToHand(card, { reveal = true } = {}) {
+    this._unreveal(card);
+    this.player.hand.push(card);
+    if (reveal) this.log(`${this.player.name}: ${card.name} を公開し手札に加えた`);
+  }
+
+  /**
+   * デッキの上からN枚を見る。
+   * 見ている間は解決領域（revealed）に置く（カードがどの領域にも属さない瞬間を作らない）。
+   * 使い終わったら deckToBottom / addToHand 等で必ず移動させること。
+   */
+  lookTopDeck(n) {
+    const cards = this.player.deck.splice(0, Math.min(n, this.player.deck.length));
+    this.player.revealed.push(...cards);
+    this.log(`${this.player.name}: デッキの上から${cards.length}枚を見る`);
+    return cards;
+  }
+
+  /** カードをデッキの下に戻す（公開中にあれば取り除く） */
+  deckToBottom(cards) {
+    for (const c of cards) this._unreveal(c);
+    this.player.deck.push(...cards);
+  }
+
+  _unreveal(card) {
+    const i = this.player.revealed.indexOf(card);
+    if (i !== -1) this.player.revealed.splice(i, 1);
+  }
+
+  /** 手札を全てデッキに戻す（シャッフルは別途） */
+  returnHandToDeck() {
+    const n = this.player.hand.length;
+    this.player.deck.push(...this.player.hand);
+    this.player.hand = [];
+    this.log(`${this.player.name}: 手札${n}枚をデッキに戻した`);
+  }
+
+  /** ホロメンをバックに出す（ステージ上限チェック付き） */
+  putToBack(card) {
+    if (this.engine._stageCount(this.player) >= 6) return false;
+    this.player.back.push(this.engine._createHolomem(card, this.state.turn));
+    this.log(`${this.player.name}: ${card.name} をステージに出した`);
+    return true;
+  }
+
+  /** エールをホロメンに付ける（送る 5.21） */
+  attachCheer(cheer, holomem) {
+    holomem.cheers.push(cheer);
+    this.log(`${holomem.stack[0].name} に ${cheer.name} を送った`);
+  }
+
+  /** サポートカード（ファン/マスコット等）をホロメンに付ける */
+  attachSupport(card, holomem) {
+    holomem.attachments.push(card);
+    this.log(`${holomem.stack[0].name} に ${card.name} を付けた`);
+  }
+
+  /** エールデッキから特定カードを取り除く */
+  removeFromCheerDeck(card) {
+    const i = this.player.cheerDeck.indexOf(card);
+    if (i !== -1) this.player.cheerDeck.splice(i, 1);
+  }
+
+  /** エールデッキの上から1枚公開してホロメンに送る (5.21.2) */
+  sendCheerFromCheerDeckTop(holomem) {
+    if (this.player.cheerDeck.length === 0) return null;
+    const cheer = this.player.cheerDeck.shift();
+    this.log(`${this.player.name}: エールデッキから ${cheer.name} を公開`);
+    this.attachCheer(cheer, holomem);
+    return cheer;
+  }
+
+  /** アーカイブからカードを取り除く */
+  removeFromArchive(card) {
+    const i = this.player.archive.indexOf(card);
+    if (i !== -1) this.player.archive.splice(i, 1);
+  }
+
+  /** ホロメンに付いているエールを1枚アーカイブする */
+  archiveCheer(holomem, cheer) {
+    const i = holomem.cheers.indexOf(cheer);
+    if (i !== -1) {
+      holomem.cheers.splice(i, 1);
+      this.player.archive.push(cheer);
+      this.log(`${holomem.stack[0].name} の ${cheer.name} をアーカイブ`);
+    }
+  }
+
+  /** エールを別のホロメンへ付け替える (5.17.4) */
+  moveCheer(cheer, fromHolomem, toHolomem) {
+    const i = fromHolomem.cheers.indexOf(cheer);
+    if (i !== -1) {
+      fromHolomem.cheers.splice(i, 1);
+      toHolomem.cheers.push(cheer);
+      this.log(`${cheer.name} を ${toHolomem.stack[0].name} に付け替えた`);
+    }
+  }
+
+  /** HPを回復する (5.23) */
+  heal(holomem, n) {
+    const before = holomem.damage;
+    holomem.damage = Math.max(0, holomem.damage - n);
+    if (before !== holomem.damage) {
+      this.log(`${holomem.stack[0].name} のHPを${before - holomem.damage}回復`);
+    }
+  }
+
+  /**
+   * 特殊ダメージを与える (5.22)
+   * opts.noLifeOnDown: 「ただし、ダウンしても相手のライフは減らない」
+   * 付いているファン等の特殊ダメージ修正（雪民など）は自動で加算される。
+   */
+  dealSpecialDamage(targetEntry, amount, opts = {}) {
+    let total = amount;
+    // 発生源ホロメンの装着カードによる特殊ダメージ修正
+    if (this.sourceHolomem) {
+      total += this.engine.effects.specialDamageBonus(this.sourceHolomem, targetEntry, this.playerIdx);
+    }
+    targetEntry.holomem.damage += total;
+    if (opts.noLifeOnDown) targetEntry.holomem.noLifeOnDown = true;
+    this.log(
+      `${targetEntry.top.name} に特殊ダメージ${total}` +
+      `${opts.noLifeOnDown ? '（ダウンしてもライフは減らない）' : ''}` +
+      `（累計${targetEntry.holomem.damage}/${this.engine.effectiveHp(targetEntry.holomem)}）`
+    );
+  }
+
+  /** ターン終了まで有効な修正を追加（「このターンの間～」） */
+  addTurnModifier(mod) {
+    this.engine.state.modifiers.push({ duration: 'turn', ...mod });
+    this.log(`継続効果: ${mod.description || mod.kind}`);
+  }
+}

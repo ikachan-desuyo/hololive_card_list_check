@@ -50,7 +50,7 @@ class ScalableCardEffectManager {
     
     try {
       // card_data.jsonを一度だけ読み込み
-      const response = await fetch('/json_file/card_data.json');
+      const response = await fetch('json_file/card_data.json');
       this.cachedCardData = await response.json();
       
       console.log('📋 基本カードデータを読み込みました');
@@ -181,7 +181,7 @@ class ScalableCardEffectManager {
         card = this.cachedCardData[cardId];
       } else {
         // フォールバック: 個別読み込み
-        const response = await fetch('/json_file/card_data.json');
+        const response = await fetch('json_file/card_data.json');
         const cardData = await response.json();
         card = cardData[cardId];
       }
@@ -208,16 +208,18 @@ class ScalableCardEffectManager {
    * カスタム効果があるかの検出
    */
   async detectCustomEffect(card) {
-    // ファイル名を正規化してファイル存在チェック
     const cardNumber = this.normalizeFileId(card.number || card.id);
     if (!cardNumber) return false;
-    
-    const scriptPath = `/battle_simulator/card-effects/cards/${cardNumber}.js`;
-    
+
+    // 静的インデックス（cards/implemented-cards.js）があればネットワークアクセス不要
+    if (Array.isArray(window.IMPLEMENTED_CARD_EFFECTS)) {
+      return window.IMPLEMENTED_CARD_EFFECTS.includes(cardNumber);
+    }
+
+    // フォールバック: HEAD fetch でファイル存在チェック
+    const scriptPath = `battle_simulator/card-effects/cards/${cardNumber}.js`;
     try {
-      // ファイル存在チェック
-      const fileExists = await this.checkFileExists(scriptPath);
-      return fileExists;
+      return await this.checkFileExists(scriptPath);
     } catch (error) {
       return false;
     }
@@ -270,31 +272,14 @@ class ScalableCardEffectManager {
 
   /**
    * 効果パターンテンプレートの登録
+   *
+   * TODO(Phase 4): 汎用パターン効果（deck_search / card_draw / limited_support）を
+   * card-effect-utils.js ベースで実装する。
+   * 旧実装は executeDeckSearch() 等の未定義メソッドを呼んでおり実行時に必ず失敗していたため、
+   * 実装が用意できるまでパターン登録は行わない（カスタム効果が無いカードは「効果未実装」になる）。
    */
   registerEffectPatterns() {
-    // デッキ検索パターン
-    this.effectPatterns.set('deck_search', {
-      template: 'DeckSearchTemplate',
-      async execute(card, context, battleEngine) {
-        return await this.executeDeckSearch(card, context, battleEngine);
-      }
-    });
-
-    // カードドローパターン
-    this.effectPatterns.set('card_draw', {
-      template: 'CardDrawTemplate',
-      async execute(card, context, battleEngine) {
-        return await this.executeCardDraw(card, context, battleEngine);
-      }
-    });
-
-    // 汎用サポートパターン
-    this.effectPatterns.set('limited_support', {
-      template: 'LimitedSupportTemplate',
-      async execute(card, context, battleEngine) {
-        return await this.executeLimitedSupport(card, context, battleEngine);
-      }
-    });
+    // 現状、登録するパターン効果なし
   }
 
   /**
@@ -315,21 +300,6 @@ class ScalableCardEffectManager {
     }
 
     console.log(`✅ デッキカード事前読み込み完了`);
-  }
-
-  /**
-   * 高頻度カードの事前読み込み（旧システム用）
-   */
-  async preloadCommonCards() {
-    // 優先度の高いカードを事前読み込み
-    const highPriorityCards = Array.from(this.cardMetadata.values())
-      .filter(meta => meta.loadPriority >= 5)
-      .sort((a, b) => b.loadPriority - a.loadPriority)
-      .slice(0, this.batchSize);
-
-    for (const meta of highPriorityCards) {
-      await this.loadCardEffect(meta.id);
-    }
   }
 
   /**
@@ -356,7 +326,7 @@ class ScalableCardEffectManager {
 
       if (effect) {
         this.effectRegistry.set(cardId, effect);
-        this.loadedEffects.add(cardId);
+        this.loadedEffects.set(cardId, effect);
       }
 
       return effect;
@@ -395,7 +365,7 @@ class ScalableCardEffectManager {
   registerCardEffect(cardId, effect) {
     const normalizedId = this.normalizeCardId(cardId);
     this.effectRegistry.set(normalizedId, effect);
-    this.loadedEffects.add(normalizedId);
+    this.loadedEffects.set(normalizedId, effect);
   }
 
   /**
@@ -431,7 +401,7 @@ class ScalableCardEffectManager {
   async loadCustomEffect(cardId) {
     // ファイル名を正規化 (例: hBP04-089_U_02 → hBP04-089)
     const fileName = this.normalizeFileId(cardId);
-    const scriptPath = `/battle_simulator/card-effects/cards/${fileName}.js`;
+    const scriptPath = `battle_simulator/card-effects/cards/${fileName}.js`;
 
     try {
       // 既にwindow.cardEffectsに登録済みかチェック（最優先）
@@ -453,8 +423,10 @@ class ScalableCardEffectManager {
         return this.getEffectFromGlobal(cardId);
       }
 
-      // ファイル存在チェック
-      const fileExists = await this.checkFileExists(scriptPath);
+      // ファイル存在チェック（静的インデックス優先、無ければ HEAD fetch）
+      const fileExists = Array.isArray(window.IMPLEMENTED_CARD_EFFECTS)
+        ? window.IMPLEMENTED_CARD_EFFECTS.includes(fileName)
+        : await this.checkFileExists(scriptPath);
       if (!fileExists) {
         return null;
       }

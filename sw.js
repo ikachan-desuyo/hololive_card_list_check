@@ -188,6 +188,17 @@ self.addEventListener('fetch', function(event) {
     return;
   }
 
+  // バトルシミュレーターv2 は開発中のためキャッシュを使わず常に最新を取得する
+  // （Cache First だと修正がブラウザに反映されず開発が破綻する）
+  if (event.request.url.includes('battle_simulator_v2')) {
+    event.respondWith(
+      fetch(event.request, { cache: 'no-store' }).catch(function() {
+        return caches.match(event.request);
+      })
+    );
+    return;
+  }
+
   // HTMLファイルに対してはNetwork First戦略を使用
   const isHTMLFile = event.request.url.endsWith('.html') || 
                      event.request.url === self.location.origin + '/' ||

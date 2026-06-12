@@ -63,50 +63,61 @@ const CustomCard = {
 
 ## 実装手順
 
-### 1. カードメタデータの登録
-`card-metadata.js`にカード情報を追加します：
+> ⚠️ 2026-06 更新: 旧手順（card-metadata.js / CardEffectBuilder）は廃止されました。
+> 現在は「カードID.js を作成 → implemented-cards.js に登録」の2ステップです。
+
+### 1. カード効果ファイルの作成
+
+`cards/<カードID>.js` を作成します（既存の `cards/hSD01-016.js` 等が実例）：
 
 ```javascript
-'your_card_id': {
-  pattern: EFFECT_PATTERNS.SIMPLE_DRAW,  // 効果パターン
-  complexity: 'low',                     // 複雑さ
-  tags: ['draw', 'basic'],              // タグ
-  description: 'カードの説明',
-  effectConfig: {
-    drawCount: 2,
-    conditions: []
+/**
+ * <カードID> - カード効果定義
+ * <カード名> (<カードタイプ>)
+ */
+const cardEffect_カードID = {  // 例: cardEffect_hSD01_016（"-" は "_" に置換）
+  cardId: '<カードID>',
+  cardName: '<カード名>',
+  cardType: '<カードタイプ>',
+
+  effects: {
+    supportEffect: {
+      type: 'support',          // support / bloom / collab / art など
+      name: '<効果名>',
+      description: '<効果テキスト>',
+      timing: 'manual',         // manual（手動発動）/ auto（自動発動）
+      limited: false,           // LIMITED効果なら true
+      condition: (card, gameState, battleEngine) => {
+        return battleEngine.gameState.currentPhase === 3; // 発動条件
+      },
+      effect: async (card, battleEngine) => {
+        const utils = new CardEffectUtils(battleEngine);
+        // utils.drawCards() などで効果を実装
+        return { success: true, message: '効果を実行しました' };
+      }
+    }
   }
-}
-```
-
-### 2. 効果の実装
-実装方法を選択：
-
-#### A) CardEffectBuilder を使用（推奨）
-```javascript
-const MyCard = new CardEffectBuilder('card_id', 'カード名')
-  .addCondition('phase', { phase: 3 })
-  .addEffect('draw', { count: 2 })
-  .build();
-```
-
-#### B) 直接実装
-```javascript
-const MyCard = {
-  cardId: 'card_id',
-  name: 'カード名',
-  canActivate: (card, context, battleEngine) => { /* 条件 */ },
-  execute: async (card, context, battleEngine) => { /* 効果 */ }
 };
+
+// 登録（このブロックは全カード共通の定型）
+if (window.cardEffects) {
+  window.cardEffects['<カードID>'] = cardEffect_カードID;
+} else {
+  window.pendingCardEffects = window.pendingCardEffects || [];
+  window.pendingCardEffects.push({ cardId: '<カードID>', effect: cardEffect_カードID });
+}
+window.cardEffect_カードID = cardEffect_カードID;
 ```
 
-### 3. グローバル登録
-```javascript
-if (typeof window !== 'undefined') {
-  if (!window.cardEffects) window.cardEffects = {};
-  window.cardEffects['card_id'] = MyCard;
-}
-```
+### 2. 実装済みインデックスへの登録
+
+`cards/implemented-cards.js` の `window.IMPLEMENTED_CARD_EFFECTS` 配列にカードIDを追加します。
+**これを忘れると効果ファイルが動的読み込みされません。**
+
+### 3. 動作確認
+
+- `test-effects.html` の `testCards` 配列にIDを追加してブラウザで実行
+- `scripts/tools/smoke-test-battle-sim.ps1` でページ全体の読み込みを確認
 
 ## 利用可能なユーティリティメソッド
 

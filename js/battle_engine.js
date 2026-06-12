@@ -76,8 +76,9 @@ class HololiveBattleEngine {
       this.cardEffectManager = null;
     }
 
-    this.initializeGame();
-    
+    // 注意: initializeGame() はここでは呼ばない。
+    // DOMContentLoaded ハンドラ側で await 付きで一度だけ実行される（二重初期化防止）
+
     // カード表示管理の初期化
     this.cardDisplayManager = new CardDisplayManager(this);
     
@@ -3939,6 +3940,8 @@ document.addEventListener('DOMContentLoaded', async () => {
       try {
         battleEngine = new HololiveBattleEngine();
         window.battleEngine = battleEngine;
+        battleEngine.initializeGame().catch(e =>
+          console.error('💥 [Battle Engine] フォールバック初期化失敗:', e));
       } catch (e) {
         console.error('💥 [Battle Engine] インスタンス作成も失敗:', e);
       }
