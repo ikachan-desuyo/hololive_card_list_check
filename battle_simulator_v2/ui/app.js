@@ -287,10 +287,18 @@ function setupDnDListeners() {
   });
 
   // ドラッグ直後の click はインスペクタ等を開かない（capture で握りつぶす）
+  // 効果のホロメン選択（choice-target）はインスペクタより優先してここで処理する
   screen.addEventListener('click', (e) => {
     if (Date.now() - dragEndedAt < 150) {
       e.stopPropagation();
       e.preventDefault();
+      return;
+    }
+    const target = e.target.closest?.('[data-choice-id]');
+    if (target) {
+      e.stopPropagation();
+      e.preventDefault();
+      engine.apply(target.dataset.choiceId);
     }
   }, true);
 }
@@ -570,17 +578,57 @@ function render() {
   handleStepPause(s);
 }
 
-/** 効果のカード選択モーダル（デッキサーチ等） */
+/**
+ * 効果の選択UI。種類ごとに最も直感的な方法で提示する:
+ *  - chooseCard    → カード画像のグリッドモーダル（クリックで選択）
+ *  - chooseHolomem → 盤面の対象ホロメンを金色に光らせ、直接クリックで選択
+ *  - confirm など  → 中央のダイアログ（ボタン）
+ */
 function renderEffectChoiceModal(s) {
   const modal = document.getElementById('choice-modal');
-  const isCardChoice = s.pending?.type === 'effectChoice' && s.pending.request?.kind === 'chooseCard';
-  if (!isCardChoice) {
+  const bar = document.getElementById('choice-bar');
+  const isEffect = s.pending?.type === 'effectChoice';
+  const kind = isEffect ? s.pending.request?.kind : null;
+
+  // --- 盤面クリック選択（chooseHolomem） ---
+  if (kind === 'chooseHolomem') {
+    modal.classList.remove('active');
+    const skipOptions = [];
+    for (const opt of s.pending.options) {
+      if (!opt.pos) {
+        skipOptions.push(opt);
+        continue;
+      }
+      const sideIdx = opt.side === 'opp' ? 1 - s.pending.player : s.pending.player;
+      const el = document.querySelector(`[data-drop="${sideIdx}:mem:${opt.pos.zone}:${opt.pos.index}"]`);
+      if (el) {
+        el.classList.add('choice-target');
+        el.dataset.choiceId = opt.id;
+      }
+    }
+    bar.innerHTML = '';
+    const label = document.createElement('span');
+    label.textContent = `👆 ${s.pending.request.title || 'ホロメンを選択'}（光っているカードをクリック）`;
+    bar.appendChild(label);
+    for (const opt of skipOptions) {
+      const btn = document.createElement('button');
+      btn.textContent = opt.label;
+      btn.addEventListener('click', () => engine.apply(opt.id));
+      bar.appendChild(btn);
+    }
+    bar.classList.add('active');
+    return;
+  }
+  bar.classList.remove('active');
+
+  // --- モーダル（chooseCard / confirm 等） ---
+  if (!isEffect) {
     modal.classList.remove('active');
     return;
   }
   modal.classList.add('active');
   document.getElementById('choice-title').textContent =
-    `${s.players[s.pending.player].name}: ${s.pending.request.title || 'カードを選択'}`;
+    `${s.players[s.pending.player].name}: ${s.pending.request.title || '選択してください'}`;
   const grid = document.getElementById('choice-grid');
   grid.innerHTML = '';
   const footer = document.getElementById('choice-footer');
@@ -640,8 +688,8 @@ function renderActions(s) {
   hint.textContent = pendingHint(s.pending);
   box.appendChild(hint);
 
-  // カード選択はモーダルで行うため、ここではボタンを出さない
-  if (s.pending.type === 'effectChoice' && s.pending.request?.kind === 'chooseCard') {
+  // 効果の選択はモーダル/盤面クリックで行うため、ここではボタンを出さない
+  if (s.pending.type === 'effectChoice') {
     return;
   }
 
