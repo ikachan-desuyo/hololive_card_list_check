@@ -434,6 +434,8 @@ function setupModals() {
 const hooks = {
   onInspect: (data) => showInspector(data),
   onArchive: (sideIdx) => showArchive(sideIdx),
+  // HP表示は装着カード等の修正込みの実効値を使う（基礎HPだと「0なのに生きてる」表示になる）
+  effectiveHp: (holomem) => engine.effectiveHp(holomem),
 };
 
 /**

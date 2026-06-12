@@ -562,15 +562,89 @@ export async function runTests() {
     assertEq(p0.hand.length, handBefore + 1, '手札が1枚（雪民）増えているはず');
   });
 
+  await testAsync('バックのホロメンも特殊ダメージでダウンする（回帰）', async () => {
+    const e = await setupMainStep(deckMap, 71);
+    const s = e.state;
+    const p1 = s.players[1];
+    // 相手バックにホロメン2人（全滅回避用に1人余分に）
+    p1.back.push(e._createHolomem(lib.get('hBP02-042_C'), 1)); // HP130
+    p1.back.push(e._createHolomem(lib.get('hBP04-043_C'), 1));
+    const backH = p1.back[0];
+    const archiveBefore = p1.archive.length;
+    const ctx = new EffectContext(e, 0, {});
+    ctx.dealSpecialDamage({ pos: { zone: 'back', index: 0 }, holomem: backH, top: backH.stack[0] }, 130);
+    s.pending = null;
+    e._checkTiming(() => {});
+    let guard = 0;
+    while (s.pending && guard++ < 10) e.apply(s.pending.options[0].id);
+    assert(!p1.back.includes(backH), 'バックのホロメンがダウンしていない');
+    assert(p1.archive.length > archiveBefore, 'ダウンしたカードがアーカイブされていない');
+  });
+
+  await testAsync('HP修正付きホロメンは基礎HP超のダメージでも実効HP未満なら生存', async () => {
+    const e = await setupMainStep(deckMap, 72);
+    const s = e.state;
+    const p1 = s.players[1];
+    const lamy = e._createHolomem(lib.get('hBP04-043_C'), 1); // HP90
+    lamy.attachments.push(lib.get('hBP04-101_C'));            // だいふく: ラミィならHP+20
+    p1.back.push(lamy);
+    lamy.damage = 100; // 基礎HP(90)超・実効HP(110)未満
+    s.pending = null;
+    e._checkTiming(() => {});
+    assert(p1.back.includes(lamy), '実効HP未満なのにダウンしてしまった');
+    lamy.damage = 110; // 実効HP到達
+    e._checkTiming(() => {});
+    let guard = 0;
+    while (s.pending && guard++ < 10) e.apply(s.pending.options[0].id);
+    assert(!p1.back.includes(lamy), '実効HP到達でダウンしていない');
+  });
+
   // ---- 第2デッキ（あの青空のせいだ: オリー/イオフィ/レイネ）----
 
+  const res2 = await fetch('../../battle_simulator/test_deck/' + encodeURIComponent('あの青空のせいだ.json'));
+  const deckMap2 = await res2.json();
+
   await testAsync('ランダムプレイアウト（あの青空のせいだ）×3シード', async () => {
-    const res2 = await fetch('../../battle_simulator/test_deck/' + encodeURIComponent('あの青空のせいだ.json'));
-    const deckMap2 = await res2.json();
     for (const seed of [61, 62, 63]) {
       const { engine, applies } = await randomPlayout(lib, deckMap2, seed);
       assert(engine.state.phase === 'ended', `seed=${seed}: ${applies}手で決着しなかった`);
     }
+  });
+
+  await testAsync('AREA 15: 「1枚ずつを1～3人に」= 同じホロメンに2枚送れない', async () => {
+    const d0 = lib.buildGameDeck(deckMap2);
+    const d1 = lib.buildGameDeck(deckMap2);
+    const registry = await buildRegistry(lib, deckMap2);
+    const e = new Engine({ decks: [d0, d1], seed: 81, firstPlayer: 0, names: ['P1', 'P2'], registry });
+    e.start();
+    while (e.state.pending && e.state.phase === 'setup') {
+      const pd = e.state.pending;
+      if (pd.type === 'redraw') e.apply('no');
+      else if (pd.type === 'placementBack') e.apply('done');
+      else e.apply(pd.options[0].id);
+    }
+    const p0 = e.state.players[0];
+    // #IDホロメン2人をステージに用意（エール0枚から開始）
+    const iofi2nd = e._createHolomem(lib.get('hBP01-055_R'), 1);
+    const reine = e._createHolomem(lib.get('hBP02-018_C'), 1);
+    p0.center = iofi2nd;
+    p0.back = [reine];
+    p0.collab = null;
+    // アーカイブにエール3枚
+    p0.archive.push(...p0.cheerDeck.splice(0, 3));
+    // AREA 15 を直接実行（常に最初の選択肢を選ぶ = 毎回同じ対象を選ぼうとする）
+    const def = registry.get('hBP01-055');
+    let finished = false;
+    e._runEffect(def.collabEffect, { playerIdx: 0, sourceCard: iofi2nd.stack[0], sourceHolomem: iofi2nd }, () => { finished = true; });
+    let guard = 0;
+    while (!finished && e.state.pending && guard++ < 20) {
+      e.apply(e.state.pending.options[0].id);
+    }
+    assert(finished, 'AREA 15 が完了しなかった');
+    // 2人とも最大1枚ずつしか付いていないこと
+    assert(iofi2nd.cheers.length <= 1, `同じホロメンに${iofi2nd.cheers.length}枚送られた（イオフィ）`);
+    assert(reine.cheers.length <= 1, `同じホロメンに${reine.cheers.length}枚送られた（レイネ）`);
+    assertEq(iofi2nd.cheers.length + reine.cheers.length, 2, '2人に1枚ずつ（計2枚）送られるはず');
   });
 
   // ---- 結果出力 ----
