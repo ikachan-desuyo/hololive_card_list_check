@@ -1,7 +1,14 @@
 /**
  * 盤面レンダリング（エンジンの state → DOM）
- * 毎回フル再描画するシンプルな実装（カード枚数は高々数十なので十分軽い）
+ *
+ * 毎回フル再描画するシンプルな実装。
+ * - ドラッグ&ドロップ用の識別子を data 属性で付与する:
+ *     data-src  = "side:zone:index"（掴める対象。例 "0:hand:2", "0:back:1", "0:center:0"）
+ *     data-drop = "side:zone:..."（落とせる場所。例 "0:zone:back", "1:mem:center:0"）
+ * - クリックでカード詳細（インスペクタ）を開くため hooks.onInspect を呼ぶ
  */
+
+const SLEEVE = 'images/card_sleeve.jpg'; // 公式カード裏面
 
 function el(tag, className, parent) {
   const e = document.createElement(tag);
@@ -10,114 +17,236 @@ function el(tag, className, parent) {
   return e;
 }
 
+/** 山札系の「厚み」: 枚数に応じた多段シャドウ */
+function stackShadow(count) {
+  const layers = Math.min(8, Math.ceil(count / 6));
+  const shadows = [];
+  for (let i = 1; i <= layers; i++) {
+    shadows.push(`${i * 1.5}px ${i * 1.5}px 0 rgba(8, 9, 20, 0.9)`);
+  }
+  return shadows.join(', ');
+}
+
 function cardEl(card, opts = {}) {
   const e = el('div', 'card');
-  if (opts.faceDown) {
+  if (opts.faceDown || !card) {
     e.classList.add('facedown');
-  } else if (card?.imageUrl) {
-    const img = document.createElement('img');
-    img.src = card.imageUrl;
-    img.alt = card.name;
-    img.loading = 'lazy';
-    e.appendChild(img);
-  }
-  if (card && !opts.faceDown) {
+  } else {
+    if (card.imageUrl) {
+      const img = document.createElement('img');
+      img.src = card.imageUrl;
+      img.alt = card.name;
+      img.loading = 'lazy';
+      img.draggable = false;
+      e.appendChild(img);
+    }
     e.dataset.preview = card.imageUrl || '';
     e.dataset.previewName = card.name;
   }
-  if (opts.rested) e.classList.add('rested');
   return e;
 }
 
-function holomemEl(holomem) {
-  const top = holomem.stack[0];
-  const e = cardEl(top, { faceDown: holomem.faceDown, rested: holomem.rested });
-  e.classList.add('holomem');
-  if (holomem.stack.length > 1) {
-    e.classList.add('stack-badge');
-    e.dataset.count = holomem.stack.length;
+/** ステージのホロメン1人（スタックの厚み・エール・付けたサポートを可視化） */
+function holomemEl(holomem, sideIdx, zone, index, hooks) {
+  const group = el('div', 'holomem-group');
+  group.dataset.drop = `${sideIdx}:mem:${zone}:${index}`;
+  group.dataset.src = `${sideIdx}:${zone}:${index}`;
+  if (holomem.rested) group.classList.add('rested');
+
+  // 重なっている下のカード（Bloom元）: 上端を少しずつ見せて厚みを出す
+  const lower = holomem.stack.slice(1);
+  lower.forEach((card, i) => {
+    const under = cardEl(card, { faceDown: holomem.faceDown });
+    under.classList.add('stack-under');
+    under.style.transform = `translateY(${-7 * (lower.length - i)}px)`;
+    under.style.zIndex = String(i);
+    group.appendChild(under);
+  });
+
+  // 本体（一番上のカード）
+  const main = cardEl(holomem.stack[0], { faceDown: holomem.faceDown });
+  main.classList.add('holomem-main');
+  main.style.zIndex = String(lower.length + 1);
+  group.appendChild(main);
+
+  // 付いているエール（左下にファン状に見せる）
+  const showCheers = holomem.cheers.slice(0, 6);
+  showCheers.forEach((cheer, i) => {
+    const mini = el('div', 'mini-card cheer-mini', group);
+    if (cheer.imageUrl) {
+      const img = document.createElement('img');
+      img.src = cheer.imageUrl;
+      img.alt = cheer.name;
+      img.draggable = false;
+      mini.appendChild(img);
+    }
+    mini.style.left = `${-14 - i * 13}px`;
+    mini.style.bottom = `${-12 + i * 3}px`;
+    mini.style.transform = `rotate(${-8 - i * 6}deg)`;
+    mini.style.zIndex = String(-1 - i);
+    mini.dataset.preview = cheer.imageUrl || '';
+    mini.dataset.previewName = cheer.name;
+  });
+  if (holomem.cheers.length > 6) {
+    const more = el('div', 'badge cheers-more', group);
+    more.textContent = `+${holomem.cheers.length - 6}`;
   }
+
+  // 付いているサポート（ツール/マスコット/ファン: 右下にファン状）
+  holomem.attachments.slice(0, 4).forEach((att, i) => {
+    const mini = el('div', 'mini-card attach-mini', group);
+    if (att.imageUrl) {
+      const img = document.createElement('img');
+      img.src = att.imageUrl;
+      img.alt = att.name;
+      img.draggable = false;
+      mini.appendChild(img);
+    }
+    mini.style.right = `${-14 - i * 13}px`;
+    mini.style.bottom = `${-12 + i * 3}px`;
+    mini.style.transform = `rotate(${8 + i * 6}deg)`;
+    mini.style.zIndex = String(-1 - i);
+    mini.dataset.preview = att.imageUrl || '';
+    mini.dataset.previewName = att.name;
+  });
+
+  // ダメージバッジ
   if (holomem.damage > 0) {
-    const b = el('div', 'badge damage', e);
+    const b = el('div', 'badge damage', group);
     b.textContent = holomem.damage;
+    b.style.zIndex = String(lower.length + 2);
   }
-  if (holomem.cheers.length > 0) {
-    const b = el('div', 'badge cheers', e);
-    b.textContent = `エール${holomem.cheers.length}`;
-    b.title = holomem.cheers.map((c) => c.name).join(' / ');
-  }
-  if (holomem.attachments.length > 0) {
-    const b = el('div', 'badge attach', e);
-    b.textContent = `+${holomem.attachments.length}`;
-    b.title = holomem.attachments.map((c) => c.name).join(' / ');
-  }
-  return e;
+
+  // クリックで詳細（スタック全体 + 付いているカード）
+  group.addEventListener('click', (e) => {
+    e.stopPropagation();
+    if (holomem.faceDown) return;
+    hooks.onInspect({
+      title: `${holomem.stack[0].name}（${zone === 'center' ? 'センター' : zone === 'collab' ? 'コラボ' : 'バック'}）`,
+      sections: [
+        { label: holomem.stack.length > 1 ? 'ホロメン（上から順）' : 'ホロメン', cards: holomem.stack },
+        ...(holomem.cheers.length ? [{ label: `エール (${holomem.cheers.length})`, cards: holomem.cheers }] : []),
+        ...(holomem.attachments.length ? [{ label: 'サポート', cards: holomem.attachments }] : []),
+      ],
+      note: `累計ダメージ: ${holomem.damage} / HP ${holomem.stack[0].hp ?? '-'}${holomem.rested ? '（お休み中）' : ''}`,
+    });
+  });
+
+  return group;
 }
 
-function zoneEl(className, label, parent) {
+function zoneEl(className, label, parent, dropKey) {
   const z = el('div', `zone ${className}`, parent);
   const l = el('span', 'zone-label', z);
   l.textContent = label;
+  if (dropKey) z.dataset.drop = dropKey;
   return z;
 }
 
-function pileEl(count, className = '') {
-  const e = el('div', `pile ${className}`);
-  e.textContent = count;
+function pileEl(count, opts = {}) {
+  const e = el('div', `pile ${opts.className || ''}`);
+  e.style.backgroundImage = `url(${SLEEVE})`;
+  if (count > 0) e.style.boxShadow = stackShadow(count);
+  const n = el('span', 'pile-count', e);
+  n.textContent = count;
+  if (count === 0) e.classList.add('empty');
   return e;
 }
 
 /** 片側プレイヤーの盤面を描画 */
-function renderSide(container, p) {
+export function renderSide(container, p, sideIdx, hooks) {
   container.innerHTML = '';
+  container.dataset.drop = `${sideIdx}:zone:table`; // サポート使用などの「場に出す」ドロップ先
 
+  // ライフ（裏向き・少しずつ重ねて表示）
   const life = zoneEl('life', 'ライフ', container);
-  for (let i = 0; i < p.life.length; i++) el('div', 'life-card', life);
+  for (let i = 0; i < p.life.length; i++) {
+    const c = el('div', 'life-card', life);
+    c.style.backgroundImage = `url(${SLEEVE})`;
+  }
 
-  const collab = zoneEl('collab', 'コラボ', container);
-  if (p.collab) collab.appendChild(holomemEl(p.collab));
+  const collab = zoneEl('collab', 'コラボ', container, `${sideIdx}:zone:collab`);
+  if (p.collab) collab.appendChild(holomemEl(p.collab, sideIdx, 'collab', 0, hooks));
 
-  const center = zoneEl('center', 'センター', container);
-  if (p.center) center.appendChild(holomemEl(p.center));
+  const center = zoneEl('center', 'センター', container, `${sideIdx}:zone:center`);
+  if (p.center) center.appendChild(holomemEl(p.center, sideIdx, 'center', 0, hooks));
 
   const oshi = zoneEl('oshi', '推し', container);
-  if (p.oshi) oshi.appendChild(cardEl(p.oshi));
+  if (p.oshi) {
+    const oc = cardEl(p.oshi);
+    oc.addEventListener('click', (e) => {
+      e.stopPropagation();
+      hooks.onInspect({ title: `推しホロメン: ${p.oshi.name}`, sections: [{ label: '推しホロメン', cards: [p.oshi] }] });
+    });
+    oshi.appendChild(oc);
+  }
 
   const holopower = zoneEl('holopower', 'ホロパワー', container);
-  const hp = pileEl(p.holoPower.length, 'small');
-  holopower.appendChild(hp);
+  holopower.appendChild(pileEl(p.holoPower.length, { className: 'small' }));
 
-  const deck = zoneEl('deck', 'デッキ', container);
+  const deck = zoneEl('deck', 'デッキ', container, `${sideIdx}:zone:deck`);
   deck.appendChild(pileEl(p.deck.length));
 
-  const backs = zoneEl('backs', 'バック', container);
-  for (const h of p.back) backs.appendChild(holomemEl(h));
+  const backs = zoneEl('backs', 'バック', container, `${sideIdx}:zone:back`);
+  p.back.forEach((h, i) => backs.appendChild(holomemEl(h, sideIdx, 'back', i, hooks)));
 
   const cheer = zoneEl('cheerdeck', 'エールデッキ', container);
   cheer.appendChild(pileEl(p.cheerDeck.length));
 
-  const archive = zoneEl('archive', 'アーカイブ', container);
-  const ar = pileEl(p.archive.length, 'archive-pile');
-  if (p.archive.length > 0) {
-    ar.title = '直近: ' + p.archive.slice(-5).map((c) => c.name).join(' / ');
+  // 公開中のカード（エールステップ/ライフ処理で移動先選択中のカード）
+  if (p.revealed.length > 0) {
+    const rev = zoneEl('revealed', '公開中', container);
+    p.revealed.forEach((card, i) => {
+      const c = cardEl(card);
+      c.dataset.src = `${sideIdx}:revealed:${i}`;
+      c.classList.add('revealed-card');
+      rev.appendChild(c);
+    });
   }
-  archive.appendChild(ar);
+
+  // アーカイブ（クリックで一覧）
+  const archive = zoneEl('archive', 'アーカイブ', container);
+  const ar = el('div', 'pile archive-pile', archive);
+  if (p.archive.length > 0) {
+    const last = p.archive[p.archive.length - 1];
+    if (last.imageUrl) {
+      const img = document.createElement('img');
+      img.src = last.imageUrl;
+      img.alt = last.name;
+      img.draggable = false;
+      ar.appendChild(img);
+    }
+    ar.style.boxShadow = stackShadow(p.archive.length);
+  } else {
+    ar.classList.add('empty');
+  }
+  const n = el('span', 'pile-count', ar);
+  n.textContent = p.archive.length;
+  ar.addEventListener('click', (e) => {
+    e.stopPropagation();
+    hooks.onArchive(sideIdx);
+  });
 }
 
-/** 手札を描画。onClickCard(index) でアクションパネルのフィルタに使う */
-function renderHand(container, hand, selectedIndex, onClickCard) {
+/** 手札を描画（acting player のもの） */
+export function renderHand(container, hand, sideIdx, hooks) {
   container.innerHTML = '';
   hand.forEach((card, i) => {
     const e = cardEl(card);
-    if (i === selectedIndex) e.classList.add('selected');
-    e.addEventListener('click', () => onClickCard(i));
+    e.dataset.src = `${sideIdx}:hand:${i}`;
+    e.addEventListener('click', (ev) => {
+      ev.stopPropagation();
+      hooks.onInspect({ title: card.name, sections: [{ label: '手札', cards: [card] }] });
+    });
     container.appendChild(e);
   });
 }
 
-function renderOppHand(container, count) {
+/** 相手の手札（裏向きミニカード） */
+export function renderOppHand(container, count) {
   container.innerHTML = '';
-  for (let i = 0; i < count; i++) el('div', 'mini-back', container);
+  for (let i = 0; i < count; i++) {
+    const c = el('div', 'mini-back', container);
+    c.style.backgroundImage = `url(${SLEEVE})`;
+  }
 }
-
-export { renderSide, renderHand, renderOppHand };

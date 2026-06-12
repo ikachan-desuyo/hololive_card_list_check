@@ -2,6 +2,7 @@
  * バトルシミュレーターv2 盤面スタイル
  * CSS 3D transform で「奥行きのあるテーブル」を表現する。
  * 相手の盤面は奥（小さく・上方）に見え、スクロール無しで全体が見える。
+ * 相手側のカードは相手向き（こちらからは逆さに見える）— 実卓の再現。
  */
 
 * { box-sizing: border-box; }
@@ -9,8 +10,8 @@
 :root {
   --card-w: 72px;
   --card-h: 100px;
-  --zone-gap: 10px;
   --accent: #6ec3ff;
+  --sleeve: url('../../images/card_sleeve.jpg');
 }
 
 html, body {
@@ -65,7 +66,7 @@ html, body {
 .scene {
   position: absolute;
   inset: 0;
-  right: 320px;            /* サイドパネル分 */
+  right: 320px;
   perspective: 1300px;
   perspective-origin: 50% 32%;
   overflow: hidden;
@@ -87,7 +88,7 @@ html, body {
   box-shadow: 0 60px 120px rgba(0, 0, 0, 0.6), inset 0 0 80px rgba(90, 100, 220, 0.15);
 }
 
-.table::after { /* センターライン */
+.table::after {
   content: '';
   position: absolute;
   left: 3%; right: 3%;
@@ -95,7 +96,7 @@ html, body {
   border-top: 1px dashed rgba(160, 170, 255, 0.4);
 }
 
-/* 各プレイヤーの盤面（相手側は180度回転で点対称配置） */
+/* 各プレイヤーの盤面（相手側は180度回転 = カードは相手向きに見える） */
 .side {
   position: absolute;
   left: 0; right: 0;
@@ -105,18 +106,18 @@ html, body {
 .side.player { bottom: 0; }
 .side.opponent { top: 0; transform: rotate(180deg); }
 
-/* ゾーン配置（プレイシート準拠: ライフ左端 / コラボ・センター中央 / 推し・ホロパワー・デッキ右 / バック手前） */
+/* ゾーン配置（プレイシート準拠） */
 .zone {
   position: absolute;
   display: flex;
-  gap: 6px;
+  gap: 18px;
   align-items: center;
   justify-content: center;
   min-width: var(--card-w);
   min-height: var(--card-h);
   border: 1px dashed rgba(150, 160, 230, 0.3);
   border-radius: 8px;
-  padding: 4px;
+  padding: 6px;
 }
 .zone .zone-label {
   position: absolute;
@@ -127,17 +128,18 @@ html, body {
   pointer-events: none;
 }
 
-.zone.life      { left: 16px;  top: 38px; flex-direction: column; min-height: 150px; border-style: solid; }
+.zone.life      { left: 14px;  top: 24px;  flex-direction: column; gap: 0; border-style: solid; min-height: 120px; justify-content: flex-start; padding-top: 8px; }
+.zone.revealed  { left: 150px; top: 28px;  border-color: rgba(255, 220, 120, 0.7); border-style: solid; box-shadow: 0 0 18px rgba(255, 220, 120, 0.25); }
 .zone.collab    { left: 300px; top: 28px; }
 .zone.center    { left: 420px; top: 28px; }
 .zone.oshi      { left: 560px; top: 28px; }
-.zone.holopower { left: 700px; top: 14px; min-height: 70px; }
+.zone.holopower { left: 700px; top: 14px;  min-height: 70px; }
 .zone.deck      { left: 820px; top: 28px; }
-.zone.backs     { left: 250px; top: 168px; min-width: 480px; min-height: 110px; }
-.zone.cheerdeck { left: 16px;  top: 230px; }
-.zone.archive   { left: 820px; top: 168px; }
+.zone.backs     { left: 240px; top: 172px; min-width: 500px; min-height: 112px; }
+.zone.cheerdeck { left: 14px;  top: 252px; }
+.zone.archive   { left: 820px; top: 172px; }
 
-/* カード */
+/* ===== カード ===== */
 .card {
   width: var(--card-w);
   height: var(--card-h);
@@ -145,7 +147,7 @@ html, body {
   background: #20223f;
   border: 1px solid rgba(255, 255, 255, 0.18);
   position: relative;
-  transition: transform 0.15s ease;
+  transition: transform 0.15s ease, box-shadow 0.15s ease;
   flex-shrink: 0;
 }
 .card img {
@@ -155,72 +157,146 @@ html, body {
   display: block;
   pointer-events: none;
 }
-.card:hover { transform: translateZ(26px) scale(1.06); z-index: 5; }
-.card.rested { transform: rotate(90deg) scale(0.92); }
-.card.rested:hover { transform: rotate(90deg) scale(0.98) translateZ(20px); }
+.card:hover { transform: translateZ(26px) scale(1.06); z-index: 30; }
 .card.facedown {
-  background: repeating-linear-gradient(135deg, #283057 0 8px, #1c2342 8px 16px);
+  background-image: var(--sleeve);
+  background-size: cover;
+  background-position: center;
   border-color: #5560a8;
 }
-.card.stack-badge::before {
-  content: attr(data-count);
-  position: absolute;
-  top: -7px; left: -7px;
-  background: #3949ab;
-  color: #fff;
-  font-size: 11px;
-  border-radius: 50%;
-  min-width: 18px; height: 18px;
-  line-height: 18px;
-  text-align: center;
-  z-index: 2;
-}
 
-/* 山札系: 枚数表示 */
-.pile {
+/* ===== ホロメン（スタック + 付帯カード） ===== */
+.holomem-group {
+  position: relative;
   width: var(--card-w);
   height: var(--card-h);
-  border-radius: 5px;
-  background: repeating-linear-gradient(135deg, #283057 0 8px, #1c2342 8px 16px);
-  border: 1px solid #5560a8;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  font-size: 18px;
-  font-weight: bold;
-  color: #cdd4ff;
-  box-shadow: 2px 2px 0 #11142c, 4px 4px 0 #0d1024;
+  flex-shrink: 0;
+  transition: transform 0.15s ease;
+  cursor: pointer;
 }
-.pile.small { height: 64px; font-size: 14px; }
-.pile.archive-pile { background: #2f1d35; border-color: #8a55a8; box-shadow: none; }
-.life-card {
-  width: 56px; height: 38px;
-  border-radius: 4px;
-  background: repeating-linear-gradient(135deg, #283057 0 6px, #1c2342 6px 12px);
-  border: 1px solid #5560a8;
-  margin: 1px 0;
-}
+.holomem-group.rested { transform: rotate(90deg) scale(0.92); }
+.holomem-group .holomem-main { position: relative; }
+.holomem-group:hover .holomem-main { transform: translateZ(26px) scale(1.06); }
 
-/* ホロメンの付帯情報バッジ */
-.holomem { position: relative; transform-style: preserve-3d; }
+/* Bloom元のカード: 上端を少しずつ見せて厚みを表現（ホバーでさらに広げる） */
+.stack-under {
+  position: absolute;
+  top: 0; left: 0;
+  transition: transform 0.2s ease;
+}
+.holomem-group:hover .stack-under { transform: translateY(-26px) !important; }
+.holomem-group:hover .stack-under:nth-last-child(3) { transform: translateY(-48px) !important; }
+.holomem-group:hover .stack-under:nth-last-child(4) { transform: translateY(-70px) !important; }
+
+/* 付いているエール/サポートのミニカード */
+.mini-card {
+  position: absolute;
+  width: 32px;
+  height: 45px;
+  border-radius: 3px;
+  border: 1px solid rgba(255, 255, 255, 0.35);
+  background: #20223f;
+  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.5);
+  transition: transform 0.15s ease;
+}
+.mini-card img {
+  width: 100%; height: 100%;
+  object-fit: cover;
+  border-radius: 3px;
+  display: block;
+  pointer-events: none;
+}
+.mini-card:hover { transform: scale(1.9) !important; z-index: 50 !important; }
+
+/* バッジ */
 .badge {
   position: absolute;
   font-size: 10px;
   border-radius: 8px;
   padding: 1px 5px;
-  z-index: 3;
   pointer-events: none;
 }
 .badge.damage { top: -7px; right: -6px; background: #c62828; color: #fff; font-weight: bold; }
-.badge.cheers { bottom: -7px; left: -6px; background: #00695c; color: #fff; }
-.badge.attach { bottom: -7px; right: -6px; background: #6a4fa3; color: #fff; }
+.badge.cheers-more { bottom: -14px; left: -16px; background: #00695c; color: #fff; z-index: 5; }
 
-/* 相手側のカード・バッジは逆さにならないように戻す */
-.side.opponent .card img { transform: rotate(180deg); }
-.side.opponent .badge { transform: rotate(180deg); }
-.side.opponent .pile, .side.opponent .zone-label { transform: rotate(180deg); }
+/* 相手側でもバッジ・枚数・ラベルは読める向きに戻す（カードは相手向きのまま） */
+.side.opponent .badge,
+.side.opponent .pile-count,
+.side.opponent .zone-label { transform: rotate(180deg); }
 
-/* ===== 手札（手前にフラット表示） ===== */
+/* ===== 山札系（裏面画像 + 枚数 + 厚み） ===== */
+.pile {
+  width: var(--card-w);
+  height: var(--card-h);
+  border-radius: 5px;
+  background-size: cover;
+  background-position: center;
+  border: 1px solid #5560a8;
+  position: relative;
+  flex-shrink: 0;
+}
+.pile.small { width: 58px; height: 80px; }
+.pile.empty { background-image: none !important; background: rgba(30, 32, 64, 0.4); border-style: dashed; box-shadow: none !important; }
+.pile-count {
+  position: absolute;
+  bottom: 3px;
+  right: 3px;
+  background: rgba(8, 9, 22, 0.85);
+  color: #cdd4ff;
+  font-size: 12px;
+  font-weight: bold;
+  border-radius: 6px;
+  padding: 1px 6px;
+  pointer-events: none;
+}
+.pile.archive-pile { cursor: pointer; border-color: #8a55a8; }
+.pile.archive-pile img {
+  width: 100%; height: 100%;
+  object-fit: cover;
+  border-radius: 5px;
+  display: block;
+  pointer-events: none;
+  filter: grayscale(0.4) brightness(0.85);
+}
+.pile.archive-pile:hover { outline: 2px solid #b07ad1; }
+
+/* ライフ: 横向きの裏面カードを少しずつ重ねる */
+.life-card {
+  width: 56px;
+  height: 40px;
+  border-radius: 4px;
+  background-size: cover;
+  background-position: center;
+  border: 1px solid #5560a8;
+  margin-top: -22px;
+  box-shadow: 0 -2px 4px rgba(0, 0, 0, 0.45);
+}
+.life-card:first-child { margin-top: 0; }
+
+/* 公開中のカード */
+.revealed-card { box-shadow: 0 0 16px rgba(255, 220, 120, 0.7); }
+
+/* ===== ドラッグ&ドロップ ===== */
+.can-drag {
+  cursor: grab;
+  outline: 2px solid rgba(110, 195, 255, 0.85);
+  outline-offset: 1px;
+  box-shadow: 0 0 14px rgba(110, 195, 255, 0.45);
+}
+.can-drag:active { cursor: grabbing; }
+[data-drop].drop-ok {
+  outline: 3px dashed rgba(120, 255, 170, 0.9);
+  outline-offset: 2px;
+  background-color: rgba(120, 255, 170, 0.10);
+  animation: drop-pulse 1s ease-in-out infinite;
+}
+@keyframes drop-pulse {
+  0%, 100% { box-shadow: 0 0 8px rgba(120, 255, 170, 0.35); }
+  50% { box-shadow: 0 0 22px rgba(120, 255, 170, 0.65); }
+}
+.side[data-drop].drop-ok { outline-offset: -6px; }
+
+/* ===== 手札 ===== */
 #hand {
   position: absolute;
   bottom: 6px;
@@ -230,13 +306,10 @@ html, body {
   gap: 8px;
   z-index: 20;
   max-width: 70%;
-  flex-wrap: nowrap;
 }
 #hand .card { width: 86px; height: 120px; cursor: pointer; }
 #hand .card:hover { transform: translateY(-22px) scale(1.12); }
-#hand .card.selected { outline: 3px solid var(--accent); transform: translateY(-16px); }
 
-/* 相手の手札（奥側に裏向きで枚数表示） */
 #opp-hand {
   position: absolute;
   top: 6px;
@@ -249,8 +322,10 @@ html, body {
 #opp-hand .mini-back {
   width: 34px; height: 48px;
   border-radius: 3px;
-  background: repeating-linear-gradient(135deg, #283057 0 5px, #1c2342 5px 10px);
+  background-size: cover;
+  background-position: center;
   border: 1px solid #5560a8;
+  transform: rotate(180deg);
 }
 
 /* ===== サイドパネル ===== */
@@ -292,7 +367,8 @@ html, body {
 }
 #actions button:hover { background: #2e3470; border-color: var(--accent); }
 #actions button.pass-btn { background: #173a2a; border-color: #2c6e4f; }
-#actions .actions-title { color: #99a; font-size: 0.82em; margin: 2px 0; }
+#actions button.toggle-all { background: transparent; border-style: dashed; color: #99a; }
+#actions .actions-title { color: #99a; font-size: 0.82em; margin: 2px 0; line-height: 1.5; }
 #log {
   height: 34%;
   overflow-y: auto;
@@ -305,7 +381,7 @@ html, body {
 #log .turn-line { color: var(--accent); font-weight: bold; }
 #log .todo-line { color: #888; font-style: italic; }
 
-/* ===== カードプレビュー（ホバー時） ===== */
+/* ===== カードプレビュー（ホバー） ===== */
 #card-preview {
   position: absolute;
   left: 12px;
@@ -323,6 +399,116 @@ html, body {
   font-size: 0.85em;
   margin-top: 4px;
 }
+
+/* ===== インスペクタ/アーカイブ モーダル ===== */
+#inspector-modal {
+  position: absolute;
+  inset: 0;
+  background: rgba(5, 5, 15, 0.75);
+  display: none;
+  align-items: center;
+  justify-content: center;
+  z-index: 90;
+}
+#inspector-modal.active { display: flex; }
+#inspector-content {
+  background: #141630;
+  border: 1px solid #3c4185;
+  border-radius: 12px;
+  width: min(720px, 90vw);
+  max-height: 86vh;
+  display: flex;
+  flex-direction: column;
+}
+#inspector-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 12px 16px;
+  border-bottom: 1px solid #2c2f5c;
+}
+#inspector-title { font-weight: bold; font-size: 1.05em; }
+#inspector-close {
+  background: none;
+  border: none;
+  color: #99a;
+  font-size: 1.4em;
+  cursor: pointer;
+}
+#inspector-close:hover { color: #fff; }
+#inspector-body { overflow-y: auto; padding: 14px 16px; }
+.inspector-note { color: #ffd98a; margin-bottom: 10px; font-size: 0.9em; }
+.inspector-section-label {
+  color: #8fa0ff;
+  font-size: 0.85em;
+  margin: 12px 0 6px;
+  border-bottom: 1px dashed #34386b;
+  padding-bottom: 2px;
+}
+.inspector-card {
+  display: flex;
+  gap: 14px;
+  padding: 10px 0;
+}
+.inspector-card img {
+  width: 140px;
+  border-radius: 8px;
+  align-self: flex-start;
+  flex-shrink: 0;
+}
+.inspector-card-info { font-size: 0.86em; line-height: 1.6; color: #ccd; }
+.inspector-card-name { font-weight: bold; font-size: 1.15em; color: #fff; }
+.detail-type { color: #9ab; margin-bottom: 4px; }
+.detail-tags span {
+  display: inline-block;
+  background: #26305c;
+  border-radius: 8px;
+  padding: 0 8px;
+  margin: 2px 4px 2px 0;
+  font-size: 0.9em;
+}
+.detail-skill {
+  background: rgba(40, 44, 90, 0.45);
+  border-radius: 6px;
+  padding: 6px 8px;
+  margin: 6px 0;
+}
+
+/* アーカイブ一覧グリッド */
+.archive-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(96px, 1fr));
+  gap: 10px;
+}
+.archive-grid-card { cursor: pointer; text-align: center; font-size: 0.72em; color: #aab; }
+.archive-grid-card img { width: 100%; border-radius: 6px; display: block; }
+.archive-grid-card:hover img { outline: 2px solid var(--accent); }
+
+/* 複数選択ポップアップ（アーツ選択など） */
+#chooser {
+  position: fixed;
+  display: none;
+  flex-direction: column;
+  gap: 4px;
+  background: #141630;
+  border: 1px solid var(--accent);
+  border-radius: 8px;
+  padding: 8px;
+  z-index: 95;
+  max-width: 330px;
+  box-shadow: 0 10px 40px rgba(0, 0, 0, 0.7);
+}
+#chooser button {
+  text-align: left;
+  padding: 8px 10px;
+  background: #222654;
+  border: 1px solid #3c4185;
+  color: #dde;
+  border-radius: 6px;
+  cursor: pointer;
+  font-size: 0.85em;
+}
+#chooser button:hover { background: #2e3470; border-color: var(--accent); }
 
 /* ===== 勝敗オーバーレイ ===== */
 #result-overlay {
