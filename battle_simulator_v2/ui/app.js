@@ -418,6 +418,23 @@ const hooks = {
   onArchive: (sideIdx) => showArchive(sideIdx),
 };
 
+/**
+ * ステップ境界の「間」(stepPause) を一定時間後に自動で進める。
+ * タイマー発火時に pending が別物になっていたら何もしない（手動クリックとの競合防止）。
+ */
+let pauseTimer = null;
+const STEP_PAUSE_MS = 700;
+
+function handleStepPause(s) {
+  if (s.pending?.type !== 'stepPause') return;
+  if (pauseTimer) return; // この pending 用に予約済み
+  const pendingRef = s.pending;
+  pauseTimer = setTimeout(() => {
+    pauseTimer = null;
+    if (engine.state.pending === pendingRef) engine.apply('ok');
+  }, STEP_PAUSE_MS);
+}
+
 let lastTurnKey = null;
 
 // ============ ステップ表示 ============
@@ -520,6 +537,7 @@ function render() {
   renderActions(s);
   renderLog(s);
   renderResult(s);
+  handleStepPause(s);
 }
 
 function renderStatus(s, handPlayer) {
@@ -545,6 +563,7 @@ function pendingHint(pending) {
     attachLifeCheer: '公開中のライフエールをホロメンへドラッグ',
     main: '手札やバックのカードをドラッグして行動（光っているカードが操作可能）',
     performance: '自分のセンター/コラボを相手のホロメンへドラッグして攻撃',
+    stepPause: '進行中…（クリックで早送り）',
   };
   return map[pending.type] || '';
 }

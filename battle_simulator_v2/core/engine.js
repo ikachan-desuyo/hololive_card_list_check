@@ -67,6 +67,8 @@ export class Engine {
   constructor(opts) {
     this.rng = createRng(opts.seed ?? 1);
     this.onChange = opts.onChange || (() => {});
+    // ステップ境界に「間」を入れる（UIが自動で進めることでドロー等の瞬間を見せる）
+    this.stepPauses = opts.stepPauses !== false;
     const names = opts.names || ['プレイヤー1', 'プレイヤー2'];
     this.state = {
       phase: 'setup',          // 'setup' | 'playing' | 'ended'
@@ -290,6 +292,20 @@ export class Engine {
     this._resetStep();
   }
 
+  /** ステップ境界の「間」。UI側がタイマーで自動進行する（クリックでも進められる） */
+  _pause(next) {
+    if (!this.stepPauses) {
+      next();
+      return;
+    }
+    this.state.pending = {
+      type: 'stepPause',
+      player: this.state.turnPlayer,
+      options: [{ id: 'ok', label: '▶ 次へ' }],
+      next,
+    };
+  }
+
   _resetStep() {
     const s = this.state;
     const p = s.players[s.turnPlayer];
@@ -300,17 +316,19 @@ export class Engine {
     }
     s.step = 'reset';
     this.log(`【${STEP_NAMES.reset}】`);
-    // 7.2.2: 全てアクティブに
-    for (const h of this._stageHolomems(p)) h.rested = false;
-    // 7.2.3: コラボ → バックへ移動してお休み
-    if (p.collab) {
-      p.collab.rested = true;
-      p.back.push(p.collab);
-      p.collab = null;
-      this.log(`${p.name}: コラボのホロメンをバックに移動（お休み）`);
-    }
-    // 7.2.6: センターが空ならバックから補充（アクティブ優先）
-    this._queueCenterRefill(p, () => this._drawStep());
+    this._pause(() => {
+      // 7.2.2: 全てアクティブに
+      for (const h of this._stageHolomems(p)) h.rested = false;
+      // 7.2.3: コラボ → バックへ移動してお休み
+      if (p.collab) {
+        p.collab.rested = true;
+        p.back.push(p.collab);
+        p.collab = null;
+        this.log(`${p.name}: コラボのホロメンをバックに移動（お休み）`);
+      }
+      // 7.2.6: センターが空ならバックから補充（アクティブ優先）
+      this._queueCenterRefill(p, () => this._drawStep());
+    });
   }
 
   /** センター補充の選択（7.2.6 / 7.7.5）。補充不要・不能なら即 next() */
@@ -335,16 +353,18 @@ export class Engine {
     const p = s.players[s.turnPlayer];
     s.step = 'draw';
     this.log(`【${STEP_NAMES.draw}】`);
-    // 7.3.2.1: 引けなければ敗北
-    if (p.deck.length === 0) {
-      this._setWinner(1 - s.turnPlayer, LOSS_REASONS.DECK_OUT, s.turnPlayer);
-      return;
-    }
-    this._drawCards(p, 1);
-    // TODO(CPU対戦実装時): 相手のドロー内容は隠す（現状はホットシートなので公開でよい）
-    const drawn = p.hand[p.hand.length - 1];
-    this.log(`${p.name}: 1枚ドロー（${drawn.name}）`);
-    this._cheerStep();
+    this._pause(() => {
+      // 7.3.2.1: 引けなければ敗北
+      if (p.deck.length === 0) {
+        this._setWinner(1 - s.turnPlayer, LOSS_REASONS.DECK_OUT, s.turnPlayer);
+        return;
+      }
+      this._drawCards(p, 1);
+      // TODO(CPU対戦実装時): 相手のドロー内容は隠す（現状はホットシートなので公開でよい）
+      const drawn = p.hand[p.hand.length - 1];
+      this.log(`${p.name}: 1枚ドロー（${drawn.name}）`);
+      this._cheerStep();
+    });
   }
 
   _cheerStep() {
@@ -352,29 +372,31 @@ export class Engine {
     const p = s.players[s.turnPlayer];
     s.step = 'cheer';
     this.log(`【${STEP_NAMES.cheer}】`);
-    if (p.cheerDeck.length === 0) {
-      this.log(`${p.name}: エールデッキが空のためスキップ`);
-      this._mainStep();
-      return;
-    }
-    const cheer = p.cheerDeck.shift();
-    this.log(`${p.name}: エール公開 → ${cheer.name}`);
-    const targets = this._stagePositions(p);
-    if (targets.length === 0) {
-      // ステージにホロメンがいない（通常は敗北処理で先に終わる）
-      p.archive.push(cheer);
-      this._mainStep();
-      return;
-    }
-    p.revealed.push(cheer);
-    s.pending = {
-      type: 'attachCheer', player: s.turnPlayer, auto: true, cheer,
-      options: targets.map((pos) => ({
-        id: `attach_${pos.zone}_${pos.index}`,
-        label: `${topCard(this._holomemAt(p, pos)).name} に ${cheer.name} を送る`,
-        pos,
-      })),
-    };
+    this._pause(() => {
+      if (p.cheerDeck.length === 0) {
+        this.log(`${p.name}: エールデッキが空のためスキップ`);
+        this._mainStep();
+        return;
+      }
+      const cheer = p.cheerDeck.shift();
+      this.log(`${p.name}: エール公開 → ${cheer.name}`);
+      const targets = this._stagePositions(p);
+      if (targets.length === 0) {
+        // ステージにホロメンがいない（通常は敗北処理で先に終わる）
+        p.archive.push(cheer);
+        this._mainStep();
+        return;
+      }
+      p.revealed.push(cheer);
+      s.pending = {
+        type: 'attachCheer', player: s.turnPlayer, auto: true, cheer,
+        options: targets.map((pos) => ({
+          id: `attach_${pos.zone}_${pos.index}`,
+          label: `${topCard(this._holomemAt(p, pos)).name} に ${cheer.name} を送る`,
+          pos,
+        })),
+      };
+    });
   }
 
   _mainStep() {
@@ -633,6 +655,9 @@ export class Engine {
         this._checkTiming(pending.resume);
         break;
       }
+      case 'stepPause':
+        pending.next();
+        break;
       case 'main':
         this._executeMainAction(action);
         break;

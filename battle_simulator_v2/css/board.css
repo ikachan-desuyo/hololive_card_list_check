@@ -152,7 +152,9 @@ html, body {
   pointer-events: none;
 }
 
-.zone.life      { left: 10px;  top: 20px;  flex-direction: column; gap: 0; border-style: solid; min-width: 104px; min-height: 130px; justify-content: flex-start; padding-top: 8px; }
+/* ライフは自陣側（手前）に向かって伸ばす。センターライン際に置くと相手フィールドに
+   食い込んで見えるため、自陣寄りに配置して下方向（自分側）へ積む */
+.zone.life      { left: 10px;  top: 158px; flex-direction: column; gap: 0; border-style: solid; min-width: 104px; min-height: 130px; justify-content: flex-start; padding-top: 8px; }
 .zone.revealed  { left: 150px; top: 30px;  border-color: rgba(255, 220, 120, 0.7); border-style: solid; box-shadow: 0 0 18px rgba(255, 220, 120, 0.25); }
 .zone.collab    { left: 295px; top: 30px; }
 .zone.center    { left: 425px; top: 30px; }
@@ -160,7 +162,7 @@ html, body {
 .zone.holopower { left: 690px; top: 30px;  min-width: 78px; min-height: 105px; }
 .zone.deck      { left: 925px; top: 30px; }
 .zone.backs     { left: 225px; top: 208px; min-width: 560px; min-height: 142px; }
-.zone.cheerdeck { left: 12px;  top: 252px; }
+.zone.cheerdeck { left: 12px;  top: 22px; }
 .zone.archive   { left: 925px; top: 208px; }
 
 /* ===== カード ===== */
