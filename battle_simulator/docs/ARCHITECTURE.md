@@ -1,5 +1,7 @@
 # バトルシミュレーター 詳細設計書
 
+> ⚠️ **注意 (2026-06-12)**: 本書には削除済みの旧システム（CardEffectManager / CardLoader / CardMetadata / EffectPatternTemplates 等）の記述が残っています。現在のファイル構成と進行中の整理は [REFACTORING_PLAN.md](REFACTORING_PLAN.md) を正としてください。
+
 ## 概要
 
 ホロライブTCGバトルシミュレーターは、ホロライブカードゲームの対戦をブラウザ上で再現するWebアプリケーションです。
