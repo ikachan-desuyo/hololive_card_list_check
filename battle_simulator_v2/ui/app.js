@@ -81,6 +81,7 @@ async function startGame() {
     }
     const seedInput = document.getElementById('seed-input').value;
     const seed = seedInput ? Number(seedInput) : Math.floor(Math.random() * 1e9);
+    currentSeed = seed;
     engine = new Engine({
       decks: [deck1, deck2],
       seed,
@@ -421,18 +422,33 @@ const hooks = {
 /**
  * ステップ境界の「間」(stepPause) を一定時間後に自動で進める。
  * タイマー発火時に pending が別物になっていたら何もしない（手動クリックとの競合防止）。
+ * 速度は設定パネルで変更可能（手動 = 自動進行なし、▶次へ ボタンで送る）
  */
 let pauseTimer = null;
-const STEP_PAUSE_MS = 700;
+const PAUSE_SPEEDS = { fast: 350, normal: 700, slow: 1300, manual: 0 };
+
+function getSettings() {
+  try {
+    return { stepSpeed: 'normal', ...JSON.parse(localStorage.getItem('bsv2_settings') || '{}') };
+  } catch {
+    return { stepSpeed: 'normal' };
+  }
+}
+
+function saveSettings(patch) {
+  localStorage.setItem('bsv2_settings', JSON.stringify({ ...getSettings(), ...patch }));
+}
 
 function handleStepPause(s) {
   if (s.pending?.type !== 'stepPause') return;
   if (pauseTimer) return; // この pending 用に予約済み
+  const ms = PAUSE_SPEEDS[getSettings().stepSpeed] ?? 700;
+  if (ms === 0) return; // 手動モード
   const pendingRef = s.pending;
   pauseTimer = setTimeout(() => {
     pauseTimer = null;
     if (engine.state.pending === pendingRef) engine.apply('ok');
-  }, STEP_PAUSE_MS);
+  }, ms);
 }
 
 let lastTurnKey = null;
@@ -656,6 +672,91 @@ function setupPreview() {
   });
 }
 
+// ============ 設定パネル ============
+
+let currentSeed = null;
+
+function setupSettingsPanel() {
+  const button = document.getElementById('settings-button');
+  const panel = document.getElementById('settings-panel');
+
+  button.addEventListener('click', (e) => {
+    e.stopPropagation();
+    panel.classList.toggle('open');
+    refreshSettingsUI();
+  });
+  document.addEventListener('click', (e) => {
+    if (panel.classList.contains('open') && !panel.contains(e.target) && e.target !== button) {
+      panel.classList.remove('open');
+    }
+  });
+
+  // ステップ送り速度
+  document.getElementById('pause-speed-buttons').addEventListener('click', (e) => {
+    const speed = e.target.dataset?.speed;
+    if (!speed) return;
+    saveSettings({ stepSpeed: speed });
+    refreshSettingsUI();
+  });
+
+  // ログコピー
+  document.getElementById('copy-log-button').addEventListener('click', async () => {
+    if (!engine) return;
+    const text = `[seed=${currentSeed}]\n` + engine.state.logs.join('\n');
+    try {
+      await navigator.clipboard.writeText(text);
+      document.getElementById('copy-log-button').textContent = '✅ コピーしました';
+      setTimeout(() => {
+        document.getElementById('copy-log-button').textContent = '📋 ログをコピー';
+      }, 1500);
+    } catch { /* クリップボード不可の環境は無視 */ }
+  });
+
+  // 投了
+  document.getElementById('concede-p1-button').addEventListener('click', () => {
+    if (engine && confirm('プレイヤー1が投了します。よろしいですか？')) {
+      engine.concede(0);
+      document.getElementById('settings-panel').classList.remove('open');
+    }
+  });
+  document.getElementById('concede-p2-button').addEventListener('click', () => {
+    if (engine && confirm('プレイヤー2が投了します。よろしいですか？')) {
+      engine.concede(1);
+      document.getElementById('settings-panel').classList.remove('open');
+    }
+  });
+
+  // ゲームリセット
+  document.getElementById('reset-game-button').addEventListener('click', () => {
+    if (confirm('ゲームをリセットしてデッキ選択に戻ります。よろしいですか？')) {
+      location.reload();
+    }
+  });
+
+  // TODO(CPU対戦): ここに「AI適用」（各プレイヤーをCPUに切り替える）項目を追加予定
+}
+
+function refreshSettingsUI() {
+  const speed = getSettings().stepSpeed;
+  for (const btn of document.querySelectorAll('#pause-speed-buttons button')) {
+    btn.classList.toggle('active', btn.dataset.speed === speed);
+  }
+  document.getElementById('seed-display').textContent = `シード値: ${currentSeed ?? '-'}`;
+}
+
+/**
+ * 盤面のレスポンシブスケーリング。
+ * テーブルは 1060x800 の固定レイアウトなので、ウィンドウが狭いと左右端
+ * （ライフ・アーカイブ）が見切れる。シーンの実寸に合わせて全体を縮小する。
+ */
+function updateBoardScale() {
+  const sceneW = window.innerWidth - 320 - 16; // サイドパネルと余白を除く
+  const sceneH = window.innerHeight - 16;
+  // rotateX(34deg) 投影後の高さは約 0.83 倍 + 手前へのはみ出し分を見込む
+  const scale = Math.min(1, sceneW / 1100, sceneH / 760);
+  document.documentElement.style.setProperty('--board-scale', String(scale));
+}
+
 // ============ 起動 ============
 
 async function main() {
@@ -670,6 +771,9 @@ async function main() {
   setupPreview();
   setupModals();
   setupDnDListeners();
+  setupSettingsPanel();
+  updateBoardScale();
+  window.addEventListener('resize', updateBoardScale);
   document.getElementById('restart-button').addEventListener('click', () => location.reload());
   console.log('✅ バトルシミュレーターv2 初期化完了');
 

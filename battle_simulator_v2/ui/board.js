@@ -181,8 +181,15 @@ export function renderSide(container, p, sideIdx, hooks) {
     oshi.appendChild(oc);
   }
 
+  // ホロパワーはプレイシート準拠でカードを横向きに置く
   const holopower = zoneEl('holopower', 'ホロパワー', container);
-  holopower.appendChild(pileEl(p.holoPower.length, { className: 'small' }));
+  const hpPile = el('div', 'pile landscape');
+  el('div', 'pile-rot', hpPile);
+  if (p.holoPower.length > 0) hpPile.style.filter = `drop-shadow(2px 2px 0 rgba(8,9,20,0.9))`;
+  else hpPile.classList.add('empty');
+  const hpCount = el('span', 'pile-count', hpPile);
+  hpCount.textContent = p.holoPower.length;
+  holopower.appendChild(hpPile);
 
   const deck = zoneEl('deck', 'デッキ', container, `${sideIdx}:zone:deck`);
   deck.appendChild(pileEl(p.deck.length));

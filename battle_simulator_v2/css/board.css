@@ -88,7 +88,8 @@ html, body {
   top: 50%;
   width: 1060px;
   height: 800px;
-  transform: translate(-50%, -53%) rotateX(34deg);
+  /* --board-scale はウィンドウサイズから app.js が設定（盤面全体が必ず画面内に収まる） */
+  transform: translate(-50%, -53%) rotateX(34deg) scale(var(--board-scale, 1));
   transform-style: preserve-3d;
   background:
     linear-gradient(180deg, rgba(120, 130, 255, 0.10), rgba(40, 40, 90, 0.18) 50%, rgba(120, 130, 255, 0.10)),
@@ -154,16 +155,19 @@ html, body {
 
 /* ライフは自陣側（手前）に向かって伸ばす。センターライン際に置くと相手フィールドに
    食い込んで見えるため、自陣寄りに配置して下方向（自分側）へ積む */
-.zone.life      { left: 10px;  top: 158px; flex-direction: column; gap: 0; border-style: solid; min-width: 104px; min-height: 130px; justify-content: flex-start; padding-top: 8px; }
+/* 配置は公式プレイシート準拠（battle_simulator/docs/RULES_SPEC.md §13）:
+   ライフ=左上から下へ / コラボ・センター・推し=上段 / ホロパワー=右上角(横向き) /
+   デッキ=右端中段 / アーカイブ=右下 / エールデッキ=左下 / バック=下段中央 */
+.zone.life      { left: 10px;  top: 46px;  flex-direction: column; gap: 0; border-style: solid; min-width: 104px; min-height: 130px; justify-content: flex-start; padding-top: 8px; }
 .zone.revealed  { left: 150px; top: 30px;  border-color: rgba(255, 220, 120, 0.7); border-style: solid; box-shadow: 0 0 18px rgba(255, 220, 120, 0.25); }
 .zone.collab    { left: 295px; top: 30px; }
 .zone.center    { left: 425px; top: 30px; }
 .zone.oshi      { left: 555px; top: 30px; }
-.zone.holopower { left: 690px; top: 30px;  min-width: 78px; min-height: 105px; }
-.zone.deck      { left: 925px; top: 30px; }
-.zone.backs     { left: 225px; top: 208px; min-width: 560px; min-height: 142px; }
-.zone.cheerdeck { left: 12px;  top: 22px; }
-.zone.archive   { left: 925px; top: 208px; }
+.zone.holopower { left: 845px; top: 10px;  min-width: 112px; min-height: 80px; }
+.zone.deck      { left: 925px; top: 96px; }
+.zone.backs     { left: 225px; top: 240px; min-width: 560px; min-height: 142px; }
+.zone.cheerdeck { left: 12px;  top: 258px; }
+.zone.archive   { left: 925px; top: 248px; }
 
 /* ===== カード ===== */
 .card {
@@ -297,6 +301,28 @@ body.dragging [data-drop].drop-ok { z-index: 60; }
   flex-shrink: 0;
 }
 .pile.small { width: 66px; height: 92px; }
+/* ホロパワー: プレイシート準拠でカードを横向きに置くスロット */
+.pile.landscape {
+  width: 100px;
+  height: 72px;
+  background-image: none !important;
+  border: none;
+  position: relative;
+}
+.pile.landscape .pile-rot {
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  width: 72px;
+  height: 100px;
+  transform: translate(-50%, -50%) rotate(90deg);
+  background-image: var(--sleeve);
+  background-size: cover;
+  background-position: center;
+  border: 1px solid #5560a8;
+  border-radius: 5px;
+}
+.pile.landscape.empty .pile-rot { background-image: none; background: rgba(30, 32, 64, 0.4); border-style: dashed; }
 .pile.empty { background-image: none !important; background: rgba(30, 32, 64, 0.4); border-style: dashed; box-shadow: none !important; }
 .pile-count {
   position: absolute;
@@ -513,6 +539,75 @@ body.dragging, body.dragging * { cursor: grabbing !important; }
   75% { opacity: 1; }
   100% { opacity: 0; transform: translate(-50%, -50%) scale(1); }
 }
+
+/* ===== 設定ボタン・パネル ===== */
+#settings-button {
+  position: absolute;
+  top: 10px;
+  right: 332px; /* サイドパネルの左隣 = フィールドの右上 */
+  width: 40px;
+  height: 40px;
+  font-size: 1.3em;
+  background: rgba(14, 16, 38, 0.9);
+  border: 1px solid #34386b;
+  border-radius: 50%;
+  color: #cdd4ff;
+  cursor: pointer;
+  z-index: 45;
+}
+#settings-button:hover { border-color: var(--accent); color: #fff; }
+
+#settings-panel {
+  position: absolute;
+  top: 58px;
+  right: 332px;
+  width: 280px;
+  background: #141630;
+  border: 1px solid #3c4185;
+  border-radius: 10px;
+  padding: 14px;
+  z-index: 46;
+  display: none;
+  box-shadow: 0 10px 40px rgba(0, 0, 0, 0.7);
+}
+#settings-panel.open { display: block; }
+.settings-title { font-weight: bold; margin-bottom: 10px; color: #fff; }
+.settings-section { border-top: 1px solid #2c2f5c; padding: 10px 0; }
+.settings-label { color: #99a; font-size: 0.82em; margin-bottom: 6px; }
+.settings-row { display: flex; gap: 6px; }
+.settings-row button {
+  flex: 1;
+  padding: 6px 4px;
+  background: #222654;
+  border: 1px solid #3c4185;
+  color: #dde;
+  border-radius: 6px;
+  cursor: pointer;
+  font-size: 0.8em;
+}
+.settings-row button.active {
+  background: linear-gradient(135deg, #2a4a8f, #4a3a9f);
+  border-color: var(--accent);
+  color: #fff;
+  font-weight: bold;
+}
+.settings-action {
+  display: block;
+  width: 100%;
+  margin: 4px 0;
+  padding: 8px 10px;
+  text-align: left;
+  background: #222654;
+  border: 1px solid #3c4185;
+  color: #dde;
+  border-radius: 6px;
+  cursor: pointer;
+  font-size: 0.86em;
+}
+.settings-action:hover { background: #2e3470; border-color: var(--accent); }
+.settings-action.danger { border-color: #8f3a3a; }
+.settings-action.danger:hover { background: #5a2330; border-color: #ff6b6b; }
+.settings-note { color: #889; font-size: 0.76em; line-height: 1.5; }
 
 /* ===== サイドパネル ===== */
 #side-panel {

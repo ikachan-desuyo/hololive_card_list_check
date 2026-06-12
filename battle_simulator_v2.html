@@ -34,6 +34,31 @@
       <div id="opp-hand"></div>
       <div id="hand"></div>
 
+      <!-- 設定ボタン（フィールド右上）と設定パネル -->
+      <button id="settings-button" title="設定">⚙</button>
+      <div id="settings-panel">
+        <div class="settings-title">設定</div>
+        <div class="settings-section">
+          <div class="settings-label">ステップ送り</div>
+          <div class="settings-row" id="pause-speed-buttons">
+            <button data-speed="fast">速い</button>
+            <button data-speed="normal">普通</button>
+            <button data-speed="slow">ゆっくり</button>
+            <button data-speed="manual">手動</button>
+          </div>
+        </div>
+        <div class="settings-section">
+          <button id="copy-log-button" class="settings-action">📋 ログをコピー</button>
+          <button id="concede-p1-button" class="settings-action">🏳 プレイヤー1が投了</button>
+          <button id="concede-p2-button" class="settings-action">🏳 プレイヤー2が投了</button>
+          <button id="reset-game-button" class="settings-action danger">🔄 ゲームをリセット</button>
+        </div>
+        <div class="settings-section">
+          <div class="settings-note" id="seed-display"></div>
+          <div class="settings-note">（同じシード値とデッキで同じ展開を再現できます）</div>
+        </div>
+      </div>
+
       <div id="side-panel">
         <div id="status"></div>
         <div id="actions"></div>
