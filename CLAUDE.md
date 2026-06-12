@@ -26,6 +26,15 @@
 - 開発用URLパラメータ: `?autostart=1&seed=42&autoplay=12` で自動開始・自動プレイ
 - エンジンは「決定ポイント」方式: `engine.actions()` で選択肢取得 → `engine.apply(id)`。乱数はシード固定可（Math.random 禁止）
 
+### カード効果の実装方法（v2）
+
+- 効果定義: `battle_simulator_v2/cards/<カードナンバー>.js` + `cards/index.js` に登録（両方必須）
+- 定義の書式・フック一覧は `core/effects/registry.js` の冒頭コメントが正本
+- 効果は**ジェネレータ関数** `*run(ctx)` で書く。プレイヤー選択は `yield ctx.chooseCard(...)` / `ctx.chooseHolomem(...)` / `ctx.confirm(...)`
+- 共通処理は `core/effects/context.js` のプリミティブ（draw / searchDeck系 / rollDice / dealSpecialDamage / heal / attachCheer / addTurnModifier 等）を必ず使う。新しい共通処理が必要なら context.js に追加する
+- 装着カード（マスコット/ファン/ツール）の常時修正は `attached.artsPlus/hpPlus/specialDmgPlus`（毎回動的計算なので後始末不要）。ターン限定の修正は `ctx.addTurnModifier`（エンドステップで自動消滅）
+- **カードがどの領域にも属さない瞬間を作らないこと**（テストの保存則が落ちる）。デッキを「見る」時は `ctx.lookTopDeck`（解決領域に置く）を使う
+
 ## バトルシミュレーター v1（参照用・凍結）
 
 - 入口: `battle_simulator.html`（スクリプト読み込み順がそのまま依存順）

@@ -10,6 +10,7 @@
 
 import { CardLibrary } from '../core/cards.js';
 import { Engine } from '../core/engine.js';
+import { EffectRegistry } from '../core/effects/registry.js';
 import { STEP_NAMES } from '../core/constants.js';
 import { renderSide, renderHand, renderOppHand } from './board.js';
 
@@ -82,11 +83,18 @@ async function startGame() {
     const seedInput = document.getElementById('seed-input').value;
     const seed = seedInput ? Number(seedInput) : Math.floor(Math.random() * 1e9);
     currentSeed = seed;
+    // カード効果定義の事前読み込み（両デッキのカードナンバー）
+    const registry = new EffectRegistry();
+    const numbers = [...Object.keys(map1), ...Object.keys(map2)]
+      .map((id) => lib.get(id)?.number)
+      .filter(Boolean);
+    await registry.preload(numbers);
     engine = new Engine({
       decks: [deck1, deck2],
       seed,
       names: ['プレイヤー1', 'プレイヤー2'],
       onChange: render,
+      registry,
     });
     document.getElementById('setup-screen').style.display = 'none';
     document.getElementById('game-screen').classList.add('active');
@@ -472,8 +480,8 @@ function enqueueStepToasts(s) {
     const m = /^【(.+?)】(.*)/.exec(line);
     if (m) {
       stepToastQueue.push(m[2].includes('スキップ') ? `${m[1]}（スキップ）` : m[1]);
-    } else if (/1枚ドロー/.test(line)) {
-      stepToastQueue.push(line.replace(/^.*?: /, '')); // 「1枚ドロー（カード名）」
+    } else if (/^.*?: 1枚ドロー/.test(line) || /^🎲/.test(line) || /特攻発動/.test(line)) {
+      stepToastQueue.push(line.replace(/^.*?: /, ''));
     }
   }
   pumpStepToast();
@@ -551,9 +559,41 @@ function render() {
   wireDnD();
   renderStatus(s, handPlayer);
   renderActions(s);
+  renderEffectChoiceModal(s);
   renderLog(s);
   renderResult(s);
   handleStepPause(s);
+}
+
+/** 効果のカード選択モーダル（デッキサーチ等） */
+function renderEffectChoiceModal(s) {
+  const modal = document.getElementById('choice-modal');
+  const isCardChoice = s.pending?.type === 'effectChoice' && s.pending.request?.kind === 'chooseCard';
+  if (!isCardChoice) {
+    modal.classList.remove('active');
+    return;
+  }
+  modal.classList.add('active');
+  document.getElementById('choice-title').textContent =
+    `${s.players[s.pending.player].name}: ${s.pending.request.title || 'カードを選択'}`;
+  const grid = document.getElementById('choice-grid');
+  grid.innerHTML = '';
+  const footer = document.getElementById('choice-footer');
+  footer.innerHTML = '';
+  for (const opt of s.pending.options) {
+    if (opt.card) {
+      const c = document.createElement('div');
+      c.className = 'archive-grid-card';
+      c.innerHTML = `<img src="${opt.card.imageUrl || ''}" alt="${escapeText(opt.card.name)}" loading="lazy"><div>${escapeText(opt.card.name)}</div>`;
+      c.addEventListener('click', () => engine.apply(opt.id));
+      grid.appendChild(c);
+    } else {
+      const btn = document.createElement('button');
+      btn.textContent = opt.label;
+      btn.addEventListener('click', () => engine.apply(opt.id));
+      footer.appendChild(btn);
+    }
+  }
 }
 
 function renderStatus(s, handPlayer) {
@@ -581,6 +621,7 @@ function pendingHint(pending) {
     performance: '自分のセンター/コラボを相手のホロメンへドラッグして攻撃',
     stepPause: '進行中…（クリックで早送り）',
   };
+  if (pending.type === 'effectChoice') return pending.request?.title || 'カード効果の選択';
   return map[pending.type] || '';
 }
 
@@ -593,6 +634,11 @@ function renderActions(s) {
   hint.className = 'actions-title';
   hint.textContent = pendingHint(s.pending);
   box.appendChild(hint);
+
+  // カード選択はモーダルで行うため、ここではボタンを出さない
+  if (s.pending.type === 'effectChoice' && s.pending.request?.kind === 'chooseCard') {
+    return;
+  }
 
   // D&D で操作できない選択肢（パス・引き直し・推しスキル等）はボタンで出す
   const buttonOptions = s.pending.options.filter((opt) => !optionDnD(s.pending, opt));

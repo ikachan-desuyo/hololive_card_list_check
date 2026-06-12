@@ -771,6 +771,46 @@ body.dragging, body.dragging * { cursor: grabbing !important; }
 .archive-grid-card img { width: 100%; border-radius: 6px; display: block; }
 .archive-grid-card:hover img { outline: 2px solid var(--accent); }
 
+/* カード効果のカード選択モーダル（デッキサーチ等） */
+#choice-modal {
+  position: absolute;
+  inset: 0;
+  background: rgba(5, 5, 15, 0.78);
+  display: none;
+  align-items: center;
+  justify-content: center;
+  z-index: 92;
+}
+#choice-modal.active { display: flex; }
+#choice-content {
+  background: #141630;
+  border: 1px solid var(--accent);
+  border-radius: 12px;
+  width: min(760px, 92vw);
+  max-height: 84vh;
+  padding: 16px;
+  display: flex;
+  flex-direction: column;
+  box-shadow: 0 0 50px rgba(110, 195, 255, 0.25);
+}
+#choice-title { font-weight: bold; margin-bottom: 12px; color: #fff; }
+#choice-grid {
+  overflow-y: auto;
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(104px, 1fr));
+  gap: 10px;
+}
+#choice-footer { margin-top: 12px; display: flex; gap: 8px; justify-content: flex-end; }
+#choice-footer button {
+  padding: 8px 16px;
+  background: #222654;
+  border: 1px solid #3c4185;
+  color: #dde;
+  border-radius: 6px;
+  cursor: pointer;
+}
+#choice-footer button:hover { border-color: var(--accent); }
+
 /* 複数選択ポップアップ（アーツ選択など） */
 #chooser {
   position: fixed;

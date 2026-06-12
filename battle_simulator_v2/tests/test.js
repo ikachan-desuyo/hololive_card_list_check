@@ -9,6 +9,7 @@
 
 import { CardLibrary, CardKind } from '../core/cards.js';
 import { Engine } from '../core/engine.js';
+import { EffectRegistry } from '../core/effects/registry.js';
 import { createRng } from '../core/rng.js';
 
 const results = [];
@@ -16,6 +17,17 @@ const results = [];
 function test(name, fn) {
   try {
     fn();
+    results.push({ name, ok: true });
+    console.log(`TEST PASS: ${name}`);
+  } catch (e) {
+    results.push({ name, ok: false, error: e.message });
+    console.error(`TEST FAIL: ${name} — ${e.message}`);
+  }
+}
+
+async function testAsync(name, fn) {
+  try {
+    await fn();
     results.push({ name, ok: true });
     console.log(`TEST PASS: ${name}`);
   } catch (e) {
@@ -44,12 +56,20 @@ function totalCards(p) {
   return n;
 }
 
+/** デッキマップから効果レジストリを構築 */
+async function buildRegistry(lib, deckMap) {
+  const registry = new EffectRegistry();
+  await registry.preload(Object.keys(deckMap).map((id) => lib.get(id)?.number).filter(Boolean));
+  return registry;
+}
+
 /** ランダムプレイアウト: シード付きで最後まで自動プレイし、不変条件を検査 */
-function randomPlayout(lib, deckMap, seed, maxApplies = 5000) {
+async function randomPlayout(lib, deckMap, seed, maxApplies = 5000) {
   const deck0 = lib.buildGameDeck(deckMap);
   const deck1 = lib.buildGameDeck(deckMap);
   assert(deck0.errors.length === 0, `デッキエラー: ${deck0.errors.join(', ')}`);
-  const engine = new Engine({ decks: [deck0, deck1], seed, names: ['P1', 'P2'] });
+  const registry = await buildRegistry(lib, deckMap);
+  const engine = new Engine({ decks: [deck0, deck1], seed, names: ['P1', 'P2'], registry });
   const rng = createRng(seed + 999);
   engine.start();
   let applies = 0;
@@ -204,9 +224,9 @@ export async function runTests() {
     assertEq(e.state.turnPlayer, 0);
   });
 
-  test('ランダムプレイアウト×5シード（保存則・クラッシュ無し・決着）', () => {
+  await testAsync('ランダムプレイアウト×5シード（保存則・クラッシュ無し・決着）', async () => {
     for (const seed of [1, 2, 3, 4, 5]) {
-      const { engine, applies } = randomPlayout(lib, deckMap, seed);
+      const { engine, applies } = await randomPlayout(lib, deckMap, seed);
       assert(
         engine.state.phase === 'ended',
         `seed=${seed}: ${applies}手で決着しなかった`
@@ -218,12 +238,111 @@ export async function runTests() {
     }
   });
 
-  test('同一シードなら同一結果（再現性）', () => {
-    const a = randomPlayout(lib, deckMap, 7);
-    const b = randomPlayout(lib, deckMap, 7);
+  await testAsync('同一シードなら同一結果（再現性）', async () => {
+    const a = await randomPlayout(lib, deckMap, 7);
+    const b = await randomPlayout(lib, deckMap, 7);
     assertEq(a.applies, b.applies, '手数が一致しない');
     assertEq(a.engine.state.winner, b.engine.state.winner, '勝者が一致しない');
     assertEq(a.engine.state.logs.length, b.engine.state.logs.length, 'ログ数が一致しない');
+  });
+
+  // ---- カード効果のシナリオテスト ----
+
+  /** セットアップを済ませてメインステップまで進めたエンジンを作る */
+  async function setupMainStep(deckMapArg, seed) {
+    const d0 = lib.buildGameDeck(deckMapArg);
+    const d1 = lib.buildGameDeck(deckMapArg);
+    const registry = await buildRegistry(lib, deckMapArg);
+    const e = new Engine({ decks: [d0, d1], seed, firstPlayer: 0, names: ['P1', 'P2'], registry });
+    e.start();
+    while (e.state.pending && e.state.phase === 'setup') {
+      const pd = e.state.pending;
+      if (pd.type === 'redraw') e.apply('no');
+      else if (pd.type === 'placementBack') e.apply('done');
+      else e.apply(pd.options[0].id);
+    }
+    while (e.state.pending && !(e.state.step === 'main' && e.state.pending.type === 'main')) {
+      e.apply(e.state.pending.options[0].id);
+    }
+    return e;
+  }
+
+  /** 効果の選択が出ている間、最初の選択肢を選び続けてメインに戻す */
+  function resolveChoices(e, pick = () => 0) {
+    let guard = 0;
+    while (e.state.pending && e.state.pending.type === 'effectChoice' && guard++ < 50) {
+      const options = e.state.pending.options;
+      e.apply(options[Math.min(pick(options), options.length - 1)].id);
+    }
+  }
+
+  await testAsync('サポート効果: 春先のどか で3枚ドロー→アーカイブ', async () => {
+    const e = await setupMainStep(deckMap, 11);
+    e.state.turn = 3; // LIMITED の先攻1ターン目制限を回避
+    const p = e.state.players[0];
+    const nodoka = lib.get('hSD01-016_C');
+    p.hand.push(nodoka);
+    e._queueMainPending();
+    const action = e.actions().find((a) => a.kind === 'support' && p.hand[a.handIndex] === nodoka);
+    assert(action, '春先のどかをプレイできない');
+    const handBefore = p.hand.length;
+    const deckBefore = p.deck.length;
+    e.apply(action.id);
+    resolveChoices(e);
+    assertEq(p.hand.length, handBefore - 1 + 3, '手札が-1+3になっていない');
+    assertEq(p.deck.length, deckBefore - 3, 'デッキが3枚減っていない');
+    assert(p.archive.includes(nodoka), '使用後にアーカイブされていない');
+  });
+
+  await testAsync('サポート使用条件: マネちゃんは手札が他に無いと使えない', async () => {
+    const e = await setupMainStep(deckMap, 12);
+    e.state.turn = 3;
+    const p = e.state.players[0];
+    const mane = lib.get('hSD01-017_02_C') || lib.get('hSD01-017_C');
+    p.hand = [mane]; // 他に手札なし
+    e._queueMainPending();
+    assert(!e.actions().some((a) => a.kind === 'support'), '手札1枚なのにマネちゃんが使えてしまう');
+    p.hand = [mane, lib.get('hBP04-043_C')];
+    e._queueMainPending();
+    const action = e.actions().find((a) => a.kind === 'support');
+    assert(action, '条件を満たしてもマネちゃんが使えない');
+    e.apply(action.id);
+    resolveChoices(e);
+    assertEq(p.hand.length, 5, '手札5枚になっていない（戻して5枚ドロー）');
+  });
+
+  await testAsync('雪民: 付け先制限と特殊ダメージ修正', async () => {
+    const e = await setupMainStep(deckMap, 13);
+    const yukimin = lib.get('hBP04-106_U');
+    const lamy = e._createHolomem(lib.get('hBP04-043_C'), 1);
+    const shion = e._createHolomem(lib.get('hBP02-042_C'), 1);
+    assert(e._canAttachSupport(lamy, yukimin), '雪花ラミィに雪民が付けられない');
+    assert(!e._canAttachSupport(shion, yukimin), '雪花ラミィ以外に雪民が付けられてしまう');
+    lamy.attachments.push(yukimin, yukimin); // 何枚でも付けられる
+    const bonusCenter = e.effects.specialDamageBonus(lamy, { pos: { zone: 'center' }, holomem: shion, top: shion.stack[0] }, 0);
+    const bonusBack = e.effects.specialDamageBonus(lamy, { pos: { zone: 'back' }, holomem: shion, top: shion.stack[0] }, 0);
+    assertEq(bonusCenter, 20, '雪民2枚で相手センターへの特殊ダメージ+20になっていない');
+    assertEq(bonusBack, 0, 'センター以外なのに修正が乗っている');
+  });
+
+  await testAsync('だいふく: アーツ+10とラミィ限定HP+20（実効HP）', async () => {
+    const e = await setupMainStep(deckMap, 14);
+    const p = e.state.players[0];
+    const daifuku = lib.get('hBP04-101_C');
+    const lamy = e._createHolomem(lib.get('hBP04-043_C'), 1); // HP90
+    lamy.attachments.push(daifuku);
+    p.back.push(lamy);
+    assertEq(e.effects.artsBonus(lamy, 0), 10, 'アーツ+10が乗っていない');
+    assertEq(e.effectiveHp(lamy), 110, 'HP90+20=110になっていない');
+  });
+
+  await testAsync('ターン修正: アーツ+20がエンドステップで消滅する', async () => {
+    const e = await setupMainStep(deckMap, 15);
+    const p = e.state.players[0];
+    e.state.modifiers.push({ kind: 'artsPlus', amount: 20, ownerIdx: 0, duration: 'turn' });
+    assertEq(e.effects.artsBonus(p.center, 0), 20, 'ターン修正が乗っていない');
+    e.effects.expireTurnModifiers();
+    assertEq(e.effects.artsBonus(p.center, 0), 0, 'ターン修正が消えていない');
   });
 
   // ---- 結果出力 ----

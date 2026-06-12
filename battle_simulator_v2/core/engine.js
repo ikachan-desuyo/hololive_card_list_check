@@ -15,6 +15,9 @@
 import { COLORLESS, STAGE_LIMIT, MULLIGAN_LIMIT, INITIAL_HAND, STEP_NAMES, LOSS_REASONS } from './constants.js';
 import { CardKind } from './cards.js';
 import { createRng, shuffle } from './rng.js';
+import { EffectContext } from './effects/context.js';
+import { EffectSystem } from './effects/system.js';
+import { EffectRegistry } from './effects/registry.js';
 
 /** ステージのホロメン1人分（カードのスタック + 付帯情報）(4.4) */
 function createHolomem(card, turn) {
@@ -69,6 +72,9 @@ export class Engine {
     this.onChange = opts.onChange || (() => {});
     // ステップ境界に「間」を入れる（UIが自動で進めることでドロー等の瞬間を見せる）
     this.stepPauses = opts.stepPauses !== false;
+    // カード効果システム（registry は事前に preload しておくこと）
+    this.registry = opts.registry || new EffectRegistry();
+    this.effects = new EffectSystem(this, this.registry);
     const names = opts.names || ['プレイヤー1', 'プレイヤー2'];
     this.state = {
       phase: 'setup',          // 'setup' | 'playing' | 'ended'
@@ -84,6 +90,7 @@ export class Engine {
       winner: null,            // 0 | 1 | 'draw'
       lossReason: null,
       logs: [],
+      modifiers: [],           // ターン中などの継続修正（EffectSystem が管理）
       perfUsed: { center: false, collab: false }, // このパフォーマンスステップでアーツ使用済みか (9.2.1.3-5)
     };
     this._setupQueue = [];
@@ -142,6 +149,67 @@ export class Engine {
 
   concede(player) {
     this._setWinner(1 - player, LOSS_REASONS.CONCEDE, player);
+    this.onChange();
+  }
+
+  /** ホロメンの実効HP（カードのHP + 装着・継続効果のHP修正） */
+  effectiveHp(holomem) {
+    const ownerIdx = this.state.players.findIndex((p) =>
+      this._stageHolomems(p).includes(holomem));
+    return (holomem.stack[0].hp ?? 0) + this.effects.hpBonus(holomem, ownerIdx);
+  }
+
+  // ============ 効果の実行（ジェネレータランナー） ============
+
+  /**
+   * 効果（ジェネレータ）を実行する。yield された選択要求は決定ポイントに変換し、
+   * 選択後に再開する。完了したら after() を呼ぶ。
+   */
+  _runEffect(effectDef, ctxOpts, after) {
+    if (!effectDef?.run) {
+      after();
+      return;
+    }
+    const ctx = new EffectContext(this, ctxOpts.playerIdx, ctxOpts);
+    let gen;
+    try {
+      gen = effectDef.run(ctx);
+    } catch (e) {
+      this.log(`⚠️ 効果の開始に失敗: ${e.message}`);
+      after();
+      return;
+    }
+    this._stepEffect(gen, undefined, after);
+  }
+
+  _stepEffect(gen, input, after) {
+    let r;
+    try {
+      r = gen.next(input);
+    } catch (e) {
+      this.log(`⚠️ 効果の実行中にエラー: ${e.message}`);
+      console.error(e);
+      after();
+      return;
+    }
+    if (r.done) {
+      after();
+      return;
+    }
+    const request = r.value; // EffectContext.chooseXxx() が返す選択要求
+    const options = request.buildOptions();
+    if (options.length === 0 || (options.length === 1 && options[0].id === 'skip')) {
+      // 選択肢なし（または「選ばない」のみ）→ null で再開
+      this._stepEffect(gen, null, after);
+      return;
+    }
+    this.state.pending = {
+      type: 'effectChoice',
+      player: request.player,
+      request,
+      options,
+      resume: (value) => this._stepEffect(gen, value, after),
+    };
     this.onChange();
   }
 
@@ -459,12 +527,15 @@ export class Engine {
     }
 
     // 8.5 推しスキル（ターン1回 / SPはゲーム1回）。コストはホロパワー。
+    // 効果が実装済みのスキルのみ提示する（未実装スキルでコストだけ払う事故を防ぐ）
+    const oshiDef = this.registry.get(p.oshi.number);
     (p.oshi.oshiSkills || []).forEach((skill, i) => {
       if (skill.sp ? p.usedSpOshiSkillThisGame : p.usedOshiSkillThisTurn) return;
       if (skill.cost === 'X') return; // X コストは未対応（TODO: 効果システムと同時に対応）
       // 「～時に使える」系はメインステップでは使えない (12.1.5)
       if (/[すし]た?時に使える/.test(skill.text)) return;
       if (p.holoPower.length < skill.cost) return;
+      if (!(skill.sp ? oshiDef?.spOshiSkill : oshiDef?.oshiSkill)) return;
       actions.push({
         id: `oshi_${i}`,
         label: `${skill.sp ? 'SP' : ''}推しスキル発動（ホロパワー-${skill.cost}）`,
@@ -477,6 +548,12 @@ export class Engine {
       if (c.kind !== CardKind.SUPPORT) return;
       // LIMITED: ターン1枚、先攻の1ターン目は不可 (8.6.2)
       if (c.limited && (p.usedLimitedThisTurn || (s.turn === 1 && idx === s.firstPlayer))) return;
+      // カード固有の使用条件（手札枚数条件など）
+      const supportDef = this.registry.get(c.number)?.support;
+      if (supportDef?.canUse) {
+        const ctx = new EffectContext(this, idx, { sourceCard: c });
+        if (!supportDef.canUse(ctx)) return;
+      }
       const attachType = ['ツール', 'マスコット', 'ファン'].includes(c.supportType);
       if (attachType) {
         for (const pos of this._stagePositions(p)) {
@@ -569,7 +646,9 @@ export class Engine {
     const p = s.players[s.turnPlayer];
     s.step = 'end';
     this.log(`【${STEP_NAMES.end}】`);
-    // TODO(効果システム): 「ターンの終わりに」誘発、「ターン中」効果の消滅 (7.7.3-4)
+    // 7.7.4: 「ターンの終わりまで」効果の消滅
+    this.effects.expireTurnModifiers();
+    // TODO(効果システム): 「ターンの終わりに」誘発 (7.7.3)
     // 7.7.5: センター補充（バックが空ならコラボがいても空のまま）
     this._queueCenterRefill(p, () => {
       this._startTurn(1 - s.turnPlayer);
@@ -658,6 +737,9 @@ export class Engine {
       case 'stepPause':
         pending.next();
         break;
+      case 'effectChoice':
+        pending.resume(action.value);
+        break;
       case 'main':
         this._executeMainAction(action);
         break;
@@ -672,6 +754,9 @@ export class Engine {
   _executeMainAction(action) {
     const s = this.state;
     const p = s.players[s.turnPlayer];
+    // 8.1.2: アクション1回ごとにチェックタイミング
+    const finish = () => this._checkTiming(() => this._queueMainPending());
+
     switch (action.kind) {
       case 'pass':
         this._performanceStep();
@@ -688,10 +773,15 @@ export class Engine {
         h.stack.unshift(card); // 上に重ねる (5.14)
         h.bloomedTurn = s.turn;
         this.log(`${p.name}: ${h.stack[1].name} → ${card.name}〔${card.bloomLevel}〕にBloom`);
-        const bloomEffect = card.keywords.find((k) => k.subtype === 'ブルームエフェクト');
-        if (bloomEffect) {
-          this.log(`TODO(効果未実装) ブルームエフェクト「${bloomEffect.name}」: ${bloomEffect.text}`);
+        // ブルームエフェクト (13.3)
+        const def = this.registry.get(card.number);
+        if (def?.bloomEffect) {
+          this.log(`《ブルームエフェクト》${def.bloomEffect.name}`);
+          this._runEffect(def.bloomEffect, { playerIdx: s.turnPlayer, sourceCard: card, sourceHolomem: h }, finish);
+          return;
         }
+        const kw = card.keywords.find((k) => k.subtype === 'ブルームエフェクト');
+        if (kw) this.log(`TODO(効果未実装) ブルームエフェクト「${kw.name}」: ${kw.text}`);
         break;
       }
       case 'collab': {
@@ -703,10 +793,15 @@ export class Engine {
           p.holoPower.push(p.deck.shift());
         }
         this.log(`${p.name}: ${topCard(h).name} がコラボ（ホロパワー+1）`);
-        const collabEffect = topCard(h).keywords.find((k) => k.subtype === 'コラボエフェクト');
-        if (collabEffect) {
-          this.log(`TODO(効果未実装) コラボエフェクト「${collabEffect.name}」: ${collabEffect.text}`);
+        // コラボエフェクト (13.2)
+        const def = this.registry.get(topCard(h).number);
+        if (def?.collabEffect) {
+          this.log(`《コラボエフェクト》${def.collabEffect.name}`);
+          this._runEffect(def.collabEffect, { playerIdx: s.turnPlayer, sourceCard: topCard(h), sourceHolomem: h }, finish);
+          return;
         }
+        const kw = topCard(h).keywords.find((k) => k.subtype === 'コラボエフェクト');
+        if (kw) this.log(`TODO(効果未実装) コラボエフェクト「${kw.name}」: ${kw.text}`);
         break;
       }
       case 'oshiSkill': {
@@ -715,14 +810,31 @@ export class Engine {
         if (skill.sp) p.usedSpOshiSkillThisGame = true;
         else p.usedOshiSkillThisTurn = true;
         this.log(`${p.name}: ${skill.sp ? 'SP' : ''}推しスキル発動（ホロパワー-${skill.cost}）`);
+        const def = this.registry.get(p.oshi.number);
+        const skillDef = skill.sp ? def?.spOshiSkill : def?.oshiSkill;
+        if (skillDef) {
+          this._runEffect(skillDef, { playerIdx: s.turnPlayer, sourceCard: p.oshi }, finish);
+          return;
+        }
         this.log(`TODO(効果未実装) 推しスキル: ${skill.text}`);
         break;
       }
       case 'support': {
         const card = p.hand.splice(action.handIndex, 1)[0];
         if (card.limited) p.usedLimitedThisTurn = true;
-        p.archive.push(card); // アイテム/イベント/スタッフは解決後アーカイブ (10.7.2.5.1.1)
         this.log(`${p.name}: サポート ${card.name} を使用`);
+        const def = this.registry.get(card.number);
+        if (def?.support) {
+          // 解決中は解決領域(4.16)に置き、解決後にアーカイブ (10.7.2.5.1.1)
+          p.revealed.push(card);
+          this._runEffect(def.support, { playerIdx: s.turnPlayer, sourceCard: card }, () => {
+            p.revealed.splice(p.revealed.indexOf(card), 1);
+            p.archive.push(card);
+            finish();
+          });
+          return;
+        }
+        p.archive.push(card);
         this.log(`TODO(効果未実装) サポート効果: ${(card.supportText || '').split('\n')[0]}`);
         break;
       }
@@ -745,8 +857,7 @@ export class Engine {
         break;
       }
     }
-    // 8.1.2: アクション1回ごとにチェックタイミング
-    this._checkTiming(() => this._queueMainPending());
+    finish();
   }
 
   _executePerformanceAction(action) {
@@ -760,30 +871,62 @@ export class Engine {
     const h = p[action.zone];
     const card = topCard(h);
     const art = card.arts[action.artIndex];
-    const target = opp[action.target.zone];
-    const targetCard = topCard(target);
 
     s.perfUsed[action.zone] = true;
+    this.log(`${card.name} のアーツ「${art.name}」！`);
+
+    const artDef = this.registry.getArt(card.number, art.name);
+    const ctxOpts = { playerIdx: s.turnPlayer, sourceCard: card, sourceHolomem: h };
 
     // アーツ解決パイプライン（RULES_SPEC §12 / 12.3.4）
-    let dmg = art.dmg;
-    if (art.text) {
-      this.log(`TODO(効果未実装) アーツ効果: ${art.text}`);
-    }
-    // 特攻: 対象の色が一致するなら加算 (12.3.4.3)
-    for (const tk of art.tokkou || []) {
-      if (targetCard.color === tk.color) {
-        dmg += tk.value;
-        this.log(`特攻発動！ ${tk.color}+${tk.value}`);
+    // 段階4: テキスト効果 → 段階5: 特攻 → 段階6: 数値決定 → 段階7: ダメージ適用
+    const resolveDamage = () => {
+      const target = opp[action.target.zone];
+      if (!target) {
+        // テキスト効果で対象が場を離れた場合、ダメージは適用されない
+        this.log('対象がいなくなったため、アーツダメージは発生しなかった');
+        this._checkTiming(() => this._queuePerformancePending());
+        return;
       }
+      const targetCard = topCard(target);
+      let dmg = art.dmg;
+      // 条件付き「このアーツ+N」（カード定義の dmgBonus）
+      if (artDef?.dmgBonus) {
+        const ctx = new EffectContext(this, s.turnPlayer, ctxOpts);
+        const bonus = artDef.dmgBonus(ctx) || 0;
+        if (bonus > 0) {
+          dmg += bonus;
+          this.log(`アーツ効果: +${bonus}`);
+        }
+      }
+      // 特攻: 対象の色が一致するなら加算 (12.3.4.3)
+      for (const tk of art.tokkou || []) {
+        if (targetCard.color === tk.color) {
+          dmg += tk.value;
+          this.log(`特攻発動！ ${tk.color}+${tk.value}`);
+        }
+      }
+      // その他の修正: 装着カード（マスコット等）・ターン中の継続効果 (12.3.4.4)
+      const mod = this.effects.artsBonus(h, s.turnPlayer);
+      if (mod !== 0) {
+        dmg += mod;
+        this.log(`継続効果・装着カードの修正: ${mod > 0 ? '+' : ''}${mod}`);
+      }
+      target.damage += dmg;
+      this.log(
+        `「${art.name}」→ ${targetCard.name} に ${dmg}ダメージ` +
+        `（累計${target.damage}/${this.effectiveHp(target)}）`
+      );
+      // 9.1.2: アーツ1回ごとにチェックタイミング
+      this._checkTiming(() => this._queuePerformancePending());
+    };
+
+    if (artDef?.run) {
+      this._runEffect(artDef, ctxOpts, resolveDamage);
+    } else {
+      if (art.text) this.log(`TODO(効果未実装) アーツ効果: ${art.text}`);
+      resolveDamage();
     }
-    target.damage += dmg;
-    this.log(
-      `${card.name}「${art.name}」→ ${targetCard.name} に ${dmg}ダメージ` +
-      `（累計${target.damage}/${targetCard.hp}）`
-    );
-    // 9.1.2: アーツ1回ごとにチェックタイミング
-    this._checkTiming(() => this._queuePerformancePending());
   }
 
   // ============ チェックタイミング (10.6 / 11章) ============
@@ -798,7 +941,7 @@ export class Engine {
     const s = this.state;
     if (s.phase === 'ended') return;
 
-    // 1) ダウン処理 (11.3): ターンプレイヤー側から
+    // 1) ダウン処理 (11.3): ターンプレイヤー側から。HPは装着・継続効果込みの実効値
     let downsProcessed = true;
     while (downsProcessed) {
       downsProcessed = false;
@@ -806,7 +949,7 @@ export class Engine {
         const p = s.players[idx];
         const downed = this._stagePositions(p).find((pos) => {
           const h = this._holomemAt(p, pos);
-          return h.damage >= topCard(h).hp;
+          return h.damage >= this.effectiveHp(h);
         });
         if (downed) {
           this._processDown(p, downed);
@@ -870,7 +1013,12 @@ export class Engine {
     // ホロメンの全カードと付いているカードをアーカイブ (11.3.1.2 / 4.4.7)
     p.archive.push(...h.stack, ...h.cheers, ...h.attachments);
     this._removeHolomem(p, pos);
-    // ライフダメージ: 通常1、Buzzは2 (2.11.2.2)
+    // ライフダメージ: 通常1、Buzzは2 (2.11.2.2)。
+    // 「ダウンしてもライフは減らない」特殊ダメージでダウンした場合は0
+    if (h.noLifeOnDown) {
+      this.log(`${p.name} のライフは減らない（効果による）`);
+      return;
+    }
     const lifeDmg = card.buzz ? 2 : 1;
     p.lifeDamage += lifeDmg;
     this.log(`${p.name} はライフダメージ${lifeDmg}を受けた`);
@@ -886,6 +1034,15 @@ export class Engine {
   }
 
   // ============ ヘルパー ============
+
+  /** EffectContext から使うヘルパー */
+  _createHolomem(card, turn) {
+    return createHolomem(card, turn);
+  }
+
+  _shuffle(arr) {
+    shuffle(arr, this.rng);
+  }
 
   _autoResolve() {
     // 選択肢が1つだけの強制選択は自動適用（UX簡略化。テストでも便利）
@@ -953,15 +1110,21 @@ export class Engine {
     return false;
   }
 
-  /** サポート付け上限 (5.17.3): ツール1 / マスコット1（ホロメン1人につき） */
+  /** サポート付け上限 (5.17.3): ツール1 / マスコット1（ホロメン1人につき）+ カード固有の制限 */
   _canAttachSupport(h, card) {
+    // カード定義に付け先ルールがあれば優先（雪民: 雪花ラミィのみ・何枚でも 等）
+    const rule = this.registry.get(card.number)?.attachRule;
+    if (rule) {
+      if (rule.canAttach && !rule.canAttach(h)) return false;
+      if (rule.unlimited) return true;
+    }
     if (card.supportType === 'ツール') {
       return !h.attachments.some((a) => a.supportType === 'ツール');
     }
     if (card.supportType === 'マスコット') {
       return !h.attachments.some((a) => a.supportType === 'マスコット');
     }
-    return true; // ファンはカードテキストによる（未実装の間は無制限）
+    return true; // ファンはカードテキストによる
   }
 
   /**
