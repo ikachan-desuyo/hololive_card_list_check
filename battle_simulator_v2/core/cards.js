@@ -139,7 +139,40 @@ export class CardLibrary {
   }
 
   /**
-   * デッキ定義（{ フルID: 枚数 }）を検証付きでゲームデッキに展開する。
+   * 入力デッキ定義を { フルID: 枚数 } の形に正規化する。
+   * 受け付ける形式:
+   *   - { id: 枚数 }                         … 本ツール標準
+   *   - [ id, id, ... ]                      … デッキビルダー保存形式（カードIDの配列。1枚=1要素）
+   *   - { oshi, holomen[], support[], yell[] } … deck_manager の構造化形式（要素はカードオブジェクトかID）
+   * 配列をそのまま buildGameDeck に渡すと Object.entries が添字(0,1,2…)をIDとして拾い
+   * 「カードが見つかりません: 0」になるため、ここで吸収する。
+   */
+  static normalizeDeckMap(deckMap) {
+    const idOf = (c) => (typeof c === 'string' ? c : (c && (c.id || c.number)) || null);
+    const countInto = (map, items) => {
+      for (const it of items || []) {
+        const id = idOf(it);
+        if (id) map[id] = (map[id] || 0) + 1;
+      }
+    };
+    if (Array.isArray(deckMap)) {
+      const map = {};
+      countInto(map, deckMap);
+      return map;
+    }
+    if (deckMap && (deckMap.holomen || deckMap.support || deckMap.yell || deckMap.oshi)) {
+      const map = {};
+      if (deckMap.oshi) countInto(map, [deckMap.oshi]);
+      countInto(map, deckMap.holomen);
+      countInto(map, deckMap.support);
+      countInto(map, deckMap.yell);
+      return map;
+    }
+    return deckMap || {};
+  }
+
+  /**
+   * デッキ定義（{ フルID: 枚数 } / カードID配列 / 構造化形式）を検証付きでゲームデッキに展開する。
    * 戻り値: { oshi, deck: [card...], cheerDeck: [card...], errors: [...] }
    */
   buildGameDeck(deckMap) {
@@ -148,7 +181,8 @@ export class CardLibrary {
     const deck = [];
     const cheerDeck = [];
 
-    for (const [id, count] of Object.entries(deckMap)) {
+    const normalized = CardLibrary.normalizeDeckMap(deckMap);
+    for (const [id, count] of Object.entries(normalized)) {
       const card = this.get(id);
       if (!card) {
         errors.push(`カードが見つかりません: ${id}`);
