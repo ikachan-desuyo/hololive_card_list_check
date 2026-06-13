@@ -25,6 +25,7 @@ export default {
         if (target) {
           ctx.removeFromCheerDeck(picked);
           ctx.log(`${ctx.player.name}: エールデッキから ${picked.name} を公開`);
+          ctx.flashReveal(picked);
           ctx.attachCheer(picked, target.holomem);
         }
       }

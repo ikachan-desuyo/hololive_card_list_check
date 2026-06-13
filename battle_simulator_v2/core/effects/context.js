@@ -262,11 +262,17 @@ export class EffectContext {
     if (i !== -1) this.player.cheerDeck.splice(i, 1);
   }
 
+  /** 効果でカードを公開した時、UIに大きく表示させる */
+  flashReveal(card) {
+    this.engine.flashReveal(card);
+  }
+
   /** エールデッキの上から1枚公開してホロメンに送る (5.21.2) */
   sendCheerFromCheerDeckTop(holomem) {
     if (this.player.cheerDeck.length === 0) return null;
     const cheer = this.player.cheerDeck.shift();
     this.log(`${this.player.name}: エールデッキから ${cheer.name} を公開`);
+    this.flashReveal(cheer); // どのエールが出たかを画面に大きく見せる
     this.attachCheer(cheer, holomem);
     return cheer;
   }

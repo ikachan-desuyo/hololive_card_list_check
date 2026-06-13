@@ -220,8 +220,13 @@ html, body {
   height: var(--card-h);
   flex-shrink: 0;
   cursor: pointer;
+  z-index: 1;
 }
-.holomem-group.rested { transform: rotate(90deg) scale(0.92); }
+/* お休み（横向き）は隣のカードと重なるため、バッジが隠れないよう前面に出す */
+.holomem-group.rested { transform: rotate(90deg) scale(0.92); z-index: 2; }
+/* お休み中もHPバッジは読める向きに戻す */
+.holomem-group.rested .badge { transform: rotate(-90deg); }
+.side.opponent .holomem-group.rested .badge { transform: rotate(90deg); }
 .holomem-group .holomem-main { position: relative; }
 .holomem-group:hover .holomem-main::after { background: rgba(255, 255, 255, 0.16); }
 
@@ -582,6 +587,39 @@ body.dragging, body.dragging * { cursor: grabbing !important; }
   26% { transform: translate(-50%, -50%) scale(1) rotate(0deg); }
   82% { opacity: 1; }
   100% { opacity: 0; transform: translate(-50%, -50%) scale(0.95); }
+}
+
+/* ===== 効果で公開されたカードの大型表示 ===== */
+#reveal-overlay {
+  position: absolute;
+  left: calc(50% - 160px);
+  top: 38%;
+  transform: translate(-50%, -50%);
+  display: none;
+  flex-direction: column;
+  align-items: center;
+  gap: 10px;
+  z-index: 99;
+  pointer-events: none;
+}
+#reveal-overlay.show {
+  display: flex;
+  animation: dice-inout 2.2s ease forwards; /* サイコロと同じ出入り */
+}
+#reveal-image {
+  width: 170px;
+  border-radius: 12px;
+  border: 2px solid var(--accent);
+  box-shadow: 0 16px 50px rgba(0, 0, 0, 0.75);
+}
+#reveal-label {
+  background: rgba(10, 12, 32, 0.92);
+  border: 1px solid var(--accent);
+  border-radius: 10px;
+  padding: 5px 22px;
+  font-size: 1.1em;
+  font-weight: bold;
+  color: #fff;
 }
 
 /* ===== ターン切り替え通知 ===== */
@@ -1001,6 +1039,23 @@ body.dragging, body.dragging * { cursor: grabbing !important; }
 #choice-restore.show { display: block; }
 .archive-grid-card.display-only { opacity: 0.45; cursor: default; }
 .archive-grid-card.display-only:hover img { outline: none; }
+/* 選択→確定の2段階: 選択中のカードを強調 */
+.archive-grid-card.selectable.selected img {
+  outline: 4px solid var(--accent);
+  box-shadow: 0 0 18px rgba(110, 195, 255, 0.7);
+}
+#choice-confirm {
+  background: linear-gradient(135deg, #2a8f4a, #3aaf5f) !important;
+  border-color: #5fcf8f !important;
+  font-weight: bold;
+  min-width: 110px;
+}
+#choice-confirm:disabled {
+  background: #20223f !important;
+  border-color: #34386b !important;
+  color: #667 !important;
+  cursor: default;
+}
 #choice-grid {
   overflow-y: auto;
   display: grid;

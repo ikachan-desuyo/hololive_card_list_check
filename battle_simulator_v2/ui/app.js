@@ -594,6 +594,24 @@ function showDice(value) {
   overlay.classList.add('show');
 }
 
+/** 効果で公開されたカード（エール等）を中央に大きく表示 */
+let lastRevealSeq = 0;
+
+function handleCardReveal(s) {
+  const reveal = s.lastReveal;
+  if (!reveal || reveal.seq === lastRevealSeq) return;
+  lastRevealSeq = reveal.seq;
+  diceShownAt = Date.now(); // サイコロと同様、表示中は選択モーダルを遅延させる
+  const overlay = document.getElementById('reveal-overlay');
+  const img = document.getElementById('reveal-image');
+  img.src = reveal.card.imageUrl || '';
+  img.alt = reveal.card.name;
+  document.getElementById('reveal-label').textContent = `公開: ${reveal.card.name}`;
+  overlay.classList.remove('show');
+  void overlay.offsetWidth;
+  overlay.classList.add('show');
+}
+
 /** 常時表示のステップ進行バー */
 const STEP_ORDER = ['reset', 'draw', 'cheer', 'main', 'performance', 'end'];
 const STEP_SHORT = { reset: 'リセット', draw: '手札', cheer: 'エール', main: 'メイン', performance: 'パフォーマンス', end: 'エンド' };
@@ -644,6 +662,7 @@ function render() {
   notifyTurnChange(s);
   renderStepBar(s);
   enqueueStepToasts(s);
+  handleCardReveal(s);
 
   // 手札表示: 人間が1人だけなら常にその人の手札を固定表示（AIの手札は見せない）
   const humans = [0, 1].filter((i) => !aiEnabled(i));
@@ -677,6 +696,7 @@ function render() {
 const DICE_MODAL_DELAY_MS = 1500;
 let diceDelayTimer = null;
 let lastChoicePending = null; // 新しい選択になったらピーク状態を解除するための参照
+let selectedChoiceId = null;  // カード選択モーダルの「選択中」状態（確定前）
 
 function renderEffectChoiceModal(s) {
   const modal = document.getElementById('choice-modal');
@@ -737,9 +757,10 @@ function renderEffectChoiceModal(s) {
     return;
   }
   modal.classList.add('active');
-  // 新しい選択が来たらピーク（盤面確認）状態を解除する
+  // 新しい選択が来たらピーク（盤面確認）と選択状態を解除する
   if (lastChoicePending !== s.pending) {
     lastChoicePending = s.pending;
+    selectedChoiceId = null;
     modal.classList.remove('peek');
     document.getElementById('choice-restore').classList.remove('show');
   }
@@ -749,12 +770,28 @@ function renderEffectChoiceModal(s) {
   grid.innerHTML = '';
   const footer = document.getElementById('choice-footer');
   footer.innerHTML = '';
+
+  // 確定ボタン（カードをクリック→選択表示→確定、の2段階で誤クリックを防ぐ）
+  const confirmBtn = document.createElement('button');
+  confirmBtn.id = 'choice-confirm';
+  confirmBtn.textContent = '✔ 確定';
+  confirmBtn.disabled = selectedChoiceId == null;
+  confirmBtn.addEventListener('click', () => {
+    if (selectedChoiceId != null) engine.apply(selectedChoiceId);
+  });
+
+  const hasCards = s.pending.options.some((o) => o.card);
   for (const opt of s.pending.options) {
     if (opt.card) {
       const c = document.createElement('div');
-      c.className = 'archive-grid-card';
+      c.className = 'archive-grid-card selectable' + (selectedChoiceId === opt.id ? ' selected' : '');
       c.innerHTML = `<img src="${opt.card.imageUrl || ''}" alt="${escapeText(opt.card.name)}" loading="lazy"><div>${escapeText(opt.card.name)}</div>`;
-      c.addEventListener('click', () => engine.apply(opt.id));
+      c.addEventListener('click', () => {
+        selectedChoiceId = opt.id;
+        for (const el of grid.querySelectorAll('.selected')) el.classList.remove('selected');
+        c.classList.add('selected');
+        confirmBtn.disabled = false;
+      });
       grid.appendChild(c);
     } else {
       const btn = document.createElement('button');
@@ -763,6 +800,8 @@ function renderEffectChoiceModal(s) {
       footer.appendChild(btn);
     }
   }
+  if (hasCards) footer.appendChild(confirmBtn);
+
   // 選択対象外だが公開されているカード（「上からN枚見る」の残り等）はグレー表示
   for (const card of s.pending.request.displayCards || []) {
     const c = document.createElement('div');

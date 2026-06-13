@@ -91,9 +91,16 @@ export class Engine {
       lossReason: null,
       logs: [],
       modifiers: [],           // ターン中などの継続修正（EffectSystem が管理）
+      lastReveal: null,        // 効果による公開カードの演出用 { card, seq }（UIが監視）
       perfUsed: { center: false, collab: false }, // このパフォーマンスステップでアーツ使用済みか (9.2.1.3-5)
     };
     this._setupQueue = [];
+    this._revealSeq = 0;
+  }
+
+  /** 効果でカードを公開した時の演出通知（UIが lastReveal を監視して大きく表示する） */
+  flashReveal(card) {
+    this.state.lastReveal = { card, seq: ++this._revealSeq };
   }
 
   // ============ 公開API ============
