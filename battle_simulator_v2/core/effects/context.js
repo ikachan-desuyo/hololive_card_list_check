@@ -11,7 +11,8 @@
  *
  * yield された選択要求はエンジンが決定ポイント（pending）に変換し、
  * プレイヤーの選択後にジェネレータを再開する。
- * 選択を伴わない操作（draw, rollDice 等）は普通のメソッド呼び出しでよい。
+ * 選択を伴わない操作（draw 等）は普通のメソッド呼び出しでよい。
+ * ただし割り込みが入りうる操作（rollDice / dealSpecialDamage）はジェネレータなので `yield* ctx.xxx(...)` で呼ぶ。
  *
  * ルール条番号は battle_simulator/docs/RULES_SPEC.md / 総合ルール ver.1.9.0 参照。
  */
@@ -30,6 +31,12 @@ export class EffectContext {
     this.playerIdx = playerIdx;
     this.sourceCard = opts.sourceCard || null;
     this.sourceHolomem = opts.sourceHolomem || null;
+    // onAnyDown 用: ダウンしたホロメンの情報 { holomem, card, ownerIdx, zone }
+    this.downedInfo = opts.downedInfo || null;
+    // onOpponentPerformanceEnd 用: そのパフォーマンスステップで自分のライフが減ったか
+    this.lifeDecreasedThisPerf = opts.lifeDecreasedThisPerf || false;
+    // 攻撃時誘発の推しスキル用: { sourceHolomem, art, artName, dealtList:[{target,zone,dealt}], downed }
+    this.attackInfo = opts.attackInfo || null;
   }
 
   get player() { return this.engine.state.players[this.playerIdx]; }
@@ -61,6 +68,21 @@ export class EffectContext {
   hasTag(card, tag) {
     const t = tag.replace(/^#/, '');
     return (card.tags || []).includes(t);
+  }
+
+  /** 「自分が後攻で、自分の最初のターン」か（多くのカードの条件「後攻で最初のターンなら」） */
+  isFirstTurnGoingSecond() {
+    return this.playerIdx !== this.engine.state.firstPlayer && this.player.turnCount === 1;
+  }
+
+  /** このターンに指定名のサポートを使ったか（「このターンに〈限界飯〉を使っていたなら」等） */
+  usedSupportNamed(name) {
+    return (this.player.supportsPlayedThisTurn || []).some((c) => c.name === name);
+  }
+
+  /** このターンに使った、指定タグを持つサポートの枚数（filter で supportType も絞れる） */
+  countSupportThisTurn(filter) {
+    return (this.player.supportsPlayedThisTurn || []).filter(filter).length;
   }
 
   /** ステージ上の自分のエールの色一覧（重複なし） */
@@ -164,11 +186,176 @@ export class EffectContext {
     return drawn;
   }
 
-  /** サイコロを1個振る (5.24) */
-  rollDice() {
-    const value = rollDie(this.engine.rng);
-    this.log(`🎲 サイコロ: ${value}`);
+  /**
+   * サイコロを1個振る (5.24)。「目をNとして扱う」継続効果に対応。ジェネレータ（呼び出しは `yield* ctx.rollDice()`）。
+   * 振った後、自分のファン等のダイス割り込み（onDiceRollReact。「目を4として扱う」「振り直す」等）があれば
+   * コントローラー自身に決定ポイントを提示する。
+   */
+  *rollDice() {
+    let value = rollDie(this.engine.rng);
+    const fixed = this.engine.state.modifiers.find(
+      (m) => m.kind === 'diceFixed' && m.ownerIdx === this.playerIdx);
+    if (fixed) {
+      this.log(`🎲 サイコロ: ${value} → ${fixed.value} として扱う（${fixed.description || '効果'}）`);
+      value = fixed.value;
+    } else {
+      this.log(`🎲 サイコロ: ${value}`);
+    }
+    value = yield* this._offerDiceReact(value);
     return value;
+  }
+
+  /** ダイス割り込み（自分のステージの装着カードの onDiceRollReact）をコントローラーに順に提示する */
+  *_offerDiceReact(value) {
+    const eng = this.engine;
+    for (const h of eng._stageHolomems(this.player)) {
+      for (const att of [...h.attachments]) { // apply で外れても走査が崩れないようスナップショット
+        const r = eng.registry.get(att.number)?.onDiceRollReact;
+        if (!r) continue;
+        // roller=振っているホロメン（推しスキルの場合は null）/ rollerCard=振っている能力の発生源カード（推し含む）
+        const info = { ownerIdx: this.playerIdx, roller: this.sourceHolomem, rollerCard: this.sourceCard, value, fanCard: att, fanHolomem: h };
+        if (r.canUse && !r.canUse(eng, info)) continue;
+        const use = yield {
+          kind: 'confirm', player: this.playerIdx, title: r.title,
+          buildOptions: () => [
+            { id: 'yes', label: r.yesLabel || '使う', value: true },
+            { id: 'no', label: '使わない', value: false },
+          ],
+        };
+        if (use) value = r.apply(eng, { ...info, value });
+      }
+    }
+    // 自分の推しスキルによるダイス割り込み（「自分の〈X〉がサイコロを振った時：振り直す」hBP02-005 等）
+    const oshiDef = eng.registry.get(this.player.oshi.number)?.onDiceRollOshiSkill;
+    if (oshiDef) {
+      const me = this.player;
+      const used = oshiDef.sp ? me.usedSpOshiSkillThisGame : me.usedOshiSkillThisTurn;
+      const info = { ownerIdx: this.playerIdx, roller: this.sourceHolomem, rollerCard: this.sourceCard, value };
+      if (!used && me.holoPower.length >= oshiDef.cost && (!oshiDef.canUse || oshiDef.canUse(eng, this.playerIdx, info))) {
+        const use = yield {
+          kind: 'confirm', player: this.playerIdx,
+          title: oshiDef.title || '推しスキルを使いますか？（サイコロ）',
+          buildOptions: () => [
+            { id: 'yes', label: `${oshiDef.sp ? 'SP' : ''}推しスキルを使う（ホロパワー-${oshiDef.cost}）`, value: true },
+            { id: 'no', label: '使わない', value: false },
+          ],
+        };
+        if (use) {
+          me.archive.push(...me.holoPower.splice(0, oshiDef.cost));
+          if (oshiDef.sp) me.usedSpOshiSkillThisGame = true; else me.usedOshiSkillThisTurn = true;
+          value = oshiDef.apply(eng, this.playerIdx, { ...info, value });
+        }
+      }
+    }
+    return value;
+  }
+
+  /**
+   * アーツの解決中にダメージ修正を積む（「サイコロを振れる：偶数の時、このアーツ+20」等）。
+   * エンジンがアーツのダメージ計算時に artBonus を加算する。
+   */
+  addArtBonus(n, reason = '') {
+    this.artBonus = (this.artBonus || 0) + n;
+    if (n !== 0) this.log(`アーツ${n > 0 ? '+' : ''}${n}${reason ? `（${reason}）` : ''}`);
+  }
+
+  /** sourceHolomem のステージ位置 {zone,index} を返す（ステージ外なら null）。起動型能力の位置限定判定に使う */
+  sourceHolomemPos() {
+    if (!this.sourceHolomem) return null;
+    for (const pos of this.engine._stagePositions(this.player)) {
+      if (this.engine._holomemAt(this.player, pos) === this.sourceHolomem) return pos;
+    }
+    return null;
+  }
+
+  /**
+   * 相手に、相手のステージのホロメンを選ばせる決定ポイント（「相手は自身のバックホロメン1人を選ぶ」等）。
+   * 決定ポイントの所有者は相手プレイヤーになる（request.player = 相手）。戻り値は選ばれたエントリ {pos, holomem, top}。
+   * 強制選択（「選ばない」なし）。候補が無ければ null で再開される。
+   */
+  opponentChoosesHolomem({ filter = null, title }) {
+    const oppIdx = 1 - this.playerIdx;
+    const opp = this.opponent;
+    const entries = [];
+    for (const pos of this.engine._stagePositions(opp)) {
+      const holomem = this.engine._holomemAt(opp, pos);
+      const top = holomem.stack[0];
+      if (!filter || filter({ pos, holomem, top })) entries.push({ pos, holomem, top });
+    }
+    return {
+      kind: 'chooseHolomem',
+      player: oppIdx,
+      title,
+      buildOptions: () => entries.map((e) => ({
+        id: `mem_${e.pos.zone}_${e.pos.index}`,
+        label: `${e.top.name}（${e.pos.zone === 'center' ? 'センター' : e.pos.zone === 'collab' ? 'コラボ' : 'バック'}）`,
+        value: e, pos: e.pos, side: 'self',
+      })),
+    };
+  }
+
+  /**
+   * ホロメンを持ち主のコラボポジションへ移動する（バックから。コラボ扱いではない＝onCollab等は誘発しない）。
+   * 相手のバックをコラボに上げさせる効果（凸待ち等）に使う。
+   */
+  moveToCollabOwner(holomem) {
+    const owner = this.state.players.find((p) => p.back.includes(holomem));
+    if (!owner || owner.collab) return false;
+    const i = owner.back.indexOf(holomem);
+    owner.back.splice(i, 1);
+    owner.collab = holomem;
+    this.log(`${holomem.stack[0].name} をコラボポジションへ移動（コラボとしては扱わない）`);
+    return true;
+  }
+
+  /** お休み状態のホロメンをアクティブにする (4.3.2) */
+  setActive(holomem) {
+    if (holomem.rested) {
+      holomem.rested = false;
+      this.log(`${holomem.stack[0].name} をアクティブにした`);
+    }
+  }
+
+  /** ホロメンをバックポジションへ移動する（センター/コラボから。アクティブ状態は維持） */
+  moveToBack(holomem) {
+    const p = this.player;
+    if (this.engine._stageCount(p) > 6) return; // 念のため
+    if (p.center === holomem) p.center = null;
+    else if (p.collab === holomem) p.collab = null;
+    else return; // 既にバック等
+    p.back.push(holomem);
+    this.log(`${holomem.stack[0].name} をバックポジションへ移動`);
+  }
+
+  /**
+   * 任意の持ち主のホロメンをバックへ移動し、お休みにして「次のリセットステップで非アクティブ」にする (hBP06-088)。
+   * 相手のセンター/コラボを下げる効果に使う（持ち主は自動判定）。
+   */
+  moveToBackRestedSkipReset(holomem) {
+    const owner = this.state.players.find(
+      (p) => p.center === holomem || p.collab === holomem || p.back.includes(holomem));
+    if (!owner) return;
+    if (owner.center === holomem) owner.center = null;
+    else if (owner.collab === holomem) owner.collab = null;
+    if (!owner.back.includes(holomem)) owner.back.push(holomem);
+    holomem.rested = true;
+    holomem.skipNextReset = true;
+    this.log(`${holomem.stack[0].name} をお休みさせてバックポジションへ移動（次のリセットステップで非アクティブ）`);
+  }
+
+  /** ホロメンを効果でダウンさせる (4.4.9)。HPに関係なく次のチェックタイミングでダウン処理 */
+  forceDown(targetEntry, opts = {}) {
+    targetEntry.holomem.forcedDown = true;
+    if (opts.noLifeOnDown) targetEntry.holomem.noLifeOnDown = true;
+    this.log(`${targetEntry.top.name} をダウンさせる${opts.noLifeOnDown ? '（ライフは減らない）' : ''}`);
+  }
+
+  /** HPをすべて回復 (5.23.2) */
+  healAll(holomem) {
+    if (holomem.damage > 0) {
+      this.log(`${holomem.stack[0].name} のHPをすべて回復（${holomem.damage}）`);
+      holomem.damage = 0;
+    }
   }
 
   /** デッキをシャッフルする (5.6) */
@@ -223,6 +410,12 @@ export class EffectContext {
     this.player.deck.push(...cards);
   }
 
+  /** カードをデッキの上に戻す（公開中にあれば取り除く。先頭の順は cards の順） */
+  deckToTop(cards) {
+    for (const c of cards) this._unreveal(c);
+    this.player.deck.unshift(...cards);
+  }
+
   _unreveal(card) {
     const i = this.player.revealed.indexOf(card);
     if (i !== -1) this.player.revealed.splice(i, 1);
@@ -256,6 +449,22 @@ export class EffectContext {
     this.log(`${holomem.stack[0].name} に ${card.name} を付けた`);
   }
 
+  /**
+   * サポートを付け、付け先カードの onAttach トリガー（「付けた時」）があれば誘発する。
+   * 効果テキスト内で装着する場合（例: アーカイブの〈こよりの助手くん〉を付ける）に使う。
+   * 使い方: yield* ctx.attachSupportWithTrigger(card, holomem);
+   */
+  *attachSupportWithTrigger(card, holomem) {
+    this.attachSupport(card, holomem);
+    const trig = this.engine.registry.get(card.number)?.triggers?.onAttach;
+    if (trig) {
+      yield* trig(new EffectContext(this.engine, this.playerIdx, {
+        sourceCard: card,
+        sourceHolomem: holomem,
+      }));
+    }
+  }
+
   /** エールデッキから特定カードを取り除く */
   removeFromCheerDeck(card) {
     const i = this.player.cheerDeck.indexOf(card);
@@ -265,6 +474,30 @@ export class EffectContext {
   /** 効果でカードを公開した時、UIに大きく表示させる */
   flashReveal(card) {
     this.engine.flashReveal(card);
+  }
+
+  /**
+   * エールデッキの上からN枚を見る。見ている間は解決領域(revealed)に置く。
+   * 使い終わったら cheerDeckToBottom / sendRevealedCheer で必ず移すこと。
+   */
+  lookTopCheerDeck(n) {
+    const cards = this.player.cheerDeck.splice(0, Math.min(n, this.player.cheerDeck.length));
+    this.player.revealed.push(...cards);
+    this.log(`${this.player.name}: エールデッキの上から${cards.length}枚を見る`);
+    return cards;
+  }
+
+  /** 解決領域のエールをエールデッキの下に戻す */
+  cheerDeckToBottom(cards) {
+    for (const c of cards) this._unreveal(c);
+    this.player.cheerDeck.push(...cards);
+  }
+
+  /** 解決領域のエールを公開してホロメンに送る（lookTopCheerDeck で見たエール用） */
+  sendRevealedCheer(cheer, holomem) {
+    this._unreveal(cheer);
+    this.flashReveal(cheer);
+    this.attachCheer(cheer, holomem);
   }
 
   /** エールデッキの上から1枚公開してホロメンに送る (5.21.2) */
@@ -283,8 +516,35 @@ export class EffectContext {
     if (i !== -1) this.player.archive.splice(i, 1);
   }
 
-  /** ホロメンに付いているエールを1枚アーカイブする */
-  archiveCheer(holomem, cheer) {
+  /**
+   * ホロメンに付いているエールを1枚アーカイブする。ジェネレータ（呼び出しは `yield* ctx.archiveCheer(...)`）。
+   * opts.ability!==false（＝能力によるアーカイブ）のとき、装着カードのコスト置換
+   * （`def.cheerArchiveReplace`：「アーカイブするエール1枚のかわりにこのカードをアーカイブできる」hBP03-106）を提示する。
+   * バトンタッチ等のシステムコストは opts.ability=false で呼び、置換を提示しない。
+   */
+  *archiveCheer(holomem, cheer, opts = {}) {
+    // 能力によるアーカイブ時のみ、自分のホロメンに付いた置換カードを提示
+    if (opts.ability !== false && this.engine._stageHolomems(this.player).includes(holomem)) {
+      for (const att of [...holomem.attachments]) {
+        const rep = this.engine.registry.get(att.number)?.cheerArchiveReplace;
+        if (!rep) continue;
+        const use = yield {
+          kind: 'confirm', player: this.playerIdx,
+          title: rep.title || `${cheer.name}のかわりに${att.name}をアーカイブする？`,
+          buildOptions: () => [
+            { id: 'yes', label: rep.yesLabel || `${att.name}をアーカイブ`, value: true },
+            { id: 'no', label: `エール（${cheer.name}）をアーカイブ`, value: false },
+          ],
+        };
+        if (use) {
+          const ai = holomem.attachments.indexOf(att);
+          if (ai !== -1) holomem.attachments.splice(ai, 1);
+          this.player.archive.push(att);
+          this.log(`${holomem.stack[0].name}: ${cheer.name}のかわりに${att.name}をアーカイブ`);
+          return; // エールは場に残る
+        }
+      }
+    }
     const i = holomem.cheers.indexOf(cheer);
     if (i !== -1) {
       holomem.cheers.splice(i, 1);
@@ -313,17 +573,40 @@ export class EffectContext {
   }
 
   /**
-   * 特殊ダメージを与える (5.22)
+   * 特殊ダメージを与える (5.22)。ジェネレータ（呼び出しは `yield* ctx.dealSpecialDamage(...)`）。
    * opts.noLifeOnDown: 「ただし、ダウンしても相手のライフは減らない」と記載がある場合のみ true。
    * 記載がない特殊ダメージでダウンした場合、ライフは通常どおり減る。
    * 付いているファン等の特殊ダメージ修正（雪民など）は自動で加算される。
+   * 相手のターン中でなくても、防御側に「受ける時」の割り込み（推しスキル/ホロメン/ファン）があれば決定ポイントを挟む。
    */
-  dealSpecialDamage(targetEntry, amount, opts = {}) {
+  *dealSpecialDamage(targetEntry, amount, opts = {}) {
     let total = amount;
     // 発生源ホロメンの装着カードによる特殊ダメージ修正
     if (this.sourceHolomem) {
       total += this.engine.effects.specialDamageBonus(this.sourceHolomem, targetEntry, this.playerIdx);
     }
+    // 受け手の「受けるダメージ」修正（軽減/増加）。特殊ダメージにも適用される（攻撃元=発生源ホロメン）
+    total = this.engine._applyDamageReceived(targetEntry.holomem, total, 'special', this.sourceHolomem || null);
+
+    // 防御側の「ダメージを受ける時」割り込み（推しスキル/ホロメンギフト/装着ファン）。発生源の相手側のみ。
+    const eng = this.engine;
+    const defIdx = eng.state.players.findIndex((p) => eng._stageHolomems(p).includes(targetEntry.holomem));
+    if (defIdx >= 0 && defIdx !== this.playerIdx) {
+      const responders = eng._collectDamageResponders(targetEntry.holomem, 'special', defIdx);
+      for (const resp of responders) {
+        const r = resp.build(total);
+        if (!r) continue;
+        const use = yield {
+          kind: 'confirm', player: defIdx, title: r.title,
+          buildOptions: () => [
+            { id: 'yes', label: r.yesLabel, value: true },
+            { id: 'no', label: '使わない', value: false },
+          ],
+        };
+        if (use) total = Math.max(0, r.apply(total));
+      }
+    }
+
     targetEntry.holomem.damage += total;
     // 「ライフは減らない」は、この特殊ダメージでダウンが確定した場合のみ適用する。
     // （ダウンに至らなかった場合にフラグを残すと、後から別のダメージで倒された時まで
@@ -340,10 +623,41 @@ export class EffectContext {
     );
   }
 
-  /** ターン終了まで有効な修正を追加（「このターンの間～」） */
+  /**
+   * ターン終了まで有効な修正を追加（「このターンの間～」）。
+   * mod.amount は数値のほか、評価時に再計算する関数 (holomem, engine)=>number も指定できる
+   * （「選んだホロメンのエール1枚につき+10」のように対象の状態で変動する修正用）。
+   */
   addTurnModifier(mod) {
     this.engine.state.modifiers.push({ duration: 'turn', ...mod });
     this.log(`継続効果: ${mod.description || mod.kind}`);
+  }
+
+  /**
+   * 「（効果名）はターンに1回しか使えない」判定。key はカード/効果ごとに一意な文字列。
+   * 既にこのターン使用済みなら true。マークは markOncePerTurn で行う（エンドステップで自動消滅）。
+   */
+  oncePerTurnUsed(key) {
+    return this.engine.state.modifiers.some(
+      (m) => m.kind === 'oncePerTurnUsed' && m.key === key && m.ownerIdx === this.playerIdx);
+  }
+
+  /** 「ターンに1回」制限を使用済みとしてマークする（ターン終了で自動消滅） */
+  markOncePerTurn(key) {
+    this.engine.state.modifiers.push({
+      duration: 'turn', kind: 'oncePerTurnUsed', key, ownerIdx: this.playerIdx,
+    });
+  }
+
+  /**
+   * 指定したブルームエフェクトを、Bloom先ホロメンを発生源として実行する (13.3)。
+   * 効果テキスト内でBloomを行った場合（コラボエフェクト等）のブルームエフェクト誘発に使う。
+   */
+  *runBloomEffect(def, card, holomem) {
+    yield* def.run(new EffectContext(this.engine, this.playerIdx, {
+      sourceCard: card,
+      sourceHolomem: holomem,
+    }));
   }
 
   /**

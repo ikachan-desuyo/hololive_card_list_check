@@ -11,6 +11,7 @@ import { CardLibrary, CardKind } from '../core/cards.js';
 import { Engine } from '../core/engine.js';
 import { EffectRegistry } from '../core/effects/registry.js';
 import { EffectContext } from '../core/effects/context.js';
+import { compileCard } from '../core/effects/text-compiler.js';
 import { HeuristicAI } from '../core/ai/heuristic.js';
 import { createRng } from '../core/rng.js';
 
@@ -48,6 +49,17 @@ function assertEq(actual, expected, msg) {
   }
 }
 
+/**
+ * ジェネレータ効果（ctx.dealSpecialDamage 等）をテストから直接駆動する。
+ * 途中の割り込み決定ポイント（confirm）は既定で answer（既定 false=使わない）で応答する。
+ */
+function drive(gen, answer = false) {
+  let r = gen.next();
+  let guard = 0;
+  while (!r.done && guard++ < 50) r = gen.next(answer);
+  return r.value;
+}
+
 /** プレイヤーの全カード枚数（領域間でカードが消えていないかの保存則） */
 function totalCards(p) {
   let n = p.deck.length + p.cheerDeck.length + p.hand.length +
@@ -58,10 +70,10 @@ function totalCards(p) {
   return n;
 }
 
-/** デッキマップから効果レジストリを構築 */
+/** デッキマップから効果レジストリを構築（手書き > 自動コンパイル） */
 async function buildRegistry(lib, deckMap) {
   const registry = new EffectRegistry();
-  await registry.preload(Object.keys(deckMap).map((id) => lib.get(id)?.number).filter(Boolean));
+  await registry.preload(Object.keys(deckMap).map((id) => lib.get(id)?.number).filter(Boolean), lib);
   return registry;
 }
 
@@ -376,7 +388,7 @@ export async function runTests() {
       center.damage = e.effectiveHp(center) - 10;
       const lifeBefore = p1.life.length;
       const ctx = new EffectContext(e, 0, {});
-      ctx.dealSpecialDamage({ pos: { zone: 'center' }, holomem: center, top: center.stack[0] }, 10);
+      drive(ctx.dealSpecialDamage({ pos: { zone: 'center' }, holomem: center, top: center.stack[0] }, 10));
       e._checkTiming(() => {});
       let guard = 0;
       while (e.state.pending && guard++ < 10) e.apply(e.state.pending.options[0].id);
@@ -391,7 +403,7 @@ export async function runTests() {
       center.damage = e.effectiveHp(center) - 10;
       const lifeBefore = p1.life.length;
       const ctx = new EffectContext(e, 0, {});
-      ctx.dealSpecialDamage({ pos: { zone: 'center' }, holomem: center, top: center.stack[0] }, 10, { noLifeOnDown: true });
+      drive(ctx.dealSpecialDamage({ pos: { zone: 'center' }, holomem: center, top: center.stack[0] }, 10, { noLifeOnDown: true }));
       e._checkTiming(() => {});
       assertEq(p1.life.length, lifeBefore, '「ライフは減らない」なのにライフが減った');
     }
@@ -404,7 +416,7 @@ export async function runTests() {
       const lifeBefore = p1.life.length;
       const ctx = new EffectContext(e, 0, {});
       // ダウンに至らない「ライフは減らない」特殊ダメージ
-      ctx.dealSpecialDamage({ pos: { zone: 'center' }, holomem: center, top: center.stack[0] }, 10, { noLifeOnDown: true });
+      drive(ctx.dealSpecialDamage({ pos: { zone: 'center' }, holomem: center, top: center.stack[0] }, 10, { noLifeOnDown: true }));
       assert(center.damage < e.effectiveHp(center), '前提が崩れている（この時点で倒れてはいけない）');
       // その後、通常ダメージで倒す
       center.damage = e.effectiveHp(center);
@@ -422,6 +434,206 @@ export async function runTests() {
     assertEq(e.effects.artsBonus(p.center, 0), 20, 'ターン修正が乗っていない');
     e.effects.expireTurnModifiers();
     assertEq(e.effects.artsBonus(p.center, 0), 0, 'ターン修正が消えていない');
+  });
+
+  // ---- テキストコンパイラ ----
+
+  await testAsync('コンパイラ: ドローサポート（注釈を無視して全文解釈）', async () => {
+    const def = compileCard(lib.get('hSD01-016_C')); // 春先のどか: 3枚引く + LIMITED注釈
+    assert(def?.support?.run, 'サポート効果がコンパイルされていない');
+    assert(def.autoCompiled, 'autoCompiled フラグが無い');
+    const e = await setupMainStep(deckMap, 101);
+    const p0 = e.state.players[0];
+    const before = p0.hand.length;
+    let done = false;
+    e._runEffect(def.support, { playerIdx: 0 }, () => { done = true; });
+    assert(done, '実行が完了しない');
+    assertEq(p0.hand.length, before + 3, '3枚ドローされていない');
+  });
+
+  await testAsync('コンパイラ: ブルームエフェクト（エールデッキの上から送る）', async () => {
+    const def = compileCard(lib.get('hBP01-041_U')); // 上から1枚をセンターかコラボに送る
+    assert(def?.bloomEffect?.run, 'ブルームエフェクトがコンパイルされていない');
+    const e = await setupMainStep(deckMap, 102);
+    const p0 = e.state.players[0];
+    const cheersBefore = p0.center.cheers.length;
+    const cheerDeckBefore = p0.cheerDeck.length;
+    let done = false;
+    e._runEffect(def.bloomEffect, { playerIdx: 0 }, () => { done = true; });
+    let guard = 0;
+    while (!done && e.state.pending && guard++ < 10) e.apply(e.state.pending.options[0].id);
+    assert(done, '実行が完了しない');
+    assertEq(p0.center.cheers.length, cheersBefore + 1, 'センターにエールが送られていない');
+    assertEq(p0.cheerDeck.length, cheerDeckBefore - 1, 'エールデッキが減っていない');
+  });
+
+  await testAsync('コンパイラ: アーツの特殊ダメージ（センター直接・選択なし）', async () => {
+    const card = lib.get('hBP07-039_C'); // 相手のセンターホロメンに特殊ダメージ20
+    const art = card.arts.find((a) => a.text);
+    const def = compileCard(card);
+    assert(def?.arts?.[art.name]?.run, 'アーツ効果がコンパイルされていない');
+    const e = await setupMainStep(deckMap, 103);
+    const p1 = e.state.players[1];
+    const dmgBefore = p1.center.damage;
+    let done = false;
+    e._runEffect(def.arts[art.name], { playerIdx: 0, sourceHolomem: e.state.players[0].center }, () => { done = true; });
+    assert(done, '選択なしで完了するはず');
+    assertEq(p1.center.damage, dmgBefore + 20, '特殊ダメージ20が入っていない');
+  });
+
+  await testAsync('コンパイラ: 条件付きアーツ+N（dmgBonus）', async () => {
+    const card = lib.get('hBP01-055_R'); // リレーションスカイ: 他の#IDがいる時+50
+    const def = compileCard(card);
+    const artDef = def?.arts?.['リレーションスカイ'];
+    assert(artDef?.dmgBonus, 'dmgBonus がコンパイルされていない');
+    const e = await setupMainStep(deckMap, 104);
+    const p0 = e.state.players[0];
+    p0.center = e._createHolomem(lib.get('hBP01-055_R'), 1); // イオフィ自身のみ
+    p0.back = [];
+    const ctx = new EffectContext(e, 0, { sourceHolomem: p0.center });
+    assertEq(artDef.dmgBonus(ctx), 0, 'イオフィのみなのに+50されている');
+    p0.back = [e._createHolomem(lib.get('hBP02-018_C'), 1)]; // レイネ（#ID）追加
+    assertEq(artDef.dmgBonus(ctx), 50, '他の#IDがいるのに+50されない');
+  });
+
+  await testAsync('コンパイラ: だいふく相当（条件付きHP+20）が手書きと同じ挙動', async () => {
+    const def = compileCard(lib.get('hBP04-101_C'));
+    assert(def?.attached, '装着修正がコンパイルされていない');
+    assertEq(def.attached.artsPlus(), 10, 'アーツ+10でない');
+    const lamy = { stack: [lib.get('hBP04-043_C')] };
+    const shion = { stack: [lib.get('hBP02-042_C')] };
+    assertEq(def.attached.hpPlus(lamy), 20, 'ラミィでHP+20になっていない');
+    assertEq(def.attached.hpPlus(shion), 0, 'ラミィ以外でHP+20になっている');
+  });
+
+  await testAsync('コンパイラ: 「上からN枚見る→選ぶ→残りを下へ」（シオン1stと同等挙動）', async () => {
+    const def = compileCard(lib.get('hBP02-045_U'));
+    assert(def?.bloomEffect?.run, '「見る」系ブルームエフェクトがコンパイルされていない');
+    const e = await setupMainStep(deckMap, 105);
+    const p0 = e.state.players[0];
+    // デッキの上3枚を固定: [青ラミィ, 青ラミィ, シオン] → 候補から1枚選んで残り2枚は下へ
+    const deckBefore = p0.deck.length;
+    const handBefore = p0.hand.length;
+    let done = false;
+    e._runEffect(def.bloomEffect, { playerIdx: 0 }, () => { done = true; });
+    let guard = 0;
+    while (!done && e.state.pending && guard++ < 15) {
+      // カード選択は最初の候補、順番選択は「この順のまま戻す」(skip) を選ぶ
+      const skip = e.state.pending.options.find((o) => o.id === 'skip');
+      e.apply((skip && /順/.test(skip.label) ? skip : e.state.pending.options[0]).id);
+    }
+    assert(done, '実行が完了しない');
+    assertEq(p0.hand.length, handBefore + 1, '1枚手札に加わっていない');
+    assertEq(p0.deck.length, deckBefore - 1, 'デッキが1枚減（3枚見て1枚取り2枚戻し）になっていない');
+    assertEq(p0.revealed.length, 0, '公開中にカードが残っている');
+  });
+
+  await testAsync('コンパイラ: 解釈できない枠は実装しない（安全側）', async () => {
+    // ゼータのマスコット: 能力追加が「アーツを使った時～」でHP+N以外 → 装着枠ごと不採用
+    const def = compileCard(lib.get('hBP07-105_C'));
+    assert(!def?.attached, '解釈できない装着効果が実装されてしまっている');
+    // 鈍器でぶっ叩くわよ！: 「能力変更可能」は未対応 → サポート枠不採用
+    const def2 = compileCard(lib.get('hBP01-110_U'));
+    assert(!def2?.support, '解釈できないサポート効果（能力変更可能）が実装されてしまっている');
+  });
+
+  await testAsync('手書き定義のアーツ名・コラボ名がカードデータと一致する', async () => {
+    // 推測で書いた名前が実データとズレていないか（ズレると効果が紐づかず無言で発動しない）
+    const checks = [
+      ['hBP01-009_C', 'arts', 'こんかなた～'],
+      ['hBP01-031_R', 'arts', '約束の力'],
+      ['hBP01-031_R', 'collab', '希望の庭園'],
+      ['hBP01-095_R', 'arts', '早送り'],
+      ['hBP01-095_R', 'collab', '巻き戻し'],
+      ['hSD01-007_C', 'collab', 'HOPE'],
+      ['hSD01-009_R', 'collab', '広がる地図'],
+      ['hSD01-015_U', 'collab', 'SoAzKo'],
+    ];
+    for (const [id, kind, name] of checks) {
+      const card = lib.get(id);
+      assert(card, `${id} が無い`);
+      if (kind === 'arts') {
+        assert(card.arts.some((a) => a.name === name), `${id} にアーツ「${name}」が無い`);
+      } else {
+        assert(card.keywords.some((k) => k.subtype === 'コラボエフェクト' && k.name === name),
+          `${id} にコラボエフェクト「${name}」が無い`);
+      }
+    }
+  });
+
+  await testAsync('手書き: ハコスのコラボ（両者手札をデッキ下→同数ドロー）でカード保存則維持', async () => {
+    const e = await setupMainStep(deckMap, 111);
+    const s = e.state;
+    const def = (await buildRegistry(lib, deckMap)).get('hBP01-075');
+    // deckMap にハコスがいない可能性があるので registry を直接構築
+    const reg = new EffectRegistry();
+    await reg.preload(['hBP01-075'], lib);
+    const hakos = reg.get('hBP01-075');
+    assert(hakos?.collabEffect, 'ハコスのコラボが読み込めない');
+    const p0 = s.players[0];
+    const p1 = s.players[1];
+    const h0 = p0.hand.length;
+    const h1 = p1.hand.length;
+    const before0 = totalCards(p0);
+    const before1 = totalCards(p1);
+    let done = false;
+    e._runEffect(hakos.collabEffect, { playerIdx: 0 }, () => { done = true; });
+    let guard = 0;
+    while (!done && s.pending && guard++ < 20) e.apply(s.pending.options[0].id);
+    assert(done, '完了しない');
+    assertEq(p0.hand.length, h0, '自分の手札枚数が元に戻っていない');
+    assertEq(p1.hand.length, h1, '相手の手札枚数が元に戻っていない');
+    assertEq(totalCards(p0), before0, '自分のカード保存則が崩れた');
+    assertEq(totalCards(p1), before1, '相手のカード保存則が崩れた');
+  });
+
+  await testAsync('コンパイラ: サイコロ分岐アーツ（奇数で+50・1でさらに+50）', async () => {
+    // hSD01-011 AZKi: 「サイコロを1回振れる：奇数の時、このアーツ+50。1の時、さらに、このアーツ+50。」
+    const def = compileCard(lib.get('hSD01-011_RR'));
+    const artName = lib.get('hSD01-011_RR').arts.find((a) => /奇数/.test(a.text)).name;
+    assert(def?.arts?.[artName]?.run, 'サイコロ分岐アーツがコンパイルされていない');
+    // 実行してクラッシュしないこと（結果はシード依存なので保存則のみ確認）
+    const e = await setupMainStep(deckMap, 112);
+    let done = false;
+    const ctx0 = e.state.players[0].center;
+    e._runEffect(def.arts[artName], { playerIdx: 0, sourceHolomem: ctx0,
+      ctx: new EffectContext(e, 0, { sourceHolomem: ctx0 }) }, () => { done = true; });
+    let guard = 0;
+    while (!done && e.state.pending && guard++ < 10) e.apply(e.state.pending.options[0].id);
+    assert(done, 'サイコロ分岐アーツが完了しない');
+  });
+
+  await testAsync('コンパイラ: 推しスキル（天音かなた「ぎゅっぎゅっ」: 残りHPを50に）', async () => {
+    const def = compileCard(lib.get('hBP01-001_OSR'));
+    assert(def?.oshiSkill?.run, '推しスキルがコンパイルされていない');
+    const e = await setupMainStep(deckMap, 113);
+    const p1 = e.state.players[1];
+    p1.center.damage = 0; // 満タン
+    const eff = e.effectiveHp(p1.center);
+    let done = false;
+    e._runEffect(def.oshiSkill, { playerIdx: 0 }, () => { done = true; });
+    assert(done, '完了しない');
+    assertEq(eff - p1.center.damage, 50, '相手センターの残りHPが50になっていない');
+  });
+
+  await testAsync('コンパイラ: 全カードでクラッシュせず、一定数を自動実装できる', async () => {
+    let compiled = 0;
+    let slots = 0;
+    for (const card of lib.byNumber.values()) {
+      let def;
+      try {
+        def = compileCard(card);
+      } catch (e) {
+        throw new Error(`${card.number} のコンパイルで例外: ${e.message}`);
+      }
+      if (def) {
+        compiled++;
+        slots += ['bloomEffect', 'collabEffect', 'support', 'attached']
+          .filter((k) => def[k]).length + Object.keys(def.arts || {}).length;
+      }
+    }
+    console.log(`自動コンパイル: ${compiled}種のカード / ${slots}スキル枠`);
+    assert(compiled >= 50, `自動実装数が少なすぎる: ${compiled}`);
   });
 
   // ---- AI ----
@@ -538,7 +750,7 @@ export async function runTests() {
     const target = { pos: { zone: 'center' }, holomem: p1.center, top: p1.center.stack[0] };
     const handBefore = p0.hand.length;
     const dmgBefore = p1.center.damage;
-    ctx.dealSpecialDamage(target, 10);
+    drive(ctx.dealSpecialDamage(target, 10));
     assert(p1.center.damage - dmgBefore >= 110, `特殊ダメージ+100が乗っていない（実際: ${p1.center.damage - dmgBefore}）`);
     // ダウンしたはず → 2枚ドローのトリガー
     assertEq(p0.hand.length, handBefore + 2, 'ダウンさせた時の2枚ドローが発動していない');
@@ -608,7 +820,7 @@ export async function runTests() {
     const backH = p1.back[0];
     const archiveBefore = p1.archive.length;
     const ctx = new EffectContext(e, 0, {});
-    ctx.dealSpecialDamage({ pos: { zone: 'back', index: 0 }, holomem: backH, top: backH.stack[0] }, 130);
+    drive(ctx.dealSpecialDamage({ pos: { zone: 'back', index: 0 }, holomem: backH, top: backH.stack[0] }, 130));
     s.pending = null;
     e._checkTiming(() => {});
     let guard = 0;

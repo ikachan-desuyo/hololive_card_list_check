@@ -15,7 +15,7 @@ import { HeuristicAI } from '../core/ai/heuristic.js';
 import { STEP_NAMES } from '../core/constants.js';
 import { renderSide, renderHand, renderOppHand } from './board.js';
 
-const TEST_DECKS = ['ラミィデッキ', 'あの青空のせいだ'];
+const TEST_DECKS = ['ラミィデッキ', 'あの青空のせいだ', 'holoX起動テスト'];
 
 let lib = null;
 let engine = null;
@@ -84,12 +84,12 @@ async function startGame() {
     const seedInput = document.getElementById('seed-input').value;
     const seed = seedInput ? Number(seedInput) : Math.floor(Math.random() * 1e9);
     currentSeed = seed;
-    // カード効果定義の事前読み込み（両デッキのカードナンバー）
+    // カード効果定義の事前読み込み（手書き定義 > テキスト自動コンパイル）
     const registry = new EffectRegistry();
     const numbers = [...Object.keys(map1), ...Object.keys(map2)]
       .map((id) => lib.get(id)?.number)
       .filter(Boolean);
-    await registry.preload(numbers);
+    await registry.preload(numbers, lib);
     engine = new Engine({
       decks: [deck1, deck2],
       seed,
@@ -709,6 +709,29 @@ function renderEffectChoiceModal(s) {
   let isEffect = s.pending?.type === 'effectChoice';
   // AIの選択は表示しない（デッキサーチ候補などの非公開情報が見えてしまうため）
   if (isEffect && aiEnabled(s.pending.player)) isEffect = false;
+
+  // --- エール送り（ライフめくり / エールステップ）も盤面クリックで送り先を選ぶ ---
+  // 公開されたエールがどのホロメンに行くかを分かりやすくするため、送り先を金色に光らせる
+  const isCheerSend = s.pending?.type === 'attachCheer' || s.pending?.type === 'attachLifeCheer';
+  if (isCheerSend && !aiEnabled(s.pending.player)) {
+    document.getElementById('choice-modal').classList.remove('active');
+    for (const opt of s.pending.options) {
+      if (!opt.pos) continue;
+      const el = document.querySelector(`[data-drop="${s.pending.player}:mem:${opt.pos.zone}:${opt.pos.index}"]`);
+      if (el) {
+        el.classList.add('choice-target');
+        el.dataset.choiceId = opt.id;
+      }
+    }
+    bar.innerHTML = '';
+    const label = document.createElement('span');
+    const cheerName = s.pending.cheer?.name || 'エール';
+    const src = s.pending.type === 'attachLifeCheer' ? 'ライフの ' : '';
+    label.textContent = `🩷 ${src}${cheerName} を送るホロメンを選択（光っているカードをクリック）`;
+    bar.appendChild(label);
+    bar.classList.add('active');
+    return;
+  }
 
   // サイコロ表示中は次の選択モーダルを出さない（サイコロが隠れて見えなくなるため）
   const sinceDice = Date.now() - diceShownAt;

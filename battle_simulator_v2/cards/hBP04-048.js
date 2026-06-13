@@ -30,13 +30,13 @@ export default {
           title: 'アーカイブするエールを選択',
         });
         if (!cheer) return;
-        ctx.archiveCheer(ctx.sourceHolomem, cheer);
+        yield* ctx.archiveCheer(ctx.sourceHolomem, cheer);
         const target = yield ctx.chooseHolomem({
           side: 'opp',
           filter: (e) => e.pos.zone === 'center' || e.pos.zone === 'back',
           title: '特殊ダメージ30を与える相手ホロメンを選択（センターかバック）',
         });
-        if (target) ctx.dealSpecialDamage(target, 30);
+        if (target) yield* ctx.dealSpecialDamage(target, 30);
       },
     },
   },

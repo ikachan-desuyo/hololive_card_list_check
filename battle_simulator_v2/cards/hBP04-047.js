@@ -19,7 +19,7 @@ export default {
         side: 'opp',
         title: '特殊ダメージ20を与える相手ホロメンを選択',
       });
-      if (target) ctx.dealSpecialDamage(target, 20, { noLifeOnDown: true });
+      if (target) yield* ctx.dealSpecialDamage(target, 20, { noLifeOnDown: true });
     },
   },
 };

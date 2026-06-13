@@ -9,7 +9,7 @@ export default {
   support: {
     *run(ctx) {
       ctx.draw(2);
-      const dice = ctx.rollDice();
+      const dice = (yield* ctx.rollDice());
       if ([3, 5, 6].includes(dice)) {
         const candidates = ctx.deckCards((c) => c.kind === 'holomen' && c.bloomLevel === 'Debut');
         const picked = yield ctx.chooseCard({

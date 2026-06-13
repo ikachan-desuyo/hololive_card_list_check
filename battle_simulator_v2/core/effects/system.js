@@ -14,6 +14,17 @@ export class EffectSystem {
     this.registry = registry;
   }
 
+  /**
+   * 継続修正の数値を解決する。amount は数値、または「評価時に再計算する関数」を許可する
+   * （「このターンの間、選んだホロメンのエール1枚につき+10」のように対象の状態で変わる修正用）。
+   * 関数は (holomem, engine) を受け取り数値を返す。
+   */
+  _resolveAmount(mod, holomem) {
+    return typeof mod.amount === 'function'
+      ? (mod.amount(holomem, this.engine) || 0)
+      : (mod.amount || 0);
+  }
+
   /** 装着カードの定義一覧 */
   _attachedDefs(holomem) {
     const out = [];
@@ -22,6 +33,29 @@ export class EffectSystem {
       if (def?.attached) out.push({ card: att, attached: def.attached });
     }
     return out;
+  }
+
+  /**
+   * 常時アウラの合計。ownerIdx 側のステージ上の各ホロメンの効果定義から、fn が返す数値を合算する。
+   * fn(def, sourceHolomem) => number。
+   * 「自分の#0期生全員のアーツ+30」「自分のコラボが受けるダメージ-10」のように、
+   * 別のホロメンを恒常的に強化/保護するギフトを表現する（def.auraArtsPlus 等で宣言）。
+   */
+  _auraSum(ownerIdx, fn) {
+    let total = 0;
+    const p = this.engine.state.players[ownerIdx];
+    if (!p) return 0;
+    for (const src of this.engine._stageHolomems(p)) {
+      const def = this.registry.get(src.stack[0].number);
+      if (def) total += fn(def, src) || 0;
+    }
+    return total;
+  }
+
+  /** holomem の持ち主インデックス（ステージ上に無ければ -1） */
+  _ownerOf(holomem) {
+    return this.engine.state.players.findIndex(
+      (p) => this.engine._stageHolomems(p).includes(holomem));
   }
 
   /** アーツ+N の合計（装着 + ターン修正） */
@@ -34,8 +68,10 @@ export class EffectSystem {
       if (mod.kind !== 'artsPlus') continue;
       if (mod.ownerIdx !== ownerIdx) continue;
       if (mod.match && !mod.match(holomem)) continue;
-      total += mod.amount;
+      total += this._resolveAmount(mod, holomem);
     }
+    // 常時アウラ（味方の別ホロメンが付与するアーツ+N）
+    total += this._auraSum(ownerIdx, (def, src) => def.auraArtsPlus?.(src, holomem, this.engine));
     return total;
   }
 
@@ -48,7 +84,37 @@ export class EffectSystem {
     for (const mod of this.engine.state.modifiers) {
       if (mod.kind !== 'hpPlus') continue;
       if (mod.match && !mod.match(holomem)) continue;
-      total += mod.amount;
+      total += this._resolveAmount(mod, holomem);
+    }
+    total += this._auraSum(ownerIdx, (def, src) => def.auraHpPlus?.(src, holomem, this.engine));
+    return total;
+  }
+
+  /**
+   * 対象ホロメンが「受けるダメージ」の増減（5.22.3 軽減 / 装着カードによる増減）。
+   * 負の値=軽減、正の値=増加。アーツダメージ・特殊ダメージ両方に適用する。
+   * @param holomem 受け手のホロメン
+   * @param zone 受け手の位置（'center'|'collab'|'back'）。ゾーン条件付き効果用
+   */
+  damageReceivedDelta(holomem, zone, kind = 'arts', attacker = null) {
+    let total = 0;
+    const ownerIdx0 = this._ownerOf(holomem);
+    for (const { attached } of this._attachedDefs(holomem)) {
+      total += attached.damageDelta?.(holomem, zone, this.engine, kind, attacker) || 0;
+    }
+    // ターン中の一時的な被ダメージ修正（「このターン自分のバック全員は特殊ダメージを受けない」hSD13-012 等）
+    for (const mod of this.engine.state.modifiers) {
+      if (mod.kind !== 'damageReceivedDelta') continue;
+      if (mod.ownerIdx != null && mod.ownerIdx !== ownerIdx0) continue;
+      if (mod.matchKind && mod.matchKind !== kind) continue;
+      if (mod.match && !mod.match(holomem, zone, kind)) continue;
+      total += this._resolveAmount(mod, holomem);
+    }
+    // 常時アウラ（味方の別ホロメンが付与する被ダメージ軽減/増加。「コラボが受けるダメージ-10」「特殊ダメージを受けない」
+    //  「自分が相手の1stから受けるアーツ-30」＝src===holomem の自己ギフトも auraDamageDelta で表現する）
+    const ownerIdx = this._ownerOf(holomem);
+    if (ownerIdx >= 0) {
+      total += this._auraSum(ownerIdx, (def, src) => def.auraDamageDelta?.(src, holomem, zone, this.engine, kind, attacker));
     }
     return total;
   }
@@ -63,17 +129,83 @@ export class EffectSystem {
       if (mod.kind !== 'specialDmgPlus') continue;
       if (mod.ownerIdx !== ownerIdx) continue;
       if (mod.match && !mod.match(sourceHolomem)) continue;
-      total += mod.amount;
+      total += this._resolveAmount(mod, sourceHolomem);
     }
+    // 常時アウラ（味方の別ホロメンが付与する特殊ダメージ+N。「〈おかゆ〉全員が相手センターに与える特殊+20」等）
+    total += this._auraSum(ownerIdx, (def, src) => def.auraSpecialDmgPlus?.(src, sourceHolomem, targetEntry, this.engine));
     return total;
   }
 
-  /** ターン終了時: 「ターンの終わりまで」の修正を消滅させる (7.7.4) */
+  /**
+   * アーツの必要エール軽減を集約する。戻り値: { 色: 軽減数 }（例 {'無色':1} / {'黄':1}）。
+   * 2系統: ①ステージ上のカードの常時オーラ def.artsCostReduceAura(自分, 対象, engine)
+   *         ②ターン修正 kind:'artCostReduce'（「このターン、〜のアーツ必要〜-1」）
+   * @param targetHolomem コストを判定するホロメン
+   * @param ownerIdx そのホロメンの持ち主
+   */
+  artsCostReduction(targetHolomem, ownerIdx) {
+    const red = {};
+    const add = (color, amount) => { red[color] = (red[color] || 0) + amount; };
+    const p = this.engine.state.players[ownerIdx];
+    for (const src of this.engine._stageHolomems(p)) {
+      const def = this.registry.get(src.stack[0].number);
+      if (def?.artsCostReduceAura) {
+        for (const r of def.artsCostReduceAura(src, targetHolomem, this.engine) || []) add(r.color, r.amount);
+      }
+    }
+    for (const mod of this.engine.state.modifiers) {
+      if (mod.kind !== 'artCostReduce' || mod.ownerIdx !== ownerIdx) continue;
+      if (mod.match && !mod.match(targetHolomem)) continue;
+      add(mod.color, mod.amount);
+    }
+    // 装着カード（ツール等）による必要エール軽減（「◆Buzzに付いていたら必要無色-1」等）
+    for (const att of targetHolomem.attachments) {
+      const adef = this.registry.get(att.number);
+      for (const r of adef?.artsCostReduceAttached?.(targetHolomem, this.engine) || []) add(r.color, r.amount);
+    }
+    return red;
+  }
+
+  /** バトンタッチの必要エール軽減（ターン修正 kind:'batonCostReduce' ＋ 装着カード）。{色:軽減数} を返す */
+  batonCostReduction(holomem, ownerIdx) {
+    const red = {};
+    for (const mod of this.engine.state.modifiers) {
+      if (mod.kind !== 'batonCostReduce' || mod.ownerIdx !== ownerIdx) continue;
+      if (mod.match && !mod.match(holomem)) continue;
+      red[mod.color] = (red[mod.color] || 0) + mod.amount;
+    }
+    // 装着カード（ファン等）による常時のバトンタッチ必要エール軽減（ころねすきー等）
+    for (const att of holomem.attachments) {
+      const adef = this.registry.get(att.number);
+      for (const r of adef?.batonCostReduceAttached?.(holomem, this.engine) || []) red[r.color] = (red[r.color] || 0) + r.amount;
+    }
+    return red;
+  }
+
+  /**
+   * このホロメンのアーツが「相手のHPが減っているバックホロメンも対象にできる」か。
+   * ターン修正 kind:'artTargetDamagedBack'（match でホロメンを限定）で表現する (hBP07-086)。
+   */
+  artCanTargetDamagedBack(holomem, ownerIdx) {
+    return this.engine.state.modifiers.some((m) =>
+      m.kind === 'artTargetDamagedBack' && m.ownerIdx === ownerIdx &&
+      (!m.match || m.match(holomem)));
+  }
+
+  /**
+   * ターン終了時: 「ターンの終わりまで」の修正を消滅させる (7.7.4)。
+   * 複数ターンにまたがる修正は mod.untilTurn（このターン番号の終わりまで有効）で表現し、
+   * state.turn >= untilTurn になったエンドステップで消滅させる（「次の相手のターン終了まで」等）。
+   */
   expireTurnModifiers() {
+    const turn = this.engine.state.turn;
     const before = this.engine.state.modifiers.length;
-    this.engine.state.modifiers = this.engine.state.modifiers.filter((m) => m.duration !== 'turn');
+    this.engine.state.modifiers = this.engine.state.modifiers.filter((m) => {
+      if (m.untilTurn != null) return turn < m.untilTurn; // 指定ターンの終わりまで残す
+      return m.duration !== 'turn';                        // 通常の「このターンの間」
+    });
     if (before !== this.engine.state.modifiers.length) {
-      this.engine.log('ターン中の継続効果が消滅した');
+      this.engine.log('継続効果が消滅した');
     }
   }
 }

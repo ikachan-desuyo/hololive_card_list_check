@@ -39,7 +39,11 @@
 
 ### カード効果の実装方法（v2）
 
-- 効果定義: `battle_simulator_v2/cards/<カードナンバー>.js` + `cards/index.js` に登録（両方必須）
+- **効果の実装は2層**: ①手書き定義 `battle_simulator_v2/cards/<カードナンバー>.js` + `cards/index.js` 登録、
+  ②手書きが無いカードは **テキストコンパイラ**（`core/effects/text-compiler.js`）が効果テキストを
+  自動実装（スキル枠単位で全文解釈できた場合のみ。安全側）。
+  **新しい定型パターンは text-compiler.js に追加**（必ずユニットテストとセットで）。
+  カバレッジはテスト「全カードでクラッシュせず～」のログで確認できる
 - 定義の書式・フック一覧は `core/effects/registry.js` の冒頭コメントが正本
 - 効果は**ジェネレータ関数** `*run(ctx)` で書く。プレイヤー選択は `yield ctx.chooseCard(...)` / `ctx.chooseHolomem(...)` / `ctx.confirm(...)`
 - 共通処理は `core/effects/context.js` のプリミティブ（draw / searchDeck系 / rollDice / dealSpecialDamage / heal / attachCheer / addTurnModifier 等）を必ず使う。新しい共通処理が必要なら context.js に追加する
