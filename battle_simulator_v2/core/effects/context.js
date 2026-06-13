@@ -363,6 +363,30 @@ export class EffectContext {
     this.engine.flashReveal(card);
   }
 
+  /**
+   * エールデッキの上からN枚を見る。見ている間は解決領域(revealed)に置く。
+   * 使い終わったら cheerDeckToBottom / sendRevealedCheer で必ず移すこと。
+   */
+  lookTopCheerDeck(n) {
+    const cards = this.player.cheerDeck.splice(0, Math.min(n, this.player.cheerDeck.length));
+    this.player.revealed.push(...cards);
+    this.log(`${this.player.name}: エールデッキの上から${cards.length}枚を見る`);
+    return cards;
+  }
+
+  /** 解決領域のエールをエールデッキの下に戻す */
+  cheerDeckToBottom(cards) {
+    for (const c of cards) this._unreveal(c);
+    this.player.cheerDeck.push(...cards);
+  }
+
+  /** 解決領域のエールを公開してホロメンに送る（lookTopCheerDeck で見たエール用） */
+  sendRevealedCheer(cheer, holomem) {
+    this._unreveal(cheer);
+    this.flashReveal(cheer);
+    this.attachCheer(cheer, holomem);
+  }
+
   /** エールデッキの上から1枚公開してホロメンに送る (5.21.2) */
   sendCheerFromCheerDeckTop(holomem) {
     if (this.player.cheerDeck.length === 0) return null;

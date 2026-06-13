@@ -742,4 +742,5 @@ export const IMPLEMENTED = {
   'hBP07-108': () => import('./hBP07-108.js'), // Zecretary（ファン）
   'hSD03-008': () => import('./hSD03-008.js'), // 猫又おかゆ（1st）
   'hSD06-010': () => import('./hSD06-010.js'), // ラプラス・ダークネス（Debut）
+  'hBP02-038': () => import('./hBP02-038.js'), // 沙花叉クロヱ1st（ブルーム: エールデッキ上3枚→1枚送る→残り下へ）
 };
