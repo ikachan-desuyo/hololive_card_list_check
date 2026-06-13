@@ -407,10 +407,30 @@ export class EffectContext {
     );
   }
 
-  /** ターン終了まで有効な修正を追加（「このターンの間～」） */
+  /**
+   * ターン終了まで有効な修正を追加（「このターンの間～」）。
+   * mod.amount は数値のほか、評価時に再計算する関数 (holomem, engine)=>number も指定できる
+   * （「選んだホロメンのエール1枚につき+10」のように対象の状態で変動する修正用）。
+   */
   addTurnModifier(mod) {
     this.engine.state.modifiers.push({ duration: 'turn', ...mod });
     this.log(`継続効果: ${mod.description || mod.kind}`);
+  }
+
+  /**
+   * 「（効果名）はターンに1回しか使えない」判定。key はカード/効果ごとに一意な文字列。
+   * 既にこのターン使用済みなら true。マークは markOncePerTurn で行う（エンドステップで自動消滅）。
+   */
+  oncePerTurnUsed(key) {
+    return this.engine.state.modifiers.some(
+      (m) => m.kind === 'oncePerTurnUsed' && m.key === key && m.ownerIdx === this.playerIdx);
+  }
+
+  /** 「ターンに1回」制限を使用済みとしてマークする（ターン終了で自動消滅） */
+  markOncePerTurn(key) {
+    this.engine.state.modifiers.push({
+      duration: 'turn', kind: 'oncePerTurnUsed', key, ownerIdx: this.playerIdx,
+    });
   }
 
   /**

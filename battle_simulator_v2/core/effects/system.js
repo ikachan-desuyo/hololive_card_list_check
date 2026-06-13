@@ -14,6 +14,17 @@ export class EffectSystem {
     this.registry = registry;
   }
 
+  /**
+   * 継続修正の数値を解決する。amount は数値、または「評価時に再計算する関数」を許可する
+   * （「このターンの間、選んだホロメンのエール1枚につき+10」のように対象の状態で変わる修正用）。
+   * 関数は (holomem, engine) を受け取り数値を返す。
+   */
+  _resolveAmount(mod, holomem) {
+    return typeof mod.amount === 'function'
+      ? (mod.amount(holomem, this.engine) || 0)
+      : (mod.amount || 0);
+  }
+
   /** 装着カードの定義一覧 */
   _attachedDefs(holomem) {
     const out = [];
@@ -34,7 +45,7 @@ export class EffectSystem {
       if (mod.kind !== 'artsPlus') continue;
       if (mod.ownerIdx !== ownerIdx) continue;
       if (mod.match && !mod.match(holomem)) continue;
-      total += mod.amount;
+      total += this._resolveAmount(mod, holomem);
     }
     return total;
   }
@@ -48,7 +59,7 @@ export class EffectSystem {
     for (const mod of this.engine.state.modifiers) {
       if (mod.kind !== 'hpPlus') continue;
       if (mod.match && !mod.match(holomem)) continue;
-      total += mod.amount;
+      total += this._resolveAmount(mod, holomem);
     }
     return total;
   }
@@ -77,7 +88,7 @@ export class EffectSystem {
       if (mod.kind !== 'specialDmgPlus') continue;
       if (mod.ownerIdx !== ownerIdx) continue;
       if (mod.match && !mod.match(sourceHolomem)) continue;
-      total += mod.amount;
+      total += this._resolveAmount(mod, sourceHolomem);
     }
     return total;
   }

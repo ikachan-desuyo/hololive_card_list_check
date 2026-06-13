@@ -11,10 +11,16 @@ export default {
   bloomEffect: {
     name: '『感情結晶体』',
     *run(ctx) {
+      // 「『感情結晶体』はターンに1回しか使えない」（同名2ndを同ターンに複数Bloomしても1回まで）
+      if (ctx.oncePerTurnUsed('hBP04-066:感情結晶体')) {
+        ctx.log('ブルームエフェクト「『感情結晶体』」はこのターン既に使用済み');
+        return;
+      }
       const n = ctx.player.hand.length;
       if (n === 0) return;
       const ok = yield ctx.confirm(`手札${n}枚をすべてアーカイブして${n}枚引きますか？`);
       if (!ok) return;
+      ctx.markOncePerTurn('hBP04-066:感情結晶体');
       for (const card of ctx.player.hand.slice()) {
         ctx.removeFromHand(card);
         ctx.player.archive.push(card);
