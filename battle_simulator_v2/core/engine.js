@@ -168,6 +168,16 @@ export class Engine {
     return (holomem.stack[0].hp ?? 0) + this.effects.hpBonus(holomem, ownerIdx);
   }
 
+  /**
+   * アーツの対象指定 { zone, index } から実際のホロメンを取り出す。
+   * center/collab は単体、back は配列なので index で引く（対象拡張カード hBP07-086 等で back を対象にできる）。
+   */
+  _targetHolomem(playerObj, target) {
+    if (!target) return null;
+    if (target.zone === 'back') return playerObj.back[target.index] || null;
+    return playerObj[target.zone] || null;
+  }
+
   /** ホロメンの現在の配置ゾーンを返す（'center'|'collab'|'back'|null） */
   _zoneOf(holomem) {
     for (const p of this.state.players) {
@@ -178,9 +188,12 @@ export class Engine {
     return null;
   }
 
-  /** 受け手の「受けるダメージ」修正を適用した最終ダメージ（0未満にはしない） */
-  _applyDamageReceived(targetHolomem, dmg) {
-    const delta = this.effects.damageReceivedDelta(targetHolomem, this._zoneOf(targetHolomem));
+  /**
+   * 受け手の「受けるダメージ」修正を適用した最終ダメージ（0未満にはしない）。
+   * @param attacker 攻撃元ホロメン（「相手の1stから受けるアーツ-30」のような攻撃元条件用。無ければnull）
+   */
+  _applyDamageReceived(targetHolomem, dmg, kind = 'arts', attacker = null) {
+    const delta = this.effects.damageReceivedDelta(targetHolomem, this._zoneOf(targetHolomem), kind, attacker);
     if (delta === 0) return dmg;
     const adjusted = Math.max(0, dmg + delta);
     if (adjusted !== dmg) {
@@ -559,6 +572,23 @@ export class Engine {
           }
         }
       });
+
+      // 特殊Bloom（カード固有の def.specialBloom。Bloomレベルの遷移条件を無視する等。hBP01-045 AZKi「Overwrite」）
+      p.hand.forEach((c, i) => {
+        if (c.kind !== CardKind.HOLOMEN) return;
+        for (const pos of this._stagePositions(p)) {
+          const h = this._holomemAt(p, pos);
+          if (this._canBloom(h, c)) continue; // 通常Bloomで既に提示済み
+          const sdef = this.registry.get(topCard(h).number);
+          if (sdef?.specialBloom?.(h, c, this, idx)) {
+            actions.push({
+              id: `bloom_${i}_${pos.zone}_${pos.index}`,
+              label: `${topCard(h).name}（${pos.zone}）を ${c.name}〔${c.bloomLevel}〕に特殊Bloom`,
+              kind: 'bloom', handIndex: i, pos,
+            });
+          }
+        }
+      });
     }
 
     // 8.4 コラボ（ターン1回、コラボが空、バックのアクティブなホロメン）
@@ -668,6 +698,8 @@ export class Engine {
     }
     s.step = 'performance';
     s.perfUsed = { center: false, collab: false };
+    // 「相手のパフォーマンスステップに自分のライフが減っていたら」判定用に開始時ライフを記録
+    s.lifeAtPerfStart = [s.players[0].life.length, s.players[1].life.length];
     this.log(`【${STEP_NAMES.performance}】`);
     this._queuePerformancePending();
   }
@@ -705,15 +737,24 @@ export class Engine {
           const cctx = new EffectContext(this, s.turnPlayer, { sourceCard: card, sourceHolomem: h });
           if (!artDef.canUse(cctx)) return;
         }
+        // 対象拡張: このターン「アーツがHPの減ったバックも対象にできる」修正を持つホロメンは相手のバックも狙える (hBP07-086)
+        let usableTargets = targets;
+        if (this.effects.artCanTargetDamagedBack(h, s.turnPlayer)) {
+          usableTargets = [...targets];
+          opp.back.forEach((b, bi) => {
+            if (b && b.damage > 0) usableTargets.push({ zone: 'back', index: bi });
+          });
+        }
         // カード定義による対象制限（「このアーツは相手のセンターホロメンしか対象にできない」等）
         const allowedTargets = artDef?.targetZones
-          ? targets.filter((t) => artDef.targetZones.includes(t.zone))
-          : targets;
+          ? usableTargets.filter((t) => artDef.targetZones.includes(t.zone))
+          : usableTargets;
         for (const t of allowedTargets) {
-          const tName = topCard(opp[t.zone]).name;
+          const tName = topCard(this._targetHolomem(opp, t)).name;
+          const zoneLabel = t.zone === 'center' ? 'センター' : t.zone === 'collab' ? 'コラボ' : 'バック';
           actions.push({
-            id: `art_${zone}_${ai}_${t.zone}`,
-            label: `${card.name}「${art.name}」(${art.dmg}${art.dmgPlus ? '+' : ''}) → 相手${t.zone === 'center' ? 'センター' : 'コラボ'} ${tName}`,
+            id: `art_${zone}_${ai}_${t.zone}_${t.index}`,
+            label: `${card.name}「${art.name}」(${art.dmg}${art.dmgPlus ? '+' : ''}) → 相手${zoneLabel} ${tName}`,
             kind: 'art', zone, artIndex: ai, target: t,
           });
         }
@@ -1032,6 +1073,28 @@ export class Engine {
   _executePerformanceAction(action) {
     const s = this.state;
     if (action.kind === 'pass') {
+      // パフォーマンスステップ終了時：防御側（非ターンプレイヤー）の onOpponentPerformanceEnd を実行
+      const defIdx = 1 - s.turnPlayer;
+      const def = s.players[defIdx];
+      const lifeDecreased = (s.lifeAtPerfStart?.[defIdx] ?? def.life.length) > def.life.length;
+      const runners = [];
+      for (const pos of this._stagePositions(def)) {
+        const wh = this._holomemAt(def, pos);
+        const trig = this.registry.get(topCard(wh).number)?.triggers?.onOpponentPerformanceEnd;
+        if (trig) runners.push({ run: trig, srcH: wh });
+      }
+      if (runners.length > 0) {
+        const runNext = (i) => {
+          if (i >= runners.length) { this._endStep(); return; }
+          this._runEffect(
+            { run: runners[i].run },
+            { playerIdx: defIdx, sourceCard: topCard(runners[i].srcH), sourceHolomem: runners[i].srcH, lifeDecreasedThisPerf: lifeDecreased },
+            () => runNext(i + 1),
+          );
+        };
+        runNext(0);
+        return;
+      }
       this._endStep();
       return;
     }
@@ -1049,12 +1112,12 @@ export class Engine {
     // テキスト効果（段階4）の実行中に積まれたアーツ修正（サイコロ等）を受け取るための参照
     const runCtx = new EffectContext(this, s.turnPlayer, ctxOpts);
     // このアーツの対象（「このアーツの対象が～なら」条件で run/dmgBonus から参照する）
-    runCtx.artTarget = opp[action.target.zone] || null;
+    runCtx.artTarget = this._targetHolomem(opp, action.target) || null;
 
     // アーツ解決パイプライン（RULES_SPEC §12 / 12.3.4）
     // 段階4: テキスト効果 → 段階5: 特攻 → 段階6: 数値決定 → 段階7: ダメージ適用
     const resolveDamage = () => {
-      const target = opp[action.target.zone];
+      const target = this._targetHolomem(opp, action.target);
       if (!target) {
         // テキスト効果で対象が場を離れた場合、ダメージは適用されない
         this.log('対象がいなくなったため、アーツダメージは発生しなかった');
@@ -1089,7 +1152,7 @@ export class Engine {
         this.log(`継続効果・装着カードの修正: ${mod > 0 ? '+' : ''}${mod}`);
       }
       // 受け手の「受けるダメージ」修正（軽減/増加）(5.22.3)。常時アウラ/装着分まで反映
-      dmg = this._applyDamageReceived(target, dmg);
+      dmg = this._applyDamageReceived(target, dmg, 'arts', h);
 
       // ダメージ適用＋アーツ後トリガー群（ダウンさせた時 → このアーツで → アーツを使った時）
       const applyAndContinue = (finalDmg) => {

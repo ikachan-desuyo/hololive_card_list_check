@@ -32,6 +32,8 @@ export class EffectContext {
     this.sourceHolomem = opts.sourceHolomem || null;
     // onAnyDown 用: ダウンしたホロメンの情報 { holomem, card, ownerIdx, zone }
     this.downedInfo = opts.downedInfo || null;
+    // onOpponentPerformanceEnd 用: そのパフォーマンスステップで自分のライフが減ったか
+    this.lifeDecreasedThisPerf = opts.lifeDecreasedThisPerf || false;
   }
 
   get player() { return this.engine.state.players[this.playerIdx]; }
@@ -446,8 +448,8 @@ export class EffectContext {
     if (this.sourceHolomem) {
       total += this.engine.effects.specialDamageBonus(this.sourceHolomem, targetEntry, this.playerIdx);
     }
-    // 受け手の「受けるダメージ」修正（軽減/増加）。特殊ダメージにも適用される
-    total = this.engine._applyDamageReceived(targetEntry.holomem, total);
+    // 受け手の「受けるダメージ」修正（軽減/増加）。特殊ダメージにも適用される（攻撃元=発生源ホロメン）
+    total = this.engine._applyDamageReceived(targetEntry.holomem, total, 'special', this.sourceHolomem || null);
     targetEntry.holomem.damage += total;
     // 「ライフは減らない」は、この特殊ダメージでダウンが確定した場合のみ適用する。
     // （ダウンに至らなかった場合にフラグを残すと、後から別のダメージで倒された時まで
@@ -488,6 +490,17 @@ export class EffectContext {
     this.engine.state.modifiers.push({
       duration: 'turn', kind: 'oncePerTurnUsed', key, ownerIdx: this.playerIdx,
     });
+  }
+
+  /**
+   * 指定したブルームエフェクトを、Bloom先ホロメンを発生源として実行する (13.3)。
+   * 効果テキスト内でBloomを行った場合（コラボエフェクト等）のブルームエフェクト誘発に使う。
+   */
+  *runBloomEffect(def, card, holomem) {
+    yield* def.run(new EffectContext(this.engine, this.playerIdx, {
+      sourceCard: card,
+      sourceHolomem: holomem,
+    }));
   }
 
   /**

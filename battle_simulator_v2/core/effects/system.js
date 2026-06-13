@@ -96,15 +96,16 @@ export class EffectSystem {
    * @param holomem 受け手のホロメン
    * @param zone 受け手の位置（'center'|'collab'|'back'）。ゾーン条件付き効果用
    */
-  damageReceivedDelta(holomem, zone) {
+  damageReceivedDelta(holomem, zone, kind = 'arts', attacker = null) {
     let total = 0;
     for (const { attached } of this._attachedDefs(holomem)) {
-      total += attached.damageDelta?.(holomem, zone, this.engine) || 0;
+      total += attached.damageDelta?.(holomem, zone, this.engine, kind, attacker) || 0;
     }
-    // 常時アウラ（味方の別ホロメンが付与する被ダメージ軽減/増加。「コラボが受けるダメージ-10」等）
+    // 常時アウラ（味方の別ホロメンが付与する被ダメージ軽減/増加。「コラボが受けるダメージ-10」「特殊ダメージを受けない」
+    //  「自分が相手の1stから受けるアーツ-30」＝src===holomem の自己ギフトも auraDamageDelta で表現する）
     const ownerIdx = this._ownerOf(holomem);
     if (ownerIdx >= 0) {
-      total += this._auraSum(ownerIdx, (def, src) => def.auraDamageDelta?.(src, holomem, zone, this.engine));
+      total += this._auraSum(ownerIdx, (def, src) => def.auraDamageDelta?.(src, holomem, zone, this.engine, kind, attacker));
     }
     return total;
   }
@@ -170,6 +171,16 @@ export class EffectSystem {
       for (const r of adef?.batonCostReduceAttached?.(holomem, this.engine) || []) red[r.color] = (red[r.color] || 0) + r.amount;
     }
     return red;
+  }
+
+  /**
+   * このホロメンのアーツが「相手のHPが減っているバックホロメンも対象にできる」か。
+   * ターン修正 kind:'artTargetDamagedBack'（match でホロメンを限定）で表現する (hBP07-086)。
+   */
+  artCanTargetDamagedBack(holomem, ownerIdx) {
+    return this.engine.state.modifiers.some((m) =>
+      m.kind === 'artTargetDamagedBack' && m.ownerIdx === ownerIdx &&
+      (!m.match || m.match(holomem)));
   }
 
   /**
