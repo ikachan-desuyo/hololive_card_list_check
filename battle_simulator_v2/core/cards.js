@@ -116,9 +116,16 @@ export function normalizeCard(raw) {
 export class CardLibrary {
   constructor(rawData) {
     this.cards = new Map();
+    this.byNumber = new Map(); // カードナンバー → 代表カード（最初のバリアント）
     for (const [id, raw] of Object.entries(rawData)) {
-      this.cards.set(id, normalizeCard({ ...raw, id }));
+      const card = normalizeCard({ ...raw, id });
+      this.cards.set(id, card);
+      if (!this.byNumber.has(card.number)) this.byNumber.set(card.number, card);
     }
+  }
+
+  getByNumber(number) {
+    return this.byNumber.get(number) || null;
   }
 
   static async load(url = 'json_file/card_data.json') {

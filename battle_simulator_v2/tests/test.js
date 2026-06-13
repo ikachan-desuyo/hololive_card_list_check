@@ -11,6 +11,7 @@ import { CardLibrary, CardKind } from '../core/cards.js';
 import { Engine } from '../core/engine.js';
 import { EffectRegistry } from '../core/effects/registry.js';
 import { EffectContext } from '../core/effects/context.js';
+import { compileCard } from '../core/effects/text-compiler.js';
 import { HeuristicAI } from '../core/ai/heuristic.js';
 import { createRng } from '../core/rng.js';
 
@@ -58,10 +59,10 @@ function totalCards(p) {
   return n;
 }
 
-/** デッキマップから効果レジストリを構築 */
+/** デッキマップから効果レジストリを構築（手書き > 自動コンパイル） */
 async function buildRegistry(lib, deckMap) {
   const registry = new EffectRegistry();
-  await registry.preload(Object.keys(deckMap).map((id) => lib.get(id)?.number).filter(Boolean));
+  await registry.preload(Object.keys(deckMap).map((id) => lib.get(id)?.number).filter(Boolean), lib);
   return registry;
 }
 
@@ -422,6 +423,122 @@ export async function runTests() {
     assertEq(e.effects.artsBonus(p.center, 0), 20, 'ターン修正が乗っていない');
     e.effects.expireTurnModifiers();
     assertEq(e.effects.artsBonus(p.center, 0), 0, 'ターン修正が消えていない');
+  });
+
+  // ---- テキストコンパイラ ----
+
+  await testAsync('コンパイラ: ドローサポート（注釈を無視して全文解釈）', async () => {
+    const def = compileCard(lib.get('hSD01-016_C')); // 春先のどか: 3枚引く + LIMITED注釈
+    assert(def?.support?.run, 'サポート効果がコンパイルされていない');
+    assert(def.autoCompiled, 'autoCompiled フラグが無い');
+    const e = await setupMainStep(deckMap, 101);
+    const p0 = e.state.players[0];
+    const before = p0.hand.length;
+    let done = false;
+    e._runEffect(def.support, { playerIdx: 0 }, () => { done = true; });
+    assert(done, '実行が完了しない');
+    assertEq(p0.hand.length, before + 3, '3枚ドローされていない');
+  });
+
+  await testAsync('コンパイラ: ブルームエフェクト（エールデッキの上から送る）', async () => {
+    const def = compileCard(lib.get('hBP01-041_U')); // 上から1枚をセンターかコラボに送る
+    assert(def?.bloomEffect?.run, 'ブルームエフェクトがコンパイルされていない');
+    const e = await setupMainStep(deckMap, 102);
+    const p0 = e.state.players[0];
+    const cheersBefore = p0.center.cheers.length;
+    const cheerDeckBefore = p0.cheerDeck.length;
+    let done = false;
+    e._runEffect(def.bloomEffect, { playerIdx: 0 }, () => { done = true; });
+    let guard = 0;
+    while (!done && e.state.pending && guard++ < 10) e.apply(e.state.pending.options[0].id);
+    assert(done, '実行が完了しない');
+    assertEq(p0.center.cheers.length, cheersBefore + 1, 'センターにエールが送られていない');
+    assertEq(p0.cheerDeck.length, cheerDeckBefore - 1, 'エールデッキが減っていない');
+  });
+
+  await testAsync('コンパイラ: アーツの特殊ダメージ（センター直接・選択なし）', async () => {
+    const card = lib.get('hBP07-039_C'); // 相手のセンターホロメンに特殊ダメージ20
+    const art = card.arts.find((a) => a.text);
+    const def = compileCard(card);
+    assert(def?.arts?.[art.name]?.run, 'アーツ効果がコンパイルされていない');
+    const e = await setupMainStep(deckMap, 103);
+    const p1 = e.state.players[1];
+    const dmgBefore = p1.center.damage;
+    let done = false;
+    e._runEffect(def.arts[art.name], { playerIdx: 0, sourceHolomem: e.state.players[0].center }, () => { done = true; });
+    assert(done, '選択なしで完了するはず');
+    assertEq(p1.center.damage, dmgBefore + 20, '特殊ダメージ20が入っていない');
+  });
+
+  await testAsync('コンパイラ: 条件付きアーツ+N（dmgBonus）', async () => {
+    const card = lib.get('hBP01-055_R'); // リレーションスカイ: 他の#IDがいる時+50
+    const def = compileCard(card);
+    const artDef = def?.arts?.['リレーションスカイ'];
+    assert(artDef?.dmgBonus, 'dmgBonus がコンパイルされていない');
+    const e = await setupMainStep(deckMap, 104);
+    const p0 = e.state.players[0];
+    p0.center = e._createHolomem(lib.get('hBP01-055_R'), 1); // イオフィ自身のみ
+    p0.back = [];
+    const ctx = new EffectContext(e, 0, { sourceHolomem: p0.center });
+    assertEq(artDef.dmgBonus(ctx), 0, 'イオフィのみなのに+50されている');
+    p0.back = [e._createHolomem(lib.get('hBP02-018_C'), 1)]; // レイネ（#ID）追加
+    assertEq(artDef.dmgBonus(ctx), 50, '他の#IDがいるのに+50されない');
+  });
+
+  await testAsync('コンパイラ: だいふく相当（条件付きHP+20）が手書きと同じ挙動', async () => {
+    const def = compileCard(lib.get('hBP04-101_C'));
+    assert(def?.attached, '装着修正がコンパイルされていない');
+    assertEq(def.attached.artsPlus(), 10, 'アーツ+10でない');
+    const lamy = { stack: [lib.get('hBP04-043_C')] };
+    const shion = { stack: [lib.get('hBP02-042_C')] };
+    assertEq(def.attached.hpPlus(lamy), 20, 'ラミィでHP+20になっていない');
+    assertEq(def.attached.hpPlus(shion), 0, 'ラミィ以外でHP+20になっている');
+  });
+
+  await testAsync('コンパイラ: 「上からN枚見る→選ぶ→残りを下へ」（シオン1stと同等挙動）', async () => {
+    const def = compileCard(lib.get('hBP02-045_U'));
+    assert(def?.bloomEffect?.run, '「見る」系ブルームエフェクトがコンパイルされていない');
+    const e = await setupMainStep(deckMap, 105);
+    const p0 = e.state.players[0];
+    // デッキの上3枚を固定: [青ラミィ, 青ラミィ, シオン] → 候補から1枚選んで残り2枚は下へ
+    const deckBefore = p0.deck.length;
+    const handBefore = p0.hand.length;
+    let done = false;
+    e._runEffect(def.bloomEffect, { playerIdx: 0 }, () => { done = true; });
+    let guard = 0;
+    while (!done && e.state.pending && guard++ < 15) {
+      // カード選択は最初の候補、順番選択は「この順のまま戻す」(skip) を選ぶ
+      const skip = e.state.pending.options.find((o) => o.id === 'skip');
+      e.apply((skip && /順/.test(skip.label) ? skip : e.state.pending.options[0]).id);
+    }
+    assert(done, '実行が完了しない');
+    assertEq(p0.hand.length, handBefore + 1, '1枚手札に加わっていない');
+    assertEq(p0.deck.length, deckBefore - 1, 'デッキが1枚減（3枚見て1枚取り2枚戻し）になっていない');
+    assertEq(p0.revealed.length, 0, '公開中にカードが残っている');
+  });
+
+  await testAsync('コンパイラ: 解釈できない枠は実装しない（安全側）', async () => {
+    // ゼータのマスコット: 能力追加が「アーツを使った時～」でHP+N以外 → 装着枠ごと不採用
+    const def = compileCard(lib.get('hBP07-105_C'));
+    assert(!def?.attached, '解釈できない装着効果が実装されてしまっている');
+    // アイドルサインペン: 「デッキの上から4枚を見る」は未対応 → サポート枠不採用
+    const def2 = compileCard(lib.get('hBP02-075_U'));
+    assert(!def2?.support, '解釈できないサポート効果が実装されてしまっている');
+  });
+
+  await testAsync('コンパイラ: 全カードでクラッシュせず、一定数を自動実装できる', async () => {
+    let compiled = 0;
+    let slots = 0;
+    for (const card of lib.byNumber.values()) {
+      const def = compileCard(card); // 例外を投げないことも検証
+      if (def) {
+        compiled++;
+        slots += ['bloomEffect', 'collabEffect', 'support', 'attached']
+          .filter((k) => def[k]).length + Object.keys(def.arts || {}).length;
+      }
+    }
+    console.log(`自動コンパイル: ${compiled}種のカード / ${slots}スキル枠`);
+    assert(compiled >= 50, `自動実装数が少なすぎる: ${compiled}`);
   });
 
   // ---- AI ----

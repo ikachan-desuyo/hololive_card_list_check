@@ -84,12 +84,12 @@ async function startGame() {
     const seedInput = document.getElementById('seed-input').value;
     const seed = seedInput ? Number(seedInput) : Math.floor(Math.random() * 1e9);
     currentSeed = seed;
-    // カード効果定義の事前読み込み（両デッキのカードナンバー）
+    // カード効果定義の事前読み込み（手書き定義 > テキスト自動コンパイル）
     const registry = new EffectRegistry();
     const numbers = [...Object.keys(map1), ...Object.keys(map2)]
       .map((id) => lib.get(id)?.number)
       .filter(Boolean);
-    await registry.preload(numbers);
+    await registry.preload(numbers, lib);
     engine = new Engine({
       decks: [deck1, deck2],
       seed,
