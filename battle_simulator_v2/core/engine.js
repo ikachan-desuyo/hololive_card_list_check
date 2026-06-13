@@ -851,15 +851,32 @@ export class Engine {
         h.stack.unshift(card); // 上に重ねる (5.14)
         h.bloomedTurn = s.turn;
         this.log(`${p.name}: ${h.stack[1].name} → ${card.name}〔${card.bloomLevel}〕にBloom`);
-        // ブルームエフェクト (13.3)
+        // ブルームエフェクト (13.3) ＋ 装着カードの「Bloomした時」トリガー（ねっ子等）を順に実行
+        const runners = [];
         const def = this.registry.get(card.number);
         if (def?.bloomEffect) {
           this.log(`《ブルームエフェクト》${def.bloomEffect.name}`);
-          this._runEffect(def.bloomEffect, { playerIdx: s.turnPlayer, sourceCard: card, sourceHolomem: h }, finish);
+          runners.push({ run: def.bloomEffect.run, src: card });
+        } else {
+          const kw = card.keywords.find((k) => k.subtype === 'ブルームエフェクト');
+          if (kw) this.log(`TODO(効果未実装) ブルームエフェクト「${kw.name}」: ${kw.text}`);
+        }
+        for (const att of h.attachments) {
+          const atrig = this.registry.get(att.number)?.triggers?.onBloom;
+          if (atrig) runners.push({ run: atrig, src: att });
+        }
+        if (runners.length > 0) {
+          const runNext = (i) => {
+            if (i >= runners.length) { finish(); return; }
+            this._runEffect(
+              { run: runners[i].run },
+              { playerIdx: s.turnPlayer, sourceCard: runners[i].src, sourceHolomem: h },
+              () => runNext(i + 1),
+            );
+          };
+          runNext(0);
           return;
         }
-        const kw = card.keywords.find((k) => k.subtype === 'ブルームエフェクト');
-        if (kw) this.log(`TODO(効果未実装) ブルームエフェクト「${kw.name}」: ${kw.text}`);
         break;
       }
       case 'collab': {
@@ -1182,7 +1199,8 @@ export class Engine {
       if (h.noLifeOnDown) {
         this.log(`${p.name} のライフは減らない（効果による）`);
       } else {
-        const lifeDmg = card.buzz ? 2 : 1;
+        // 「減るライフ-N」（onDown効果で h.lifeReductionOnDown を立てる）を反映
+        const lifeDmg = Math.max(0, (card.buzz ? 2 : 1) - (h.lifeReductionOnDown || 0));
         p.lifeDamage += lifeDmg;
         this.log(`${p.name} はライフダメージ${lifeDmg}を受けた`);
       }
