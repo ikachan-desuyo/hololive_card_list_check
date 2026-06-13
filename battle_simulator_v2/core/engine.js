@@ -1104,6 +1104,18 @@ export class Engine {
       next();
     };
 
+    // ダウンしたホロメン自身の「ダウンした時」トリガー (13.4 ギフト等)。
+    // アーカイブ前に実行する（エールやスタックの付け替え・回収が間に合うように）。
+    // 「相手のターンで～」等の条件は各カードの run() 内で ctx.state.turnPlayer を見て判定する。
+    const runDownTrigger = () => {
+      const trig = this.registry.get(card.number)?.triggers?.onDown;
+      if (trig) {
+        this._runEffect({ run: trig }, { playerIdx: ownerIdx, sourceCard: card, sourceHolomem: h }, finish);
+      } else {
+        finish();
+      }
+    };
+
     // 「（ホロメンが）ダウンした時に使える」推しスキル (11.3.1.1 / 12.1.5.2)
     // 例: 雪花ラミィ「愛してる」— ダウンしたホロメンのファンを手札に戻す
     const skillDef = this.registry.get(p.oshi.number)?.onDownOshiSkill;
@@ -1118,13 +1130,13 @@ export class Engine {
         ],
         resume: (use) => {
           if (use) skillDef.apply(this, ownerIdx, h);
-          finish();
+          runDownTrigger();
         },
       };
       return;
     }
 
-    finish();
+    runDownTrigger();
   }
 
   /**
