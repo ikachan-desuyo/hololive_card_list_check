@@ -31,7 +31,7 @@ export default {
       *run(ctx) {
         const ok = yield ctx.confirm('アーツ「デスティニーソング」: サイコロを1回振りますか？');
         if (!ok) return;
-        const roll = ctx.rollDice();
+        const roll = (yield* ctx.rollDice());
         if (roll % 2 === 1) {
           ctx.addArtBonus(50, '奇数');
           if (roll === 1) ctx.addArtBonus(50, '1');

@@ -12,7 +12,7 @@ export default {
       // 「振れる」=任意。振らない選択も可。
       const ok = yield ctx.confirm('サイコロを1回振りますか？（奇数で緑ホロメン1人をHP20回復）');
       if (!ok) return;
-      const value = ctx.rollDice();
+      const value = (yield* ctx.rollDice());
       if (value % 2 === 0) return; // 偶数なら何もしない
       const target = yield ctx.chooseHolomem({
         side: 'self',

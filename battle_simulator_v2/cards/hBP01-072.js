@@ -19,7 +19,7 @@ export default {
         if (!hasRedCheer) return;
         const ok = yield ctx.confirm('「WAZZUP!!」: サイコロを1回振りますか？（奇数で相手コラボに特殊ダメージ20）');
         if (!ok) return;
-        const roll = ctx.rollDice();
+        const roll = (yield* ctx.rollDice());
         if (roll % 2 === 0) {
           ctx.log('偶数のため効果は発動しない');
           return;
@@ -29,7 +29,7 @@ export default {
           ctx.log('相手にコラボホロメンがいないため対象なし');
           return;
         }
-        ctx.dealSpecialDamage(collab, 20);
+        yield* ctx.dealSpecialDamage(collab, 20);
       },
     },
   },

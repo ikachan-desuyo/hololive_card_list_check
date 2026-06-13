@@ -22,7 +22,7 @@ export default {
         if (rolls === 0) return;
         let hits = 0;
         for (let i = 0; i < rolls; i++) {
-          if (ctx.rollDice() >= 4) hits++;
+          if ((yield* ctx.rollDice()) >= 4) hits++;
         }
         if (hits > 0) ctx.addArtBonus(hits * 10, `4以上${hits}回`);
       },

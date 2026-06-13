@@ -14,17 +14,17 @@ export default {
       *run(ctx) {
         const ok = yield ctx.confirm('サイコロを1回振りますか？（2/4/6: センターに特殊20、3/5: センターとコラボに特殊20）');
         if (!ok) return;
-        const value = ctx.rollDice();
+        const value = (yield* ctx.rollDice());
         if (value === 2 || value === 4 || value === 6) {
           // 相手のセンターホロメンに特殊ダメージ20
           const center = ctx.holomems('opp', (e) => e.pos.zone === 'center')[0];
-          if (center) ctx.dealSpecialDamage(center, 20);
+          if (center) yield* ctx.dealSpecialDamage(center, 20);
         } else if (value === 3 || value === 5) {
           // 相手のセンターホロメンとコラボホロメンに特殊ダメージ20
           const center = ctx.holomems('opp', (e) => e.pos.zone === 'center')[0];
-          if (center) ctx.dealSpecialDamage(center, 20);
+          if (center) yield* ctx.dealSpecialDamage(center, 20);
           const collab = ctx.holomems('opp', (e) => e.pos.zone === 'collab')[0];
-          if (collab) ctx.dealSpecialDamage(collab, 20);
+          if (collab) yield* ctx.dealSpecialDamage(collab, 20);
         }
         // 1 の時は何も起きない
       },

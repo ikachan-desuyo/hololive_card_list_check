@@ -26,7 +26,7 @@ export default {
       return ctx.holomems('opp', (e) => e.holomem.cheers.length > 0).length > 0;
     },
     *run(ctx) {
-      const dice = ctx.rollDice();
+      const dice = (yield* ctx.rollDice());
       if (dice > 3) {
         ctx.log('サイコロが4以上のため効果なし');
         return;

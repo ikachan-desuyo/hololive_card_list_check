@@ -32,7 +32,7 @@ export default {
           filter: (e) => e.pos.zone === 'back',
           title: '特殊ダメージ30を与える相手バックホロメンを選択',
         });
-        if (target) ctx.dealSpecialDamage(target, 30);
+        if (target) yield* ctx.dealSpecialDamage(target, 30);
       },
     },
   },

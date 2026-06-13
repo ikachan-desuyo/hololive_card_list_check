@@ -18,7 +18,7 @@ export default {
         ctx.log('相手のコラボホロメンが居ないため特殊ダメージは発生しなかった');
         return;
       }
-      ctx.dealSpecialDamage(collab, 20);
+      yield* ctx.dealSpecialDamage(collab, 20);
     },
   },
 };

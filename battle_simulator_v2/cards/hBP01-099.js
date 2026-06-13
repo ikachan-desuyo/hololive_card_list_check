@@ -12,7 +12,7 @@ export default {
       // 「サイコロを振れる」= 任意。振らない選択も可。
       const ok = yield ctx.confirm('サイコロを1回振りますか？（奇数なら相手のセンターとバックを交代）');
       if (!ok) return;
-      const roll = ctx.rollDice();
+      const roll = (yield* ctx.rollDice());
       if (roll % 2 === 0) return; // 偶数: 何も起きない
       const opp = ctx.opponent;
       if (!opp.center || opp.back.length === 0) return;

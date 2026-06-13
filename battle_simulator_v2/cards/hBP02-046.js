@@ -49,7 +49,7 @@ export default {
         if (!hasAnyCheer || oppMems.length < 2) return;
         const ok = yield ctx.confirm('サイコロを1回振りますか？（5以上で相手のエール1枚を付け替える）');
         if (!ok) return;
-        const roll = ctx.rollDice();
+        const roll = (yield* ctx.rollDice());
         if (roll < 5) return;
 
         // 相手ステージのエール1枚を選ぶ（owner を記録）

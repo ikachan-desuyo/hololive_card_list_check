@@ -17,7 +17,7 @@ export default {
         title: '特殊ダメージ30を与える相手ホロメンを選択（センターかコラボ）',
         optional: true,
       });
-      if (target) ctx.dealSpecialDamage(target, 30);
+      if (target) yield* ctx.dealSpecialDamage(target, 30);
       // その後、相手は自身のデッキを1枚引く（条件なし）
       const opp = ctx.opponent;
       if (opp.deck.length > 0) {

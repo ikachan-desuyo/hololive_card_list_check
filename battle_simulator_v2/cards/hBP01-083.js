@@ -20,7 +20,7 @@ export default {
       // 「振れる」=任意
       const ok = yield ctx.confirm('サイコロを1回振りますか？（3以上でエールデッキの上から1枚をホロメンに送る）');
       if (!ok) return;
-      const value = ctx.rollDice();
+      const value = (yield* ctx.rollDice());
       if (value < 3) return;
       if (ctx.player.cheerDeck.length === 0) return;
       const target = yield ctx.chooseHolomem({

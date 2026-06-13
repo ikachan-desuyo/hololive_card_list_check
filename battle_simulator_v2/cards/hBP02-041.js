@@ -25,7 +25,7 @@ export default {
         ctx.archiveCheer(ctx.sourceHolomem, cheer);
         // 相手のセンターホロメンに特殊ダメージ20
         const center = ctx.holomems('opp', (e) => e.pos.zone === 'center')[0];
-        if (center) ctx.dealSpecialDamage(center, 20);
+        if (center) yield* ctx.dealSpecialDamage(center, 20);
         // 相手のバックホロメン1人に特殊ダメージ20
         const backs = ctx.holomems('opp', (e) => e.pos.zone === 'back');
         if (backs.length > 0) {
@@ -33,7 +33,7 @@ export default {
             side: 'opp', filter: (e) => e.pos.zone === 'back',
             title: '特殊ダメージ20を与える相手のバックホロメンを選択',
           });
-          if (target) ctx.dealSpecialDamage(target, 20);
+          if (target) yield* ctx.dealSpecialDamage(target, 20);
         }
       },
     },

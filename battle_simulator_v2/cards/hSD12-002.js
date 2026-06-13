@@ -82,7 +82,7 @@ export default {
       if (count <= 0) return;
       const amount = count * 10;
       ctx.log(`アーカイブの #Advent ホロメン/エール ${count}枚 → 特殊ダメージ${amount}`);
-      ctx.dealSpecialDamage(center, amount);
+      yield* ctx.dealSpecialDamage(center, amount);
     },
   },
 };

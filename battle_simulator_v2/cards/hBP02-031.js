@@ -11,7 +11,7 @@ export default {
     name: 'キミたちの声が船長の支えです！',
     *run(ctx) {
       const collab = ctx.holomems('opp', (e) => e.pos.zone === 'collab')[0];
-      if (collab) ctx.dealSpecialDamage(collab, 20);
+      if (collab) yield* ctx.dealSpecialDamage(collab, 20);
     },
   },
 };

@@ -31,7 +31,7 @@ export default {
 
       // 相手のセンターホロメンに特殊ダメージ20
       const center = ctx.holomems('opp', (e) => e.pos.zone === 'center')[0];
-      if (center) ctx.dealSpecialDamage(center, 20);
+      if (center) yield* ctx.dealSpecialDamage(center, 20);
 
       // その後、自分のアーカイブのエール1枚を自分のホロメンに送る
       const cheers = ctx.player.archive.filter((c) => c.kind === 'cheer');

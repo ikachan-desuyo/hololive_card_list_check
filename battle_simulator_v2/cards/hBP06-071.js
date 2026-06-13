@@ -13,7 +13,7 @@ export default {
       *run(ctx) {
         let odds = 0;
         for (let i = 0; i < 3; i++) {
-          if (ctx.rollDice() % 2 === 1) odds++;
+          if ((yield* ctx.rollDice()) % 2 === 1) odds++;
         }
         ctx.log(`奇数が${odds}回出た`);
         if (odds > 0) ctx.addArtBonus(odds * 20, `奇数${odds}回ぶんアーツ+${odds * 20}`);
@@ -23,14 +23,14 @@ export default {
       *run(ctx) {
         let odds = 0;
         for (let i = 0; i < 5; i++) {
-          if (ctx.rollDice() % 2 === 1) odds++;
+          if ((yield* ctx.rollDice()) % 2 === 1) odds++;
         }
         ctx.log(`奇数が${odds}回出た`);
         // 奇数が出た回数1回につき、「デッキを1枚引き、相手のセンター/コラボに特殊ダメージ30」を1セット実行
         for (let i = 0; i < odds; i++) {
           ctx.draw(1);
           for (const e of ctx.holomems('opp', (x) => x.pos.zone === 'center' || x.pos.zone === 'collab')) {
-            ctx.dealSpecialDamage(e, 30);
+            yield* ctx.dealSpecialDamage(e, 30);
           }
         }
       },

@@ -10,7 +10,7 @@ export default {
     *run(ctx) {
       const ok = yield ctx.confirm('サイコロを振りますか？', '振る', '振らない');
       if (!ok) return;
-      const value = ctx.rollDice();
+      const value = (yield* ctx.rollDice());
       if (value <= 4) {
         const entry = yield ctx.chooseHolomem({
           side: 'self',

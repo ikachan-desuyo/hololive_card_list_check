@@ -21,7 +21,7 @@ export default {
         title: '特殊ダメージ20を与える相手ホロメンを選択（センターかバック）',
       });
       if (!target) return;
-      ctx.dealSpecialDamage(target, 20, { noLifeOnDown: true });
+      yield* ctx.dealSpecialDamage(target, 20, { noLifeOnDown: true });
     },
   },
 };

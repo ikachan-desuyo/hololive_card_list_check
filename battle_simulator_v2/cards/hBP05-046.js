@@ -30,7 +30,7 @@ export default {
         const ok = ctx.holomems('self', (e) => e.top.bloomLevel === '2nd' && ctx.hasTag(e.top, '5期生')).length > 0;
         if (!ok) return;
         const target = yield ctx.chooseHolomem({ side: 'opp', title: '特殊ダメージ20を与える相手ホロメンを選択' });
-        if (target) ctx.dealSpecialDamage(target, 20);
+        if (target) yield* ctx.dealSpecialDamage(target, 20);
       },
     },
   },

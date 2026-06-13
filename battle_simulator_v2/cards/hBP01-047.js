@@ -19,7 +19,7 @@ export default {
       // その後、サイコロを1回振れる（任意）
       const wantRoll = yield ctx.confirm('サイコロを1回振りますか？（奇数なら緑エールをこのホロメンに送れる）');
       if (!wantRoll) return;
-      const dice = ctx.rollDice();
+      const dice = (yield* ctx.rollDice());
       if (dice % 2 === 0) return; // 偶数なら何も起きない
 
       // 奇数: アーカイブの緑エール1～3枚をこのホロメンに送れる（任意）

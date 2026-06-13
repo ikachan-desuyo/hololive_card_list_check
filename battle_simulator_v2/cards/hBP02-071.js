@@ -17,7 +17,7 @@ export default {
     *run(ctx) {
       const roll = yield ctx.confirm('サイコロを1回振りますか？');
       if (!roll) return;
-      const value = ctx.rollDice();
+      const value = (yield* ctx.rollDice());
       if (value % 2 === 0) return; // 偶数の時は何もしない
       // 奇数の時
       const candidates = ctx.player.cheerDeck.filter(

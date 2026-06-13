@@ -16,7 +16,7 @@ export default {
       const center = ctx.holomems('opp', (e) => e.pos.zone === 'center')[0];
       if (!center) return;
       const amount = ctx.isFirstTurnGoingSecond() ? 20 : 10;
-      ctx.dealSpecialDamage(center, amount);
+      yield* ctx.dealSpecialDamage(center, amount);
     },
   },
 };

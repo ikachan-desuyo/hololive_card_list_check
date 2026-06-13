@@ -26,11 +26,11 @@ export default {
         if (ctx.sourceHolomemPos()?.zone !== 'collab') return;
         const collab = ctx.holomems('opp', (e) => e.pos.zone === 'collab')[0];
         if (collab) {
-          ctx.dealSpecialDamage(collab, 50);
+          yield* ctx.dealSpecialDamage(collab, 50);
           return;
         }
         const center = ctx.holomems('opp', (e) => e.pos.zone === 'center')[0];
-        if (center) ctx.dealSpecialDamage(center, 50);
+        if (center) yield* ctx.dealSpecialDamage(center, 50);
       },
     },
   },

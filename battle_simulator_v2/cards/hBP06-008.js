@@ -20,7 +20,7 @@ export default {
   oshiSkill: {
     *run(ctx) {
       const p = ctx.player;
-      const value = ctx.rollDice();
+      const value = (yield* ctx.rollDice());
       const life = p.life.length;
 
       // 出た目が自分のライフ以上：デッキからカード1枚を手札に加え、デッキをシャッフル

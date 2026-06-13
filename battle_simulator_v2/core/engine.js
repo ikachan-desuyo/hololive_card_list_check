@@ -1195,6 +1195,7 @@ export class Engine {
         dmg = this._applyDamageReceived(t, dmg, 'arts', h);
         // 防御側の被ダメージ推しスキル割り込み（対象ごと）
         this._offerDamageOshiSkill(t, dmg, (finalDmg) => {
+          // (kind='arts')
           t.damage += finalDmg;
           totalDealt += finalDmg;
           this.log(
@@ -1411,44 +1412,101 @@ export class Engine {
   }
 
   /**
-   * 「相手のターンで、自分のホロメンが相手からダメージを受ける時に使える」防御側の推しスキル割り込み。
-   * アーツダメージ適用の直前に呼ぶ。使える推しスキルがあれば防御側に決定ポイントを提示し、
-   * 使用時は軽減後のダメージで after を呼ぶ。無ければそのまま after(dmg)。
-   * 定義: oshi の onDamageOshiSkill = { cost, sp?, title, canUse(engine,defIdx,target,dmg), reduce(engine,defIdx,target,dmg)=>N }
+   * 防御側の「ダメージを受ける時に使える」割り込みを収集する。返り値は各レスポンダーの記述子配列。
+   * build(curDmg) は現在のダメージで使用可能なら { title, yesLabel, apply(d)=>newDmg } を、不可なら null を返す。
+   * 種別: ①推しスキル onDamageOshiSkill ②対象の装着カード onDamageReceivedReact ③防御側ステージのホロメンギフト onDamageReceivedReact
+   * @param target 受け手ホロメン  @param kind 'arts'|'special'  @param defIdx 防御側
    */
-  _offerDamageOshiSkill(targetHolomem, dmg, after) {
+  _collectDamageResponders(target, kind, defIdx) {
+    const defender = this.state.players[defIdx];
+    const out = [];
+
+    // ① 推しスキル（「受ける時に使える推しスキル：ダメージ-N」）
+    const skill = this.registry.get(defender.oshi.number)?.onDamageOshiSkill;
+    if (skill) {
+      out.push({ build: (curDmg) => {
+        const used = skill.sp ? defender.usedSpOshiSkillThisGame : defender.usedOshiSkillThisTurn;
+        if (used || defender.holoPower.length < skill.cost) return null;
+        if (skill.canUse && !skill.canUse(this, defIdx, target, curDmg)) return null;
+        return {
+          title: skill.title || '推しスキルを使いますか？（受けるダメージ軽減）',
+          yesLabel: `${skill.sp ? 'SP' : ''}推しスキルを使う（ホロパワー-${skill.cost}）`,
+          apply: (d) => {
+            defender.archive.push(...defender.holoPower.splice(0, skill.cost));
+            if (skill.sp) defender.usedSpOshiSkillThisGame = true;
+            else defender.usedOshiSkillThisTurn = true;
+            const red = skill.reduce ? (skill.reduce(this, defIdx, target, d) || 0) : 0;
+            const fin = Math.max(0, d - red);
+            this.log(`${defender.name}: 推しスキルで受けるダメージ ${d} → ${fin}（-${red}）`);
+            return fin;
+          },
+        };
+      } });
+    }
+
+    // ② 対象に付いている装着カード（ファン等）のリアクティブ反応（hBP03-105 ルーナイト等）
+    for (const att of target.attachments) {
+      const r = this.registry.get(att.number)?.onDamageReceivedReact;
+      if (!r) continue;
+      out.push({ build: (curDmg) => {
+        const info = { defIdx, target, dmg: curDmg, kind, attachedCard: att, reactor: target };
+        if (r.canUse && !r.canUse(this, info)) return null;
+        return {
+          title: r.title || '装着カードの効果を使いますか？',
+          yesLabel: r.yesLabel || '使う',
+          apply: (d) => (r.apply(this, { ...info, dmg: d }) ?? d),
+        };
+      } });
+    }
+
+    // ③ 防御側ステージのホロメンギフトのリアクティブ反応（hSD13-012 ジジ等。特殊ダメージ限定など）
+    for (const reactor of this._stageHolomems(defender)) {
+      const r = this.registry.get(reactor.stack[0].number)?.onDamageReceivedReact;
+      if (!r) continue;
+      out.push({ build: (curDmg) => {
+        const info = { defIdx, target, dmg: curDmg, kind, reactor };
+        if (r.canUse && !r.canUse(this, info)) return null;
+        return {
+          title: r.title || 'ギフトを使いますか？',
+          yesLabel: r.yesLabel || '使う',
+          apply: (d) => (r.apply(this, { ...info, dmg: d }) ?? d),
+        };
+      } });
+    }
+
+    return out;
+  }
+
+  /**
+   * 「相手のターンで、自分のホロメンが相手からダメージを受ける時に使える」防御側の割り込み（推しスキル＋ホロメン/ファン）。
+   * アーツダメージ適用の直前に呼ぶ。使える割り込みを順に防御側へ決定ポイントとして提示し、最終ダメージで after を呼ぶ。
+   * 無ければそのまま after(dmg)。特殊ダメージの割り込みは _offerDamageInterruptsGen（generator版）を使う。
+   */
+  _offerDamageOshiSkill(targetHolomem, dmg, after, kind = 'arts') {
     const s = this.state;
     const defIdx = s.players.findIndex((p) => this._stageHolomems(p).includes(targetHolomem));
     // 攻撃はターンプレイヤー→相手。防御側はターンプレイヤーでない側のみ（自分のアーツの自爆等は対象外）
     if (defIdx < 0 || defIdx === s.turnPlayer) { after(dmg); return; }
-    const defender = s.players[defIdx];
-    const skill = this.registry.get(defender.oshi.number)?.onDamageOshiSkill;
-    if (!skill) { after(dmg); return; }
-    const used = skill.sp ? defender.usedSpOshiSkillThisGame : defender.usedOshiSkillThisTurn;
-    if (used || defender.holoPower.length < skill.cost) { after(dmg); return; }
-    if (skill.canUse && !skill.canUse(this, defIdx, targetHolomem, dmg)) { after(dmg); return; }
-    this.state.pending = {
-      type: 'effectChoice',
-      player: defIdx,
-      request: { kind: 'confirm', title: skill.title || '推しスキルを使いますか？（受けるダメージ軽減）' },
-      options: [
-        { id: 'yes', label: `${skill.sp ? 'SP' : ''}推しスキルを使う（ホロパワー-${skill.cost}）`, value: true },
-        { id: 'no', label: '使わない', value: false },
-      ],
-      resume: (use) => {
-        let finalDmg = dmg;
-        if (use) {
-          defender.archive.push(...defender.holoPower.splice(0, skill.cost));
-          if (skill.sp) defender.usedSpOshiSkillThisGame = true;
-          else defender.usedOshiSkillThisTurn = true;
-          const red = skill.reduce ? (skill.reduce(this, defIdx, targetHolomem, dmg) || 0) : 0;
-          finalDmg = Math.max(0, dmg - red);
-          this.log(`${defender.name}: 推しスキルで受けるダメージ ${dmg} → ${finalDmg}（-${red}）`);
-        }
-        after(finalDmg);
-      },
+    const responders = this._collectDamageResponders(targetHolomem, kind, defIdx);
+    if (responders.length === 0) { after(dmg); return; }
+
+    const run = (i, curDmg) => {
+      if (i >= responders.length) { after(curDmg); return; }
+      const r = responders[i].build(curDmg);
+      if (!r) { run(i + 1, curDmg); return; }
+      this.state.pending = {
+        type: 'effectChoice',
+        player: defIdx,
+        request: { kind: 'confirm', title: r.title },
+        options: [
+          { id: 'yes', label: r.yesLabel, value: true },
+          { id: 'no', label: '使わない', value: false },
+        ],
+        resume: (use) => run(i + 1, use ? r.apply(curDmg) : curDmg),
+      };
+      this.onChange();
     };
-    this.onChange();
+    run(0, dmg);
   }
 
   /**

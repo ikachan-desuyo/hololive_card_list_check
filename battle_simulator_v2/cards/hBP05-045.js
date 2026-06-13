@@ -21,7 +21,7 @@ export default {
     '僕のコト、大好きになってみない？': {
       *run(ctx) {
         const target = yield ctx.chooseHolomem({ side: 'opp', title: '特殊ダメージ20を与える相手ホロメンを選択' });
-        if (target) ctx.dealSpecialDamage(target, 20);
+        if (target) yield* ctx.dealSpecialDamage(target, 20);
         const cheers = ctx.player.archive.filter((c) => c.kind === 'cheer');
         const backs = ctx.holomems('self', (e) => e.pos.zone === 'back' && ctx.hasTag(e.top, 'ゲーマーズ'));
         if (cheers.length === 0 || backs.length === 0) return;

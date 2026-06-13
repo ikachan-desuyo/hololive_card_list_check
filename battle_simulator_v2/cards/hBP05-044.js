@@ -17,7 +17,7 @@ export default {
       ctx.markOncePerTurn('hBP05-044:お弁当タイム');
       // 相手センターに特殊10
       const center = ctx.holomems('opp', (e) => e.pos.zone === 'center')[0];
-      if (center) ctx.dealSpecialDamage(center, 10);
+      if (center) yield* ctx.dealSpecialDamage(center, 10);
       // 相手バック1人に特殊10
       const backs = ctx.holomems('opp', (e) => e.pos.zone === 'back');
       if (backs.length > 0) {
@@ -26,7 +26,7 @@ export default {
           filter: (e) => e.pos.zone === 'back',
           title: '特殊ダメージ10を与える相手のバックホロメンを選択',
         });
-        if (target) ctx.dealSpecialDamage(target, 10);
+        if (target) yield* ctx.dealSpecialDamage(target, 10);
       }
     },
   },
@@ -37,7 +37,7 @@ export default {
           side: 'opp',
           title: '特殊ダメージ10を与える相手ホロメンを選択',
         });
-        if (target) ctx.dealSpecialDamage(target, 10);
+        if (target) yield* ctx.dealSpecialDamage(target, 10);
       },
     },
   },

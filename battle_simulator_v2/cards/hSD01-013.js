@@ -12,7 +12,7 @@ export default {
       *run(ctx) {
         const ok = yield ctx.confirm('サイコロを1回振りますか？');
         if (!ok) return;
-        const v = ctx.rollDice();
+        const v = (yield* ctx.rollDice());
         if (v % 2 === 1) {
           // 奇数: エールデッキの上から1枚をこのホロメンに送る
           ctx.sendCheerFromCheerDeckTop(ctx.sourceHolomem);

@@ -24,7 +24,7 @@ export default {
         ctx.log('選んだホロメンは受けているダメージが無いため特殊ダメージは0');
         return;
       }
-      ctx.dealSpecialDamage(target, amount);
+      yield* ctx.dealSpecialDamage(target, amount);
     },
   },
   arts: {
@@ -37,7 +37,7 @@ export default {
           filter: (e) => e.pos.zone === 'center' || e.pos.zone === 'collab',
           title: '特殊ダメージ90を与える相手ホロメンを選択（センターかコラボ）',
         });
-        if (target) ctx.dealSpecialDamage(target, 90);
+        if (target) yield* ctx.dealSpecialDamage(target, 90);
       },
     },
   },

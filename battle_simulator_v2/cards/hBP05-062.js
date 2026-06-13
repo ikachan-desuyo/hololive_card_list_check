@@ -35,7 +35,7 @@ export default {
           filter: (e) => e.pos.zone === 'center' || e.pos.zone === 'collab',
           title: `特殊ダメージ${count * 20}を与える相手ホロメンを選択（センターかコラボ）`,
         });
-        if (target) ctx.dealSpecialDamage(target, count * 20);
+        if (target) yield* ctx.dealSpecialDamage(target, count * 20);
       },
     },
   },

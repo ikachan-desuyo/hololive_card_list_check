@@ -20,7 +20,7 @@ export default {
       }
       // 相手のセンターホロメンに特殊ダメージ10（ダウンしてもライフは減らない）
       const oppCenter = ctx.holomems('opp', (e) => e.pos.zone === 'center')[0];
-      if (oppCenter) ctx.dealSpecialDamage(oppCenter, 10, { noLifeOnDown: true });
+      if (oppCenter) yield* ctx.dealSpecialDamage(oppCenter, 10, { noLifeOnDown: true });
       // 相手のバックホロメン1人に特殊ダメージ10（ダウンしてもライフは減らない）
       const backTarget = yield ctx.chooseHolomem({
         side: 'opp',
@@ -28,7 +28,7 @@ export default {
         title: '特殊ダメージ10を与える相手バックホロメンを選択',
         optional: true,
       });
-      if (backTarget) ctx.dealSpecialDamage(backTarget, 10, { noLifeOnDown: true });
+      if (backTarget) yield* ctx.dealSpecialDamage(backTarget, 10, { noLifeOnDown: true });
     },
   },
 };

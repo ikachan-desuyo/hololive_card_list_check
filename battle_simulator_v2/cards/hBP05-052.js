@@ -12,7 +12,7 @@ export default {
       const hasEvent = ctx.player.archive.some((c) => c.kind === 'support' && c.supportType === 'イベント');
       if (!hasEvent) return;
       const center = ctx.holomems('opp', (e) => e.pos.zone === 'center')[0];
-      if (center) ctx.dealSpecialDamage(center, 10);
+      if (center) yield* ctx.dealSpecialDamage(center, 10);
     },
   },
 };

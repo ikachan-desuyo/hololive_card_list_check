@@ -53,7 +53,7 @@ export default {
           title: `オーバーしたダメージ${overflow}の特殊ダメージを与える相手の2ndホロメンを選択`,
         });
         if (!target) return;
-        ctx.dealSpecialDamage(target, overflow);
+        yield* ctx.dealSpecialDamage(target, overflow);
       },
     },
   },

@@ -12,7 +12,7 @@ export default {
       *run(ctx) {
         const backs = ctx.holomems('opp', (e) => e.pos.zone === 'back');
         for (const target of backs) {
-          ctx.dealSpecialDamage(target, 10, { noLifeOnDown: true });
+          yield* ctx.dealSpecialDamage(target, 10, { noLifeOnDown: true });
         }
       },
     },

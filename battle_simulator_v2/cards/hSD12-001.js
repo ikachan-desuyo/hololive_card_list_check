@@ -86,7 +86,7 @@ export default {
         ctx.log(`${ctx.player.name}: アーカイブにサポートカードが無いため特殊ダメージ0`);
         return;
       }
-      ctx.dealSpecialDamage(target, amount);
+      yield* ctx.dealSpecialDamage(target, amount);
     },
   },
 };

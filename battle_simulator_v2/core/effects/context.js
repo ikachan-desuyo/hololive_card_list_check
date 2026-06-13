@@ -11,7 +11,8 @@
  *
  * yield された選択要求はエンジンが決定ポイント（pending）に変換し、
  * プレイヤーの選択後にジェネレータを再開する。
- * 選択を伴わない操作（draw, rollDice 等）は普通のメソッド呼び出しでよい。
+ * 選択を伴わない操作（draw 等）は普通のメソッド呼び出しでよい。
+ * ただし割り込みが入りうる操作（rollDice / dealSpecialDamage）はジェネレータなので `yield* ctx.xxx(...)` で呼ぶ。
  *
  * ルール条番号は battle_simulator/docs/RULES_SPEC.md / 総合ルール ver.1.9.0 参照。
  */
@@ -183,8 +184,12 @@ export class EffectContext {
     return drawn;
   }
 
-  /** サイコロを1個振る (5.24)。「目をNとして扱う」継続効果に対応 */
-  rollDice() {
+  /**
+   * サイコロを1個振る (5.24)。「目をNとして扱う」継続効果に対応。ジェネレータ（呼び出しは `yield* ctx.rollDice()`）。
+   * 振った後、自分のファン等のダイス割り込み（onDiceRollReact。「目を4として扱う」「振り直す」等）があれば
+   * コントローラー自身に決定ポイントを提示する。
+   */
+  *rollDice() {
     let value = rollDie(this.engine.rng);
     const fixed = this.engine.state.modifiers.find(
       (m) => m.kind === 'diceFixed' && m.ownerIdx === this.playerIdx);
@@ -193,6 +198,30 @@ export class EffectContext {
       value = fixed.value;
     } else {
       this.log(`🎲 サイコロ: ${value}`);
+    }
+    value = yield* this._offerDiceReact(value);
+    return value;
+  }
+
+  /** ダイス割り込み（自分のステージの装着カードの onDiceRollReact）をコントローラーに順に提示する */
+  *_offerDiceReact(value) {
+    const eng = this.engine;
+    for (const h of eng._stageHolomems(this.player)) {
+      for (const att of [...h.attachments]) { // apply で外れても走査が崩れないようスナップショット
+        const r = eng.registry.get(att.number)?.onDiceRollReact;
+        if (!r) continue;
+        // roller=振っているホロメン（推しスキルの場合は null）/ rollerCard=振っている能力の発生源カード（推し含む）
+        const info = { ownerIdx: this.playerIdx, roller: this.sourceHolomem, rollerCard: this.sourceCard, value, fanCard: att, fanHolomem: h };
+        if (r.canUse && !r.canUse(eng, info)) continue;
+        const use = yield {
+          kind: 'confirm', player: this.playerIdx, title: r.title,
+          buildOptions: () => [
+            { id: 'yes', label: r.yesLabel || '使う', value: true },
+            { id: 'no', label: '使わない', value: false },
+          ],
+        };
+        if (use) value = r.apply(eng, { ...info, value });
+      }
     }
     return value;
   }
@@ -493,12 +522,13 @@ export class EffectContext {
   }
 
   /**
-   * 特殊ダメージを与える (5.22)
+   * 特殊ダメージを与える (5.22)。ジェネレータ（呼び出しは `yield* ctx.dealSpecialDamage(...)`）。
    * opts.noLifeOnDown: 「ただし、ダウンしても相手のライフは減らない」と記載がある場合のみ true。
    * 記載がない特殊ダメージでダウンした場合、ライフは通常どおり減る。
    * 付いているファン等の特殊ダメージ修正（雪民など）は自動で加算される。
+   * 相手のターン中でなくても、防御側に「受ける時」の割り込み（推しスキル/ホロメン/ファン）があれば決定ポイントを挟む。
    */
-  dealSpecialDamage(targetEntry, amount, opts = {}) {
+  *dealSpecialDamage(targetEntry, amount, opts = {}) {
     let total = amount;
     // 発生源ホロメンの装着カードによる特殊ダメージ修正
     if (this.sourceHolomem) {
@@ -506,6 +536,26 @@ export class EffectContext {
     }
     // 受け手の「受けるダメージ」修正（軽減/増加）。特殊ダメージにも適用される（攻撃元=発生源ホロメン）
     total = this.engine._applyDamageReceived(targetEntry.holomem, total, 'special', this.sourceHolomem || null);
+
+    // 防御側の「ダメージを受ける時」割り込み（推しスキル/ホロメンギフト/装着ファン）。発生源の相手側のみ。
+    const eng = this.engine;
+    const defIdx = eng.state.players.findIndex((p) => eng._stageHolomems(p).includes(targetEntry.holomem));
+    if (defIdx >= 0 && defIdx !== this.playerIdx) {
+      const responders = eng._collectDamageResponders(targetEntry.holomem, 'special', defIdx);
+      for (const resp of responders) {
+        const r = resp.build(total);
+        if (!r) continue;
+        const use = yield {
+          kind: 'confirm', player: defIdx, title: r.title,
+          buildOptions: () => [
+            { id: 'yes', label: r.yesLabel, value: true },
+            { id: 'no', label: '使わない', value: false },
+          ],
+        };
+        if (use) total = Math.max(0, r.apply(total));
+      }
+    }
+
     targetEntry.holomem.damage += total;
     // 「ライフは減らない」は、この特殊ダメージでダウンが確定した場合のみ適用する。
     // （ダウンに至らなかった場合にフラグを残すと、後から別のダメージで倒された時まで

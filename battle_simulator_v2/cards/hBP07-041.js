@@ -12,7 +12,7 @@ export default {
     *run(ctx) {
       const collab = ctx.holomems('opp', (e) => e.pos.zone === 'collab');
       if (collab.length === 0) return; // 相手にコラボホロメンがいなければ何もしない
-      ctx.dealSpecialDamage(collab[0], 50);
+      yield* ctx.dealSpecialDamage(collab[0], 50);
     },
   },
   arts: {

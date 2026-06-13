@@ -10,7 +10,7 @@ export default {
     name: 'ポルカとのなんでもない休日',
     *run(ctx) {
       const collab = ctx.holomems('opp', (e) => e.pos.zone === 'collab')[0];
-      if (collab) ctx.dealSpecialDamage(collab, 20);
+      if (collab) yield* ctx.dealSpecialDamage(collab, 20);
     },
   },
   arts: {
@@ -29,7 +29,7 @@ export default {
           filter: (e) => e.pos.zone === 'center' || e.pos.zone === 'collab',
           title: '特殊ダメージ10を与える相手ホロメンを選択（センターかコラボ）',
         });
-        if (target) ctx.dealSpecialDamage(target, 10);
+        if (target) yield* ctx.dealSpecialDamage(target, 10);
       },
     },
   },

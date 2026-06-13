@@ -41,7 +41,7 @@ export default {
           title: `特殊ダメージ${adventCount * 10}を与える相手ホロメンを選択（Debut以外）`,
         });
         if (!target) return;
-        ctx.dealSpecialDamage(target, adventCount * 10);
+        yield* ctx.dealSpecialDamage(target, adventCount * 10);
       },
     },
   },

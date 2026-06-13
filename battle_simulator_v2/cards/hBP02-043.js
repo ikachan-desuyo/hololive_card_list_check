@@ -13,7 +13,7 @@ export default {
       // 「振れる」=任意。振るか確認する。
       const doRoll = yield ctx.confirm('サイコロを1回振りますか？');
       if (!doRoll) return;
-      const value = ctx.rollDice();
+      const value = (yield* ctx.rollDice());
       if (value < 4) {
         ctx.log('出目が4未満のため効果なし');
         return;

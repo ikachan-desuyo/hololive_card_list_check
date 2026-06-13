@@ -42,7 +42,7 @@ export default {
       ctx.archiveCheer(holomem, picked);
       const backs = ctx.holomems('opponent', (e) => e.pos.zone === 'back');
       for (const e of backs) {
-        ctx.dealSpecialDamage(e, 10, { noLifeOnDown: true });
+        yield* ctx.dealSpecialDamage(e, 10, { noLifeOnDown: true });
       }
     },
   },

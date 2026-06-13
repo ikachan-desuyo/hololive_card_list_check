@@ -15,7 +15,7 @@ export default {
       ).length > 0;
       if (!hasRobosaa) return;
       const center = ctx.holomems('opp', (e) => e.pos.zone === 'center')[0];
-      if (center) ctx.dealSpecialDamage(center, 20);
+      if (center) yield* ctx.dealSpecialDamage(center, 20);
     },
   },
   arts: {

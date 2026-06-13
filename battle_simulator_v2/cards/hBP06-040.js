@@ -8,9 +8,9 @@ export default {
   arts: {
     'You can do it!': {
       *run(ctx) {
-        if (ctx.rollDice() % 2 === 1) {
+        if ((yield* ctx.rollDice()) % 2 === 1) {
           for (const e of ctx.holomems('opp', (x) => x.pos.zone === 'center' || x.pos.zone === 'collab')) {
-            ctx.dealSpecialDamage(e, 10);
+            yield* ctx.dealSpecialDamage(e, 10);
           }
         }
       },

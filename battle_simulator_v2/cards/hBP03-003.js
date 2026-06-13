@@ -28,7 +28,7 @@ export default {
       // 「振れる」=任意
       const go = yield ctx.confirm('サイコロを振りますか？', '振る', '振らない');
       if (!go) return;
-      const roll = ctx.rollDice();
+      const roll = (yield* ctx.rollDice());
       const count = (roll === 3 || roll === 5) ? 2 : 1; // 3か5で2枚、それ以外(1/2/4/6)で1枚
       for (let i = 0; i < count; i++) {
         const cards = ctx.player.archive.filter(is35P);

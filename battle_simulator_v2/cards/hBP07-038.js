@@ -11,10 +11,10 @@ export default {
   bloomEffect: {
     name: '幻獣グルメハンター',
     *run(ctx) {
-      const value = ctx.rollDice();
+      const value = (yield* ctx.rollDice());
       if (value % 2 === 1) {
         const center = ctx.holomems('opp', (e) => e.pos.zone === 'center')[0];
-        if (center) ctx.dealSpecialDamage(center, 20);
+        if (center) yield* ctx.dealSpecialDamage(center, 20);
       } else {
         ctx.draw(1);
       }

@@ -68,7 +68,7 @@ export default {
       const target = ctx.holomems('opponent', (e) =>
         e.pos.zone === 'center' && e.top.bloomLevel !== 'Debut')[0];
       if (!target) return;
-      ctx.dealSpecialDamage(target, 100);
+      yield* ctx.dealSpecialDamage(target, 100);
     },
   },
 };

@@ -19,7 +19,7 @@ export default {
       const chosen = target.holomem;
       let odd = 0;
       for (let i = 0; i < 3; i++) {
-        const v = ctx.rollDice();
+        const v = (yield* ctx.rollDice());
         if (v % 2 === 1) odd++;
       }
       if (odd === 0) return;

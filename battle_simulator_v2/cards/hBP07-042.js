@@ -18,7 +18,7 @@ export default {
     '純心タランテラ': {
       *run(ctx) {
         for (const entry of ctx.holomems('opp', (e) => e.pos.zone === 'center' || e.pos.zone === 'collab')) {
-          ctx.dealSpecialDamage(entry, 40);
+          yield* ctx.dealSpecialDamage(entry, 40);
         }
       },
     },

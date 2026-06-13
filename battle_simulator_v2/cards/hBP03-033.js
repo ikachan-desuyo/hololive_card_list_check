@@ -14,7 +14,7 @@ export default {
       const center = ctx.holomems('opp', (e) => e.pos.zone === 'center')[0];
       if (!center) return;
       const hasTool = center.holomem.attachments.some((a) => a.supportType === 'ツール');
-      ctx.dealSpecialDamage(center, hasTool ? 30 : 10);
+      yield* ctx.dealSpecialDamage(center, hasTool ? 30 : 10);
     },
   },
 };

@@ -13,14 +13,14 @@ export default {
       if (!ok) return;
       let odds = 0;
       for (let i = 0; i < 3; i++) {
-        if (ctx.rollDice() % 2 === 1) odds++;
+        if ((yield* ctx.rollDice()) % 2 === 1) odds++;
       }
       if (odds === 0) {
         ctx.log('奇数が出なかったため特殊ダメージなし');
         return;
       }
       const center = ctx.holomems('opp', (e) => e.pos.zone === 'center')[0];
-      if (center) ctx.dealSpecialDamage(center, odds * 10);
+      if (center) yield* ctx.dealSpecialDamage(center, odds * 10);
     },
   },
 };

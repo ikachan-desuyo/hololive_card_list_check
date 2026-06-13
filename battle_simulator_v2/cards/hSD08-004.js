@@ -39,7 +39,7 @@ export default {
         });
         if (!target) return;
         ctx.markOncePerTurn('hSD08-004-arts');
-        ctx.dealSpecialDamage(target, 40);
+        yield* ctx.dealSpecialDamage(target, 40);
       },
     },
   },

@@ -24,7 +24,7 @@ export default {
     *run(ctx) {
       const ok = yield ctx.confirm('サイコロを1回振りますか？（偶数: デッキからファン1枚を手札へ）', '振る', '振らない');
       if (!ok) return;
-      const v = ctx.rollDice();
+      const v = (yield* ctx.rollDice());
       // 〈兎田ぺこら〉の能力でサイコロを振った（アーツ「カードするぺこ」の判定用フラグ）
       ctx.markOncePerTurn(DICE_FLAG);
       // 偶数(2/4/6)の時のみ効果

@@ -13,7 +13,7 @@ export default {
     'ホイールオブフォーチュン': {
       *run(ctx) {
         if (!ctx.player.usedSpOshiSkillThisGame) return; // SP推しスキル未使用なら何もしない
-        const value = ctx.rollDice();
+        const value = (yield* ctx.rollDice());
         ctx.addArtBonus(value * 10, `サイコロの目${value}×10`);
       },
     },

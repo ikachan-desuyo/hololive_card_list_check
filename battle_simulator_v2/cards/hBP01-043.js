@@ -21,7 +21,7 @@ export default {
         const ok = yield ctx.confirm('サイコロを3回振ってこのアーツを強化しますか？');
         if (!ok) return;
         let sum = 0;
-        for (let i = 0; i < 3; i++) sum += ctx.rollDice();
+        for (let i = 0; i < 3; i++) sum += (yield* ctx.rollDice());
         ctx.addArtBonus(sum * 10, `サイコロ3回の合計${sum}×10`);
       },
     },

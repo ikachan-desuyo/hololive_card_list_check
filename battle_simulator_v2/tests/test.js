@@ -49,6 +49,17 @@ function assertEq(actual, expected, msg) {
   }
 }
 
+/**
+ * ジェネレータ効果（ctx.dealSpecialDamage 等）をテストから直接駆動する。
+ * 途中の割り込み決定ポイント（confirm）は既定で answer（既定 false=使わない）で応答する。
+ */
+function drive(gen, answer = false) {
+  let r = gen.next();
+  let guard = 0;
+  while (!r.done && guard++ < 50) r = gen.next(answer);
+  return r.value;
+}
+
 /** プレイヤーの全カード枚数（領域間でカードが消えていないかの保存則） */
 function totalCards(p) {
   let n = p.deck.length + p.cheerDeck.length + p.hand.length +
@@ -377,7 +388,7 @@ export async function runTests() {
       center.damage = e.effectiveHp(center) - 10;
       const lifeBefore = p1.life.length;
       const ctx = new EffectContext(e, 0, {});
-      ctx.dealSpecialDamage({ pos: { zone: 'center' }, holomem: center, top: center.stack[0] }, 10);
+      drive(ctx.dealSpecialDamage({ pos: { zone: 'center' }, holomem: center, top: center.stack[0] }, 10));
       e._checkTiming(() => {});
       let guard = 0;
       while (e.state.pending && guard++ < 10) e.apply(e.state.pending.options[0].id);
@@ -392,7 +403,7 @@ export async function runTests() {
       center.damage = e.effectiveHp(center) - 10;
       const lifeBefore = p1.life.length;
       const ctx = new EffectContext(e, 0, {});
-      ctx.dealSpecialDamage({ pos: { zone: 'center' }, holomem: center, top: center.stack[0] }, 10, { noLifeOnDown: true });
+      drive(ctx.dealSpecialDamage({ pos: { zone: 'center' }, holomem: center, top: center.stack[0] }, 10, { noLifeOnDown: true }));
       e._checkTiming(() => {});
       assertEq(p1.life.length, lifeBefore, '「ライフは減らない」なのにライフが減った');
     }
@@ -405,7 +416,7 @@ export async function runTests() {
       const lifeBefore = p1.life.length;
       const ctx = new EffectContext(e, 0, {});
       // ダウンに至らない「ライフは減らない」特殊ダメージ
-      ctx.dealSpecialDamage({ pos: { zone: 'center' }, holomem: center, top: center.stack[0] }, 10, { noLifeOnDown: true });
+      drive(ctx.dealSpecialDamage({ pos: { zone: 'center' }, holomem: center, top: center.stack[0] }, 10, { noLifeOnDown: true }));
       assert(center.damage < e.effectiveHp(center), '前提が崩れている（この時点で倒れてはいけない）');
       // その後、通常ダメージで倒す
       center.damage = e.effectiveHp(center);
@@ -739,7 +750,7 @@ export async function runTests() {
     const target = { pos: { zone: 'center' }, holomem: p1.center, top: p1.center.stack[0] };
     const handBefore = p0.hand.length;
     const dmgBefore = p1.center.damage;
-    ctx.dealSpecialDamage(target, 10);
+    drive(ctx.dealSpecialDamage(target, 10));
     assert(p1.center.damage - dmgBefore >= 110, `特殊ダメージ+100が乗っていない（実際: ${p1.center.damage - dmgBefore}）`);
     // ダウンしたはず → 2枚ドローのトリガー
     assertEq(p0.hand.length, handBefore + 2, 'ダウンさせた時の2枚ドローが発動していない');
@@ -809,7 +820,7 @@ export async function runTests() {
     const backH = p1.back[0];
     const archiveBefore = p1.archive.length;
     const ctx = new EffectContext(e, 0, {});
-    ctx.dealSpecialDamage({ pos: { zone: 'back', index: 0 }, holomem: backH, top: backH.stack[0] }, 130);
+    drive(ctx.dealSpecialDamage({ pos: { zone: 'back', index: 0 }, holomem: backH, top: backH.stack[0] }, 130));
     s.pending = null;
     e._checkTiming(() => {});
     let guard = 0;

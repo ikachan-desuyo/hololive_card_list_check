@@ -23,7 +23,7 @@ export default {
       // 相手のセンターホロメン
       const center = ctx.holomems('opp', (e) => e.pos.zone === 'center')[0];
       if (!center) return;
-      ctx.dealSpecialDamage(center, amount);
+      yield* ctx.dealSpecialDamage(center, amount);
     },
   },
   // アーツ「マリンに任せろってマジで」は追加効果テキストが無いため定義不要。

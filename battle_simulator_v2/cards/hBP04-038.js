@@ -11,7 +11,7 @@ export default {
     name: 'どこ見ちゃってるのかな～！！♥♡',
     *run(ctx) {
       for (const entry of ctx.holomems('opp', (e) => e.pos.zone === 'center' || e.pos.zone === 'collab')) {
-        ctx.dealSpecialDamage(entry, 10);
+        yield* ctx.dealSpecialDamage(entry, 10);
       }
     },
   },

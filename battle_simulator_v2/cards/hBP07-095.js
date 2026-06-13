@@ -23,7 +23,7 @@ export default {
     },
     *run(ctx) {
       // 自分のサイコロ（diceFixed 等の自分側の継続効果を反映）
-      const myRoll = ctx.rollDice();
+      const myRoll = (yield* ctx.rollDice());
       // 相手のサイコロ（相手側の能力ではないが、シード乱数で振る。継続効果の対象外）
       const oppRoll = rollDie(ctx.engine.rng);
       ctx.log(`🎲 相手のサイコロ: ${oppRoll}`);

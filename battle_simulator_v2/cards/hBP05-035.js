@@ -50,7 +50,7 @@ export default {
           filter: (e) => e.pos.zone === 'center' || e.pos.zone === 'collab',
           title: '特殊ダメージ50を与える相手ホロメンを選択（センターかコラボ）',
         });
-        if (target) ctx.dealSpecialDamage(target, 50);
+        if (target) yield* ctx.dealSpecialDamage(target, 50);
         // 自分のステージに〈35P〉があるなら1ドロー
         const has35P = ctx.holomems('self', (e) =>
           e.holomem.attachments.some((a) => a.name === '35P')).length > 0;

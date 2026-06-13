@@ -20,7 +20,7 @@ export default {
     *run(ctx) {
       const ok = yield ctx.confirm('ブルームエフェクト「アイドルかなたそを」: サイコロを1回振りますか？');
       if (!ok) return;
-      const roll = ctx.rollDice();
+      const roll = (yield* ctx.rollDice());
       if (roll > 3) {
         ctx.log('3以下ではなかったため効果は発動しない');
         return;

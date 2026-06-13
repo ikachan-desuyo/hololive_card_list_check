@@ -48,6 +48,16 @@
  *       *onOpponentPerformanceEnd(ctx) {...},            // 相手のパフォーマンスステップ終了時（防御側で発火。ctx.lifeDecreasedThisPerf でそのステップ中のライフ減少を判定）
  *     },                                                 //   ※ctx.sourceCard=自分, ctx.sourceHolomem=付いた/ダウンした/ダウンさせたホロメン
  *     specialBloom(h, handCard, engine, ownerIdx) { return bool; }, // 特殊Bloom: true でメインのBloom候補に追加（レベル遷移条件のみ迂回。同名/HP/ターン制限は通常通り）
+ *     onDamageReceivedReact: {                          // 「ダメージを受ける時に使える」リアクティブ割り込み（推しスキル以外。ホロメンギフト/装着ファン）
+ *       title, yesLabel,                                //   防御側に決定ポイントを提示。アーツ/特殊どちらのダメージ経路でも発火する
+ *       canUse(engine, info) { return bool; },          //   info = { defIdx, target, dmg, kind:'arts'|'special', reactor?(ステージ側), attachedCard?(装着側) }
+ *       apply(engine, info) { return newDmg; },         //   コスト/副作用を実行し、調整後ダメージを返す（hBP03-105 ファン-30 / hSD13-012 特殊シールド）
+ *     },
+ *     onDiceRollReact: {                                // 「サイコロを振った時に使える」リアクティブ割り込み（自分のファン等。コントローラー自身が選択）
+ *       title, yesLabel,                                //   ctx.rollDice() 内で発火
+ *       canUse(engine, info) { return bool; },          //   info = { ownerIdx, roller(振ったホロメン/推しはnull), rollerCard, value, fanCard, fanHolomem }
+ *       apply(engine, info) { return newValue; },       //   コスト/副作用を実行し、置き換える出目を返す（hBP06-103 目を4に / hBP01-123 振り直し）
+ *     },
  *     // ※ターン修正による機構: kind:'artTargetDamagedBack'（アーツ対象をHP減バックに拡張）/ kind:'reArts'（使ったアーツをもう1回。used フラグで消費）
  *     //   いずれも ctx.addTurnModifier({kind, ownerIdx, match}) で付与する
  *     artsCostReduceAura(src, target, engine) {          // アーツ必要エール軽減オーラ（[{color,amount}]を返す。engine が実効コスト算出に使用）

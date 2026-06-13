@@ -30,7 +30,7 @@ export default {
         ctx.archiveCheer(ctx.sourceHolomem, picked);
         const backs = ctx.holomems('opponent', (e) => e.pos.zone === 'back');
         for (const e of backs) {
-          ctx.dealSpecialDamage(e, 20, { noLifeOnDown: true });
+          yield* ctx.dealSpecialDamage(e, 20, { noLifeOnDown: true });
         }
       },
     },
@@ -57,7 +57,7 @@ export default {
         }
         const backs = ctx.holomems('opponent', (e) => e.pos.zone === 'back');
         const total = backs.reduce((s, e) => s + (e.holomem.damage || 0), 0);
-        if (total > 0) ctx.dealSpecialDamage(center, total, {});
+        if (total > 0) yield* ctx.dealSpecialDamage(center, total, {});
       },
     },
   },

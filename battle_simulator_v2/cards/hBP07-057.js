@@ -16,7 +16,7 @@ export default {
         side: 'opp',
         title: '特殊ダメージ30を与える相手ホロメンを選択',
       });
-      if (target) ctx.dealSpecialDamage(target, 30);
+      if (target) yield* ctx.dealSpecialDamage(target, 30);
     },
   },
   arts: {
@@ -32,7 +32,7 @@ export default {
           side: 'opp',
           title: '特殊ダメージ50を与える相手ホロメンを選択',
         });
-        if (target) ctx.dealSpecialDamage(target, 50);
+        if (target) yield* ctx.dealSpecialDamage(target, 50);
       },
     },
   },

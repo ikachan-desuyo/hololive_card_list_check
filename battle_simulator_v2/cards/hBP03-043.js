@@ -47,7 +47,7 @@ export default {
 
         // 付け替えたなら、相手のセンターホロメンに特殊ダメージ50
         const center = ctx.holomems('opp', (e) => e.pos.zone === 'center')[0];
-        if (center) ctx.dealSpecialDamage(center, 50);
+        if (center) yield* ctx.dealSpecialDamage(center, 50);
       },
     },
   },

@@ -19,7 +19,7 @@ export default {
       if (!ok) return;
       let hi = 0;
       for (let i = 0; i < rolls; i++) {
-        if (ctx.rollDice() >= 4) hi++;
+        if ((yield* ctx.rollDice()) >= 4) hi++;
       }
       for (let i = 0; i < hi; i++) ctx.sendCheerFromCheerDeckTop(ctx.sourceHolomem);
     },

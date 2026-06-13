@@ -46,7 +46,7 @@ export default {
         description: `このターン、${chosen.stack[0].name} のアーツ+40`,
       });
       // サイコロを振る（6以外ならデッキに戻す処理は未実装。上部JSDoc参照）
-      const roll = ctx.rollDice();
+      const roll = (yield* ctx.rollDice());
       if (roll !== 6) {
         ctx.log('TODO(効果未実装): 6以外のため本来このカードをデッキに戻してシャッフルするが、エンジン制約によりアーカイブへ送られる');
       }

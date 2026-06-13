@@ -14,7 +14,7 @@ export default {
     *run(ctx) {
       const ok = yield ctx.confirm('サイコロを1回振りますか？');
       if (!ok) return;
-      const v = ctx.rollDice();
+      const v = (yield* ctx.rollDice());
       // 3か5の時はまずデッキを1枚引く
       if (v === 3 || v === 5) {
         ctx.draw(1);
@@ -22,7 +22,7 @@ export default {
       // 2か4か6、または3か5の時、相手のセンターホロメンに特殊ダメージ10
       if (v === 2 || v === 3 || v === 4 || v === 5 || v === 6) {
         const center = ctx.holomems('opp', (e) => e.pos.zone === 'center')[0];
-        if (center) ctx.dealSpecialDamage(center, 10);
+        if (center) yield* ctx.dealSpecialDamage(center, 10);
       }
     },
   },

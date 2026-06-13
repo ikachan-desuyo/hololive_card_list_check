@@ -23,7 +23,7 @@ export default {
         const from = pairs.find((p) => p.ch === cheer).from;
         ctx.archiveCheer(from, cheer);
         const center = ctx.holomems('opp', (e) => e.pos.zone === 'center')[0];
-        if (center) ctx.dealSpecialDamage(center, 30);
+        if (center) yield* ctx.dealSpecialDamage(center, 30);
       },
     },
   },

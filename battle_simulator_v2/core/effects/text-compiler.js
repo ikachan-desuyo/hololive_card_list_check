@@ -732,14 +732,14 @@ const RUNNERS = {
     const filter = step.target.filter(ctx);
     if (step.target.all) {
       for (const entry of ctx.holomems('opp', filter)) {
-        ctx.dealSpecialDamage(entry, step.n, { noLifeOnDown: step.noLife });
+        yield* ctx.dealSpecialDamage(entry, step.n, { noLifeOnDown: step.noLife });
       }
       return;
     }
     // 対象が一意（「相手のセンターホロメンに～」等）なら選択なしで直接与える
     if (!step.target.choice) {
       const entry = ctx.holomems('opp', filter)[0];
-      if (entry) ctx.dealSpecialDamage(entry, step.n, { noLifeOnDown: step.noLife });
+      if (entry) yield* ctx.dealSpecialDamage(entry, step.n, { noLifeOnDown: step.noLife });
       return;
     }
     const count = step.target.count || 1;
@@ -752,7 +752,7 @@ const RUNNERS = {
       });
       if (!entry) break;
       chosen.add(entry.holomem);
-      ctx.dealSpecialDamage(entry, step.n, { noLifeOnDown: step.noLife });
+      yield* ctx.dealSpecialDamage(entry, step.n, { noLifeOnDown: step.noLife });
     }
   },
   *forceDown(ctx, step) {
@@ -938,7 +938,7 @@ const RUNNERS = {
       if (!ok) return;
     }
     for (let r = 0; r < step.rolls; r++) {
-      const value = ctx.rollDice();
+      const value = (yield* ctx.rollDice());
       for (const branch of step.branches) {
         if (branch.cond(value)) {
           for (const sub of branch.steps) {
@@ -954,7 +954,7 @@ const RUNNERS = {
       if (!ok) return;
     }
     let total = 0;
-    for (let r = 0; r < step.rolls; r++) total += ctx.rollDice();
+    for (let r = 0; r < step.rolls; r++) total += (yield* ctx.rollDice());
     ctx.addArtBonus(total * step.per, `出た目合計${total}`);
   },
 

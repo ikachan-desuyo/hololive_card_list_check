@@ -20,7 +20,7 @@ export default {
       }
       // 相手のセンターホロメンに特殊ダメージ20
       const center = ctx.holomems('opp', (e) => e.pos.zone === 'center')[0];
-      if (center) ctx.dealSpecialDamage(center, 20);
+      if (center) yield* ctx.dealSpecialDamage(center, 20);
       // 〈雪民〉3枚以上なら2枚、そうでなければ1枚引く
       ctx.draw(yukiminCount >= 3 ? 2 : 1);
     },

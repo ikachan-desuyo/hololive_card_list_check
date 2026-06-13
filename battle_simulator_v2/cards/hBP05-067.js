@@ -36,7 +36,7 @@ export default {
       *run(ctx) {
         const ok = yield ctx.confirm('サイコロを振りますか？', '振る', '振らない');
         if (!ok) return;
-        const v = ctx.rollDice();
+        const v = (yield* ctx.rollDice());
         const life = ctx.player.life.length;
         if (v >= life) ctx.addArtBonus(60, 'サイコロの目がライフ以上');
         if (v <= life) ctx.draw(1);

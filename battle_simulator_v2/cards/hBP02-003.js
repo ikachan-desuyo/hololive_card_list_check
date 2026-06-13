@@ -47,7 +47,7 @@ export default {
         title: `特殊ダメージ${amount}を与える相手のセンターorコラボホロメンを選択`,
       });
       if (!target) return;
-      ctx.dealSpecialDamage(target, amount);
+      yield* ctx.dealSpecialDamage(target, amount);
     },
   },
 };

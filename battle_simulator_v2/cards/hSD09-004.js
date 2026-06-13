@@ -35,7 +35,7 @@ export default {
           e.pos.zone === 'center' || e.pos.zone === 'collab'
         );
         for (const t of targets) {
-          ctx.dealSpecialDamage(t, amount);
+          yield* ctx.dealSpecialDamage(t, amount);
         }
       },
     },

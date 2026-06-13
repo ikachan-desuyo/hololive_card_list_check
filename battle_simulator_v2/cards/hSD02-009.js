@@ -36,7 +36,7 @@ export default {
           filter: (e) => e.pos.zone === 'center',
           title: `特殊ダメージ${archived * 40}を与える相手のセンターホロメンを選択`,
         });
-        if (target) ctx.dealSpecialDamage(target, archived * 40);
+        if (target) yield* ctx.dealSpecialDamage(target, archived * 40);
       },
     },
   },

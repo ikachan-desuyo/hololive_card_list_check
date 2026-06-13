@@ -39,7 +39,7 @@ export default {
           ctx.archiveCheer(ctx.sourceHolomem, cheer);
         }
         for (const e of ctx.holomems('opp', (x) => x.pos.zone === 'back')) {
-          ctx.dealSpecialDamage(e, 30, { noLifeOnDown: true });
+          yield* ctx.dealSpecialDamage(e, 30, { noLifeOnDown: true });
         }
       },
     },

@@ -20,7 +20,7 @@ export default {
       const go = yield ctx.confirm('サイコロを振りますか？', '振る', '振らない');
       if (!go) return;
 
-      const roll = ctx.rollDice();
+      const roll = (yield* ctx.rollDice());
       // 奇数(1/3/5)の時のみ効果。偶数の時は何もしない。
       if (roll % 2 === 0) return;
 

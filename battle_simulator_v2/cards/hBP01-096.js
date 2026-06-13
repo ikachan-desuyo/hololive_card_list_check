@@ -13,7 +13,7 @@ export default {
       // 「サイコロを振れる」= 任意
       const ok = yield ctx.confirm('サイコロを1回振りますか？（偶数でBuzzホロメンをサーチ）');
       if (!ok) return;
-      const value = ctx.rollDice();
+      const value = (yield* ctx.rollDice());
       if (value % 2 !== 0) return; // 奇数なら効果なし
       const buzz = ctx.deckCards((c) => c.kind === 'holomen' && c.buzz);
       if (buzz.length === 0) {

@@ -12,7 +12,7 @@ export default {
       *run(ctx) {
         // 相手のセンターホロメンに特殊ダメージ10
         const center = ctx.holomems('opp', (e) => e.pos.zone === 'center')[0];
-        if (center) ctx.dealSpecialDamage(center, 10);
+        if (center) yield* ctx.dealSpecialDamage(center, 10);
 
         // その後、自分の推しホロメンが〈常闇トワ〉の時のみ追加効果
         if (ctx.player.oshi?.name !== '常闇トワ') return;

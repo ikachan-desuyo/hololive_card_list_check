@@ -17,7 +17,7 @@ export default {
         filter: (e) => e.pos.zone === 'center' || e.pos.zone === 'back',
         title: '特殊ダメージ10を与える相手のセンターかバックのホロメンを選択',
       });
-      if (target) ctx.dealSpecialDamage(target, 10);
+      if (target) yield* ctx.dealSpecialDamage(target, 10);
     },
   },
 };

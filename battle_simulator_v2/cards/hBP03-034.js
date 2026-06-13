@@ -35,12 +35,12 @@ export default {
       *run(ctx) {
         const ok = yield ctx.confirm('サイコロを1回振りますか？');
         if (!ok) return;
-        const v = ctx.rollDice();
+        const v = (yield* ctx.rollDice());
         if (v % 2 === 1) {
           // 奇数: 相手のセンターホロメンとコラボホロメンに特殊ダメージ20
           const targets = ctx.holomems('opp', (e) =>
             e.pos.zone === 'center' || e.pos.zone === 'collab');
-          for (const t of targets) ctx.dealSpecialDamage(t, 20);
+          for (const t of targets) yield* ctx.dealSpecialDamage(t, 20);
         } else {
           // 偶数: このアーツ+40
           ctx.addArtBonus(40, 'サイコロ偶数');

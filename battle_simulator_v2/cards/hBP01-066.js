@@ -35,7 +35,7 @@ export default {
           filter: (e) => e.pos.zone === 'collab',
           title: '特殊ダメージ40を与える相手のコラボホロメンを選択',
         });
-        if (target) ctx.dealSpecialDamage(target, 40);
+        if (target) yield* ctx.dealSpecialDamage(target, 40);
       },
     },
   },

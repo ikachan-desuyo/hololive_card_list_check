@@ -40,7 +40,7 @@ export default {
           title: '特殊ダメージ20を与える相手のコラボホロメンを選択',
           optional: true,
         });
-        if (target) ctx.dealSpecialDamage(target, 20);
+        if (target) yield* ctx.dealSpecialDamage(target, 20);
       }
     },
   },

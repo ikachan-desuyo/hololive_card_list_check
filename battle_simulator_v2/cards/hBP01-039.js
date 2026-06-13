@@ -16,7 +16,7 @@ export default {
       // 「振れる」=任意。振らない選択も可。
       const ok = yield ctx.confirm('サイコロを1回振りますか？（偶数でエールデッキの上から1枚を自分のホロメンに送る）');
       if (!ok) return;
-      const value = ctx.rollDice();
+      const value = (yield* ctx.rollDice());
       if (value % 2 !== 0) return; // 偶数の時のみ
       if (ctx.player.cheerDeck.length === 0) return;
       const target = yield ctx.chooseHolomem({

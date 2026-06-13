@@ -11,7 +11,7 @@ export default {
     *run(ctx) {
       const center = ctx.holomems('opp', (e) => e.pos.zone === 'center')[0];
       if (!center) return;
-      ctx.dealSpecialDamage(center, 30, { noLifeOnDown: true });
+      yield* ctx.dealSpecialDamage(center, 30, { noLifeOnDown: true });
     },
   },
 };

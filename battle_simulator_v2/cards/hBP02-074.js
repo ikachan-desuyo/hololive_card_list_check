@@ -13,7 +13,7 @@ export default {
       // 「振れる」=任意
       const ok = yield ctx.confirm('サイコロを1回振りますか？');
       if (!ok) return;
-      const value = ctx.rollDice();
+      const value = (yield* ctx.rollDice());
       if (value % 2 !== 0) return; // 偶数の時のみ
       const tools = ctx.deckCards((c) => c.supportType === 'ツール');
       const picked = yield ctx.chooseCard({

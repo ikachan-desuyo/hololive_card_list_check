@@ -16,7 +16,7 @@ export default {
         if (!hasSingerBack) return;
         // 相手のコラボホロメンに特殊ダメージ20
         const collab = ctx.holomems('opp', (e) => e.pos.zone === 'collab')[0];
-        if (collab) ctx.dealSpecialDamage(collab, 20);
+        if (collab) yield* ctx.dealSpecialDamage(collab, 20);
       },
     },
   },

@@ -17,7 +17,7 @@ export default {
   },
   support: {
     *run(ctx) {
-      const value = ctx.rollDice();
+      const value = (yield* ctx.rollDice());
       if (value < 3) return;
       const cheers = ctx.player.archive.filter((c) => c.kind === 'cheer');
       if (cheers.length === 0) return;

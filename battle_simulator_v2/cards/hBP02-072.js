@@ -16,7 +16,7 @@ export default {
     *run(ctx) {
       const roll = yield ctx.confirm('サイコロを1回振りますか？（偶数でデッキからイベント1枚を手札に加える）');
       if (!roll) return;
-      const value = ctx.rollDice();
+      const value = (yield* ctx.rollDice());
       if (value % 2 !== 0) return; // 偶数の時のみ
       const events = ctx.deckCards((c) => c.kind === 'support' && c.supportType === 'イベント');
       if (events.length > 0) {

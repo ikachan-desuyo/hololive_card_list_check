@@ -33,7 +33,7 @@ export default {
           .filter((c) => c === '無色').length;
         if (num <= 0) return;
         const entry = ctx.holomems('opp', (e) => e.holomem === t)[0];
-        if (entry) ctx.dealSpecialDamage(entry, num * 10);
+        if (entry) yield* ctx.dealSpecialDamage(entry, num * 10);
       },
     },
   },

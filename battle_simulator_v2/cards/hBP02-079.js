@@ -6,7 +6,7 @@
  *   自分の#魔法を持つイベントはターンに1回しか使えない。
  *
  * 実装メモ:
- *   - 特殊ダメージ20 + noLifeOnDown は ctx.dealSpecialDamage(target, 20, {noLifeOnDown:true}) で表現。
+ *   - 特殊ダメージ20 + noLifeOnDown は yield* ctx.dealSpecialDamage(target, 20, {noLifeOnDown:true}) で表現。
  *     （dealSpecialDamage はダウン確定時のみ noLifeOnDown を立てる仕様）
  *   - 「自分の#魔法を持つイベントはターンに1回しか使えない」は、#魔法 イベント全体で共有する
  *     ターン1回キー（MAGIC_EVENT_KEY）で制限する。同キーを使う他の #魔法 イベントとも排他になる。
@@ -31,7 +31,7 @@ export default {
         title: '特殊ダメージ20を与える相手のセンター/コラボホロメンを選択',
       });
       if (!target) return;
-      ctx.dealSpecialDamage(target, 20, { noLifeOnDown: true });
+      yield* ctx.dealSpecialDamage(target, 20, { noLifeOnDown: true });
     },
   },
   ai: {

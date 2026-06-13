@@ -12,14 +12,14 @@ export default {
       *run(ctx) {
         const ok = yield ctx.confirm('サイコロを1回振りますか？');
         if (!ok) return;
-        const value = ctx.rollDice();
+        const value = (yield* ctx.rollDice());
         if (value % 2 !== 0) return; // 偶数の時のみ
         const target = yield ctx.chooseHolomem({
           side: 'opp',
           filter: (e) => e.pos.zone === 'back',
           title: '特殊ダメージ20を与える相手のバックホロメンを選択',
         });
-        if (target) ctx.dealSpecialDamage(target, 20, { noLifeOnDown: true });
+        if (target) yield* ctx.dealSpecialDamage(target, 20, { noLifeOnDown: true });
       },
     },
   },

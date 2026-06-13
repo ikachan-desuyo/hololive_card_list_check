@@ -21,7 +21,7 @@ export default {
       return engine.state.players[ownerIdx].usedSpOshiSkillThisGame === true;
     },
     *run(ctx) {
-      const value = ctx.rollDice();
+      const value = (yield* ctx.rollDice());
       const need = value - ctx.player.hand.length;
       if (need > 0) {
         ctx.draw(need);
@@ -33,7 +33,7 @@ export default {
 
   spOshiSkill: {
     *run(ctx) {
-      const value = ctx.rollDice();
+      const value = (yield* ctx.rollDice());
       const count = Math.min(value, ctx.player.hand.length);
       for (let i = 0; i < count; i++) {
         // 残り手札から1枚選んでアーカイブ（手札が尽きたら終了）

@@ -18,7 +18,7 @@ export default {
       if (!hasCheer) return;
       const ok = yield ctx.confirm('サイコロを振りますか？（4以上で相手のエール1枚を付け替える）');
       if (!ok) return;
-      const roll = ctx.rollDice();
+      const roll = (yield* ctx.rollDice());
       if (roll < 4) return;
       // 付け替え元のエールを選択（相手ステージ上の全エールから）
       const cheerChoices = [];
@@ -50,8 +50,8 @@ export default {
         if (amount <= 0) return;
         // 相手のセンターホロメンとコラボホロメンの両方に与える
         const collab = ctx.holomems('opp', (e) => e.pos.zone === 'collab')[0];
-        if (center) ctx.dealSpecialDamage(center, amount);
-        if (collab) ctx.dealSpecialDamage(collab, amount);
+        if (center) yield* ctx.dealSpecialDamage(center, amount);
+        if (collab) yield* ctx.dealSpecialDamage(collab, amount);
       },
     },
   },

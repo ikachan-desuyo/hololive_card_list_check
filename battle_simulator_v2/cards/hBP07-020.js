@@ -14,7 +14,7 @@ export default {
   collabEffect: {
     name: 'Ya ya ya ya ya～!',
     *run(ctx) {
-      const value = ctx.rollDice();
+      const value = (yield* ctx.rollDice());
       if (value % 2 === 0) {
         ctx.log('偶数のため効果なし');
         return;

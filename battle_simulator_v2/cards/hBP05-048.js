@@ -16,7 +16,7 @@ function* dmgTwoBacks(ctx) {
     });
     if (!target) break;
     used.add(target.holomem);
-    ctx.dealSpecialDamage(target, 10);
+    yield* ctx.dealSpecialDamage(target, 10);
   }
 }
 

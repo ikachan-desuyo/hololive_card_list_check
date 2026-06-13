@@ -33,7 +33,7 @@ export default {
       if (dmg <= 0) return;
 
       const oppCenter = ctx.holomems('opp', (e) => e.pos.zone === 'center')[0];
-      if (oppCenter) ctx.dealSpecialDamage(oppCenter, dmg);
+      if (oppCenter) yield* ctx.dealSpecialDamage(oppCenter, dmg);
     },
   },
   // アーツ「隠しきれない魅力」はテキスト効果を持たない（ダメージのみ）

@@ -22,7 +22,7 @@ export default {
           e.holomem.attachments.some((a) => (a.tags || []).includes("カエラ'sアームズ"))).length > 0;
         if (!hasArm) return;
         const target = ctx.holomems('opp', (e) => e.pos.zone === 'collab')[0];
-        if (target) ctx.dealSpecialDamage(target, 30);
+        if (target) yield* ctx.dealSpecialDamage(target, 30);
       },
     },
   },

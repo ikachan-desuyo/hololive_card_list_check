@@ -8,7 +8,7 @@ export default {
     'ぐるぐる～': {
       *run(ctx) {
         const center = ctx.holomems('opp', (e) => e.pos.zone === 'center')[0];
-        if (center) ctx.dealSpecialDamage(center, 10);
+        if (center) yield* ctx.dealSpecialDamage(center, 10);
       },
     },
   },

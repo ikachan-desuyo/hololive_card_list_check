@@ -11,7 +11,7 @@ export default {
       return ctx.holomems('opp', (e) => e.pos.zone === 'back').length > 0;
     },
     *run(ctx) {
-      const value = ctx.rollDice();
+      const value = (yield* ctx.rollDice());
       if (value < 4) {
         ctx.log('サイコロの目が3以下のため効果なし');
         return;
@@ -22,7 +22,7 @@ export default {
         title: '特殊ダメージ20を与える相手のバックホロメンを選択',
       });
       if (!target) return;
-      ctx.dealSpecialDamage(target, 20, { noLifeOnDown: true });
+      yield* ctx.dealSpecialDamage(target, 20, { noLifeOnDown: true });
     },
   },
 };

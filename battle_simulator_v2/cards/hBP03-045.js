@@ -46,7 +46,7 @@ export default {
         });
         if (!target) break;
         // ダウンしても相手のライフは減らない
-        ctx.dealSpecialDamage(target, 10, { noLifeOnDown: true });
+        yield* ctx.dealSpecialDamage(target, 10, { noLifeOnDown: true });
       }
     },
   },

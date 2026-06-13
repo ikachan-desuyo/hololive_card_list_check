@@ -12,7 +12,7 @@ export default {
       *run(ctx) {
         const ok = yield ctx.confirm('サイコロを1回振りますか？（出た目×10このアーツ+）', '振る', '振らない');
         if (!ok) return;
-        const v = ctx.rollDice();
+        const v = (yield* ctx.rollDice());
         ctx.addArtBonus(v * 10, `サイコロの目${v}×10`);
       },
     },

@@ -19,7 +19,7 @@ export default {
       return ctx.sourceHolomemPos()?.zone === 'collab'; // コラボポジション限定
     },
     *run(ctx) {
-      const v = ctx.rollDice();
+      const v = (yield* ctx.rollDice());
       if (v % 2 === 1) {
         ctx.log('奇数: バックポジションへ移動する');
         ctx.moveToBack(ctx.sourceHolomem);

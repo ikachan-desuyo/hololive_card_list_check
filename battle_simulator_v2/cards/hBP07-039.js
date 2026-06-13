@@ -19,7 +19,7 @@ export default {
     '俺の名は〝ちゃまお〟漢の中の漢だ！': {
       *run(ctx) {
         const center = ctx.holomems('opp', (e) => e.pos.zone === 'center')[0];
-        if (center) ctx.dealSpecialDamage(center, 20);
+        if (center) yield* ctx.dealSpecialDamage(center, 20);
       },
     },
   },

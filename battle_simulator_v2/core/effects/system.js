@@ -98,8 +98,17 @@ export class EffectSystem {
    */
   damageReceivedDelta(holomem, zone, kind = 'arts', attacker = null) {
     let total = 0;
+    const ownerIdx0 = this._ownerOf(holomem);
     for (const { attached } of this._attachedDefs(holomem)) {
       total += attached.damageDelta?.(holomem, zone, this.engine, kind, attacker) || 0;
+    }
+    // ターン中の一時的な被ダメージ修正（「このターン自分のバック全員は特殊ダメージを受けない」hSD13-012 等）
+    for (const mod of this.engine.state.modifiers) {
+      if (mod.kind !== 'damageReceivedDelta') continue;
+      if (mod.ownerIdx != null && mod.ownerIdx !== ownerIdx0) continue;
+      if (mod.matchKind && mod.matchKind !== kind) continue;
+      if (mod.match && !mod.match(holomem, zone, kind)) continue;
+      total += this._resolveAmount(mod, holomem);
     }
     // 常時アウラ（味方の別ホロメンが付与する被ダメージ軽減/増加。「コラボが受けるダメージ-10」「特殊ダメージを受けない」
     //  「自分が相手の1stから受けるアーツ-30」＝src===holomem の自己ギフトも auraDamageDelta で表現する）

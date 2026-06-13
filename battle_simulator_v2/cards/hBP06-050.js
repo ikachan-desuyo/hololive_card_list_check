@@ -16,7 +16,7 @@ export default {
           title: '特殊ダメージ10を与える相手のバックホロメンを選択',
           optional: true,
         });
-        if (target) ctx.dealSpecialDamage(target, 10);
+        if (target) yield* ctx.dealSpecialDamage(target, 10);
       },
     },
     // 'Lunar Duality' は追加効果テキストなし（ダメージのみ）のため定義不要

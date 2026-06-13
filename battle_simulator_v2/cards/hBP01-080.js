@@ -13,7 +13,7 @@ export default {
     *run(ctx) {
       const ok = yield ctx.confirm('サイコロを振りますか？（雪山の記憶）');
       if (!ok) return;
-      const value = ctx.rollDice();
+      const value = (yield* ctx.rollDice());
       if (value % 2 === 0) {
         ctx.log('偶数のため効果は発動しない');
         return;

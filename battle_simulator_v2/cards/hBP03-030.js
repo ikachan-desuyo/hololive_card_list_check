@@ -24,7 +24,7 @@ export default {
       return count35P(ctx.sourceHolomem) > 0;
     },
     *run(ctx) {
-      const value = ctx.rollDice();
+      const value = (yield* ctx.rollDice());
       if (value === 3 || value === 5) {
         const me = ctx.sourceHolomem;
         ctx.addTurnModifier({

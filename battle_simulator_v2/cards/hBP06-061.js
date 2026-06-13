@@ -13,7 +13,7 @@ export default {
         if (!hasRobosa) return;
         const center = ctx.holomems('opponent', (e) => e.pos.zone === 'center')[0];
         if (!center) return;
-        ctx.dealSpecialDamage(center, 20);
+        yield* ctx.dealSpecialDamage(center, 20);
       },
     },
   },
