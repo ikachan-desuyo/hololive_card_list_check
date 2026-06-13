@@ -187,6 +187,34 @@ export class EffectContext {
     if (n !== 0) this.log(`アーツ${n > 0 ? '+' : ''}${n}${reason ? `（${reason}）` : ''}`);
   }
 
+  /** sourceHolomem のステージ位置 {zone,index} を返す（ステージ外なら null）。起動型能力の位置限定判定に使う */
+  sourceHolomemPos() {
+    if (!this.sourceHolomem) return null;
+    for (const pos of this.engine._stagePositions(this.player)) {
+      if (this.engine._holomemAt(this.player, pos) === this.sourceHolomem) return pos;
+    }
+    return null;
+  }
+
+  /** お休み状態のホロメンをアクティブにする (4.3.2) */
+  setActive(holomem) {
+    if (holomem.rested) {
+      holomem.rested = false;
+      this.log(`${holomem.stack[0].name} をアクティブにした`);
+    }
+  }
+
+  /** ホロメンをバックポジションへ移動する（センター/コラボから。アクティブ状態は維持） */
+  moveToBack(holomem) {
+    const p = this.player;
+    if (this.engine._stageCount(p) > 6) return; // 念のため
+    if (p.center === holomem) p.center = null;
+    else if (p.collab === holomem) p.collab = null;
+    else return; // 既にバック等
+    p.back.push(holomem);
+    this.log(`${holomem.stack[0].name} をバックポジションへ移動`);
+  }
+
   /** ホロメンを効果でダウンさせる (4.4.9)。HPに関係なく次のチェックタイミングでダウン処理 */
   forceDown(targetEntry, opts = {}) {
     targetEntry.holomem.forcedDown = true;

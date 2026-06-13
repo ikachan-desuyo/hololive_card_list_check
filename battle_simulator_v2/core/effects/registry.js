@@ -27,6 +27,13 @@
  *       canAttach(holomem) { return bool; },
  *       unlimited: true,                                 // 1人に何枚でも
  *     },
+ *     activatedAbilities: [{                             // メインステップで使う起動型能力「[コスト]：[効果]」
+ *       name: '...',                                     // ログ表示名
+ *       oncePerTurn: true,                               // [ターンに1回] 制限（省略時は無制限）
+ *       canUse(ctx) { return bool; },                    // 使用条件（位置限定・付け先・コスト支払い可否など）
+ *       *run(ctx) {...},                                 // コスト支払い(yield)＋効果本体
+ *     }],                                                // ※ソースはホロメン自身/装着カード。ctx.sourceHolomem=付いているホロメン
+ *                                                        //   ctx.sourceHolomemPos().zone で位置限定を判定できる
  *     ai: {                                              // AI用のカード固有知識（任意）
  *       supportValue({ engine, player, card }) {},       // サポートの使用価値（0=使わない）
  *     },

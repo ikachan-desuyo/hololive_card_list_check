@@ -609,6 +609,32 @@ export class Engine {
       }
     });
 
+    // 起動型能力（メインステップで使える「[コスト]：[効果]」型の能力）。
+    // ソースはホロメンのトップカード自身、または付いている装着カード（ツール/マスコット/ファン）。
+    // 定義: カード def の activatedAbilities[] （registry.js 参照）
+    for (const pos of this._stagePositions(p)) {
+      const h = this._holomemAt(p, pos);
+      const sources = [
+        { card: topCard(h), attachIndex: -1 },
+        ...h.attachments.map((a, ai) => ({ card: a, attachIndex: ai })),
+      ];
+      for (const src of sources) {
+        const abilities = this.registry.get(src.card.number)?.activatedAbilities;
+        if (!abilities) continue;
+        abilities.forEach((ability, abIdx) => {
+          // [ターンに1回] 済みは除外
+          if (ability.oncePerTurn && src.card._abilityUsedTurn?.[abIdx] === s.turn) return;
+          const ctx = new EffectContext(this, idx, { sourceCard: src.card, sourceHolomem: h });
+          if (ability.canUse && !ability.canUse(ctx)) return;
+          actions.push({
+            id: `ability_${pos.zone}_${pos.index}_${src.attachIndex}_${abIdx}`,
+            label: `起動効果: ${ability.name}（${topCard(h).name}）`,
+            kind: 'activatedAbility', pos, attachIndex: src.attachIndex, abilityIndex: abIdx,
+          });
+        });
+      }
+    }
+
     // 8.7 バトンタッチ（ターン1回、センター&バック両方アクティブ、エールコスト）
     if (!p.usedBatonTouchThisTurn && p.center && !p.center.rested) {
       const cost = topCard(p.center).batonTouch || [];
@@ -891,6 +917,20 @@ export class Engine {
         h.attachments.push(card);
         this.log(`${p.name}: ${card.name}〔${card.supportType}〕を ${topCard(h).name} に付けた`);
         break;
+      }
+      case 'activatedAbility': {
+        const h = this._holomemAt(p, action.pos);
+        const source = action.attachIndex >= 0 ? h.attachments[action.attachIndex] : topCard(h);
+        const ability = this.registry.get(source.number)?.activatedAbilities?.[action.abilityIndex];
+        if (!ability) { finish(); return; }
+        // [ターンに1回] のマーキング（使用宣言した時点で消費）
+        if (ability.oncePerTurn) {
+          source._abilityUsedTurn = source._abilityUsedTurn || {};
+          source._abilityUsedTurn[action.abilityIndex] = s.turn;
+        }
+        this.log(`${p.name}: 起動効果「${ability.name}」`);
+        this._runEffect(ability, { playerIdx: s.turnPlayer, sourceCard: source, sourceHolomem: h }, finish);
+        return;
       }
       case 'baton': {
         // コストのエールはプレイヤーが選んでアーカイブする (8.7.2)
