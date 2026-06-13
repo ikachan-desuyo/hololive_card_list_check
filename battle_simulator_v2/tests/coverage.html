@@ -57,6 +57,25 @@
         else if (compileCard(card)) row.auto++;
       }
 
+      // 未実装カードの一覧出力（?missing=製品名 で指定。?missing=all で全製品）
+      const params = new URLSearchParams(location.search);
+      const missingFilter = params.get('missing');
+      if (missingFilter) {
+        for (const [number, { product }] of earliest) {
+          if (missingFilter !== 'all' && !product.includes(missingFilter)) continue;
+          const card = lib.getByNumber(number);
+          if (!card || !needsEffect(card)) continue;
+          if (IMPLEMENTED[number] || compileCard(card)) continue;
+          const texts = [
+            ...(card.keywords || []).map((k) => `《${k.subtype}》${k.text}`),
+            card.supportText || '',
+            ...(card.arts || []).filter((a) => a.text).map((a) => `[アーツ]${a.text}`),
+            ...(card.oshiSkills || []).map((s) => `[推し]${s.text}`),
+          ].filter(Boolean).join(' / ').replace(/\n/g, ' ');
+          console.log(`MISSING: ${number} ${card.name} :: ${texts.slice(0, 180)}`);
+        }
+      }
+
       const rows = [...byProduct.entries()].sort((a, b) => a[1].date.localeCompare(b[1].date));
       let totalAll = 0, doneAll = 0;
       let html = '<table><tr><th>製品（発売日順）</th><th>発売日</th><th>要効果</th><th>手書き</th><th>自動</th><th>未実装</th><th>実装率</th></tr>';

@@ -305,9 +305,16 @@ export function compileSentence(s) {
     return { kind: 'artBonusFlat', n: Number(m[1]) };
   }
 
-  // ドロー
+  // ドロー（後続のアーカイブ付き: 「N枚引いた後、手札M枚をアーカイブする」）
+  if ((m = /^自分のデッキを(\d+)枚引いた後、手札(\d+)枚をアーカイブする$/.exec(s))) {
+    return { kind: 'drawThenArchive', draw: Number(m[1]), archive: Number(m[2]) };
+  }
   if ((m = /^自分のデッキを(\d+)枚引く$/.exec(s))) {
     return { kind: 'draw', n: Number(m[1]) };
+  }
+  // 手札をアーカイブ（単独文）
+  if ((m = /^手札(\d+)枚をアーカイブする$/.exec(s))) {
+    return { kind: 'archiveHand', n: Number(m[1]) };
   }
   // シャッフル
   if (/^(そして)?デッキをシャッフルする$/.test(s)) return { kind: 'shuffleDeck' };
@@ -566,6 +573,22 @@ function* chooseSelfEntry(ctx, target, title, optional = false) {
 
 const RUNNERS = {
   *draw(ctx, step) { ctx.draw(step.n); },
+  *drawThenArchive(ctx, step) {
+    ctx.draw(step.draw);
+    yield* RUNNERS.archiveHand(ctx, { n: step.archive });
+  },
+  *archiveHand(ctx, step) {
+    for (let i = 0; i < step.n && ctx.player.hand.length > 0; i++) {
+      const card = yield ctx.chooseCard({
+        cards: ctx.player.hand,
+        title: `アーカイブする手札を選択（${i + 1}/${step.n}）`,
+      });
+      if (!card) break;
+      ctx.removeFromHand(card);
+      ctx.player.archive.push(card);
+      ctx.log(`${card.name} をアーカイブした`);
+    }
+  },
   *shuffleDeck(ctx) { ctx.shuffleDeck(); },
   *shuffleCheerDeck(ctx) { ctx.shuffleCheerDeck(); },
 
@@ -1135,6 +1158,14 @@ function compileArt(text) {
 
 // ---------- 装着カード（ツール/マスコット/ファン） ----------
 
+/**
+ * 装着カードのコンパイル。
+ * 基礎効果（アーツ+N / HP+N / 受けるダメージ±N / 相手センターへの特殊ダメージ+N /
+ * ファンの付け先ルール / ◆条件付きHP+N）は確実なので採用する。
+ * トリガー型の◆能力（「コラボした時」「ダウンした時」「[ターンに1回]」等）は
+ * 未対応だが、その段落だけスキップして基礎効果は活かす（部分採用）。
+ * → マスコットの「HP+20」等が確実に効くようになる。
+ */
 function compileAttached(text) {
   const blocks = normalize(text).split(/\n+/).map((b) => b.trim()).filter(Boolean);
   const attached = {};
@@ -1143,7 +1174,7 @@ function compileAttached(text) {
   while (i < blocks.length) {
     const b = blocks[i].replace(/^■/, '').replace(/。$/, '');
     let m;
-    if (IGNORABLE.some((rx) => rx.test(b))) { i++; continue; }
+    if (IGNORABLE.some((rx) => rx.test(b)) || /^[ 　]*$/.test(b)) { i++; continue; }
     if ((m = /^この(マスコット|ツール|ファン)が付いているホロメンのアーツ\+(\d+)$/.exec(b))) {
       const n = Number(m[2]);
       const prev = attached.artsPlus;
@@ -1153,6 +1184,24 @@ function compileAttached(text) {
     if ((m = /^この(マスコット|ツール|ファン)が付いているホロメンのHP\+(\d+)$/.exec(b))) {
       const n = Number(m[2]);
       attached.hpPlus = () => n;
+      i++; continue;
+    }
+    // 受けるダメージ±N（無条件）
+    if ((m = /^この(マスコット|ツール|ファン)が付いているホロメンが受けるダメージ([+-])(\d+)$/.exec(b))) {
+      const delta = (m[2] === '-' ? -1 : 1) * Number(m[3]);
+      attached.damageDelta = () => delta;
+      i++; continue;
+    }
+    // 受けるダメージ±N（センター/コラボ限定）
+    if ((m = /^この(マスコット|ツール|ファン)が付いているホロメンがセンターポジションかコラボポジションで受けるダメージ([+-])(\d+)$/.exec(b))) {
+      const delta = (m[2] === '-' ? -1 : 1) * Number(m[3]);
+      attached.damageDelta = (h, zone) => (zone === 'center' || zone === 'collab' ? delta : 0);
+      i++; continue;
+    }
+    if ((m = /^この(マスコット|ツール|ファン)が付いている#(\S+?)を持たないホロメンが受けるダメージ([+-])(\d+)$/.exec(b))) {
+      const tag = m[2];
+      const delta = (m[3] === '-' ? -1 : 1) * Number(m[4]);
+      attached.damageDelta = (h) => ((h.stack[0].tags || []).includes(tag) ? 0 : delta);
       i++; continue;
     }
     if ((m = /^この(ファン|マスコット|ツール)が付いているホロメンが、相手のセンターホロメンに与える特殊ダメージ\+(\d+)$/.exec(b))) {
@@ -1169,12 +1218,23 @@ function compileAttached(text) {
       const name = m[1];
       const next = (blocks[i + 1] || '').replace(/^■/, '').replace(/。$/, '');
       const hm = /^この(マスコット|ツール|ファン)が付いているホロメンのHP\+(\d+)$/.exec(next);
-      if (!hm) return null; // HP+N 以外の能力追加は手書き対象
-      const n = Number(hm[2]);
-      attached.hpPlus = (h) => (h.stack[0].name === name ? n : 0);
+      const am = /^この(マスコット|ツール|ファン)が付いているホロメンのアーツ\+(\d+)$/.exec(next);
+      if (hm) {
+        const n = Number(hm[2]);
+        attached.hpPlus = (h) => (h.stack[0].name === name ? n : 0);
+        i += 2; continue;
+      }
+      if (am) {
+        const n = Number(am[2]);
+        const prev = attached.artsPlus;
+        attached.artsPlus = (h, e) => (prev ? prev(h, e) : 0) + (h.stack[0].name === name ? n : 0);
+        i += 2; continue;
+      }
+      // HP+N / アーツ+N 以外の能力追加（トリガー型）は段落ごとスキップ（基礎効果は活かす）
       i += 2; continue;
     }
-    return null;
+    // 解釈できない段落（トリガー型の常時テキスト等）はスキップして基礎効果を活かす
+    i++;
   }
   if (Object.keys(attached).length === 0 && !def.attachRule) return null;
   if (Object.keys(attached).length > 0) def.attached = attached;
@@ -1197,6 +1257,13 @@ function compileSupport(text) {
       const others = ctx.player.hand.length - 1;
       return over ? others >= n : others <= n;
     };
+    norm = norm.slice(m[0].length);
+  }
+  // 使用条件: ライフ枚数
+  if ((m = /^このカードは、自分のライフが(\d+)以下でなければ使えない。/.exec(norm))) {
+    const n = Number(m[1]);
+    const prev = canUse;
+    canUse = (ctx) => (!prev || prev(ctx)) && ctx.player.life.length <= n;
     norm = norm.slice(m[0].length);
   }
   // 使用条件 + 強制コスト: ホロパワー / ステージのエール

@@ -355,6 +355,8 @@ export class EffectContext {
     if (this.sourceHolomem) {
       total += this.engine.effects.specialDamageBonus(this.sourceHolomem, targetEntry, this.playerIdx);
     }
+    // 受け手の「受けるダメージ」修正（軽減/増加）。特殊ダメージにも適用される
+    total = this.engine._applyDamageReceived(targetEntry.holomem, total);
     targetEntry.holomem.damage += total;
     // 「ライフは減らない」は、この特殊ダメージでダウンが確定した場合のみ適用する。
     // （ダウンに至らなかった場合にフラグを残すと、後から別のダメージで倒された時まで

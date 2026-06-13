@@ -53,6 +53,20 @@ export class EffectSystem {
     return total;
   }
 
+  /**
+   * 対象ホロメンが「受けるダメージ」の増減（5.22.3 軽減 / 装着カードによる増減）。
+   * 負の値=軽減、正の値=増加。アーツダメージ・特殊ダメージ両方に適用する。
+   * @param holomem 受け手のホロメン
+   * @param zone 受け手の位置（'center'|'collab'|'back'）。ゾーン条件付き効果用
+   */
+  damageReceivedDelta(holomem, zone) {
+    let total = 0;
+    for (const { attached } of this._attachedDefs(holomem)) {
+      total += attached.damageDelta?.(holomem, zone, this.engine) || 0;
+    }
+    return total;
+  }
+
   /** 特殊ダメージ+N の合計（発生源の装着カード + ターン修正） */
   specialDamageBonus(sourceHolomem, targetEntry, ownerIdx) {
     let total = 0;

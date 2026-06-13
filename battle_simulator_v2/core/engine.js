@@ -166,6 +166,27 @@ export class Engine {
     return (holomem.stack[0].hp ?? 0) + this.effects.hpBonus(holomem, ownerIdx);
   }
 
+  /** ホロメンの現在の配置ゾーンを返す（'center'|'collab'|'back'|null） */
+  _zoneOf(holomem) {
+    for (const p of this.state.players) {
+      if (p.center === holomem) return 'center';
+      if (p.collab === holomem) return 'collab';
+      if (p.back.includes(holomem)) return 'back';
+    }
+    return null;
+  }
+
+  /** 受け手の「受けるダメージ」修正を適用した最終ダメージ（0未満にはしない） */
+  _applyDamageReceived(targetHolomem, dmg) {
+    const delta = this.effects.damageReceivedDelta(targetHolomem, this._zoneOf(targetHolomem));
+    if (delta === 0) return dmg;
+    const adjusted = Math.max(0, dmg + delta);
+    if (adjusted !== dmg) {
+      this.log(`受けるダメージ修正: ${dmg} → ${adjusted}（${delta > 0 ? '+' : ''}${delta}）`);
+    }
+    return adjusted;
+  }
+
   // ============ 効果の実行（ジェネレータランナー） ============
 
   /**
@@ -962,6 +983,8 @@ export class Engine {
         dmg += mod;
         this.log(`継続効果・装着カードの修正: ${mod > 0 ? '+' : ''}${mod}`);
       }
+      // 受け手の「受けるダメージ」修正（軽減/増加）(5.22.3)
+      dmg = this._applyDamageReceived(target, dmg);
       target.damage += dmg;
       this.log(
         `「${art.name}」→ ${targetCard.name} に ${dmg}ダメージ` +
