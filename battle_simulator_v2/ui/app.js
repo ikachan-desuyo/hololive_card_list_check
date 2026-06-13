@@ -15,7 +15,7 @@ import { HeuristicAI } from '../core/ai/heuristic.js';
 import { STEP_NAMES } from '../core/constants.js';
 import { renderSide, renderHand, renderOppHand } from './board.js';
 
-const TEST_DECKS = ['ラミィデッキ', 'あの青空のせいだ'];
+const TEST_DECKS = ['ラミィデッキ', 'あの青空のせいだ', 'holoX起動テスト'];
 
 let lib = null;
 let engine = null;

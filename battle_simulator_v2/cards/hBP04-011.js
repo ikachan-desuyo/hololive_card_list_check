@@ -26,7 +26,8 @@ export default {
         });
         if (target) {
           ctx.removeFromArchive(picked);
-          ctx.attachSupport(picked, target.holomem);
+          // アーカイブから付けるので、助手くんの「付けた時」トリガーも誘発する
+          yield* ctx.attachSupportWithTrigger(picked, target.holomem);
         }
       },
     },

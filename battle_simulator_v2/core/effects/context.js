@@ -63,6 +63,11 @@ export class EffectContext {
     return (card.tags || []).includes(t);
   }
 
+  /** 「自分が後攻で、自分の最初のターン」か（多くのカードの条件「後攻で最初のターンなら」） */
+  isFirstTurnGoingSecond() {
+    return this.playerIdx !== this.engine.state.firstPlayer && this.player.turnCount === 1;
+  }
+
   /** ステージ上の自分のエールの色一覧（重複なし） */
   ownStageCheerColors() {
     const colors = new Set();
@@ -319,6 +324,22 @@ export class EffectContext {
   attachSupport(card, holomem) {
     holomem.attachments.push(card);
     this.log(`${holomem.stack[0].name} に ${card.name} を付けた`);
+  }
+
+  /**
+   * サポートを付け、付け先カードの onAttach トリガー（「付けた時」）があれば誘発する。
+   * 効果テキスト内で装着する場合（例: アーカイブの〈こよりの助手くん〉を付ける）に使う。
+   * 使い方: yield* ctx.attachSupportWithTrigger(card, holomem);
+   */
+  *attachSupportWithTrigger(card, holomem) {
+    this.attachSupport(card, holomem);
+    const trig = this.engine.registry.get(card.number)?.triggers?.onAttach;
+    if (trig) {
+      yield* trig(new EffectContext(this.engine, this.playerIdx, {
+        sourceCard: card,
+        sourceHolomem: holomem,
+      }));
+    }
   }
 
   /** エールデッキから特定カードを取り除く */

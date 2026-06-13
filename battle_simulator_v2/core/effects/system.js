@@ -93,6 +93,42 @@ export class EffectSystem {
     return total;
   }
 
+  /**
+   * アーツの必要エール軽減を集約する。戻り値: { 色: 軽減数 }（例 {'無色':1} / {'黄':1}）。
+   * 2系統: ①ステージ上のカードの常時オーラ def.artsCostReduceAura(自分, 対象, engine)
+   *         ②ターン修正 kind:'artCostReduce'（「このターン、〜のアーツ必要〜-1」）
+   * @param targetHolomem コストを判定するホロメン
+   * @param ownerIdx そのホロメンの持ち主
+   */
+  artsCostReduction(targetHolomem, ownerIdx) {
+    const red = {};
+    const add = (color, amount) => { red[color] = (red[color] || 0) + amount; };
+    const p = this.engine.state.players[ownerIdx];
+    for (const src of this.engine._stageHolomems(p)) {
+      const def = this.registry.get(src.stack[0].number);
+      if (def?.artsCostReduceAura) {
+        for (const r of def.artsCostReduceAura(src, targetHolomem, this.engine) || []) add(r.color, r.amount);
+      }
+    }
+    for (const mod of this.engine.state.modifiers) {
+      if (mod.kind !== 'artCostReduce' || mod.ownerIdx !== ownerIdx) continue;
+      if (mod.match && !mod.match(targetHolomem)) continue;
+      add(mod.color, mod.amount);
+    }
+    return red;
+  }
+
+  /** バトンタッチの必要エール軽減（ターン修正 kind:'batonCostReduce'）。{色:軽減数} を返す */
+  batonCostReduction(holomem, ownerIdx) {
+    const red = {};
+    for (const mod of this.engine.state.modifiers) {
+      if (mod.kind !== 'batonCostReduce' || mod.ownerIdx !== ownerIdx) continue;
+      if (mod.match && !mod.match(holomem)) continue;
+      red[mod.color] = (red[mod.color] || 0) + mod.amount;
+    }
+    return red;
+  }
+
   /** ターン終了時: 「ターンの終わりまで」の修正を消滅させる (7.7.4) */
   expireTurnModifiers() {
     const before = this.engine.state.modifiers.length;

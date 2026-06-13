@@ -13,6 +13,7 @@
  *     arts: { 'アーツ名': {
  *       *run(ctx) {...},                                 // テキスト効果（パイプライン段階4）
  *       dmgBonus(ctx) { return N; },                     // 条件付き「このアーツ+N」
+ *       *onDownDealt(ctx) {...},                          // 「このアーツで相手をダウンさせた時」（ダメージ適用後に発火）
  *     } },
  *     support: {
  *       canUse(ctx) { return bool; },                    // 追加の使用条件
@@ -36,6 +37,14 @@
  *                                                        //   ctx.sourceHolomemPos().zone で位置限定を判定できる
  *     ai: {                                              // AI用のカード固有知識（任意）
  *       supportValue({ engine, player, card }) {},       // サポートの使用価値（0=使わない）
+ *     },
+ *     triggers: {                                        // ホロメン/カードのトリガー効果
+ *       *onDown(ctx) {...},                              // このホロメンがダウンした時（アーカイブ前。_processDown で発火）
+ *       *onAttach(ctx) {...},                            // このカードを付けた時（supportAttach / attachSupportWithTrigger で発火）
+ *       *onOpponentDown(ctx) {...},                      // このホロメンが相手をダウンさせた時（アーツ解決時に発火。選択可）
+ *     },                                                 //   ※ctx.sourceCard=自分, ctx.sourceHolomem=付いた/ダウンした/ダウンさせたホロメン
+ *     artsCostReduceAura(src, target, engine) {          // アーツ必要エール軽減オーラ（[{color,amount}]を返す。engine が実効コスト算出に使用）
+ *       return [{ color: '黄', amount: 1 }];             //   src=この能力の持ち主, target=コスト判定対象のホロメン
  *     },
  *     oshiSkill / spOshiSkill: { canUse(engine, idx), *run(ctx) },
  *     onDownOshiSkill: { cost, title, canUse(engine, idx, holomem), apply(engine, idx, holomem) },

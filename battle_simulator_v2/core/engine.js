@@ -637,7 +637,7 @@ export class Engine {
 
     // 8.7 バトンタッチ（ターン1回、センター&バック両方アクティブ、エールコスト）
     if (!p.usedBatonTouchThisTurn && p.center && !p.center.rested) {
-      const cost = topCard(p.center).batonTouch || [];
+      const cost = this._effectiveBatonCost(p.center, topCard(p.center).batonTouch || [], idx);
       if (this._canPayCheers(p.center.cheers, cost)) {
         p.back.forEach((h, i) => {
           if (!h.rested) {
@@ -690,7 +690,8 @@ export class Engine {
       if (!h || s.perfUsed[zone] || h.rested) continue; // 9.2.1.2-5
       const card = topCard(h);
       card.arts.forEach((art, ai) => {
-        if (!this._canPayCheers(h.cheers, art.cost)) return;
+        const cost = this._effectiveArtCost(h, art.cost, s.turnPlayer);
+        if (!this._canPayCheers(h.cheers, cost)) return;
         // カード定義による対象制限（「このアーツは相手のセンターホロメンしか対象にできない」等）
         const artDef = this.registry.getArt(card.number, art.name);
         const allowedTargets = artDef?.targetZones
@@ -916,6 +917,12 @@ export class Engine {
         const h = this._holomemAt(p, action.pos);
         h.attachments.push(card);
         this.log(`${p.name}: ${card.name}〔${card.supportType}〕を ${topCard(h).name} に付けた`);
+        // 装着時トリガー（「（手札/アーカイブから）付けた時」）。こよりの助手くん等
+        const trig = this.registry.get(card.number)?.triggers?.onAttach;
+        if (trig) {
+          this._runEffect({ run: trig }, { playerIdx: s.turnPlayer, sourceCard: card, sourceHolomem: h }, finish);
+          return;
+        }
         break;
       }
       case 'activatedAbility': {
@@ -936,7 +943,7 @@ export class Engine {
         // コストのエールはプレイヤーが選んでアーカイブする (8.7.2)
         // 指定色を先に支払い、無色（任意の色でよい）を後に回す
         const center = p.center;
-        const cost = [...(topCard(center).batonTouch || [])]
+        const cost = this._effectiveBatonCost(center, topCard(center).batonTouch || [], s.turnPlayer)
           .sort((a, b) => (a === COLORLESS ? 1 : 0) - (b === COLORLESS ? 1 : 0));
         const backIndex = action.backIndex;
         const payAndSwap = function* (ctx) {
@@ -1032,7 +1039,25 @@ export class Engine {
       );
       // 「ダウンさせた時」トリガー（このアーツでダウンが確定した場合）
       if (target.damage >= this.effectiveHp(target)) {
-        this._notifySourceDown(h, s.turnPlayer);
+        this._notifySourceDown(h, s.turnPlayer); // 継続効果(ターン修正)の同期通知（ラミィSP等）
+        // アタッカーの onOpponentDown（カード共通）＋ このアーツ固有の onDownDealt（「このアーツで〜時」）を順に実行
+        const runners = [];
+        const cardTrig = this.registry.get(topCard(h).number)?.triggers?.onOpponentDown;
+        if (cardTrig) runners.push(cardTrig);
+        if (artDef?.onDownDealt) runners.push(artDef.onDownDealt);
+        if (runners.length > 0) {
+          const cont = () => this._checkTiming(() => this._queuePerformancePending());
+          const runNext = (i) => {
+            if (i >= runners.length) { cont(); return; }
+            this._runEffect(
+              { run: runners[i] },
+              { playerIdx: s.turnPlayer, sourceCard: topCard(h), sourceHolomem: h },
+              () => runNext(i + 1),
+            );
+          };
+          runNext(0);
+          return;
+        }
       }
       // 9.1.2: アーツ1回ごとにチェックタイミング
       this._checkTiming(() => this._queuePerformancePending());
@@ -1148,12 +1173,20 @@ export class Engine {
     // アーカイブ前に実行する（エールやスタックの付け替え・回収が間に合うように）。
     // 「相手のターンで～」等の条件は各カードの run() 内で ctx.state.turnPlayer を見て判定する。
     const runDownTrigger = () => {
-      const trig = this.registry.get(card.number)?.triggers?.onDown;
-      if (trig) {
-        this._runEffect({ run: trig }, { playerIdx: ownerIdx, sourceCard: card, sourceHolomem: h }, finish);
-      } else {
-        finish();
-      }
+      // ダウンしたホロメン自身＋付いている装着カード（ファン等）の onDown を順に実行する。
+      // どちらも sourceHolomem は「ダウンしたホロメン」。アーカイブ前なのでエール回収等が間に合う。
+      const trigs = [card, ...h.attachments]
+        .map((c) => ({ srcCard: c, trig: this.registry.get(c.number)?.triggers?.onDown }))
+        .filter((x) => x.trig);
+      const runNext = (i) => {
+        if (i >= trigs.length) { finish(); return; }
+        this._runEffect(
+          { run: trigs[i].trig },
+          { playerIdx: ownerIdx, sourceCard: trigs[i].srcCard, sourceHolomem: h },
+          () => runNext(i + 1),
+        );
+      };
+      runNext(0);
     };
 
     // 「（ホロメンが）ダウンした時に使える」推しスキル (11.3.1.1 / 12.1.5.2)
@@ -1294,6 +1327,35 @@ export class Engine {
       return !h.attachments.some((a) => a.supportType === 'マスコット');
     }
     return true; // ファンはカードテキストによる
+  }
+
+  /**
+   * アーツの必要エールに軽減（「無色-1」「黄-1」等）を適用した実効コストを返す。
+   * アーツはエールを消費しない（満たしているかの判定のみ）ため、判定直前に使う。
+   */
+  _effectiveArtCost(holomem, cost, ownerIdx) {
+    const red = this.effects.artsCostReduction(holomem, ownerIdx);
+    const out = [...cost];
+    for (const [color, amount] of Object.entries(red)) {
+      for (let i = 0; i < amount; i++) {
+        const idx = out.indexOf(color);
+        if (idx !== -1) out.splice(idx, 1);
+      }
+    }
+    return out;
+  }
+
+  /** バトンタッチの必要エールに軽減（「無色-2」等）を適用した実効コストを返す */
+  _effectiveBatonCost(holomem, cost, ownerIdx) {
+    const red = this.effects.batonCostReduction(holomem, ownerIdx);
+    const out = [...cost];
+    for (const [color, amount] of Object.entries(red)) {
+      for (let i = 0; i < amount; i++) {
+        const idx = out.indexOf(color);
+        if (idx !== -1) out.splice(idx, 1);
+      }
+    }
+    return out;
   }
 
   /**
