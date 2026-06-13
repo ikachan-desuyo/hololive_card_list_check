@@ -78,18 +78,43 @@ export class EffectContext {
 
   /**
    * カードを1枚選ぶ。optional なら「選ばない」も可（null が返る）。
-   * cards: 正規化済みカードの配列
+   * cards: 選択可能なカード / displayCards: 選択不可だが見せるカード
+   *   （「デッキの上からN枚を見る」で対象外のカードも公開するために使う）
    */
-  chooseCard({ cards, title, optional = false, skipLabel = '選ばない' }) {
+  chooseCard({ cards, title, optional = false, skipLabel = '選ばない', displayCards = [] }) {
     return {
       kind: 'chooseCard',
       player: this.playerIdx,
       title,
+      displayCards: displayCards.filter((c) => !cards.includes(c)),
       buildOptions: () => [
         ...cards.map((c, i) => ({ id: `card_${i}`, label: c.name, card: c, value: c })),
         ...(optional ? [{ id: 'skip', label: skipLabel, value: null }] : []),
       ],
     };
+  }
+
+  /**
+   * カードの並び順をプレイヤーに決めさせるフロー（「好きな順でデッキの下に戻す」等）。
+   * 1枚ずつ「次に置くカード」を選ぶ。「この順のまま」も選べる。
+   * 使い方: const ordered = yield* ctx.orderCardsFlow(cards, 'デッキの下に戻す順番');
+   */
+  *orderCardsFlow(cards, title) {
+    const remaining = [...cards];
+    const ordered = [];
+    while (remaining.length > 1) {
+      const picked = yield this.chooseCard({
+        cards: remaining,
+        title: `${title}: ${ordered.length + 1}番目（上側）に置くカードを選択`,
+        optional: true,
+        skipLabel: 'この順のまま戻す',
+      });
+      if (!picked) break;
+      ordered.push(picked);
+      remaining.splice(remaining.indexOf(picked), 1);
+    }
+    ordered.push(...remaining);
+    return ordered;
   }
 
   /** 自分/相手のホロメンを1人選ぶ（filter適用後）。optional 可 */

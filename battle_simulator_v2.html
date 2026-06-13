@@ -101,11 +101,16 @@
       <!-- カード効果のカード選択モーダル（デッキサーチ等） -->
       <div id="choice-modal">
         <div id="choice-content">
-          <div id="choice-title"></div>
+          <div id="choice-header">
+            <div id="choice-title"></div>
+            <button id="choice-peek" title="モーダルを一時的に隠して盤面を確認">🔍 盤面を確認</button>
+          </div>
           <div id="choice-grid"></div>
           <div id="choice-footer"></div>
         </div>
       </div>
+      <!-- 盤面確認中に選択へ戻るボタン -->
+      <button id="choice-restore">▲ カード選択に戻る</button>
 
       <!-- ターン切り替え通知 -->
       <div id="turn-toast"></div>

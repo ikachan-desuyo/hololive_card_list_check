@@ -415,6 +415,16 @@ function showChooser(x, y, options) {
 }
 
 function setupModals() {
+  // 選択モーダルの「盤面を確認」: モーダルを一時的に隠して場のカードを見られるようにする
+  document.getElementById('choice-peek').addEventListener('click', () => {
+    document.getElementById('choice-modal').classList.add('peek');
+    document.getElementById('choice-restore').classList.add('show');
+  });
+  document.getElementById('choice-restore').addEventListener('click', () => {
+    document.getElementById('choice-modal').classList.remove('peek');
+    document.getElementById('choice-restore').classList.remove('show');
+  });
+
   document.getElementById('inspector-close').addEventListener('click', () => {
     document.getElementById('inspector-modal').classList.remove('active');
   });
@@ -494,7 +504,11 @@ function enqueueStepToasts(s) {
       showDice(Number(dice[1])); // サイコロは専用の大型表示
     } else if (m) {
       stepToastQueue.push(m[2].includes('スキップ') ? `${m[1]}（スキップ）` : m[1]);
-    } else if (/^.*?: 1枚ドロー/.test(line) || /特攻発動/.test(line)) {
+    } else if (
+      /^.*?: 1枚ドロー/.test(line) ||
+      /特攻発動/.test(line) ||
+      /エール(デッキから|公開)/.test(line) // エールデッキから送られたエールの種類を見せる
+    ) {
       stepToastQueue.push(line.replace(/^.*?: /, ''));
     }
   }
@@ -525,7 +539,10 @@ const DICE_PIPS = {
   6: [0, 2, 3, 5, 6, 8],
 };
 
+let diceShownAt = 0; // サイコロ表示中はモーダルを遅延させるための時刻
+
 function showDice(value) {
+  diceShownAt = Date.now();
   const overlay = document.getElementById('dice-overlay');
   const die = document.getElementById('dice-face');
   die.innerHTML = '';
@@ -620,12 +637,30 @@ function render() {
  *  - chooseHolomem → 盤面の対象ホロメンを金色に光らせ、直接クリックで選択
  *  - confirm など  → 中央のダイアログ（ボタン）
  */
+const DICE_MODAL_DELAY_MS = 1500;
+let diceDelayTimer = null;
+let lastChoicePending = null; // 新しい選択になったらピーク状態を解除するための参照
+
 function renderEffectChoiceModal(s) {
   const modal = document.getElementById('choice-modal');
   const bar = document.getElementById('choice-bar');
   let isEffect = s.pending?.type === 'effectChoice';
   // AIの選択は表示しない（デッキサーチ候補などの非公開情報が見えてしまうため）
   if (isEffect && aiEnabled(s.pending.player)) isEffect = false;
+
+  // サイコロ表示中は次の選択モーダルを出さない（サイコロが隠れて見えなくなるため）
+  const sinceDice = Date.now() - diceShownAt;
+  if (isEffect && sinceDice < DICE_MODAL_DELAY_MS) {
+    modal.classList.remove('active');
+    bar.classList.remove('active');
+    clearTimeout(diceDelayTimer);
+    diceDelayTimer = setTimeout(() => {
+      diceDelayTimer = null;
+      if (engine) render();
+    }, DICE_MODAL_DELAY_MS - sinceDice + 30);
+    return;
+  }
+
   const kind = isEffect ? s.pending.request?.kind : null;
 
   // --- 盤面クリック選択（chooseHolomem） ---
@@ -665,6 +700,12 @@ function renderEffectChoiceModal(s) {
     return;
   }
   modal.classList.add('active');
+  // 新しい選択が来たらピーク（盤面確認）状態を解除する
+  if (lastChoicePending !== s.pending) {
+    lastChoicePending = s.pending;
+    modal.classList.remove('peek');
+    document.getElementById('choice-restore').classList.remove('show');
+  }
   document.getElementById('choice-title').textContent =
     `${s.players[s.pending.player].name}: ${s.pending.request.title || '選択してください'}`;
   const grid = document.getElementById('choice-grid');
@@ -684,6 +725,13 @@ function renderEffectChoiceModal(s) {
       btn.addEventListener('click', () => engine.apply(opt.id));
       footer.appendChild(btn);
     }
+  }
+  // 選択対象外だが公開されているカード（「上からN枚見る」の残り等）はグレー表示
+  for (const card of s.pending.request.displayCards || []) {
+    const c = document.createElement('div');
+    c.className = 'archive-grid-card display-only';
+    c.innerHTML = `<img src="${card.imageUrl || ''}" alt="${escapeText(card.name)}" loading="lazy"><div>${escapeText(card.name)}（対象外）</div>`;
+    grid.appendChild(c);
   }
 }
 

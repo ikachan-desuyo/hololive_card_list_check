@@ -111,15 +111,18 @@ function holomemEl(holomem, sideIdx, zone, index, hooks) {
   });
 
   // HPバッジ（残りHP/最大HP。装着カードのHP修正込みの実効値。残量に応じて色が変わる）
-  if (holomem.damage > 0) {
+  // 無傷でも常に表示する
+  {
     const maxHp = hooks.effectiveHp ? hooks.effectiveHp(holomem) : (holomem.stack[0].hp ?? 0);
-    const remain = Math.max(0, maxHp - holomem.damage);
-    const b = el('div', 'badge damage', group);
-    b.textContent = `${remain}/${maxHp}`;
-    const ratio = maxHp > 0 ? remain / maxHp : 0;
-    if (ratio <= 0.3) b.classList.add('hp-low');
-    else if (ratio <= 0.6) b.classList.add('hp-mid');
-    b.style.zIndex = String(lower.length + 2);
+    if (maxHp > 0 && !holomem.faceDown) {
+      const remain = Math.max(0, maxHp - holomem.damage);
+      const b = el('div', 'badge damage', group);
+      b.textContent = `${remain}/${maxHp}`;
+      const ratio = remain / maxHp;
+      if (ratio <= 0.3) b.classList.add('hp-low');
+      else if (ratio <= 0.6) b.classList.add('hp-mid');
+      b.style.zIndex = String(lower.length + 2);
+    }
   }
 
   // クリックで詳細（スタック全体 + 付いているカード）
