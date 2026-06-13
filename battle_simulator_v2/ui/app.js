@@ -207,9 +207,14 @@ function startDrag(e) {
     if (st.dsts.includes(el.dataset.drop)) el.classList.add('drop-ok');
   }
   // カーソルに追従するゴースト（掴んだカードの絵柄）
+  // 注意: ホロメンはBloomで複数枚重なっている。querySelector('img') だと
+  // DOM順で最初の「一番下のカード」が取れてしまうため、本体(.holomem-main)を優先する
   const ghost = document.createElement('div');
   ghost.className = 'drag-ghost';
-  const img = st.srcEl.querySelector('img');
+  const img =
+    st.srcEl.querySelector('.holomem-main img') ||   // ステージのホロメン（スタックの一番上）
+    st.srcEl.querySelector(':scope > img') ||        // 手札・公開中カード
+    st.srcEl.querySelector('img');
   ghost.style.backgroundImage = img?.src ? `url(${img.src})` : 'var(--sleeve)';
   document.body.appendChild(ghost);
   st.ghost = ghost;

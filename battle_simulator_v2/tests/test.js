@@ -115,6 +115,14 @@ export async function runTests() {
     assert(lib.cards.size > 2000, `カード数が少なすぎる: ${lib.cards.size}`);
   });
 
+  test('デッキ構築: 同名カードの各コピーは独立したオブジェクト', () => {
+    const d = lib.buildGameDeck({ 'hY04-001_C': 20, 'hBP04-004_OSR': 1, 'hBP04-043_C': 50 });
+    assertEq(d.errors.length, 0, `デッキエラー: ${d.errors.join(',')}`);
+    assert(d.cheerDeck[0] !== d.cheerDeck[1], '青エール同士が同一オブジェクトになっている');
+    assert(d.deck[0] !== d.deck[1], 'ホロメンのコピー同士が同一オブジェクトになっている');
+    assertEq(d.cheerDeck[0].name, d.cheerDeck[1].name, 'コピーの内容は同一であるべき');
+  });
+
   test('ホロメンの正規化（HP・Bloomレベル・アーツコスト）', () => {
     const c = lib.get('hBP01-024_02_C');
     assert(c, 'hBP01-024_02_C が無い');
@@ -560,6 +568,34 @@ export async function runTests() {
     let guard = 0;
     while (s.pending && guard++ < 10) e.apply(s.pending.options[0].id);
     assertEq(p0.hand.length, handBefore + 1, '手札が1枚（雪民）増えているはず');
+  });
+
+  await testAsync('バトンタッチ: アーカイブするエールを選択できる', async () => {
+    const e = await setupMainStep(deckMap, 91);
+    const s = e.state;
+    const p0 = s.players[0];
+    // センター: エール2枚ちょうど（どちらを払うか選べる状態）。バック: アクティブ1人
+    const center = p0.center;
+    const cheerA = p0.cheerDeck.shift();
+    const cheerB = p0.cheerDeck.shift();
+    center.cheers = [cheerA, cheerB]; // エールステップで付いた分は除いて2枚に固定
+    p0.back = [e._createHolomem(lib.get('hBP02-042_C'), 1)];
+    e._queueMainPending();
+    const action = e.actions().find((a) => a.kind === 'baton');
+    assert(action, 'バトンタッチがアクションに出ていない');
+    e.apply(action.id);
+    // エール選択の決定ポイントが出る（候補2枚）
+    assertEq(s.pending?.type, 'effectChoice', 'エール選択になっていない');
+    assertEq(s.pending.options.filter((o) => o.card).length, 2, '候補が2枚出ていない');
+    // 2枚目（cheerB）を選んで支払う
+    const optB = s.pending.options.find((o) => o.card === cheerB);
+    e.apply(optB.id);
+    // 交代が完了し、選んだ方がアーカイブされている
+    assert(p0.archive.includes(cheerB), '選んだエールがアーカイブされていない');
+    assert(!p0.archive.includes(cheerA), '選んでいないエールまでアーカイブされた');
+    assertEq(p0.center.stack[0].name, '紫咲シオン', 'バックのホロメンがセンターに来ていない');
+    const oldCenterNowBack = p0.back[p0.back.length - 1];
+    assert(oldCenterNowBack.cheers.includes(cheerA), '残したエールが元センターに付いたままになっていない');
   });
 
   await testAsync('バックのホロメンも特殊ダメージでダウンする（回帰）', async () => {

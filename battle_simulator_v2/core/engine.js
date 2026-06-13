@@ -210,6 +210,11 @@ export class Engine {
       this._stepEffect(gen, null, after);
       return;
     }
+    // 強制のカード選択で候補が1枚だけなら自動で確定（確定クリックの手間を省く）
+    if (request.kind === 'chooseCard' && options.length === 1 && options[0].card) {
+      this._stepEffect(gen, options[0].value, after);
+      return;
+    }
     this.state.pending = {
       type: 'effectChoice',
       player: request.player,
@@ -858,14 +863,34 @@ export class Engine {
         break;
       }
       case 'baton': {
-        const cost = topCard(p.center).batonTouch || [];
-        this._payCheers(p, p.center, cost);
-        const back = p.back.splice(action.backIndex, 1)[0];
-        p.back.push(p.center);
-        p.center = back;
-        p.usedBatonTouchThisTurn = true;
-        this.log(`${p.name}: バトンタッチ（${topCard(back).name} がセンターへ）`);
-        break;
+        // コストのエールはプレイヤーが選んでアーカイブする (8.7.2)
+        // 指定色を先に支払い、無色（任意の色でよい）を後に回す
+        const center = p.center;
+        const cost = [...(topCard(center).batonTouch || [])]
+          .sort((a, b) => (a === COLORLESS ? 1 : 0) - (b === COLORLESS ? 1 : 0));
+        const backIndex = action.backIndex;
+        const payAndSwap = function* (ctx) {
+          for (const color of cost) {
+            const candidates = color === COLORLESS
+              ? [...center.cheers]
+              : center.cheers.filter((c) => c.color === color);
+            const pool = candidates.length > 0 ? candidates : [...center.cheers];
+            if (pool.length === 0) return; // 支払えない（canPayチェック済みなので通常来ない）
+            const cheer = yield ctx.chooseCard({
+              cards: pool,
+              title: `バトンタッチ: アーカイブするエールを選択（コスト: ${color}）`,
+            });
+            if (!cheer) return;
+            ctx.archiveCheer(center, cheer);
+          }
+          const back = p.back.splice(backIndex, 1)[0];
+          p.back.push(p.center);
+          p.center = back;
+          p.usedBatonTouchThisTurn = true;
+          ctx.log(`${p.name}: バトンタッチ（${topCard(back).name} がセンターへ）`);
+        };
+        this._runEffect({ run: payAndSwap }, { playerIdx: s.turnPlayer }, finish);
+        return;
       }
     }
     finish();
@@ -1197,13 +1222,4 @@ export class Engine {
     return pool.length >= anyCount;
   }
 
-  /** コスト分のエールをアーカイブ（バトンタッチ 8.7.2 等）。指定色優先で自動選択 */
-  _payCheers(p, h, cost) {
-    for (const color of cost) {
-      let i = color === COLORLESS ? 0 : h.cheers.findIndex((c) => c.color === color);
-      if (i === -1) i = 0;
-      const cheer = h.cheers.splice(i, 1)[0];
-      if (cheer) p.archive.push(cheer);
-    }
-  }
 }
