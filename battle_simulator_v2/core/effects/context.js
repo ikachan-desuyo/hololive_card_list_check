@@ -68,6 +68,16 @@ export class EffectContext {
     return this.playerIdx !== this.engine.state.firstPlayer && this.player.turnCount === 1;
   }
 
+  /** このターンに指定名のサポートを使ったか（「このターンに〈限界飯〉を使っていたなら」等） */
+  usedSupportNamed(name) {
+    return (this.player.supportsPlayedThisTurn || []).some((c) => c.name === name);
+  }
+
+  /** このターンに使った、指定タグを持つサポートの枚数（filter で supportType も絞れる） */
+  countSupportThisTurn(filter) {
+    return (this.player.supportsPlayedThisTurn || []).filter(filter).length;
+  }
+
   /** ステージ上の自分のエールの色一覧（重複なし） */
   ownStageCheerColors() {
     const colors = new Set();

@@ -56,6 +56,7 @@ function createPlayerState(name, gameDeck) {
     usedLimitedThisTurn: false,
     usedCollabThisTurn: false,
     usedBatonTouchThisTurn: false,
+    supportsPlayedThisTurn: [], // このターンに使ったサポートのカード名一覧
     usedOshiSkillThisTurn: false,
     usedSpOshiSkillThisGame: false,
     turnCount: 0,           // このプレイヤーの何ターン目か
@@ -390,6 +391,7 @@ export class Engine {
     p.usedSupportThisTurn = false;
     p.usedCollabThisTurn = false;
     p.usedBatonTouchThisTurn = false;
+    p.supportsPlayedThisTurn = []; // このターンに使ったサポートのカード名一覧（「〈限界飯〉を使っていたなら」等）
     // 推しスキルの[ターンに1回]は両プレイヤーともリセットする
     // （「相手のターンでダウンした時に使える」等、相手ターン中に使うスキルがあるため）
     for (const pl of s.players) pl.usedOshiSkillThisTurn = false;
@@ -894,6 +896,7 @@ export class Engine {
         const card = p.hand.splice(action.handIndex, 1)[0];
         if (card.limited) p.usedLimitedThisTurn = true;
         p.usedSupportThisTurn = true;
+        p.supportsPlayedThisTurn.push(card);
         this.log(`${p.name}: サポート ${card.name} を使用`);
         const def = this.registry.get(card.number);
         if (def?.support) {
@@ -914,6 +917,7 @@ export class Engine {
         const card = p.hand.splice(action.handIndex, 1)[0];
         if (card.limited) p.usedLimitedThisTurn = true;
         p.usedSupportThisTurn = true;
+        p.supportsPlayedThisTurn.push(card);
         const h = this._holomemAt(p, action.pos);
         h.attachments.push(card);
         this.log(`${p.name}: ${card.name}〔${card.supportType}〕を ${topCard(h).name} に付けた`);
