@@ -1,6 +1,6 @@
 /**
  * 定数定義
- * ルールの根拠は battle_simulator/docs/RULES_SPEC.md（条番号は総合ルール ver.1.9.0）
+ * ルールの根拠は battle_simulator_v2/docs/RULES_SPEC.md（条番号は総合ルール ver.1.9.0）
  */
 
 // 色（内部表現は日本語で統一。card_data.json の color フィールドと一致させる）

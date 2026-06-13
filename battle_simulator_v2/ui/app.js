@@ -41,7 +41,7 @@ async function resolveDeckMap(key) {
   const kind = key.slice(0, key.indexOf(':'));
   const name = key.slice(key.indexOf(':') + 1);
   if (kind === 'test') {
-    const res = await fetch(`battle_simulator/test_deck/${encodeURIComponent(name)}.json`);
+    const res = await fetch(`battle_simulator_v2/test_deck/${encodeURIComponent(name)}.json`);
     if (!res.ok) throw new Error(`テストデッキの読み込みに失敗: ${name}`);
     return res.json();
   }

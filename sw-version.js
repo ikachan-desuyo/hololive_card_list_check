@@ -1,27 +1,27 @@
 // Version Management Configuration
 // このファイルはバージョンアップ時に更新されます
 
-const APP_VERSION = "4.18.0"; // バトルシミュレーターv2 追加 + SWキャッシュ整理
-const VERSION_DESCRIPTION = "バトルシミュレーターv2";
+const APP_VERSION = "4.19.0"; // 旧版バトルシミュレーター(v1)を削除し v2 に一本化
+const VERSION_DESCRIPTION = "バトルシミュレーターv2に一本化";
 
 // ✅ 各ページのバージョン情報を一元管理
 const PAGE_VERSIONS = {
-  "index.html": "4.18.0",
-  "binder_collection.html": "4.18.0",
-  "collection_binder.html": "4.18.0",
-  "card_list.html": "4.18.0",
-  "holoca_skill_page.html": "4.18.0",
-  "deck_builder.html": "4.18.0"
+  "index.html": "4.19.0",
+  "binder_collection.html": "4.19.0",
+  "collection_binder.html": "4.19.0",
+  "card_list.html": "4.19.0",
+  "holoca_skill_page.html": "4.19.0",
+  "deck_builder.html": "4.19.0"
 };
 
 // ✅ 更新内容の詳細情報
 const UPDATE_DETAILS = {
-  title: "v4.18.0",
-  description: "バトルシミュレーターv2",
+  title: "v4.19.0",
+  description: "バトルシミュレーターをv2に一本化",
   changes: [
-    "バトルシミュレーターv2を追加（3D盤面・D&D操作・公式ルール準拠・カード効果）",
-    "ホームのメニューをv2に差し替え（旧版は参照用に残置）",
-    "SWキャッシュの整理（画像キャッシュ分離・更新検知の強化）"
+    "旧版バトルシミュレーター（v1）を削除し、バトルシミュレーターv2に一本化",
+    "v2が使うテストデッキ・ルール仕様(RULES_SPEC等)をv2配下に統合",
+    "SWキャッシュからv1関連ファイルを除去"
   ]
 };
 

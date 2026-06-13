@@ -239,7 +239,7 @@ export async function runTests() {
   });
 
   // ---- 統合テスト: 実デッキでのプレイアウト ----
-  const deckRes = await fetch('../../battle_simulator/test_deck/' + encodeURIComponent('ラミィデッキ.json'));
+  const deckRes = await fetch('../test_deck/' + encodeURIComponent('ラミィデッキ.json'));
   const deckMap = await deckRes.json();
 
   test('セットアップ: 手札7枚・ライフ・先攻後攻', () => {
@@ -873,7 +873,7 @@ export async function runTests() {
 
   // ---- 第2デッキ（あの青空のせいだ: オリー/イオフィ/レイネ）----
 
-  const res2 = await fetch('../../battle_simulator/test_deck/' + encodeURIComponent('あの青空のせいだ.json'));
+  const res2 = await fetch('../test_deck/' + encodeURIComponent('あの青空のせいだ.json'));
   const deckMap2 = await res2.json();
 
   await testAsync('ランダムプレイアウト（あの青空のせいだ）×3シード', async () => {

@@ -62,7 +62,7 @@
       const out = document.getElementById('out');
       try {
         const lib = await CardLibrary.load('../../json_file/card_data.json');
-        const deckRes = await fetch('../../battle_simulator/test_deck/' + encodeURIComponent('ラミィデッキ.json'));
+        const deckRes = await fetch('../test_deck/' + encodeURIComponent('ラミィデッキ.json'));
         const deckMap = await deckRes.json();
 
         const a = await playout(lib, deckMap);

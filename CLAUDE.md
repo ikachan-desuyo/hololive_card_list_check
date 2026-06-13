@@ -25,11 +25,12 @@
   v2 を正式リリースしてオフライン対応する際は、このバイパスを外して urlsToCache に v2 ファイル一式を追加すること
 - モジュールシステム不使用。各ファイルは class を定義して `window.XXX` に登録し、`<script>` タグの順序で依存を解決している
 
-## バトルシミュレーター v2（現行の開発ライン）
+## バトルシミュレーター（v2 / 唯一の現行ライン）
 
-- 入口: `battle_simulator_v2.html` / コード: `battle_simulator_v2/`（**ES modules使用**。旧コードと違い window 登録はしない）
-- 構成: `core/`（DOM非依存のゲームエンジン）+ `ui/`（3D盤面・CSS 3D transform）+ `tests/`（ルールテスト）
-- ルールの実装根拠は `battle_simulator/docs/RULES_SPEC.md` の条番号をコメントに書く
+- 入口: `battle_simulator_v2.html` / コード: `battle_simulator_v2/`（**ES modules使用**。window 登録はしない）
+- 構成: `core/`（DOM非依存のゲームエンジン）+ `ui/`（3D盤面・CSS 3D transform）+ `tests/`（ルールテスト）+ `docs/`（仕様）+ `test_deck/`（テスト用デッキ）
+- ゲームルールの正本: `battle_simulator_v2/docs/RULES_SPEC.md`（公式 総合ルール ver.1.9.0 の実装向け整理。原文PDF: https://hololive-official-cardgame.com/rules/ ）。実装根拠はこの条番号をコメントに書く
+- カード効果の実装状況: `battle_simulator_v2/docs/CARD_EFFECT_STATUS.md`
 - カード個別効果は未実装（`TODO(効果未実装)` ログを出す）。効果システムが次の開発対象
 - テスト: `battle_simulator_v2/tests/test.html`（`scripts/tools/smoke-test-battle-sim.ps1` がヘッドレスで実行）
 - 開発用URLパラメータ: `?autostart=1&seed=42&autoplay=12` で自動開始・自動プレイ
@@ -54,18 +55,7 @@
 - **効果テキストは厳密に解釈する**。「1枚ずつを…1～3人に」=別々のホロメンへ各1枚、「まで」=0可、HP条件は「より大きい」等。
   曖昧・不明な場合は必ず 総合ルール（RULES_SPEC.md/原文PDF）と公式Q&A（https://hololive-official-cardgame.com/rules/question/ のキーワード検索）で裁定を確認してから実装する
 
-## バトルシミュレーター v1（参照用・凍結）
-
-- 入口: `battle_simulator.html`（スクリプト読み込み順がそのまま依存順）
-- 本体: `battle_simulator/` 配下のマネージャ群 + `js/battle_engine.js`（統括）
-- カード効果: `battle_simulator/card-effects/scalable-card-effect-manager.js` が本系統。
-  個別カード効果は `card-effects/cards/<カードID>.js` を動的読み込み（`window.cardEffect_<ID>` に登録）
-- **状態更新は必ず StateManager（state-manager.js）経由で行う**（直接 players/gameState を書き換えない）
-- リファクタリング計画と現状: `battle_simulator/docs/REFACTORING_PLAN.md` を必ず参照（docs/ の他の設計書は一部古い）
-- ゲームルールの正本: `battle_simulator/docs/RULES_SPEC.md`（公式 総合ルール ver.1.9.0 の実装向け整理。原文PDF: https://hololive-official-cardgame.com/rules/ ）
-- カード効果ファイルを `card-effects/cards/` に追加・削除したら `cards/implemented-cards.js` のID一覧も更新する
-- 簡易テスト: `battle_simulator/card-effects/test-effects.html`
-- スモークテスト: `powershell -File scripts\tools\smoke-test-battle-sim.ps1`（Python + ヘッドレスEdge。変更後は必ず実行）
+> 旧版バトルシミュレーター（v1: `battle_simulator/` ＋ `js/battle_engine.js` ＋ `battle_simulator.html`）は 2026-06 に削除し、v2 に一本化した。使用していたテストデッキ・ルール仕様は `battle_simulator_v2/` 配下へ移設済み。
 
 ## 環境メモ
 

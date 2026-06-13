@@ -7,7 +7,7 @@
  *   - UI/テスト/CPU は engine.actions() で選択肢を取得し、engine.apply(actionId) で適用する
  *   - 乱数はシード可能（テストの再現性）。Math.random は使わない
  *
- * ルールの根拠は battle_simulator/docs/RULES_SPEC.md（条番号は総合ルール ver.1.9.0）。
+ * ルールの根拠は battle_simulator_v2/docs/RULES_SPEC.md（条番号は総合ルール ver.1.9.0）。
  * カード個別効果（キーワード能力・サポート効果・推しスキル効果）は未実装で、
  * 発動タイミングで TODO ログを出す（効果システムは次フェーズ）。
  */

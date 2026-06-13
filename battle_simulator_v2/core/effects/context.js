@@ -14,7 +14,7 @@
  * 選択を伴わない操作（draw 等）は普通のメソッド呼び出しでよい。
  * ただし割り込みが入りうる操作（rollDice / dealSpecialDamage）はジェネレータなので `yield* ctx.xxx(...)` で呼ぶ。
  *
- * ルール条番号は battle_simulator/docs/RULES_SPEC.md / 総合ルール ver.1.9.0 参照。
+ * ルール条番号は battle_simulator_v2/docs/RULES_SPEC.md / 総合ルール ver.1.9.0 参照。
  */
 
 import { COLORLESS } from '../constants.js';
