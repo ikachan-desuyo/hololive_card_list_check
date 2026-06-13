@@ -30,6 +30,8 @@ export class EffectContext {
     this.playerIdx = playerIdx;
     this.sourceCard = opts.sourceCard || null;
     this.sourceHolomem = opts.sourceHolomem || null;
+    // onAnyDown 用: ダウンしたホロメンの情報 { holomem, card, ownerIdx, zone }
+    this.downedInfo = opts.downedInfo || null;
   }
 
   get player() { return this.engine.state.players[this.playerIdx]; }

@@ -57,6 +57,7 @@ function createPlayerState(name, gameDeck) {
     usedCollabThisTurn: false,
     usedBatonTouchThisTurn: false,
     supportsPlayedThisTurn: [], // このターンに使ったサポートのカード名一覧
+    downedCardsLastOppTurn: [], // 直前の相手ターンにダウンした自分のホロメンのカード一覧
     usedOshiSkillThisTurn: false,
     usedSpOshiSkillThisGame: false,
     turnCount: 0,           // このプレイヤーの何ターン目か
@@ -392,6 +393,10 @@ export class Engine {
     p.usedCollabThisTurn = false;
     p.usedBatonTouchThisTurn = false;
     p.supportsPlayedThisTurn = []; // このターンに使ったサポートのカード名一覧（「〈限界飯〉を使っていたなら」等）
+    // 「直前の相手のターンに自分のホロメンがダウンしていたなら」用。
+    // このターン(idx)の間に相手(1-idx)のホロメンがダウンしたら蓄積し、相手の次の自ターンで参照される。
+    // idxのターン開始時に相手側のリストをクリアして、このターン中の相手ホロメンのダウンを新規に貯める。
+    s.players[1 - playerIdx].downedCardsLastOppTurn = [];
     // 推しスキルの[ターンに1回]は両プレイヤーともリセットする
     // （「相手のターンでダウンした時に使える」等、相手ターン中に使うスキルがあるため）
     for (const pl of s.players) pl.usedOshiSkillThisTurn = false;
@@ -1043,6 +1048,8 @@ export class Engine {
     const ctxOpts = { playerIdx: s.turnPlayer, sourceCard: card, sourceHolomem: h };
     // テキスト効果（段階4）の実行中に積まれたアーツ修正（サイコロ等）を受け取るための参照
     const runCtx = new EffectContext(this, s.turnPlayer, ctxOpts);
+    // このアーツの対象（「このアーツの対象が～なら」条件で run/dmgBonus から参照する）
+    runCtx.artTarget = opp[action.target.zone] || null;
 
     // アーツ解決パイプライン（RULES_SPEC §12 / 12.3.4）
     // 段階4: テキスト効果 → 段階5: 特攻 → 段階6: 数値決定 → 段階7: ダメージ適用
@@ -1214,6 +1221,10 @@ export class Engine {
     const card = topCard(h);
     const ownerIdx = this.state.players.indexOf(p);
     this.log(`${card.name} がダウン！`);
+    // 相手のターン中の自分のホロメンのダウンを記録（「直前の相手のターンにダウンしていたなら」用）
+    if (this.state.turnPlayer !== ownerIdx) {
+      (p.downedCardsLastOppTurn || (p.downedCardsLastOppTurn = [])).push(card);
+    }
 
     const finish = () => {
       // ホロメンの全カードと付いているカードをアーカイブ (11.3.1.2 / 4.4.7)
@@ -1236,18 +1247,28 @@ export class Engine {
     // アーカイブ前に実行する（エールやスタックの付け替え・回収が間に合うように）。
     // 「相手のターンで～」等の条件は各カードの run() 内で ctx.state.turnPlayer を見て判定する。
     const runDownTrigger = () => {
-      // ダウンしたホロメン自身＋付いている装着カード（ファン等）の onDown を順に実行する。
-      // どちらも sourceHolomem は「ダウンしたホロメン」。アーカイブ前なのでエール回収等が間に合う。
-      const trigs = [card, ...h.attachments]
-        .map((c) => ({ srcCard: c, trig: this.registry.get(c.number)?.triggers?.onDown }))
-        .filter((x) => x.trig);
+      const downedInfo = { holomem: h, card, ownerIdx, zone: pos.zone };
+      const runners = [];
+      // 1) ダウンしたホロメン自身＋付いている装着カード（ファン等）の onDown。sourceHolomem はダウンしたホロメン。
+      for (const c of [card, ...h.attachments]) {
+        const trig = this.registry.get(c.number)?.triggers?.onDown;
+        if (trig) runners.push({ run: trig, opts: { playerIdx: ownerIdx, sourceCard: c, sourceHolomem: h } });
+      }
+      // 2) 場の全ホロメン（両者）＋装着の onAnyDown（ダウンしたホロメン自身は除く）。downedInfo を渡す。
+      for (let pi = 0; pi < 2; pi++) {
+        const pl = this.state.players[pi];
+        for (const wpos of this._stagePositions(pl)) {
+          const wh = this._holomemAt(pl, wpos);
+          if (wh === h) continue;
+          for (const c of [topCard(wh), ...wh.attachments]) {
+            const atrig = this.registry.get(c.number)?.triggers?.onAnyDown;
+            if (atrig) runners.push({ run: atrig, opts: { playerIdx: pi, sourceCard: c, sourceHolomem: wh, downedInfo } });
+          }
+        }
+      }
       const runNext = (i) => {
-        if (i >= trigs.length) { finish(); return; }
-        this._runEffect(
-          { run: trigs[i].trig },
-          { playerIdx: ownerIdx, sourceCard: trigs[i].srcCard, sourceHolomem: h },
-          () => runNext(i + 1),
-        );
+        if (i >= runners.length) { finish(); return; }
+        this._runEffect({ run: runners[i].run }, runners[i].opts, () => runNext(i + 1));
       };
       runNext(0);
     };
