@@ -189,9 +189,12 @@ export function renderSide(container, p, sideIdx, hooks) {
   const oshi = zoneEl('oshi', '推し', container);
   if (p.oshi) {
     const oc = cardEl(p.oshi);
+    // 推しスキルが発動可能なら金色に光らせる（クリックでスキル選択）
+    if (hooks.oshiCanAct?.(sideIdx)) oc.classList.add('can-act');
     oc.addEventListener('click', (e) => {
       e.stopPropagation();
-      hooks.onInspect({ title: `推しホロメン: ${p.oshi.name}`, sections: [{ label: '推しホロメン', cards: [p.oshi] }] });
+      if (hooks.onOshi) hooks.onOshi(sideIdx, p.oshi, e);
+      else hooks.onInspect({ title: `推しホロメン: ${p.oshi.name}`, sections: [{ label: '推しホロメン', cards: [p.oshi] }] });
     });
     oshi.appendChild(oc);
   }

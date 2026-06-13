@@ -848,6 +848,32 @@ body.dragging, body.dragging * { cursor: grabbing !important; }
   padding: 6px 8px;
   margin: 6px 0;
 }
+/* アーツのダメージは見落とさないよう大きな赤バッジで表示 */
+.detail-skill .art-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}
+.detail-skill .art-dmg {
+  background: #c62828;
+  color: #fff;
+  font-weight: bold;
+  font-size: 1.15em;
+  padding: 1px 12px;
+  border-radius: 12px;
+  flex-shrink: 0;
+}
+.detail-skill .art-cost { color: #aab; margin: 3px 0; }
+.detail-skill .cost-chip {
+  display: inline-block;
+  background: #26305c;
+  border: 1px solid #44488a;
+  border-radius: 8px;
+  padding: 0 7px;
+  margin-right: 3px;
+  font-size: 0.92em;
+}
 
 /* アーカイブ一覧グリッド */
 .archive-grid {
@@ -858,6 +884,18 @@ body.dragging, body.dragging * { cursor: grabbing !important; }
 .archive-grid-card { cursor: pointer; text-align: center; font-size: 0.72em; color: #aab; }
 .archive-grid-card img { width: 100%; border-radius: 6px; display: block; }
 .archive-grid-card:hover img { outline: 2px solid var(--accent); }
+
+/* 発動可能なアクションを持つカード（推しスキル等）: 金色に光らせる */
+.card.can-act {
+  outline: 2px solid rgba(255, 200, 80, 0.95);
+  outline-offset: 1px;
+  cursor: pointer;
+  animation: can-act-pulse 1.2s ease-in-out infinite;
+}
+@keyframes can-act-pulse {
+  0%, 100% { box-shadow: 0 0 8px rgba(255, 200, 80, 0.4); }
+  50% { box-shadow: 0 0 22px rgba(255, 200, 80, 0.8); }
+}
 
 /* 効果のホロメン選択: 盤面の対象を金色に光らせてクリックで選ぶ */
 [data-drop].choice-target {

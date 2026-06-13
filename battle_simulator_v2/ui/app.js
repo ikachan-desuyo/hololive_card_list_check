@@ -325,8 +325,16 @@ function cardDetailHtml(card) {
     rows.push(`<div class="detail-skill"><b>《${escapeText(kw.subtype)}》${escapeText(kw.name)}</b><br>${escapeText(kw.text)}</div>`);
   }
   for (const art of card.arts || []) {
-    const cost = art.cost.join('');
-    rows.push(`<div class="detail-skill"><b>アーツ: ${escapeText(art.name)}</b>（${escapeText(cost)}）ダメージ ${art.dmg}${art.dmgPlus ? '+' : ''}${art.tokkou?.length ? ` / 特攻: ${art.tokkou.map((t) => `${t.color}+${t.value}`).join(', ')}` : ''}${art.text ? `<br>${escapeText(art.text)}` : ''}</div>`);
+    const cost = art.cost.map((c) => `<span class="cost-chip">${escapeText(c)}</span>`).join('');
+    rows.push(
+      `<div class="detail-skill art">` +
+      `<div class="art-head"><b>アーツ: ${escapeText(art.name)}</b>` +
+      `<span class="art-dmg">${art.dmg}${art.dmgPlus ? '+' : ''}</span></div>` +
+      `<div class="art-cost">コスト: ${cost}` +
+      `${art.tokkou?.length ? `　特攻: ${art.tokkou.map((t) => `${escapeText(t.color)}+${t.value}`).join(', ')}` : ''}</div>` +
+      `${art.text ? `<div>${escapeText(art.text)}</div>` : ''}` +
+      `</div>`
+    );
   }
   for (const skill of card.oshiSkills || []) {
     rows.push(`<div class="detail-skill"><b>${skill.sp ? 'SP' : ''}推しスキル</b><br>${escapeText(skill.text)}</div>`);
@@ -396,7 +404,10 @@ function showArchive(sideIdx) {
   modal.classList.add('active');
 }
 
-/** 同一ドロップに複数の選択肢があるときの小ポップアップ（例: アーツ選択） */
+/**
+ * 小ポップアップ（例: アーツ選択・推しスキル選択）。
+ * opt.run があればそれを実行、無ければ engine.apply(opt.id)
+ */
 function showChooser(x, y, options) {
   const chooser = document.getElementById('chooser');
   chooser.innerHTML = '';
@@ -405,13 +416,22 @@ function showChooser(x, y, options) {
     btn.textContent = opt.label;
     btn.addEventListener('click', () => {
       chooser.style.display = 'none';
-      engine.apply(opt.id);
+      if (opt.run) opt.run();
+      else engine.apply(opt.id);
     });
     chooser.appendChild(btn);
   }
   chooser.style.display = 'flex';
   chooser.style.left = `${Math.min(x, window.innerWidth - 340)}px`;
   chooser.style.top = `${Math.min(y, window.innerHeight - 40 * options.length - 20)}px`;
+}
+
+/** メインステップ中に発動可能な推しスキルのアクション一覧 */
+function oshiSkillActions(sideIdx) {
+  const s = engine?.state;
+  if (!s?.pending || s.pending.type !== 'main' || s.pending.player !== sideIdx) return [];
+  if (aiEnabled(sideIdx)) return [];
+  return s.pending.options.filter((o) => o.kind === 'oshiSkill');
 }
 
 function setupModals() {
@@ -446,6 +466,23 @@ const hooks = {
   onArchive: (sideIdx) => showArchive(sideIdx),
   // HP表示は装着カード等の修正込みの実効値を使う（基礎HPだと「0なのに生きてる」表示になる）
   effectiveHp: (holomem) => engine.effectiveHp(holomem),
+  // 推しホロメンカード: スキル発動可能なら光らせ、クリックでその場から発動できる
+  oshiCanAct: (sideIdx) => oshiSkillActions(sideIdx).length > 0,
+  onOshi: (sideIdx, card, ev) => {
+    const acts = oshiSkillActions(sideIdx);
+    const detail = {
+      title: `推しホロメン: ${card.name}`,
+      sections: [{ label: '推しホロメン', cards: [card] }],
+    };
+    if (acts.length === 0) {
+      showInspector(detail);
+      return;
+    }
+    showChooser(ev.clientX, ev.clientY, [
+      ...acts,
+      { label: '📄 カード詳細を見る', run: () => showInspector(detail) },
+    ]);
+  },
 };
 
 /**
@@ -1028,6 +1065,11 @@ async function main() {
       engine.apply((active[0] || actions[0]).id);
     }
     console.log('✅ autostart 完了');
+  }
+
+  // 開発用: ?inspecttest=1 で手札1枚目の詳細モーダルを自動で開く（表示確認用）
+  if (params.get('inspecttest')) {
+    setTimeout(() => document.querySelector('#hand .card')?.click(), 300);
   }
 
   // 開発用: ?dicetest=N でサイコロ表示を静止表示（見た目確認用）
