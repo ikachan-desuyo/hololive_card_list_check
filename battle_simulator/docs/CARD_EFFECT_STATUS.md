@@ -49,7 +49,7 @@
 | hBP07 | 2025 | 110 | 110 | 94 | 実装可能分ほぼ消化（並列実装。保留16枚は§8） |
 | hSD02〜hSD13 | — | — | 133 | 123 | 並列で実装（保留10枚） |
 
-> 手書き合計 **705枚**（= index.js 登録キー数）。常時アウラ＋onArtsUse＋リアクティブ被ダメージ割り込み＋ダイス固定を追加。残り保留は真にニッチな未対応機構依存。ブラウザテスト 41/41 PASS・読み込み0エラー。番号別は `cards/index.js` のコメント参照。
+> 手書き合計 **709枚**（= index.js 登録キー数）。常時アウラ＋onArtsUse＋リアクティブ被ダメージ割り込み＋ダイス固定を追加。残り保留は真にニッチな未対応機構依存。ブラウザテスト 41/41 PASS・読み込み0エラー。番号別は `cards/index.js` のコメント参照。
 > hBP01/02/03/06/07・hSD01-13 はマルチエージェント並列で実装（各ファイルのJSDocに実装範囲・保留部分を明記）。
 > **効果要874のうち685を手書き実装。残り約189は未対応機構が前提のカード（§4/§8）。バニラ178はネイティブ動作。**
 
@@ -67,7 +67,11 @@
 - **起動型能力** `activatedAbilities[]`（メインステップの「[コスト]：[効果]」。ホロメン自身/装着カード）
 - **相手をダウンさせた時** `triggers.onOpponentDown`（カード共通）＋ **アーツ固有 `arts.<名>.onDownDealt`**（「このアーツで〜時」）。アーツ解決時に順次発火・選択可
 - **アーツ必要エール軽減** `artsCostReduceAura(src,target,engine)` ＋ ターン修正 `kind:'artCostReduce'`（`_effectiveArtCost`）
-- **バトンタッチ必要エール軽減** ターン修正 `kind:'batonCostReduce'`（`_effectiveBatonCost`）
+- **バトンタッチ必要エール軽減** ターン修正 `kind:'batonCostReduce'` ＋ 装着 `batonCostReduceAttached`（`_effectiveBatonCost`）
+- **装着カードによるアーツ必要エール軽減** `artsCostReduceAttached(host,engine)`（◆Buzzで無色-1 等）
+- **エールデッキscry** `ctx.lookTopCheerDeck(n)/cheerDeckToBottom/sendRevealedCheer`
+- **アーツで与ダメージ時** `arts.<名>.onDamageDealt(ctx,dealt)`（ライフスティール等）
+- **アーツ使用条件** `arts.<名>.canUse(ctx)`（条件未達なら選択肢に出ない）
 - 特殊ダメージ `dealSpecialDamage`（特攻・装着の特殊ダメージ＋・受けダメージ軽減を加味）
 - **常時アウラ** `auraArtsPlus/auraHpPlus/auraDamageDelta/auraSpecialDmgPlus`（別ホロメンを恒常強化/保護。「#0期生全員+30」「コラボが受けるダメージ-10」「受けない＝-100000」「〈X〉の特殊+20」等。`_auraSum` で味方ステージを走査）
 - **アーツを使った時** `triggers.onArtsUse`（アーツ解決後に発火・選択可。ホロパワー操作/特殊ダメージ/エール送り等）

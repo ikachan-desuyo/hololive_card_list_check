@@ -14,6 +14,8 @@
  *       *run(ctx) {...},                                 // テキスト効果（パイプライン段階4）
  *       dmgBonus(ctx) { return N; },                     // 条件付き「このアーツ+N」
  *       *onDownDealt(ctx) {...},                          // 「このアーツで相手をダウンさせた時」（ダメージ適用後に発火）
+ *       *onDamageDealt(ctx, dealt) {...},                 // 「このアーツでダメージを与えた時」（与ダメージ量を受け取る。ライフスティール等）
+ *       canUse(ctx) { return bool; },                     // アーツ使用条件（満たさなければ選択肢に出ない）
  *     } },
  *     support: {
  *       canUse(ctx) { return bool; },                    // 追加の使用条件

@@ -694,8 +694,13 @@ export class Engine {
       card.arts.forEach((art, ai) => {
         const cost = this._effectiveArtCost(h, art.cost, s.turnPlayer);
         if (!this._canPayCheers(h.cheers, cost)) return;
-        // カード定義による対象制限（「このアーツは相手のセンターホロメンしか対象にできない」等）
         const artDef = this.registry.getArt(card.number, art.name);
+        // カード定義によるアーツ使用条件（「アーカイブにサポート4枚以上なければ使えない」等）
+        if (artDef?.canUse) {
+          const cctx = new EffectContext(this, s.turnPlayer, { sourceCard: card, sourceHolomem: h });
+          if (!artDef.canUse(cctx)) return;
+        }
+        // カード定義による対象制限（「このアーツは相手のセンターホロメンしか対象にできない」等）
         const allowedTargets = artDef?.targetZones
           ? targets.filter((t) => artDef.targetZones.includes(t.zone))
           : targets;
@@ -1054,6 +1059,11 @@ export class Engine {
         }
         const onArts = this.registry.get(topCard(h).number)?.triggers?.onArtsUse;
         if (onArts) runners.push(onArts);
+        // 「このアーツで（相手に）ダメージを与えた時」（実際に与えたダメージ量を渡す。ライフスティール等）
+        if (artDef?.onDamageDealt && finalDmg > 0) {
+          const dealt = finalDmg;
+          runners.push(function* onDamageDealtWrap(c) { yield* artDef.onDamageDealt(c, dealt); });
+        }
         if (runners.length > 0) {
           const runNext = (i) => {
             if (i >= runners.length) { cont(); return; }

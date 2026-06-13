@@ -148,16 +148,26 @@ export class EffectSystem {
       if (mod.match && !mod.match(targetHolomem)) continue;
       add(mod.color, mod.amount);
     }
+    // 装着カード（ツール等）による必要エール軽減（「◆Buzzに付いていたら必要無色-1」等）
+    for (const att of targetHolomem.attachments) {
+      const adef = this.registry.get(att.number);
+      for (const r of adef?.artsCostReduceAttached?.(targetHolomem, this.engine) || []) add(r.color, r.amount);
+    }
     return red;
   }
 
-  /** バトンタッチの必要エール軽減（ターン修正 kind:'batonCostReduce'）。{色:軽減数} を返す */
+  /** バトンタッチの必要エール軽減（ターン修正 kind:'batonCostReduce' ＋ 装着カード）。{色:軽減数} を返す */
   batonCostReduction(holomem, ownerIdx) {
     const red = {};
     for (const mod of this.engine.state.modifiers) {
       if (mod.kind !== 'batonCostReduce' || mod.ownerIdx !== ownerIdx) continue;
       if (mod.match && !mod.match(holomem)) continue;
       red[mod.color] = (red[mod.color] || 0) + mod.amount;
+    }
+    // 装着カード（ファン等）による常時のバトンタッチ必要エール軽減（ころねすきー等）
+    for (const att of holomem.attachments) {
+      const adef = this.registry.get(att.number);
+      for (const r of adef?.batonCostReduceAttached?.(holomem, this.engine) || []) red[r.color] = (red[r.color] || 0) + r.amount;
     }
     return red;
   }
