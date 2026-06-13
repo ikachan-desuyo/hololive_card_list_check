@@ -27,7 +27,16 @@
  *       canAttach(holomem) { return bool; },
  *       unlimited: true,                                 // 1人に何枚でも
  *     },
+ *     ai: {                                              // AI用のカード固有知識（任意）
+ *       supportValue({ engine, player, card }) {},       // サポートの使用価値（0=使わない）
+ *     },
+ *     oshiSkill / spOshiSkill: { canUse(engine, idx), *run(ctx) },
+ *     onDownOshiSkill: { cost, title, canUse(engine, idx, holomem), apply(engine, idx, holomem) },
  *   }
+ *
+ * 設計原則: カード固有の知識（効果もAI評価も）は必ずこのカード定義に置く。
+ * エンジンや core/ai/heuristic.js にカード番号を直書きしない（実装対象は874種ある）。
+ * ai ブロックが無いカードは、AIがカードテキストのパターンから汎用評価する。
  */
 
 import { IMPLEMENTED } from '../../cards/index.js';

@@ -4,6 +4,12 @@
  */
 export default {
   number: 'hBP01-104',
+  ai: {
+    // 盤面が薄い時の展開手段として高評価
+    supportValue({ engine, player }) {
+      return engine._stageCount(player) < 4 ? 32 : 6;
+    },
+  },
   support: {
     canUse(ctx) {
       // ステージ上限(6)に空きがなければ出せない

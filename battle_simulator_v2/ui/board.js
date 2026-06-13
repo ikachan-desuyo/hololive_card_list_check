@@ -110,17 +110,19 @@ function holomemEl(holomem, sideIdx, zone, index, hooks) {
     mini.dataset.previewName = att.name;
   });
 
-  // HPバッジ（残りHP/最大HP。残量に応じて色が変わる）
-  if (holomem.damage > 0) {
-    const top = holomem.stack[0];
-    const maxHp = top.hp ?? 0;
-    const remain = Math.max(0, maxHp - holomem.damage);
-    const b = el('div', 'badge damage', group);
-    b.textContent = `${remain}/${maxHp}`;
-    const ratio = maxHp > 0 ? remain / maxHp : 0;
-    if (ratio <= 0.3) b.classList.add('hp-low');
-    else if (ratio <= 0.6) b.classList.add('hp-mid');
-    b.style.zIndex = String(lower.length + 2);
+  // HPバッジ（残りHP/最大HP。装着カードのHP修正込みの実効値。残量に応じて色が変わる）
+  // 無傷でも常に表示する
+  {
+    const maxHp = hooks.effectiveHp ? hooks.effectiveHp(holomem) : (holomem.stack[0].hp ?? 0);
+    if (maxHp > 0 && !holomem.faceDown) {
+      const remain = Math.max(0, maxHp - holomem.damage);
+      const b = el('div', 'badge damage', group);
+      b.textContent = `${remain}/${maxHp}`;
+      const ratio = remain / maxHp;
+      if (ratio <= 0.3) b.classList.add('hp-low');
+      else if (ratio <= 0.6) b.classList.add('hp-mid');
+      b.style.zIndex = String(lower.length + 2);
+    }
   }
 
   // クリックで詳細（スタック全体 + 付いているカード）
@@ -134,7 +136,14 @@ function holomemEl(holomem, sideIdx, zone, index, hooks) {
         ...(holomem.cheers.length ? [{ label: `エール (${holomem.cheers.length})`, cards: holomem.cheers }] : []),
         ...(holomem.attachments.length ? [{ label: 'サポート', cards: holomem.attachments }] : []),
       ],
-      note: `残りHP: ${Math.max(0, (holomem.stack[0].hp ?? 0) - holomem.damage)}/${holomem.stack[0].hp ?? '-'}（累計ダメージ${holomem.damage}）${holomem.rested ? '（お休み中）' : ''}`,
+      note: (() => {
+        const maxHp = hooks.effectiveHp ? hooks.effectiveHp(holomem) : (holomem.stack[0].hp ?? 0);
+        const base = holomem.stack[0].hp ?? 0;
+        const bonus = maxHp - base;
+        return `残りHP: ${Math.max(0, maxHp - holomem.damage)}/${maxHp}` +
+          `${bonus !== 0 ? `（基礎${base}${bonus > 0 ? '+' : ''}${bonus}）` : ''}` +
+          `（累計ダメージ${holomem.damage}）${holomem.rested ? '（お休み中）' : ''}`;
+      })(),
     });
   });
 
@@ -180,9 +189,12 @@ export function renderSide(container, p, sideIdx, hooks) {
   const oshi = zoneEl('oshi', '推し', container);
   if (p.oshi) {
     const oc = cardEl(p.oshi);
+    // 推しスキルが発動可能なら金色に光らせる（クリックでスキル選択）
+    if (hooks.oshiCanAct?.(sideIdx)) oc.classList.add('can-act');
     oc.addEventListener('click', (e) => {
       e.stopPropagation();
-      hooks.onInspect({ title: `推しホロメン: ${p.oshi.name}`, sections: [{ label: '推しホロメン', cards: [p.oshi] }] });
+      if (hooks.onOshi) hooks.onOshi(sideIdx, p.oshi, e);
+      else hooks.onInspect({ title: `推しホロメン: ${p.oshi.name}`, sections: [{ label: '推しホロメン', cards: [p.oshi] }] });
     });
     oshi.appendChild(oc);
   }

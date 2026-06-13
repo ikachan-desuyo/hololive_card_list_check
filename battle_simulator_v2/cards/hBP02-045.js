@@ -19,14 +19,17 @@ export default {
           title: '手札に加える青/紫ホロメンを選択',
           optional: true,
           skipLabel: '加えない',
+          displayCards: pool, // 見た3枚は対象外のカードも表示する
         });
         if (picked) {
           pool.splice(pool.indexOf(picked), 1);
           ctx.addToHand(picked);
         }
       }
-      ctx.deckToBottom(pool);
-      if (pool.length > 0) ctx.log(`残り${pool.length}枚をデッキの下に戻した`);
+      // 残りは好きな順でデッキの下へ
+      const ordered = yield* ctx.orderCardsFlow(pool, 'デッキの下に戻す順番');
+      ctx.deckToBottom(ordered);
+      if (ordered.length > 0) ctx.log(`残り${ordered.length}枚をデッキの下に戻した`);
     },
   },
 };

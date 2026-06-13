@@ -6,6 +6,16 @@
  */
 export default {
   number: 'hBP02-076',
+  ai: {
+    // 対応する同名1stが自分のデッキに残っている時のみ価値がある
+    // （自分のデッキ構成は自分の公開情報。順序は見ない）
+    supportValue({ player }) {
+      const debuts = player.hand.filter((c) => c.kind === 'holomen' && c.bloomLevel === 'Debut');
+      const hasTarget = debuts.some((d) => player.deck.some((c) =>
+        c.kind === 'holomen' && c.bloomLevel === '1st' && !c.buzz && c.name === d.name));
+      return hasTarget ? 34 : 0;
+    },
+  },
   support: {
     canUse(ctx) {
       return ctx.player.hand.some((c) => c.kind === 'holomen' && c.bloomLevel === 'Debut');

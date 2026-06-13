@@ -41,7 +41,8 @@ function parseArtCost(icons) {
 
 function parseOshiSkill(skill) {
   const text = skill.text || '';
-  const costMatch = /\[ホロパワー：-(\d+|X)\]/.exec(text);
+  // コスト表記は2形式ある: "[ホロパワー：-1]" と "[ホロパワー：2消費]"
+  const costMatch = /\[ホロパワー：-?(\d+|X)(?:消費)?\]/.exec(text);
   return {
     sp: skill.type === 'SP推しスキル',
     cost: costMatch ? (costMatch[1] === 'X' ? 'X' : Number(costMatch[1])) : 0,
@@ -147,13 +148,17 @@ export class CardLibrary {
         continue;
       }
       for (let i = 0; i < count; i++) {
-        if (card.kind === CardKind.OSHI) {
-          if (oshi) errors.push(`推しホロメンが複数あります: ${card.name}`);
-          oshi = card;
-        } else if (card.kind === CardKind.CHEER) {
-          cheerDeck.push(card);
+        // 物理カード1枚ごとに独立したオブジェクトにする（浅いコピー）。
+        // 参照を共有すると「どの1枚を選んだか」の識別ができず、
+        // 選択UI・Set管理などの同一性に依存する処理が壊れる
+        const copy = { ...card };
+        if (copy.kind === CardKind.OSHI) {
+          if (oshi) errors.push(`推しホロメンが複数あります: ${copy.name}`);
+          oshi = copy;
+        } else if (copy.kind === CardKind.CHEER) {
+          cheerDeck.push(copy);
         } else {
-          deck.push(card);
+          deck.push(copy);
         }
       }
     }

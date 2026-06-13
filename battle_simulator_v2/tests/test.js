@@ -11,6 +11,7 @@ import { CardLibrary, CardKind } from '../core/cards.js';
 import { Engine } from '../core/engine.js';
 import { EffectRegistry } from '../core/effects/registry.js';
 import { EffectContext } from '../core/effects/context.js';
+import { HeuristicAI } from '../core/ai/heuristic.js';
 import { createRng } from '../core/rng.js';
 
 const results = [];
@@ -112,6 +113,14 @@ export async function runTests() {
   // ---- カード正規化 ----
   test('カードデータが読み込める', () => {
     assert(lib.cards.size > 2000, `カード数が少なすぎる: ${lib.cards.size}`);
+  });
+
+  test('デッキ構築: 同名カードの各コピーは独立したオブジェクト', () => {
+    const d = lib.buildGameDeck({ 'hY04-001_C': 20, 'hBP04-004_OSR': 1, 'hBP04-043_C': 50 });
+    assertEq(d.errors.length, 0, `デッキエラー: ${d.errors.join(',')}`);
+    assert(d.cheerDeck[0] !== d.cheerDeck[1], '青エール同士が同一オブジェクトになっている');
+    assert(d.deck[0] !== d.deck[1], 'ホロメンのコピー同士が同一オブジェクトになっている');
+    assertEq(d.cheerDeck[0].name, d.cheerDeck[1].name, 'コピーの内容は同一であるべき');
   });
 
   test('ホロメンの正規化（HP・Bloomレベル・アーツコスト）', () => {
@@ -413,6 +422,265 @@ export async function runTests() {
     assertEq(e.effects.artsBonus(p.center, 0), 20, 'ターン修正が乗っていない');
     e.effects.expireTurnModifiers();
     assertEq(e.effects.artsBonus(p.center, 0), 0, 'ターン修正が消えていない');
+  });
+
+  // ---- AI ----
+
+  await testAsync('AI同士の対戦が決着する（3シード・保存則維持）', async () => {
+    for (const seed of [31, 32, 33]) {
+      const d0 = lib.buildGameDeck(deckMap);
+      const d1 = lib.buildGameDeck(deckMap);
+      const registry = await buildRegistry(lib, deckMap);
+      const e = new Engine({ decks: [d0, d1], seed, names: ['AI1', 'AI2'], registry });
+      e.start();
+      const ais = [new HeuristicAI(0), new HeuristicAI(1)];
+      let applies = 0;
+      while (e.state.phase !== 'ended' && applies < 4000) {
+        const pending = e.state.pending;
+        assert(pending, `seed=${seed}: pending が無いのに終わっていない`);
+        const id = ais[pending.player].choose(e);
+        e.apply(id);
+        applies++;
+      }
+      assert(e.state.phase === 'ended', `seed=${seed}: ${applies}手で決着しなかった`);
+      for (const p of e.state.players) {
+        assertEq(totalCards(p), 70, `seed=${seed}: ${p.name} のカード総数が崩れた`);
+      }
+    }
+  });
+
+  await testAsync('AI: 倒せる相手を優先して攻撃する（リーサル選択）', async () => {
+    const e = await setupMainStep(deckMap, 41);
+    const s = e.state;
+    s.turn = 3; // 先攻1ターン目のパフォーマンススキップを回避
+    const p0 = s.players[0];
+    const p1 = s.players[1];
+    // 自分のセンターにエールを持たせてアーツを撃てる状態にする
+    p0.center.cheers.push(...p0.cheerDeck.splice(0, 3));
+    // 相手: センターは残りHP10（倒せる）、バックは満タン
+    p1.back.push(e._createHolomem(lib.get('hBP02-042_C'), 1));
+    p1.center.damage = e.effectiveHp(p1.center) - 10;
+    // パフォーマンスステップに入る
+    s.pending = null;
+    e._performanceStep();
+    assert(s.pending?.type === 'performance', 'パフォーマンスの決定ポイントになっていない');
+    const ai = new HeuristicAI(0);
+    const id = ai.choose(e);
+    const opt = s.pending.options.find((o) => o.id === id);
+    assert(opt && opt.kind === 'art', `AIがアーツを選ばなかった (${id})`);
+    assertEq(opt.target.zone, 'center', 'AIが倒せるセンターを狙っていない');
+  });
+
+  // ---- AI判断の質 ----
+
+  await testAsync('AI: エールを撃てるホロメンに過剰投資しない', async () => {
+    const e = await setupMainStep(deckMap, 51);
+    const s = e.state;
+    const p0 = s.players[0];
+    // センター: 2ndラミィ（最大コスト3）に既に3枚 → これ以上は不要
+    p0.center = e._createHolomem(lib.get('hBP04-048_RR'), 1);
+    p0.center.cheers.push(...p0.cheerDeck.splice(0, 3));
+    // バック: エール0枚の1stラミィ（青1+無色1で50点アーツ）
+    p0.back = [e._createHolomem(lib.get('hBP04-047_R'), 1)];
+    s.pending = null;
+    e._cheerStep();
+    while (s.pending?.type === 'stepPause') e.apply('ok');
+    assertEq(s.pending?.type, 'attachCheer', 'エール送付の決定ポイントになっていない');
+    const ai = new HeuristicAI(0);
+    const id = ai.choose(e);
+    const opt = s.pending.options.find((o) => o.id === id);
+    assertEq(opt.pos.zone, 'back', '満タンのセンターではなくバックに送るべき');
+  });
+
+  await testAsync('AI: 利益のないBloomをしない / 利益のあるBloomは選ぶ', async () => {
+    const e = await setupMainStep(deckMap, 52);
+    const s = e.state;
+    s.turn = 3;
+    const p0 = s.players[0];
+    p0.turnCount = 2; // 最初のターン制限を回避
+    // センター: 1stラミィ hBP04-045（HP150・効果なし）
+    p0.center = e._createHolomem(lib.get('hBP04-045_C'), 1);
+    const ai = new HeuristicAI(0);
+    // ケース1: 同一カードへのBloom（利益ゼロ）→ 選ばない
+    p0.hand = [lib.get('hBP04-045_C')];
+    e._queueMainPending();
+    const id1 = ai.choose(e);
+    const opt1 = s.pending.options.find((o) => o.id === id1);
+    assert(opt1.kind !== 'bloom', '利益のない同一カードBloomを選んでしまった');
+    // ケース2: 2nd hBP04-048（HP190+ブルームエフェクト）へのBloom → 選ぶ
+    p0.hand = [lib.get('hBP04-048_RR')];
+    e._queueMainPending();
+    const id2 = ai.choose(e);
+    const opt2 = s.pending.options.find((o) => o.id === id2);
+    assertEq(opt2.kind, 'bloom', '利益のあるBloomを選ばなかった');
+  });
+
+  // ---- 推しスキル ----
+
+  await testAsync('推しスキル: ラミィSP（特殊ダメージ+100とダウン時2ドロー）', async () => {
+    const e = await setupMainStep(deckMap, 53);
+    const s = e.state;
+    const p0 = s.players[0];
+    const p1 = s.players[1];
+    p0.center = e._createHolomem(lib.get('hBP04-043_C'), 1); // 雪花ラミィ
+    p0.holoPower.push(...p0.deck.splice(0, 3));
+    p1.back.push(e._createHolomem(lib.get('hBP02-042_C'), 1));
+    e._queueMainPending();
+    const action = e.actions().find((a) => a.kind === 'oshiSkill');
+    assert(action, 'SP推しスキルがアクションに出ていない');
+    e.apply(action.id);
+    // 対象の雪花ラミィを選択
+    assertEq(s.pending?.type, 'effectChoice', '対象選択になっていない');
+    e.apply(s.pending.options[0].id);
+    assertEq(s.modifiers?.length ?? e.state.modifiers.length, 2, 'ターン修正が2件積まれていない');
+    // 特殊ダメージ+100の確認: ラミィから相手センターへ10点 → 110点になる
+    const ctx = new EffectContext(e, 0, { sourceHolomem: p0.center });
+    const target = { pos: { zone: 'center' }, holomem: p1.center, top: p1.center.stack[0] };
+    const handBefore = p0.hand.length;
+    const dmgBefore = p1.center.damage;
+    ctx.dealSpecialDamage(target, 10);
+    assert(p1.center.damage - dmgBefore >= 110, `特殊ダメージ+100が乗っていない（実際: ${p1.center.damage - dmgBefore}）`);
+    // ダウンしたはず → 2枚ドローのトリガー
+    assertEq(p0.hand.length, handBefore + 2, 'ダウンさせた時の2枚ドローが発動していない');
+  });
+
+  await testAsync('推しスキル: ラミィ「愛してる」（相手ターンのダウン時にファン回収）', async () => {
+    const e = await setupMainStep(deckMap, 54);
+    const s = e.state;
+    const p0 = s.players[0];
+    s.turnPlayer = 1; // 相手のターンにする
+    p0.center = e._createHolomem(lib.get('hBP04-043_C'), 1);
+    const yukimin = lib.get('hBP04-106_U');
+    p0.center.attachments.push(yukimin);
+    p0.back.push(e._createHolomem(lib.get('hBP02-042_C'), 1)); // 全滅回避
+    p0.holoPower.push(p0.deck.shift());
+    p0.usedOshiSkillThisTurn = false;
+    // センターを倒す
+    p0.center.damage = e.effectiveHp(p0.center);
+    s.pending = null;
+    e._checkTiming(() => {});
+    assertEq(s.pending?.type, 'effectChoice', '推しスキルの確認が出ていない');
+    const handBefore = p0.hand.length;
+    e.apply('yes');
+    assert(p0.hand.includes(yukimin), '雪民が手札に戻っていない');
+    assertEq(p0.holoPower.length, 0, 'ホロパワーのコストが払われていない');
+    // 残りのダウン処理（ライフ送り）を消化
+    let guard = 0;
+    while (s.pending && guard++ < 10) e.apply(s.pending.options[0].id);
+    assertEq(p0.hand.length, handBefore + 1, '手札が1枚（雪民）増えているはず');
+  });
+
+  await testAsync('バトンタッチ: アーカイブするエールを選択できる', async () => {
+    const e = await setupMainStep(deckMap, 91);
+    const s = e.state;
+    const p0 = s.players[0];
+    // センター: エール2枚ちょうど（どちらを払うか選べる状態）。バック: アクティブ1人
+    const center = p0.center;
+    const cheerA = p0.cheerDeck.shift();
+    const cheerB = p0.cheerDeck.shift();
+    center.cheers = [cheerA, cheerB]; // エールステップで付いた分は除いて2枚に固定
+    p0.back = [e._createHolomem(lib.get('hBP02-042_C'), 1)];
+    e._queueMainPending();
+    const action = e.actions().find((a) => a.kind === 'baton');
+    assert(action, 'バトンタッチがアクションに出ていない');
+    e.apply(action.id);
+    // エール選択の決定ポイントが出る（候補2枚）
+    assertEq(s.pending?.type, 'effectChoice', 'エール選択になっていない');
+    assertEq(s.pending.options.filter((o) => o.card).length, 2, '候補が2枚出ていない');
+    // 2枚目（cheerB）を選んで支払う
+    const optB = s.pending.options.find((o) => o.card === cheerB);
+    e.apply(optB.id);
+    // 交代が完了し、選んだ方がアーカイブされている
+    assert(p0.archive.includes(cheerB), '選んだエールがアーカイブされていない');
+    assert(!p0.archive.includes(cheerA), '選んでいないエールまでアーカイブされた');
+    assertEq(p0.center.stack[0].name, '紫咲シオン', 'バックのホロメンがセンターに来ていない');
+    const oldCenterNowBack = p0.back[p0.back.length - 1];
+    assert(oldCenterNowBack.cheers.includes(cheerA), '残したエールが元センターに付いたままになっていない');
+  });
+
+  await testAsync('バックのホロメンも特殊ダメージでダウンする（回帰）', async () => {
+    const e = await setupMainStep(deckMap, 71);
+    const s = e.state;
+    const p1 = s.players[1];
+    // 相手バックにホロメン2人（全滅回避用に1人余分に）
+    p1.back.push(e._createHolomem(lib.get('hBP02-042_C'), 1)); // HP130
+    p1.back.push(e._createHolomem(lib.get('hBP04-043_C'), 1));
+    const backH = p1.back[0];
+    const archiveBefore = p1.archive.length;
+    const ctx = new EffectContext(e, 0, {});
+    ctx.dealSpecialDamage({ pos: { zone: 'back', index: 0 }, holomem: backH, top: backH.stack[0] }, 130);
+    s.pending = null;
+    e._checkTiming(() => {});
+    let guard = 0;
+    while (s.pending && guard++ < 10) e.apply(s.pending.options[0].id);
+    assert(!p1.back.includes(backH), 'バックのホロメンがダウンしていない');
+    assert(p1.archive.length > archiveBefore, 'ダウンしたカードがアーカイブされていない');
+  });
+
+  await testAsync('HP修正付きホロメンは基礎HP超のダメージでも実効HP未満なら生存', async () => {
+    const e = await setupMainStep(deckMap, 72);
+    const s = e.state;
+    const p1 = s.players[1];
+    const lamy = e._createHolomem(lib.get('hBP04-043_C'), 1); // HP90
+    lamy.attachments.push(lib.get('hBP04-101_C'));            // だいふく: ラミィならHP+20
+    p1.back.push(lamy);
+    lamy.damage = 100; // 基礎HP(90)超・実効HP(110)未満
+    s.pending = null;
+    e._checkTiming(() => {});
+    assert(p1.back.includes(lamy), '実効HP未満なのにダウンしてしまった');
+    lamy.damage = 110; // 実効HP到達
+    e._checkTiming(() => {});
+    let guard = 0;
+    while (s.pending && guard++ < 10) e.apply(s.pending.options[0].id);
+    assert(!p1.back.includes(lamy), '実効HP到達でダウンしていない');
+  });
+
+  // ---- 第2デッキ（あの青空のせいだ: オリー/イオフィ/レイネ）----
+
+  const res2 = await fetch('../../battle_simulator/test_deck/' + encodeURIComponent('あの青空のせいだ.json'));
+  const deckMap2 = await res2.json();
+
+  await testAsync('ランダムプレイアウト（あの青空のせいだ）×3シード', async () => {
+    for (const seed of [61, 62, 63]) {
+      const { engine, applies } = await randomPlayout(lib, deckMap2, seed);
+      assert(engine.state.phase === 'ended', `seed=${seed}: ${applies}手で決着しなかった`);
+    }
+  });
+
+  await testAsync('AREA 15: 「1枚ずつを1～3人に」= 同じホロメンに2枚送れない', async () => {
+    const d0 = lib.buildGameDeck(deckMap2);
+    const d1 = lib.buildGameDeck(deckMap2);
+    const registry = await buildRegistry(lib, deckMap2);
+    const e = new Engine({ decks: [d0, d1], seed: 81, firstPlayer: 0, names: ['P1', 'P2'], registry });
+    e.start();
+    while (e.state.pending && e.state.phase === 'setup') {
+      const pd = e.state.pending;
+      if (pd.type === 'redraw') e.apply('no');
+      else if (pd.type === 'placementBack') e.apply('done');
+      else e.apply(pd.options[0].id);
+    }
+    const p0 = e.state.players[0];
+    // #IDホロメン2人をステージに用意（エール0枚から開始）
+    const iofi2nd = e._createHolomem(lib.get('hBP01-055_R'), 1);
+    const reine = e._createHolomem(lib.get('hBP02-018_C'), 1);
+    p0.center = iofi2nd;
+    p0.back = [reine];
+    p0.collab = null;
+    // アーカイブにエール3枚
+    p0.archive.push(...p0.cheerDeck.splice(0, 3));
+    // AREA 15 を直接実行（常に最初の選択肢を選ぶ = 毎回同じ対象を選ぼうとする）
+    const def = registry.get('hBP01-055');
+    let finished = false;
+    e._runEffect(def.collabEffect, { playerIdx: 0, sourceCard: iofi2nd.stack[0], sourceHolomem: iofi2nd }, () => { finished = true; });
+    let guard = 0;
+    while (!finished && e.state.pending && guard++ < 20) {
+      e.apply(e.state.pending.options[0].id);
+    }
+    assert(finished, 'AREA 15 が完了しなかった');
+    // 2人とも最大1枚ずつしか付いていないこと
+    assert(iofi2nd.cheers.length <= 1, `同じホロメンに${iofi2nd.cheers.length}枚送られた（イオフィ）`);
+    assert(reine.cheers.length <= 1, `同じホロメンに${reine.cheers.length}枚送られた（レイネ）`);
+    assertEq(iofi2nd.cheers.length + reine.cheers.length, 2, '2人に1枚ずつ（計2枚）送られるはず');
   });
 
   // ---- 結果出力 ----

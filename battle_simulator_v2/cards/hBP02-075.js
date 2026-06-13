@@ -21,14 +21,16 @@ export default {
           title: '手札に加える #絵 のホロメンを選択（任意）',
           optional: true,
           skipLabel: 'これ以上加えない',
+          displayCards: pool, // 見た4枚は対象外のカードも表示する
         });
         if (!picked) break;
         pool.splice(pool.indexOf(picked), 1);
         ctx.addToHand(picked);
       }
-      // 残りはデッキの下へ（順序選択は省略: 今の並び順で戻す）
-      ctx.deckToBottom(pool);
-      if (pool.length > 0) ctx.log(`残り${pool.length}枚をデッキの下に戻した`);
+      // 残りは好きな順でデッキの下へ
+      const ordered = yield* ctx.orderCardsFlow(pool, 'デッキの下に戻す順番');
+      ctx.deckToBottom(ordered);
+      if (ordered.length > 0) ctx.log(`残り${ordered.length}枚をデッキの下に戻した`);
     },
   },
 };

@@ -34,6 +34,8 @@
 - テスト: `battle_simulator_v2/tests/test.html`（`scripts/tools/smoke-test-battle-sim.ps1` がヘッドレスで実行）
 - 開発用URLパラメータ: `?autostart=1&seed=42&autoplay=12` で自動開始・自動プレイ
 - エンジンは「決定ポイント」方式: `engine.actions()` で選択肢取得 → `engine.apply(id)`。乱数はシード固定可（Math.random 禁止）
+- CPU/AI: `core/ai/heuristic.js`（決定ポイントごとのスコアリング）。設定パネル「AI適用」または `?ai=1|2|both` で有効化。
+  **AIは公開情報のみ使用**（相手の手札・山札の中身は見ない設計原則。heuristic.js 冒頭コメント参照）
 
 ### カード効果の実装方法（v2）
 
@@ -41,8 +43,12 @@
 - 定義の書式・フック一覧は `core/effects/registry.js` の冒頭コメントが正本
 - 効果は**ジェネレータ関数** `*run(ctx)` で書く。プレイヤー選択は `yield ctx.chooseCard(...)` / `ctx.chooseHolomem(...)` / `ctx.confirm(...)`
 - 共通処理は `core/effects/context.js` のプリミティブ（draw / searchDeck系 / rollDice / dealSpecialDamage / heal / attachCheer / addTurnModifier 等）を必ず使う。新しい共通処理が必要なら context.js に追加する
+- **規模感**: ユニークカード1,052種、うち効果実装が必要なのは874種（2026-06時点）。この規模が前提
+- **カード固有の知識（効果・AI評価とも）は cards/<番号>.js に集約**。エンジン・heuristic.js にカード番号を直書きしない。AI評価は `ai.supportValue` 等の任意ブロック（無ければテキストパターンの汎用評価にフォールバック）
 - 装着カード（マスコット/ファン/ツール）の常時修正は `attached.artsPlus/hpPlus/specialDmgPlus`（毎回動的計算なので後始末不要）。ターン限定の修正は `ctx.addTurnModifier`（エンドステップで自動消滅）
 - **カードがどの領域にも属さない瞬間を作らないこと**（テストの保存則が落ちる）。デッキを「見る」時は `ctx.lookTopDeck`（解決領域に置く）を使う
+- **効果テキストは厳密に解釈する**。「1枚ずつを…1～3人に」=別々のホロメンへ各1枚、「まで」=0可、HP条件は「より大きい」等。
+  曖昧・不明な場合は必ず 総合ルール（RULES_SPEC.md/原文PDF）と公式Q&A（https://hololive-official-cardgame.com/rules/question/ のキーワード検索）で裁定を確認してから実装する
 
 ## バトルシミュレーター v1（参照用・凍結）
 

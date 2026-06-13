@@ -91,9 +91,16 @@ export class Engine {
       lossReason: null,
       logs: [],
       modifiers: [],           // ターン中などの継続修正（EffectSystem が管理）
+      lastReveal: null,        // 効果による公開カードの演出用 { card, seq }（UIが監視）
       perfUsed: { center: false, collab: false }, // このパフォーマンスステップでアーツ使用済みか (9.2.1.3-5)
     };
     this._setupQueue = [];
+    this._revealSeq = 0;
+  }
+
+  /** 効果でカードを公開した時の演出通知（UIが lastReveal を監視して大きく表示する） */
+  flashReveal(card) {
+    this.state.lastReveal = { card, seq: ++this._revealSeq };
   }
 
   // ============ 公開API ============
@@ -201,6 +208,11 @@ export class Engine {
     if (options.length === 0 || (options.length === 1 && options[0].id === 'skip')) {
       // 選択肢なし（または「選ばない」のみ）→ null で再開
       this._stepEffect(gen, null, after);
+      return;
+    }
+    // 強制のカード選択で候補が1枚だけなら自動で確定（確定クリックの手間を省く）
+    if (request.kind === 'chooseCard' && options.length === 1 && options[0].card) {
+      this._stepEffect(gen, options[0].value, after);
       return;
     }
     this.state.pending = {
@@ -355,7 +367,9 @@ export class Engine {
     p.usedLimitedThisTurn = false;
     p.usedCollabThisTurn = false;
     p.usedBatonTouchThisTurn = false;
-    p.usedOshiSkillThisTurn = false;
+    // 推しスキルの[ターンに1回]は両プレイヤーともリセットする
+    // （「相手のターンでダウンした時に使える」等、相手ターン中に使うスキルがあるため）
+    for (const pl of s.players) pl.usedOshiSkillThisTurn = false;
     this.log(`―― ターン${s.turn}: ${p.name} のターン ――`);
     this._resetStep();
   }
@@ -535,7 +549,9 @@ export class Engine {
       // 「～時に使える」系はメインステップでは使えない (12.1.5)
       if (/[すし]た?時に使える/.test(skill.text)) return;
       if (p.holoPower.length < skill.cost) return;
-      if (!(skill.sp ? oshiDef?.spOshiSkill : oshiDef?.oshiSkill)) return;
+      const skillDef = skill.sp ? oshiDef?.spOshiSkill : oshiDef?.oshiSkill;
+      if (!skillDef) return;
+      if (skillDef.canUse && !skillDef.canUse(this, idx)) return;
       actions.push({
         id: `oshi_${i}`,
         label: `${skill.sp ? 'SP' : ''}推しスキル発動（ホロパワー-${skill.cost}）`,
@@ -847,14 +863,34 @@ export class Engine {
         break;
       }
       case 'baton': {
-        const cost = topCard(p.center).batonTouch || [];
-        this._payCheers(p, p.center, cost);
-        const back = p.back.splice(action.backIndex, 1)[0];
-        p.back.push(p.center);
-        p.center = back;
-        p.usedBatonTouchThisTurn = true;
-        this.log(`${p.name}: バトンタッチ（${topCard(back).name} がセンターへ）`);
-        break;
+        // コストのエールはプレイヤーが選んでアーカイブする (8.7.2)
+        // 指定色を先に支払い、無色（任意の色でよい）を後に回す
+        const center = p.center;
+        const cost = [...(topCard(center).batonTouch || [])]
+          .sort((a, b) => (a === COLORLESS ? 1 : 0) - (b === COLORLESS ? 1 : 0));
+        const backIndex = action.backIndex;
+        const payAndSwap = function* (ctx) {
+          for (const color of cost) {
+            const candidates = color === COLORLESS
+              ? [...center.cheers]
+              : center.cheers.filter((c) => c.color === color);
+            const pool = candidates.length > 0 ? candidates : [...center.cheers];
+            if (pool.length === 0) return; // 支払えない（canPayチェック済みなので通常来ない）
+            const cheer = yield ctx.chooseCard({
+              cards: pool,
+              title: `バトンタッチ: アーカイブするエールを選択（コスト: ${color}）`,
+            });
+            if (!cheer) return;
+            ctx.archiveCheer(center, cheer);
+          }
+          const back = p.back.splice(backIndex, 1)[0];
+          p.back.push(p.center);
+          p.center = back;
+          p.usedBatonTouchThisTurn = true;
+          ctx.log(`${p.name}: バトンタッチ（${topCard(back).name} がセンターへ）`);
+        };
+        this._runEffect({ run: payAndSwap }, { playerIdx: s.turnPlayer }, finish);
+        return;
       }
     }
     finish();
@@ -917,6 +953,10 @@ export class Engine {
         `「${art.name}」→ ${targetCard.name} に ${dmg}ダメージ` +
         `（累計${target.damage}/${this.effectiveHp(target)}）`
       );
+      // 「ダウンさせた時」トリガー（このアーツでダウンが確定した場合）
+      if (target.damage >= this.effectiveHp(target)) {
+        this._notifySourceDown(h, s.turnPlayer);
+      }
       // 9.1.2: アーツ1回ごとにチェックタイミング
       this._checkTiming(() => this._queuePerformancePending());
     };
@@ -933,18 +973,16 @@ export class Engine {
 
   /**
    * ルール処理ループ: ダウン処理 → 敗北判定 → ライフダメージ処理。
-   * ライフダメージ処理はプレイヤーの選択（送り先）を要するため、
-   * 決定ポイントを挟んで resume で再入する。
-   * TODO(効果システム): 自動能力の待機・プレイをこのループに統合する (10.6.3)
+   * ダウン処理（推しスキル確認）とライフダメージ処理はプレイヤーの選択を要するため、
+   * 継続（step / resume）で再入する。
+   * TODO(効果システム): 一般の自動能力の待機・プレイをこのループに統合する (10.6.3)
    */
   _checkTiming(resume) {
     const s = this.state;
-    if (s.phase === 'ended') return;
+    const step = () => {
+      if (s.phase === 'ended') return;
 
-    // 1) ダウン処理 (11.3): ターンプレイヤー側から。HPは装着・継続効果込みの実効値
-    let downsProcessed = true;
-    while (downsProcessed) {
-      downsProcessed = false;
+      // 1) ダウン処理 (11.3): ターンプレイヤー側から1体ずつ。HPは実効値で判定
       for (const idx of [s.turnPlayer, 1 - s.turnPlayer]) {
         const p = s.players[idx];
         const downed = this._stagePositions(p).find((pos) => {
@@ -952,76 +990,117 @@ export class Engine {
           return h.damage >= this.effectiveHp(h);
         });
         if (downed) {
-          this._processDown(p, downed);
-          downsProcessed = true;
-          break;
+          this._processDown(p, downed, step); // 処理後に step へ再入
+          return;
         }
       }
-    }
 
-    // 2) 敗北判定 (11.2): 同時成立は引き分け
-    const losses = [];
-    for (let i = 0; i < 2; i++) {
-      const p = s.players[i];
-      if (p.life.length === 0) {
-        losses.push({ player: i, reason: LOSS_REASONS.LIFE_ZERO });
-      } else if (this._stageCount(p) === 0) {
-        losses.push({ player: i, reason: LOSS_REASONS.NO_STAGE });
+      // 2) 敗北判定 (11.2): 同時成立は引き分け
+      const losses = [];
+      for (let i = 0; i < 2; i++) {
+        const p = s.players[i];
+        if (p.life.length === 0) {
+          losses.push({ player: i, reason: LOSS_REASONS.LIFE_ZERO });
+        } else if (this._stageCount(p) === 0) {
+          losses.push({ player: i, reason: LOSS_REASONS.NO_STAGE });
+        }
       }
-    }
-    if (losses.length === 2) {
-      s.phase = 'ended';
-      s.winner = 'draw';
-      this.log('両者同時敗北 — 引き分け');
-      return;
-    }
-    if (losses.length === 1) {
-      this._setWinner(1 - losses[0].player, losses[0].reason, losses[0].player);
-      return;
-    }
-
-    // 3) ライフダメージ処理 (11.5): ターンプレイヤー優先
-    // （ライフが空のケースは上の敗北判定で終了済み）
-    for (const idx of [s.turnPlayer, 1 - s.turnPlayer]) {
-      const p = s.players[idx];
-      if (p.lifeDamage > 0) {
-        const cheer = p.life.shift();
-        p.revealed.push(cheer);
-        const targets = this._stagePositions(p);
-        this.log(`${p.name}: ライフ公開 → ${cheer.name}`);
-        s.pending = {
-          type: 'attachLifeCheer', player: idx, auto: true, cheer, resume,
-          options: targets.map((pos) => ({
-            id: `life_${pos.zone}_${pos.index}`,
-            label: `${topCard(this._holomemAt(p, pos)).name} に送る`,
-            pos,
-          })),
-        };
-        return; // 選択後に _checkTiming(resume) へ再入する
+      if (losses.length === 2) {
+        s.phase = 'ended';
+        s.winner = 'draw';
+        this.log('両者同時敗北 — 引き分け');
+        return;
       }
-    }
+      if (losses.length === 1) {
+        this._setWinner(1 - losses[0].player, losses[0].reason, losses[0].player);
+        return;
+      }
 
-    resume();
+      // 3) ライフダメージ処理 (11.5): ターンプレイヤー優先
+      // （ライフが空のケースは上の敗北判定で終了済み）
+      for (const idx of [s.turnPlayer, 1 - s.turnPlayer]) {
+        const p = s.players[idx];
+        if (p.lifeDamage > 0) {
+          const cheer = p.life.shift();
+          p.revealed.push(cheer);
+          const targets = this._stagePositions(p);
+          this.log(`${p.name}: ライフ公開 → ${cheer.name}`);
+          s.pending = {
+            type: 'attachLifeCheer', player: idx, auto: true, cheer, resume,
+            options: targets.map((pos) => ({
+              id: `life_${pos.zone}_${pos.index}`,
+              label: `${topCard(this._holomemAt(p, pos)).name} に送る`,
+              pos,
+            })),
+          };
+          return; // 選択後に _checkTiming(resume) へ再入する
+        }
+      }
+
+      resume();
+    };
+    if (s.phase === 'ended') return;
+    step();
   }
 
-  /** ダウン処理 (11.3) */
-  _processDown(p, pos) {
+  /** ダウン処理 (11.3)。完了後に next() を呼ぶ（推しスキル確認で中断する場合がある） */
+  _processDown(p, pos, next) {
     const h = this._holomemAt(p, pos);
     const card = topCard(h);
+    const ownerIdx = this.state.players.indexOf(p);
     this.log(`${card.name} がダウン！`);
-    // TODO(効果システム): 「ダウンした時/ダウンさせた時」能力 (11.3.1.1)
-    // ホロメンの全カードと付いているカードをアーカイブ (11.3.1.2 / 4.4.7)
-    p.archive.push(...h.stack, ...h.cheers, ...h.attachments);
-    this._removeHolomem(p, pos);
-    // ライフダメージ: 通常1、Buzzは2 (2.11.2.2)。
-    // 「ダウンしてもライフは減らない」特殊ダメージでダウンした場合は0
-    if (h.noLifeOnDown) {
-      this.log(`${p.name} のライフは減らない（効果による）`);
+
+    const finish = () => {
+      // ホロメンの全カードと付いているカードをアーカイブ (11.3.1.2 / 4.4.7)
+      p.archive.push(...h.stack, ...h.cheers, ...h.attachments);
+      this._removeHolomem(p, pos);
+      // ライフダメージ: 通常1、Buzzは2 (2.11.2.2)。
+      // 「ダウンしてもライフは減らない」特殊ダメージでダウンした場合は0
+      if (h.noLifeOnDown) {
+        this.log(`${p.name} のライフは減らない（効果による）`);
+      } else {
+        const lifeDmg = card.buzz ? 2 : 1;
+        p.lifeDamage += lifeDmg;
+        this.log(`${p.name} はライフダメージ${lifeDmg}を受けた`);
+      }
+      next();
+    };
+
+    // 「（ホロメンが）ダウンした時に使える」推しスキル (11.3.1.1 / 12.1.5.2)
+    // 例: 雪花ラミィ「愛してる」— ダウンしたホロメンのファンを手札に戻す
+    const skillDef = this.registry.get(p.oshi.number)?.onDownOshiSkill;
+    if (skillDef?.canUse?.(this, ownerIdx, h)) {
+      this.state.pending = {
+        type: 'effectChoice',
+        player: ownerIdx,
+        request: { kind: 'confirm', title: skillDef.title || '推しスキルを使いますか？' },
+        options: [
+          { id: 'yes', label: `推しスキルを使う（ホロパワー-${skillDef.cost}）`, value: true },
+          { id: 'no', label: '使わない', value: false },
+        ],
+        resume: (use) => {
+          if (use) skillDef.apply(this, ownerIdx, h);
+          finish();
+        },
+      };
       return;
     }
-    const lifeDmg = card.buzz ? 2 : 1;
-    p.lifeDamage += lifeDmg;
-    this.log(`${p.name} はライフダメージ${lifeDmg}を受けた`);
+
+    finish();
+  }
+
+  /**
+   * 「（指定ホロメンが）相手のホロメンをダウンさせた時」のトリガー通知。
+   * ダメージ適用時に閾値を超えたら呼ばれる（雪花ラミィSP推しスキル等）。
+   */
+  _notifySourceDown(sourceHolomem, ownerIdx) {
+    if (!sourceHolomem) return;
+    for (const mod of this.state.modifiers) {
+      if (mod.kind !== 'onSourceDown') continue;
+      if (mod.ownerIdx !== ownerIdx) continue;
+      if (mod.match && !mod.match(sourceHolomem)) continue;
+      mod.onDown?.(this);
+    }
   }
 
   _setWinner(winnerIdx, reason, loserIdx) {
@@ -1143,13 +1222,4 @@ export class Engine {
     return pool.length >= anyCount;
   }
 
-  /** コスト分のエールをアーカイブ（バトンタッチ 8.7.2 等）。指定色優先で自動選択 */
-  _payCheers(p, h, cost) {
-    for (const color of cost) {
-      let i = color === COLORLESS ? 0 : h.cheers.findIndex((c) => c.color === color);
-      if (i === -1) i = 0;
-      const cheer = h.cheers.splice(i, 1)[0];
-      if (cheer) p.archive.push(cheer);
-    }
-  }
 }

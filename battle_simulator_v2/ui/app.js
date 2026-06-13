@@ -11,6 +11,7 @@
 import { CardLibrary } from '../core/cards.js';
 import { Engine } from '../core/engine.js';
 import { EffectRegistry } from '../core/effects/registry.js';
+import { HeuristicAI } from '../core/ai/heuristic.js';
 import { STEP_NAMES } from '../core/constants.js';
 import { renderSide, renderHand, renderOppHand } from './board.js';
 
@@ -206,9 +207,14 @@ function startDrag(e) {
     if (st.dsts.includes(el.dataset.drop)) el.classList.add('drop-ok');
   }
   // カーソルに追従するゴースト（掴んだカードの絵柄）
+  // 注意: ホロメンはBloomで複数枚重なっている。querySelector('img') だと
+  // DOM順で最初の「一番下のカード」が取れてしまうため、本体(.holomem-main)を優先する
   const ghost = document.createElement('div');
   ghost.className = 'drag-ghost';
-  const img = st.srcEl.querySelector('img');
+  const img =
+    st.srcEl.querySelector('.holomem-main img') ||   // ステージのホロメン（スタックの一番上）
+    st.srcEl.querySelector(':scope > img') ||        // 手札・公開中カード
+    st.srcEl.querySelector('img');
   ghost.style.backgroundImage = img?.src ? `url(${img.src})` : 'var(--sleeve)';
   document.body.appendChild(ghost);
   st.ghost = ghost;
@@ -324,8 +330,16 @@ function cardDetailHtml(card) {
     rows.push(`<div class="detail-skill"><b>《${escapeText(kw.subtype)}》${escapeText(kw.name)}</b><br>${escapeText(kw.text)}</div>`);
   }
   for (const art of card.arts || []) {
-    const cost = art.cost.join('');
-    rows.push(`<div class="detail-skill"><b>アーツ: ${escapeText(art.name)}</b>（${escapeText(cost)}）ダメージ ${art.dmg}${art.dmgPlus ? '+' : ''}${art.tokkou?.length ? ` / 特攻: ${art.tokkou.map((t) => `${t.color}+${t.value}`).join(', ')}` : ''}${art.text ? `<br>${escapeText(art.text)}` : ''}</div>`);
+    const cost = art.cost.map((c) => `<span class="cost-chip">${escapeText(c)}</span>`).join('');
+    rows.push(
+      `<div class="detail-skill art">` +
+      `<div class="art-head"><b>アーツ: ${escapeText(art.name)}</b>` +
+      `<span class="art-dmg">${art.dmg}${art.dmgPlus ? '+' : ''}</span></div>` +
+      `<div class="art-cost">コスト: ${cost}` +
+      `${art.tokkou?.length ? `　特攻: ${art.tokkou.map((t) => `${escapeText(t.color)}+${t.value}`).join(', ')}` : ''}</div>` +
+      `${art.text ? `<div>${escapeText(art.text)}</div>` : ''}` +
+      `</div>`
+    );
   }
   for (const skill of card.oshiSkills || []) {
     rows.push(`<div class="detail-skill"><b>${skill.sp ? 'SP' : ''}推しスキル</b><br>${escapeText(skill.text)}</div>`);
@@ -395,7 +409,10 @@ function showArchive(sideIdx) {
   modal.classList.add('active');
 }
 
-/** 同一ドロップに複数の選択肢があるときの小ポップアップ（例: アーツ選択） */
+/**
+ * 小ポップアップ（例: アーツ選択・推しスキル選択）。
+ * opt.run があればそれを実行、無ければ engine.apply(opt.id)
+ */
 function showChooser(x, y, options) {
   const chooser = document.getElementById('chooser');
   chooser.innerHTML = '';
@@ -404,7 +421,8 @@ function showChooser(x, y, options) {
     btn.textContent = opt.label;
     btn.addEventListener('click', () => {
       chooser.style.display = 'none';
-      engine.apply(opt.id);
+      if (opt.run) opt.run();
+      else engine.apply(opt.id);
     });
     chooser.appendChild(btn);
   }
@@ -413,7 +431,25 @@ function showChooser(x, y, options) {
   chooser.style.top = `${Math.min(y, window.innerHeight - 40 * options.length - 20)}px`;
 }
 
+/** メインステップ中に発動可能な推しスキルのアクション一覧 */
+function oshiSkillActions(sideIdx) {
+  const s = engine?.state;
+  if (!s?.pending || s.pending.type !== 'main' || s.pending.player !== sideIdx) return [];
+  if (aiEnabled(sideIdx)) return [];
+  return s.pending.options.filter((o) => o.kind === 'oshiSkill');
+}
+
 function setupModals() {
+  // 選択モーダルの「盤面を確認」: モーダルを一時的に隠して場のカードを見られるようにする
+  document.getElementById('choice-peek').addEventListener('click', () => {
+    document.getElementById('choice-modal').classList.add('peek');
+    document.getElementById('choice-restore').classList.add('show');
+  });
+  document.getElementById('choice-restore').addEventListener('click', () => {
+    document.getElementById('choice-modal').classList.remove('peek');
+    document.getElementById('choice-restore').classList.remove('show');
+  });
+
   document.getElementById('inspector-close').addEventListener('click', () => {
     document.getElementById('inspector-modal').classList.remove('active');
   });
@@ -433,6 +469,25 @@ function setupModals() {
 const hooks = {
   onInspect: (data) => showInspector(data),
   onArchive: (sideIdx) => showArchive(sideIdx),
+  // HP表示は装着カード等の修正込みの実効値を使う（基礎HPだと「0なのに生きてる」表示になる）
+  effectiveHp: (holomem) => engine.effectiveHp(holomem),
+  // 推しホロメンカード: スキル発動可能なら光らせ、クリックでその場から発動できる
+  oshiCanAct: (sideIdx) => oshiSkillActions(sideIdx).length > 0,
+  onOshi: (sideIdx, card, ev) => {
+    const acts = oshiSkillActions(sideIdx);
+    const detail = {
+      title: `推しホロメン: ${card.name}`,
+      sections: [{ label: '推しホロメン', cards: [card] }],
+    };
+    if (acts.length === 0) {
+      showInspector(detail);
+      return;
+    }
+    showChooser(ev.clientX, ev.clientY, [
+      ...acts,
+      { label: '📄 カード詳細を見る', run: () => showInspector(detail) },
+    ]);
+  },
 };
 
 /**
@@ -486,9 +541,16 @@ function enqueueStepToasts(s) {
   lastLogLen = s.logs.length;
   for (const line of newLines) {
     const m = /^【(.+?)】(.*)/.exec(line);
-    if (m) {
+    const dice = /^🎲 サイコロ: (\d)/.exec(line);
+    if (dice) {
+      showDice(Number(dice[1])); // サイコロは専用の大型表示
+    } else if (m) {
       stepToastQueue.push(m[2].includes('スキップ') ? `${m[1]}（スキップ）` : m[1]);
-    } else if (/^.*?: 1枚ドロー/.test(line) || /^🎲/.test(line) || /特攻発動/.test(line)) {
+    } else if (
+      /^.*?: 1枚ドロー/.test(line) ||
+      /特攻発動/.test(line) ||
+      /エール(デッキから|公開)/.test(line) // エールデッキから送られたエールの種類を見せる
+    ) {
       stepToastQueue.push(line.replace(/^.*?: /, ''));
     }
   }
@@ -507,6 +569,52 @@ function pumpStepToast() {
     stepToastActive = false;
     pumpStepToast();
   }, 1000);
+}
+
+/** サイコロの結果を中央に大きく表示（実物風のピップ描画） */
+const DICE_PIPS = {
+  1: [4],
+  2: [2, 6],
+  3: [2, 4, 6],
+  4: [0, 2, 6, 8],
+  5: [0, 2, 4, 6, 8],
+  6: [0, 2, 3, 5, 6, 8],
+};
+
+let diceShownAt = 0; // サイコロ表示中はモーダルを遅延させるための時刻
+
+function showDice(value) {
+  diceShownAt = Date.now();
+  const overlay = document.getElementById('dice-overlay');
+  const die = document.getElementById('dice-face');
+  die.innerHTML = '';
+  for (let cell = 0; cell < 9; cell++) {
+    const pip = document.createElement('div');
+    pip.className = DICE_PIPS[value]?.includes(cell) ? 'pip' : 'pip empty';
+    die.appendChild(pip);
+  }
+  document.getElementById('dice-label').textContent = `サイコロ: ${value}`;
+  overlay.classList.remove('show');
+  void overlay.offsetWidth; // アニメーション再生のためリフロー
+  overlay.classList.add('show');
+}
+
+/** 効果で公開されたカード（エール等）を中央に大きく表示 */
+let lastRevealSeq = 0;
+
+function handleCardReveal(s) {
+  const reveal = s.lastReveal;
+  if (!reveal || reveal.seq === lastRevealSeq) return;
+  lastRevealSeq = reveal.seq;
+  diceShownAt = Date.now(); // サイコロと同様、表示中は選択モーダルを遅延させる
+  const overlay = document.getElementById('reveal-overlay');
+  const img = document.getElementById('reveal-image');
+  img.src = reveal.card.imageUrl || '';
+  img.alt = reveal.card.name;
+  document.getElementById('reveal-label').textContent = `公開: ${reveal.card.name}`;
+  overlay.classList.remove('show');
+  void overlay.offsetWidth;
+  overlay.classList.add('show');
 }
 
 /** 常時表示のステップ進行バー */
@@ -559,8 +667,13 @@ function render() {
   notifyTurnChange(s);
   renderStepBar(s);
   enqueueStepToasts(s);
+  handleCardReveal(s);
 
-  const handPlayer = s.pending ? s.pending.player : s.turnPlayer;
+  // 手札表示: 人間が1人だけなら常にその人の手札を固定表示（AIの手札は見せない）
+  const humans = [0, 1].filter((i) => !aiEnabled(i));
+  const handPlayer = humans.length === 1
+    ? humans[0]
+    : (s.pending ? s.pending.player : s.turnPlayer);
   renderHand(document.getElementById('hand'), s.players[handPlayer].hand, handPlayer, hooks);
   renderOppHand(document.getElementById('opp-hand'), s.players[1 - handPlayer].hand.length);
 
@@ -576,6 +689,7 @@ function render() {
   renderLog(s);
   renderResult(s);
   handleStepPause(s);
+  handleAI(s);
 }
 
 /**
@@ -584,10 +698,31 @@ function render() {
  *  - chooseHolomem → 盤面の対象ホロメンを金色に光らせ、直接クリックで選択
  *  - confirm など  → 中央のダイアログ（ボタン）
  */
+const DICE_MODAL_DELAY_MS = 1500;
+let diceDelayTimer = null;
+let lastChoicePending = null; // 新しい選択になったらピーク状態を解除するための参照
+let selectedChoiceId = null;  // カード選択モーダルの「選択中」状態（確定前）
+
 function renderEffectChoiceModal(s) {
   const modal = document.getElementById('choice-modal');
   const bar = document.getElementById('choice-bar');
-  const isEffect = s.pending?.type === 'effectChoice';
+  let isEffect = s.pending?.type === 'effectChoice';
+  // AIの選択は表示しない（デッキサーチ候補などの非公開情報が見えてしまうため）
+  if (isEffect && aiEnabled(s.pending.player)) isEffect = false;
+
+  // サイコロ表示中は次の選択モーダルを出さない（サイコロが隠れて見えなくなるため）
+  const sinceDice = Date.now() - diceShownAt;
+  if (isEffect && sinceDice < DICE_MODAL_DELAY_MS) {
+    modal.classList.remove('active');
+    bar.classList.remove('active');
+    clearTimeout(diceDelayTimer);
+    diceDelayTimer = setTimeout(() => {
+      diceDelayTimer = null;
+      if (engine) render();
+    }, DICE_MODAL_DELAY_MS - sinceDice + 30);
+    return;
+  }
+
   const kind = isEffect ? s.pending.request?.kind : null;
 
   // --- 盤面クリック選択（chooseHolomem） ---
@@ -627,18 +762,41 @@ function renderEffectChoiceModal(s) {
     return;
   }
   modal.classList.add('active');
+  // 新しい選択が来たらピーク（盤面確認）と選択状態を解除する
+  if (lastChoicePending !== s.pending) {
+    lastChoicePending = s.pending;
+    selectedChoiceId = null;
+    modal.classList.remove('peek');
+    document.getElementById('choice-restore').classList.remove('show');
+  }
   document.getElementById('choice-title').textContent =
     `${s.players[s.pending.player].name}: ${s.pending.request.title || '選択してください'}`;
   const grid = document.getElementById('choice-grid');
   grid.innerHTML = '';
   const footer = document.getElementById('choice-footer');
   footer.innerHTML = '';
+
+  // 確定ボタン（カードをクリック→選択表示→確定、の2段階で誤クリックを防ぐ）
+  const confirmBtn = document.createElement('button');
+  confirmBtn.id = 'choice-confirm';
+  confirmBtn.textContent = '✔ 確定';
+  confirmBtn.disabled = selectedChoiceId == null;
+  confirmBtn.addEventListener('click', () => {
+    if (selectedChoiceId != null) engine.apply(selectedChoiceId);
+  });
+
+  const hasCards = s.pending.options.some((o) => o.card);
   for (const opt of s.pending.options) {
     if (opt.card) {
       const c = document.createElement('div');
-      c.className = 'archive-grid-card';
+      c.className = 'archive-grid-card selectable' + (selectedChoiceId === opt.id ? ' selected' : '');
       c.innerHTML = `<img src="${opt.card.imageUrl || ''}" alt="${escapeText(opt.card.name)}" loading="lazy"><div>${escapeText(opt.card.name)}</div>`;
-      c.addEventListener('click', () => engine.apply(opt.id));
+      c.addEventListener('click', () => {
+        selectedChoiceId = opt.id;
+        for (const el of grid.querySelectorAll('.selected')) el.classList.remove('selected');
+        c.classList.add('selected');
+        confirmBtn.disabled = false;
+      });
       grid.appendChild(c);
     } else {
       const btn = document.createElement('button');
@@ -646,6 +804,15 @@ function renderEffectChoiceModal(s) {
       btn.addEventListener('click', () => engine.apply(opt.id));
       footer.appendChild(btn);
     }
+  }
+  if (hasCards) footer.appendChild(confirmBtn);
+
+  // 選択対象外だが公開されているカード（「上からN枚見る」の残り等）はグレー表示
+  for (const card of s.pending.request.displayCards || []) {
+    const c = document.createElement('div');
+    c.className = 'archive-grid-card display-only';
+    c.innerHTML = `<img src="${card.imageUrl || ''}" alt="${escapeText(card.name)}" loading="lazy"><div>${escapeText(card.name)}（対象外）</div>`;
+    grid.appendChild(c);
   }
 }
 
@@ -771,6 +938,38 @@ function setupPreview() {
   });
 }
 
+// ============ AI（CPU操作） ============
+
+const aiAgents = [null, null];
+let aiOverride = null; // URLパラメータによる一時上書き（保存しない）
+let aiTimer = null;
+const AI_DELAY_MS = 600;
+
+function aiEnabled(idx) {
+  if (aiOverride) return aiOverride[idx];
+  return !!(getSettings().aiPlayers || [false, false])[idx];
+}
+
+/** AI担当プレイヤーの決定ポイントを少し間を置いて自動で進める */
+function handleAI(s) {
+  if (!s.pending || s.phase === 'ended') return;
+  const idx = s.pending.player;
+  if (!aiEnabled(idx)) return;
+  if (aiTimer) return;
+  const pendingRef = s.pending;
+  aiTimer = setTimeout(() => {
+    aiTimer = null;
+    if (!engine || engine.state.pending !== pendingRef) return;
+    if (!aiAgents[idx]) aiAgents[idx] = new HeuristicAI(idx);
+    try {
+      const id = aiAgents[idx].choose(engine);
+      if (id != null) engine.apply(id);
+    } catch (e) {
+      console.error('AIの手の適用に失敗:', e);
+    }
+  }, AI_DELAY_MS);
+}
+
 // ============ 設定パネル ============
 
 let currentSeed = null;
@@ -796,6 +995,18 @@ function setupSettingsPanel() {
     if (!speed) return;
     saveSettings({ stepSpeed: speed });
     refreshSettingsUI();
+  });
+
+  // AI適用（CPUが操作するプレイヤーの切り替え）
+  document.getElementById('ai-buttons').addEventListener('click', (e) => {
+    const idx = e.target.dataset?.ai;
+    if (idx == null) return;
+    const current = getSettings().aiPlayers || [false, false];
+    current[Number(idx)] = !current[Number(idx)];
+    aiOverride = null; // 手動変更したらURL上書きは解除
+    saveSettings({ aiPlayers: current });
+    refreshSettingsUI();
+    if (engine) render(); // AIループを起動
   });
 
   // ログコピー
@@ -840,6 +1051,9 @@ function refreshSettingsUI() {
   for (const btn of document.querySelectorAll('#pause-speed-buttons button')) {
     btn.classList.toggle('active', btn.dataset.speed === speed);
   }
+  for (const btn of document.querySelectorAll('#ai-buttons button')) {
+    btn.classList.toggle('active', aiEnabled(Number(btn.dataset.ai)));
+  }
   document.getElementById('seed-display').textContent = `シード値: ${currentSeed ?? '-'}`;
 }
 
@@ -876,8 +1090,14 @@ async function main() {
   document.getElementById('restart-button').addEventListener('click', () => location.reload());
   console.log('✅ バトルシミュレーターv2 初期化完了');
 
-  // 開発・スモークテスト用: ?autostart=1&seed=42 で即ゲーム開始
+  // 開発用: ?ai=1|2|both でAI適用を一時的に上書き（設定には保存しない）
   const params = new URLSearchParams(location.search);
+  const aiParam = params.get('ai');
+  if (aiParam) {
+    aiOverride = [aiParam === '1' || aiParam === 'both', aiParam === '2' || aiParam === 'both'];
+  }
+
+  // 開発・スモークテスト用: ?autostart=1&seed=42 で即ゲーム開始
   if (params.get('autostart')) {
     if (params.get('seed')) document.getElementById('seed-input').value = params.get('seed');
     await startGame();
@@ -889,6 +1109,20 @@ async function main() {
       engine.apply((active[0] || actions[0]).id);
     }
     console.log('✅ autostart 完了');
+  }
+
+  // 開発用: ?inspecttest=1 で手札1枚目の詳細モーダルを自動で開く（表示確認用）
+  if (params.get('inspecttest')) {
+    setTimeout(() => document.querySelector('#hand .card')?.click(), 300);
+  }
+
+  // 開発用: ?dicetest=N でサイコロ表示を静止表示（見た目確認用）
+  if (params.get('dicetest')) {
+    showDice(Number(params.get('dicetest')) || 6);
+    const overlay = document.getElementById('dice-overlay');
+    overlay.style.animation = 'none';
+    overlay.style.opacity = '1';
+    overlay.style.display = 'flex';
   }
 }
 

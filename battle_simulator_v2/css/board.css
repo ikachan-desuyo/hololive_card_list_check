@@ -220,8 +220,13 @@ html, body {
   height: var(--card-h);
   flex-shrink: 0;
   cursor: pointer;
+  z-index: 1;
 }
-.holomem-group.rested { transform: rotate(90deg) scale(0.92); }
+/* お休み（横向き）は隣のカードと重なるため、バッジが隠れないよう前面に出す */
+.holomem-group.rested { transform: rotate(90deg) scale(0.92); z-index: 2; }
+/* お休み中もHPバッジは読める向きに戻す */
+.holomem-group.rested .badge { transform: rotate(-90deg); }
+.side.opponent .holomem-group.rested .badge { transform: rotate(90deg); }
 .holomem-group .holomem-main { position: relative; }
 .holomem-group:hover .holomem-main::after { background: rgba(255, 255, 255, 0.16); }
 
@@ -531,6 +536,92 @@ body.dragging, body.dragging * { cursor: grabbing !important; }
   100% { opacity: 0; transform: translate(-50%, -45%); }
 }
 
+/* ===== サイコロ結果の大型表示 ===== */
+#dice-overlay {
+  position: absolute;
+  left: calc(50% - 160px);
+  top: 38%;
+  transform: translate(-50%, -50%);
+  display: none;
+  flex-direction: column;
+  align-items: center;
+  gap: 10px;
+  z-index: 99; /* 選択モーダル(92)・チューザー(95)より上（結果表示100の下） */
+  pointer-events: none;
+}
+#dice-overlay.show {
+  display: flex;
+  animation: dice-inout 2.2s ease forwards;
+}
+#dice-face {
+  width: 120px;
+  height: 120px;
+  background: linear-gradient(145deg, #ffffff, #dfe3f0);
+  border-radius: 20px;
+  border: 2px solid #aab;
+  box-shadow: 0 16px 50px rgba(0, 0, 0, 0.75), inset 0 -4px 10px rgba(0, 0, 0, 0.12);
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  grid-template-rows: repeat(3, 1fr);
+  padding: 18px;
+  gap: 6px;
+}
+#dice-face .pip {
+  background: radial-gradient(circle at 35% 35%, #444, #111);
+  border-radius: 50%;
+}
+#dice-face .pip.empty { background: transparent; }
+#dice-label {
+  background: rgba(10, 12, 32, 0.92);
+  border: 1px solid var(--accent);
+  border-radius: 10px;
+  padding: 5px 22px;
+  font-size: 1.2em;
+  font-weight: bold;
+  color: #fff;
+}
+@keyframes dice-inout {
+  0% { opacity: 0; transform: translate(-50%, -50%) scale(0.4) rotate(-25deg); }
+  12% { opacity: 1; transform: translate(-50%, -50%) scale(1.15) rotate(8deg); }
+  20% { transform: translate(-50%, -50%) scale(1) rotate(-3deg); }
+  26% { transform: translate(-50%, -50%) scale(1) rotate(0deg); }
+  82% { opacity: 1; }
+  100% { opacity: 0; transform: translate(-50%, -50%) scale(0.95); }
+}
+
+/* ===== 効果で公開されたカードの大型表示 ===== */
+#reveal-overlay {
+  position: absolute;
+  left: calc(50% - 160px);
+  top: 38%;
+  transform: translate(-50%, -50%);
+  display: none;
+  flex-direction: column;
+  align-items: center;
+  gap: 10px;
+  z-index: 99;
+  pointer-events: none;
+}
+#reveal-overlay.show {
+  display: flex;
+  animation: dice-inout 2.2s ease forwards; /* サイコロと同じ出入り */
+}
+#reveal-image {
+  width: 170px;
+  border-radius: 12px;
+  border: 2px solid var(--accent);
+  box-shadow: 0 16px 50px rgba(0, 0, 0, 0.75);
+}
+#reveal-label {
+  background: rgba(10, 12, 32, 0.92);
+  border: 1px solid var(--accent);
+  border-radius: 10px;
+  padding: 5px 22px;
+  font-size: 1.1em;
+  font-weight: bold;
+  color: #fff;
+}
+
 /* ===== ターン切り替え通知 ===== */
 #turn-toast {
   position: absolute;
@@ -795,6 +886,32 @@ body.dragging, body.dragging * { cursor: grabbing !important; }
   padding: 6px 8px;
   margin: 6px 0;
 }
+/* アーツのダメージは見落とさないよう大きな赤バッジで表示 */
+.detail-skill .art-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}
+.detail-skill .art-dmg {
+  background: #c62828;
+  color: #fff;
+  font-weight: bold;
+  font-size: 1.15em;
+  padding: 1px 12px;
+  border-radius: 12px;
+  flex-shrink: 0;
+}
+.detail-skill .art-cost { color: #aab; margin: 3px 0; }
+.detail-skill .cost-chip {
+  display: inline-block;
+  background: #26305c;
+  border: 1px solid #44488a;
+  border-radius: 8px;
+  padding: 0 7px;
+  margin-right: 3px;
+  font-size: 0.92em;
+}
 
 /* アーカイブ一覧グリッド */
 .archive-grid {
@@ -805,6 +922,18 @@ body.dragging, body.dragging * { cursor: grabbing !important; }
 .archive-grid-card { cursor: pointer; text-align: center; font-size: 0.72em; color: #aab; }
 .archive-grid-card img { width: 100%; border-radius: 6px; display: block; }
 .archive-grid-card:hover img { outline: 2px solid var(--accent); }
+
+/* 発動可能なアクションを持つカード（推しスキル等）: 金色に光らせる */
+.card.can-act {
+  outline: 2px solid rgba(255, 200, 80, 0.95);
+  outline-offset: 1px;
+  cursor: pointer;
+  animation: can-act-pulse 1.2s ease-in-out infinite;
+}
+@keyframes can-act-pulse {
+  0%, 100% { box-shadow: 0 0 8px rgba(255, 200, 80, 0.4); }
+  50% { box-shadow: 0 0 22px rgba(255, 200, 80, 0.8); }
+}
 
 /* 効果のホロメン選択: 盤面の対象を金色に光らせてクリックで選ぶ */
 [data-drop].choice-target {
@@ -871,7 +1000,62 @@ body.dragging, body.dragging * { cursor: grabbing !important; }
   flex-direction: column;
   box-shadow: 0 0 50px rgba(110, 195, 255, 0.25);
 }
-#choice-title { font-weight: bold; margin-bottom: 12px; color: #fff; }
+#choice-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  margin-bottom: 12px;
+}
+#choice-title { font-weight: bold; color: #fff; }
+#choice-peek {
+  flex-shrink: 0;
+  padding: 5px 12px;
+  background: #222654;
+  border: 1px solid #3c4185;
+  color: #dde;
+  border-radius: 6px;
+  cursor: pointer;
+  font-size: 0.82em;
+}
+#choice-peek:hover { border-color: var(--accent); }
+/* ピーク中はモーダルを隠す（選択状態は維持） */
+#choice-modal.active.peek { display: none; }
+#choice-restore {
+  position: absolute;
+  right: 336px;
+  bottom: 16px;
+  display: none;
+  padding: 10px 20px;
+  background: linear-gradient(135deg, #4a7cff, #9a4aff);
+  border: 1px solid var(--accent);
+  color: #fff;
+  font-weight: bold;
+  border-radius: 10px;
+  cursor: pointer;
+  z-index: 96;
+  box-shadow: 0 6px 24px rgba(0, 0, 0, 0.6);
+}
+#choice-restore.show { display: block; }
+.archive-grid-card.display-only { opacity: 0.45; cursor: default; }
+.archive-grid-card.display-only:hover img { outline: none; }
+/* 選択→確定の2段階: 選択中のカードを強調 */
+.archive-grid-card.selectable.selected img {
+  outline: 4px solid var(--accent);
+  box-shadow: 0 0 18px rgba(110, 195, 255, 0.7);
+}
+#choice-confirm {
+  background: linear-gradient(135deg, #2a8f4a, #3aaf5f) !important;
+  border-color: #5fcf8f !important;
+  font-weight: bold;
+  min-width: 110px;
+}
+#choice-confirm:disabled {
+  background: #20223f !important;
+  border-color: #34386b !important;
+  color: #667 !important;
+  cursor: default;
+}
 #choice-grid {
   overflow-y: auto;
   display: grid;

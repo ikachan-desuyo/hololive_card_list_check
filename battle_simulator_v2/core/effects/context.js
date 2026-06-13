@@ -78,18 +78,43 @@ export class EffectContext {
 
   /**
    * カードを1枚選ぶ。optional なら「選ばない」も可（null が返る）。
-   * cards: 正規化済みカードの配列
+   * cards: 選択可能なカード / displayCards: 選択不可だが見せるカード
+   *   （「デッキの上からN枚を見る」で対象外のカードも公開するために使う）
    */
-  chooseCard({ cards, title, optional = false, skipLabel = '選ばない' }) {
+  chooseCard({ cards, title, optional = false, skipLabel = '選ばない', displayCards = [] }) {
     return {
       kind: 'chooseCard',
       player: this.playerIdx,
       title,
+      displayCards: displayCards.filter((c) => !cards.includes(c)),
       buildOptions: () => [
         ...cards.map((c, i) => ({ id: `card_${i}`, label: c.name, card: c, value: c })),
         ...(optional ? [{ id: 'skip', label: skipLabel, value: null }] : []),
       ],
     };
+  }
+
+  /**
+   * カードの並び順をプレイヤーに決めさせるフロー（「好きな順でデッキの下に戻す」等）。
+   * 1枚ずつ「次に置くカード」を選ぶ。「この順のまま」も選べる。
+   * 使い方: const ordered = yield* ctx.orderCardsFlow(cards, 'デッキの下に戻す順番');
+   */
+  *orderCardsFlow(cards, title) {
+    const remaining = [...cards];
+    const ordered = [];
+    while (remaining.length > 1) {
+      const picked = yield this.chooseCard({
+        cards: remaining,
+        title: `${title}: ${ordered.length + 1}番目（上側）に置くカードを選択`,
+        optional: true,
+        skipLabel: 'この順のまま戻す',
+      });
+      if (!picked) break;
+      ordered.push(picked);
+      remaining.splice(remaining.indexOf(picked), 1);
+    }
+    ordered.push(...remaining);
+    return ordered;
   }
 
   /** 自分/相手のホロメンを1人選ぶ（filter適用後）。optional 可 */
@@ -237,11 +262,17 @@ export class EffectContext {
     if (i !== -1) this.player.cheerDeck.splice(i, 1);
   }
 
+  /** 効果でカードを公開した時、UIに大きく表示させる */
+  flashReveal(card) {
+    this.engine.flashReveal(card);
+  }
+
   /** エールデッキの上から1枚公開してホロメンに送る (5.21.2) */
   sendCheerFromCheerDeckTop(holomem) {
     if (this.player.cheerDeck.length === 0) return null;
     const cheer = this.player.cheerDeck.shift();
     this.log(`${this.player.name}: エールデッキから ${cheer.name} を公開`);
+    this.flashReveal(cheer); // どのエールが出たかを画面に大きく見せる
     this.attachCheer(cheer, holomem);
     return cheer;
   }
@@ -297,8 +328,10 @@ export class EffectContext {
     // 「ライフは減らない」は、この特殊ダメージでダウンが確定した場合のみ適用する。
     // （ダウンに至らなかった場合にフラグを残すと、後から別のダメージで倒された時まで
     //   ライフが減らなくなってしまう）
-    if (opts.noLifeOnDown && targetEntry.holomem.damage >= this.engine.effectiveHp(targetEntry.holomem)) {
-      targetEntry.holomem.noLifeOnDown = true;
+    if (targetEntry.holomem.damage >= this.engine.effectiveHp(targetEntry.holomem)) {
+      if (opts.noLifeOnDown) targetEntry.holomem.noLifeOnDown = true;
+      // 「ダウンさせた時」トリガー（雪花ラミィSP推しスキル等）
+      this.engine._notifySourceDown(this.sourceHolomem, this.playerIdx);
     }
     this.log(
       `${targetEntry.top.name} に特殊ダメージ${total}` +
@@ -311,5 +344,47 @@ export class EffectContext {
   addTurnModifier(mod) {
     this.engine.state.modifiers.push({ duration: 'turn', ...mod });
     this.log(`継続効果: ${mod.description || mod.kind}`);
+  }
+
+  /**
+   * アーカイブのホロメンを使ってBloomさせるフロー（オリー推しスキル等）。
+   * Bloomの通常条件（同名・レベル遷移・HP>ダメージ・ターン制限 8.3）に従う。
+   * 使い方: const done = yield* ctx.bloomFromArchiveFlow({ targetFilter, optional });
+   */
+  *bloomFromArchiveFlow({ targetFilter = null, optional = false } = {}) {
+    const candidates = this.player.archive.filter((card) =>
+      card.kind === 'holomen' &&
+      this.holomems('self', targetFilter).some((e) => this.engine._canBloom(e.holomem, card)));
+    if (candidates.length === 0) {
+      this.log('アーカイブにBloomできるホロメンがいない');
+      return false;
+    }
+    const card = yield this.chooseCard({
+      cards: candidates,
+      title: 'アーカイブからBloomさせるホロメンカードを選択',
+      optional,
+      skipLabel: 'Bloomしない',
+    });
+    if (!card) return false;
+    const entry = yield this.chooseHolomem({
+      side: 'self',
+      filter: (e) => (!targetFilter || targetFilter(e)) && this.engine._canBloom(e.holomem, card),
+      title: `${card.name} でBloomさせるホロメンを選択`,
+    });
+    if (!entry) return false;
+    this.removeFromArchive(card);
+    entry.holomem.stack.unshift(card);
+    entry.holomem.bloomedTurn = this.state.turn;
+    this.log(`${entry.holomem.stack[1].name} → ${card.name}〔${card.bloomLevel}〕にBloom（アーカイブから）`);
+    // ブルームエフェクトも誘発する (13.3)
+    const def = this.engine.registry.get(card.number)?.bloomEffect;
+    if (def) {
+      this.log(`《ブルームエフェクト》${def.name}`);
+      yield* def.run(new EffectContext(this.engine, this.playerIdx, {
+        sourceCard: card,
+        sourceHolomem: entry.holomem,
+      }));
+    }
+    return true;
   }
 }
