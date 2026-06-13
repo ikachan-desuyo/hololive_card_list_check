@@ -15,7 +15,7 @@ import { HeuristicAI } from '../core/ai/heuristic.js';
 import { STEP_NAMES } from '../core/constants.js';
 import { renderSide, renderHand, renderOppHand } from './board.js';
 
-const TEST_DECKS = ['ラミィデッキ', 'あの青空のせいだ', 'holoX起動テスト'];
+const TEST_DECKS = ['ラミィデッキ', 'あの青空のせいだ', 'holoX起動テスト', 'ジジ'];
 
 let lib = null;
 let engine = null;
@@ -69,8 +69,9 @@ async function startGame() {
   const errBox = document.getElementById('setup-error');
   errBox.textContent = '';
   try {
-    const map1 = await resolveDeckMap(document.getElementById('deck-p1').value);
-    const map2 = await resolveDeckMap(document.getElementById('deck-p2').value);
+    // デッキ定義は {id:枚数} / カードID配列 / 構造化形式 のいずれもあり得るので正規化してから使う
+    const map1 = CardLibrary.normalizeDeckMap(await resolveDeckMap(document.getElementById('deck-p1').value));
+    const map2 = CardLibrary.normalizeDeckMap(await resolveDeckMap(document.getElementById('deck-p2').value));
     const deck1 = lib.buildGameDeck(map1);
     const deck2 = lib.buildGameDeck(map2);
     const errors = [

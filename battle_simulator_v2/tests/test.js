@@ -135,6 +135,30 @@ export async function runTests() {
     assertEq(d.cheerDeck[0].name, d.cheerDeck[1].name, 'コピーの内容は同一であるべき');
   });
 
+  test('デッキ構築: カードID配列・構造化形式も受け付ける（デッキビルダー保存形式の互換）', () => {
+    // 配列形式（デッキビルダーが localStorage に保存する形）。以前は Object.entries が添字を拾い
+    // 「カードが見つかりません: 0」になっていた回帰を防ぐ。
+    const arr = [];
+    arr.push('hBP04-004_OSR');
+    for (let i = 0; i < 50; i++) arr.push('hBP04-043_C');
+    for (let i = 0; i < 20; i++) arr.push('hY04-001_C');
+    const fromArray = lib.buildGameDeck(arr);
+    assertEq(fromArray.errors.length, 0, `配列デッキのエラー: ${fromArray.errors.join(',')}`);
+    assertEq(fromArray.deck.length, 50, 'メインデッキ50枚');
+    assertEq(fromArray.cheerDeck.length, 20, 'エールデッキ20枚');
+    assert(fromArray.oshi, '推しが取れていない');
+    // 正規化単体: 配列 → {id:枚数}
+    const norm = CardLibrary.normalizeDeckMap(['a', 'a', 'b']);
+    assertEq(norm.a, 2, '配列のカウントが正しくない');
+    assertEq(norm.b, 1, '配列のカウントが正しくない');
+    // 構造化形式（deck_manager の {oshi, holomen, support, yell}）
+    const struct = CardLibrary.normalizeDeckMap({
+      oshi: { id: 'hBP04-004_OSR' }, holomen: ['hBP04-043_C', 'hBP04-043_C'], support: [], yell: ['hY04-001_C'],
+    });
+    assertEq(struct['hBP04-043_C'], 2, '構造化形式のカウントが正しくない');
+    assertEq(struct['hBP04-004_OSR'], 1, '構造化形式の推しカウントが正しくない');
+  });
+
   test('ホロメンの正規化（HP・Bloomレベル・アーツコスト）', () => {
     const c = lib.get('hBP01-024_02_C');
     assert(c, 'hBP01-024_02_C が無い');
