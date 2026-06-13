@@ -1,0 +1,60 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8">
+  <title>カード効果カバレッジ書き出し</title>
+  <style>body { font-family: 'Segoe UI', sans-serif; max-width: 900px; margin: 2em auto; background: #1b1b2f; color: #eee; }</style>
+</head>
+<body>
+  <h1>カード効果カバレッジ書き出し</h1>
+  <div id="summary">実行中...</div>
+  <pre id="out" style="white-space: pre-wrap; font-size: 12px;"></pre>
+  <script type="module">
+    // 実際の v2 レジストリ（手書き＞自動コンパイル）でカードを分類し、番号→状態のJSONを書き出す。
+    // scripts/tools/build-effect-checklist.py がこの COVERAGE_JSON= 行を拾って markdown を生成する。
+    import { CardLibrary } from '../core/cards.js';
+    import { IMPLEMENTED } from '../cards/index.js';
+    import { compileCard } from '../core/effects/text-compiler.js';
+
+    function needsEffect(card) {
+      // 効果実装が必要か（バニラ判定）。キーワード/推しスキル/サポート効果/テキスト付きアーツがあれば必要。
+      if ((card.keywords || []).length > 0) return true;
+      if ((card.oshiSkills || []).length > 0) return true;
+      if (card.supportText) return true;
+      if ((card.arts || []).some((a) => a.text && a.text.trim())) return true;
+      return false;
+    }
+
+    (async () => {
+      const lib = await CardLibrary.load('../../json_file/card_data.json');
+      const map = {};
+      let hand = 0, comp = 0, todo = 0, vanilla = 0;
+      for (const [number, card] of lib.byNumber.entries()) {
+        const need = needsEffect(card);
+        let status;
+        if (IMPLEMENTED[number]) {
+          status = 'handwritten';
+          if (need) hand++; else hand++; // 手書きは効果ありとみなす
+        } else {
+          let def = null;
+          try { def = compileCard(card); } catch (e) { def = null; }
+          if (def) { status = 'compiled'; comp++; }
+          else if (need) { status = 'todo'; todo++; }
+          else { status = 'vanilla'; vanilla++; }
+        }
+        map[number] = { status, need, kind: card.kind, name: card.name };
+      }
+      const json = JSON.stringify(map);
+      console.log('COVERAGE_COUNT handwritten=' + hand + ' compiled=' + comp + ' todo=' + todo + ' vanilla=' + vanilla + ' total=' + Object.keys(map).length);
+      console.log('COVERAGE_JSON=' + json);
+      document.getElementById('summary').textContent =
+        `手書き ${hand} / 自動 ${comp} / 未実装(TODO) ${todo} / バニラ ${vanilla} / 合計 ${Object.keys(map).length}`;
+      document.getElementById('summary').id = 'done';
+      document.getElementById('out').textContent = json.slice(0, 4000);
+    })().catch((e) => {
+      document.getElementById('summary').textContent = '失敗: ' + e.message;
+      console.error('COVERAGE_ERROR', e);
+    });
+  </script>
+</body>
+</html>

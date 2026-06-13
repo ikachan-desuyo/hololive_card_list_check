@@ -1,0 +1,84 @@
+/**
+ * パヴォリア・レイネ (hBP08-033) ホロメン・緑・2nd・HP190（#ID #ID2期生 #トリ #絵）
+ *
+ * [コラボエフェクト] 監視者の眼差し:
+ *   自分のエールデッキから、エール1枚を自分の#IDを持つホロメンに送る。
+ *   そしてエールデッキをシャッフルする。
+ *   → 「公開して選ぶ」記述が無いので、エールデッキの上から1枚を送る（非公開デッキから任意の1枚は選べない）。
+ *     送り先は #ID を持つ自分のホロメン1人（プレイヤー選択）。送った後にエールデッキをシャッフル。
+ *     送り先が居ない／エールデッキが空なら何もしない（強制効果だが対象/エールが無ければ不発）。
+ *
+ * [アーツ] ノックアウト・ツイスト (140):
+ *   自分のアーカイブのエール1～2枚を自分の〈パヴォリア・レイネ〉1人に送る。
+ *   → 送り先は名称〈パヴォリア・レイネ〉の自分のホロメン1人（複数バージョン含む）をプレイヤーが選ぶ。
+ *     その1人に、アーカイブのエールを1～2枚送る（アーカイブの枚数が上限）。1枚目は必須、2枚目は任意。
+ *     アーカイブにエールが無い／送り先が居ないなら何もしない。
+ *     特攻〔青+50〕とダメージ140はアイコン/dmgで処理されるためrunでは扱わない。
+ *
+ * 保留: なし（全文 context.js のプリミティブで実装）。
+ */
+const REINE = 'パヴォリア・レイネ';
+
+export default {
+  number: 'hBP08-033',
+
+  collabEffect: {
+    name: '監視者の眼差し',
+    *run(ctx) {
+      if (ctx.player.cheerDeck.length === 0) {
+        ctx.log('エールデッキにエールがない');
+        return;
+      }
+      const targets = ctx.holomems('self', (e) => ctx.hasTag(e.top, 'ID'));
+      if (targets.length === 0) {
+        ctx.log('#IDを持つホロメンがいない');
+        return;
+      }
+      const dest = yield ctx.chooseHolomem({
+        side: 'self',
+        filter: (e) => ctx.hasTag(e.top, 'ID'),
+        title: 'エールデッキから送る先の#IDホロメンを選択',
+      });
+      if (!dest) return;
+      ctx.sendCheerFromCheerDeckTop(dest.holomem);
+      ctx.shuffleCheerDeck();
+    },
+  },
+
+  arts: {
+    'ノックアウト・ツイスト': {
+      *run(ctx) {
+        // 送り先候補: 自分の〈パヴォリア・レイネ〉（複数バージョン含む）
+        const reineTargets = ctx.holomems('self', (e) => ctx.nameIs(e.top, REINE));
+        if (reineTargets.length === 0) {
+          ctx.log('〈パヴォリア・レイネ〉がいない');
+          return;
+        }
+        if (ctx.player.archive.filter((c) => c.kind === 'cheer').length === 0) {
+          ctx.log('アーカイブに送れるエールがない');
+          return;
+        }
+        const dest = yield ctx.chooseHolomem({
+          side: 'self',
+          filter: (e) => ctx.nameIs(e.top, REINE),
+          title: 'アーカイブのエールを送る〈パヴォリア・レイネ〉を選択',
+        });
+        if (!dest) return;
+        // アーカイブのエールを1～2枚送る（1枚目は必須、2枚目は任意）
+        for (let i = 0; i < 2; i++) {
+          const cheers = ctx.player.archive.filter((c) => c.kind === 'cheer');
+          if (cheers.length === 0) break;
+          const picked = yield ctx.chooseCard({
+            cards: cheers,
+            title: `アーカイブから送るエールを選択（${i + 1}/2枚目）`,
+            optional: i > 0,
+            skipLabel: '送るのをやめる',
+          });
+          if (!picked) break;
+          ctx.removeFromArchive(picked);
+          ctx.attachCheer(picked, dest.holomem);
+        }
+      },
+    },
+  },
+};

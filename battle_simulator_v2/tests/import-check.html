@@ -1,0 +1,32 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head><meta charset="UTF-8"><title>全カード import チェック</title></head>
+<body>
+  <div id="summary">実行中...</div>
+  <script type="module">
+    // IMPLEMENTED の全エントリを実際に動的 import し、構文エラー/モジュール例外を検出する。
+    import { IMPLEMENTED } from '../cards/index.js';
+    (async () => {
+      const entries = Object.entries(IMPLEMENTED);
+      const fails = [];
+      let okCount = 0;
+      const results = await Promise.allSettled(entries.map(([n, imp]) =>
+        imp().then((m) => {
+          const def = m && m.default;
+          if (!def || typeof def !== 'object') throw new Error('default export が無い/オブジェクトでない');
+          if (def.number !== n) {
+            // number 不一致は警告（致命ではないがログ）
+            console.warn('NUMBER_MISMATCH ' + n + ' != ' + def.number);
+          }
+          okCount++;
+        }).catch((e) => { fails.push(n + ': ' + e.message); })
+      ));
+      console.log('IMPORT_CHECK total=' + entries.length + ' ok=' + okCount + ' fail=' + fails.length);
+      for (const f of fails) console.error('IMPORT_FAIL ' + f);
+      document.getElementById('summary').textContent =
+        fails.length === 0 ? ('ALL IMPORTS OK (' + okCount + ')') : (fails.length + ' 件失敗');
+      document.getElementById('summary').id = fails.length === 0 ? 'all-ok' : 'has-fail';
+    })().catch((e) => { console.error('IMPORT_CHECK_ERROR ' + e.message); document.getElementById('summary').textContent = 'runner error: ' + e.message; });
+  </script>
+</body>
+</html>

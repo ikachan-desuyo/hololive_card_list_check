@@ -1,5 +1,5 @@
 // Service Worker for offline caching with centralized version management
-// Version: 4.18.0
+// Version: 4.19.0
 // 注意: バージョンアップ時は sw-version.js と合わせてこのコメントも更新すること。
 // （SWの更新検知は sw.js 本体のバイト差分が最速・最確実。importScripts の
 //   sw-version.js だけの変更だと、環境によって検知がHTTPキャッシュのTTL分遅れる）
@@ -30,19 +30,6 @@ const urlsToCache = [
   './js/deck_builder.js',
   './js/holoca_skill_page.js',
   './js/modal-ui.js',
-  './js/battle_engine.js',
-  './battle_simulator.html',
-  './battle_simulator/state-manager.js',
-  './battle_simulator/hand-manager.js',
-  './battle_simulator/card-display-manager.js',
-  './battle_simulator/info-panel-manager.js',
-  './battle_simulator/phase-controller.js',
-  './battle_simulator/placement-controller.js',
-  './battle_simulator/game-setup-manager.js',
-  './battle_simulator/turn-manager.js',
-  './battle_simulator/card-interaction-manager.js',
-  './battle_simulator/performance-manager.js',
-  './battle_simulator/cpu_logic.js',
   './sw-version.js',
   './sw-utils.js',
   './sw-handlers.js',

@@ -39,8 +39,15 @@ function parseArtCost(icons) {
   return main.map((c) => ICON_COLOR_MAP[c] || '無色');
 }
 
+// カードテキスト中の半角コロンを全角に正規化する。
+// 公式カードリストは「[ホロパワー:-6]」「LIMITED:」のように半角コロンを使うが、
+// 既存のパーサ（推しスキルコスト等）とテキストコンパイラの正規表現は全角「：」前提のため統一する。
+function fwColon(s) {
+  return (s || '').replace(/:/g, '：');
+}
+
 function parseOshiSkill(skill) {
-  const text = skill.text || '';
+  const text = fwColon(skill.text || '');
   // コスト表記は2形式ある: "[ホロパワー：-1]" と "[ホロパワー：2消費]"
   const costMatch = /\[ホロパワー：-?(\d+|X)(?:消費)?\]/.exec(text);
   return {
@@ -94,18 +101,18 @@ export function normalizeCard(raw) {
         dmgPlus: dmgStr.includes('+'),
         cost: parseArtCost(skill.icons),
         tokkou: parseTokkou(skill.icons?.tokkou),
-        text: skill.description || '',
+        text: fwColon(skill.description || ''),
       });
     } else if (skill.type === 'キーワード') {
       card.keywords.push({
         subtype: skill.subtype || '',
         name: skill.name || '',
-        text: skill.description || '',
+        text: fwColon(skill.description || ''),
       });
     } else if (skill.type === '推しスキル' || skill.type === 'SP推しスキル') {
       card.oshiSkills.push(parseOshiSkill(skill));
     } else if (skill.type === 'サポート効果') {
-      card.supportText = skill.name || skill.description || '';
+      card.supportText = fwColon(skill.name || skill.description || '');
     }
   }
 
