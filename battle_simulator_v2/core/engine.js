@@ -442,8 +442,11 @@ export class Engine {
     s.step = 'reset';
     this.log(`【${STEP_NAMES.reset}】`);
     this._pause(() => {
-      // 7.2.2: 全てアクティブに
-      for (const h of this._stageHolomems(p)) h.rested = false;
+      // 7.2.2: 全てアクティブに（ただし「次のリセットでアクティブにならない」フラグ付きは据え置き、フラグを消費）
+      for (const h of this._stageHolomems(p)) {
+        if (h.skipNextReset) { h.skipNextReset = false; continue; } // お休みのまま、次回からは通常通り
+        h.rested = false;
+      }
       // 7.2.3: コラボ → バックへ移動してお休み
       if (p.collab) {
         p.collab.rested = true;
@@ -724,41 +727,55 @@ export class Engine {
     if (opp.center) targets.push({ zone: 'center', index: 0 });
     if (opp.collab) targets.push({ zone: 'collab', index: 0 });
 
+    // 指定ホロメンの指定アーツについて、対象ごとのアーツアクションを actions に積む（通常／再アーツ共通）
+    const pushArtActions = (h, zone, art, ai, isReArts) => {
+      const card = topCard(h);
+      const cost = this._effectiveArtCost(h, art.cost, s.turnPlayer);
+      if (!this._canPayCheers(h.cheers, cost)) return;
+      const artDef = this.registry.getArt(card.number, art.name);
+      // カード定義によるアーツ使用条件（「アーカイブにサポート4枚以上なければ使えない」等）
+      if (artDef?.canUse) {
+        const cctx = new EffectContext(this, s.turnPlayer, { sourceCard: card, sourceHolomem: h });
+        if (!artDef.canUse(cctx)) return;
+      }
+      // 対象拡張: このターン「アーツがHPの減ったバックも対象にできる」修正を持つホロメンは相手のバックも狙える (hBP07-086)
+      let usableTargets = targets;
+      if (this.effects.artCanTargetDamagedBack(h, s.turnPlayer)) {
+        usableTargets = [...targets];
+        opp.back.forEach((b, bi) => {
+          if (b && b.damage > 0) usableTargets.push({ zone: 'back', index: bi });
+        });
+      }
+      // カード定義による対象制限（「このアーツは相手のセンターホロメンしか対象にできない」等）
+      const allowedTargets = artDef?.targetZones
+        ? usableTargets.filter((t) => artDef.targetZones.includes(t.zone))
+        : usableTargets;
+      for (const t of allowedTargets) {
+        const tName = topCard(this._targetHolomem(opp, t)).name;
+        const zoneLabel = t.zone === 'center' ? 'センター' : t.zone === 'collab' ? 'コラボ' : 'バック';
+        actions.push({
+          id: `art${isReArts ? 're' : ''}_${zone}_${ai}_${t.zone}_${t.index}`,
+          label: `${card.name}「${art.name}」(${art.dmg}${art.dmgPlus ? '+' : ''})${isReArts ? '【再アーツ】' : ''} → 相手${zoneLabel} ${tName}`,
+          kind: 'art', zone, artIndex: ai, target: t, reArts: isReArts || undefined,
+        });
+      }
+    };
+
     for (const zone of ['center', 'collab']) {
       const h = p[zone];
-      if (!h || s.perfUsed[zone] || h.rested) continue; // 9.2.1.2-5
-      const card = topCard(h);
-      card.arts.forEach((art, ai) => {
-        const cost = this._effectiveArtCost(h, art.cost, s.turnPlayer);
-        if (!this._canPayCheers(h.cheers, cost)) return;
-        const artDef = this.registry.getArt(card.number, art.name);
-        // カード定義によるアーツ使用条件（「アーカイブにサポート4枚以上なければ使えない」等）
-        if (artDef?.canUse) {
-          const cctx = new EffectContext(this, s.turnPlayer, { sourceCard: card, sourceHolomem: h });
-          if (!artDef.canUse(cctx)) return;
+      if (!h || h.rested) continue;
+      if (!s.perfUsed[zone]) {
+        // 通常のアーツ使用 (9.2.1.2-5)
+        topCard(h).arts.forEach((art, ai) => pushArtActions(h, zone, art, ai, false));
+      } else if (h.lastArtUsedIndex != null) {
+        // 再アーツ: このターン「同じアーツをもう1回使える」修正を持つホロメンは直前のアーツを再使用できる (hBP07-008)
+        const reMod = s.modifiers.find(
+          (m) => m.kind === 'reArts' && !m.used && m.ownerIdx === s.turnPlayer && m.match?.(h));
+        if (reMod) {
+          const art = topCard(h).arts[h.lastArtUsedIndex];
+          if (art) pushArtActions(h, zone, art, h.lastArtUsedIndex, true);
         }
-        // 対象拡張: このターン「アーツがHPの減ったバックも対象にできる」修正を持つホロメンは相手のバックも狙える (hBP07-086)
-        let usableTargets = targets;
-        if (this.effects.artCanTargetDamagedBack(h, s.turnPlayer)) {
-          usableTargets = [...targets];
-          opp.back.forEach((b, bi) => {
-            if (b && b.damage > 0) usableTargets.push({ zone: 'back', index: bi });
-          });
-        }
-        // カード定義による対象制限（「このアーツは相手のセンターホロメンしか対象にできない」等）
-        const allowedTargets = artDef?.targetZones
-          ? usableTargets.filter((t) => artDef.targetZones.includes(t.zone))
-          : usableTargets;
-        for (const t of allowedTargets) {
-          const tName = topCard(this._targetHolomem(opp, t)).name;
-          const zoneLabel = t.zone === 'center' ? 'センター' : t.zone === 'collab' ? 'コラボ' : 'バック';
-          actions.push({
-            id: `art_${zone}_${ai}_${t.zone}_${t.index}`,
-            label: `${card.name}「${art.name}」(${art.dmg}${art.dmgPlus ? '+' : ''}) → 相手${zoneLabel} ${tName}`,
-            kind: 'art', zone, artIndex: ai, target: t,
-          });
-        }
-      });
+      }
     }
 
     actions.push({ id: 'pass', label: 'エンドステップへ', kind: 'pass' });
@@ -1105,7 +1122,14 @@ export class Engine {
     const art = card.arts[action.artIndex];
 
     s.perfUsed[action.zone] = true;
-    this.log(`${card.name} のアーツ「${art.name}」！`);
+    h.lastArtUsedIndex = action.artIndex; // 再アーツ（同じアーツをもう1回）判定用に記録
+    // 再アーツでの使用なら、対応する「もう1回」修正を消費する (hBP07-008)
+    if (action.reArts) {
+      const reMod = s.modifiers.find(
+        (m) => m.kind === 'reArts' && !m.used && m.ownerIdx === s.turnPlayer && m.match?.(h));
+      if (reMod) reMod.used = true;
+    }
+    this.log(`${card.name} のアーツ「${art.name}」！${action.reArts ? '（再アーツ）' : ''}`);
 
     const artDef = this.registry.getArt(card.number, art.name);
     const ctxOpts = { playerIdx: s.turnPlayer, sourceCard: card, sourceHolomem: h };
@@ -1117,63 +1141,87 @@ export class Engine {
     // アーツ解決パイプライン（RULES_SPEC §12 / 12.3.4）
     // 段階4: テキスト効果 → 段階5: 特攻 → 段階6: 数値決定 → 段階7: ダメージ適用
     const resolveDamage = () => {
-      const target = this._targetHolomem(opp, action.target);
-      if (!target) {
+      const primary = this._targetHolomem(opp, action.target);
+      if (!primary) {
         // テキスト効果で対象が場を離れた場合、ダメージは適用されない
         this.log('対象がいなくなったため、アーツダメージは発生しなかった');
         this._checkTiming(() => this._queuePerformancePending());
         return;
       }
-      const targetCard = topCard(target);
-      let dmg = art.dmg;
+      // 対象に依存しない修正までを baseDmg に集約（特攻と被ダメージ修正は対象ごとに適用する）
+      let baseDmg = art.dmg;
       // 条件付き「このアーツ+N」（カード定義の dmgBonus）
       if (artDef?.dmgBonus) {
         const bonus = artDef.dmgBonus(runCtx) || 0;
         if (bonus > 0) {
-          dmg += bonus;
+          baseDmg += bonus;
           this.log(`アーツ効果: +${bonus}`);
         }
       }
       // テキスト効果の実行中に積まれた修正（サイコロの結果など）
-      if (runCtx.artBonus) {
-        dmg += runCtx.artBonus;
-      }
-      // 特攻: 対象の色が一致するなら加算 (12.3.4.3)
-      for (const tk of art.tokkou || []) {
-        if (targetCard.color === tk.color) {
-          dmg += tk.value;
-          this.log(`特攻発動！ ${tk.color}+${tk.value}`);
-        }
-      }
+      if (runCtx.artBonus) baseDmg += runCtx.artBonus;
       // その他の修正: 装着カード（マスコット等）・ターン中の継続効果 (12.3.4.4)
       const mod = this.effects.artsBonus(h, s.turnPlayer);
       if (mod !== 0) {
-        dmg += mod;
+        baseDmg += mod;
         this.log(`継続効果・装着カードの修正: ${mod > 0 ? '+' : ''}${mod}`);
       }
-      // 受け手の「受けるダメージ」修正（軽減/増加）(5.22.3)。常時アウラ/装着分まで反映
-      dmg = this._applyDamageReceived(target, dmg, 'arts', h);
 
-      // ダメージ適用＋アーツ後トリガー群（ダウンさせた時 → このアーツで → アーツを使った時）
-      const applyAndContinue = (finalDmg) => {
-        target.damage += finalDmg;
-        this.log(
-          `「${art.name}」→ ${targetCard.name} に ${finalDmg}ダメージ` +
-          `（累計${target.damage}/${this.effectiveHp(target)}）`
-        );
+      // アーツダメージの対象。リダイレクト（「対象のかわりに相手のセンターとコラボに与える」hBP07-081等）があれば差し替え
+      let targets = [primary];
+      if (artDef?.redirectTargets) {
+        const rt = (artDef.redirectTargets(runCtx) || []).filter(Boolean);
+        if (rt.length > 0) {
+          targets = rt;
+          this.log(`アーツの対象を変更: ${rt.map((t) => topCard(t).name).join('・')}`);
+        }
+      }
+
+      const downed = [];
+      let totalDealt = 0;
+
+      // 1体ぶんのダメージ適用（特攻→被ダメージ修正→推しスキル割り込み→加算）。完了後 after2 を呼ぶ
+      const applyToTarget = (t, after2) => {
+        const tCard = topCard(t);
+        let dmg = baseDmg;
+        // 特攻: 対象の色が一致するなら加算 (12.3.4.3)
+        for (const tk of art.tokkou || []) {
+          if (tCard.color === tk.color) {
+            dmg += tk.value;
+            this.log(`特攻発動！ ${tk.color}+${tk.value}`);
+          }
+        }
+        // 受け手の「受けるダメージ」修正（軽減/増加）(5.22.3)。常時アウラ/装着分まで反映
+        dmg = this._applyDamageReceived(t, dmg, 'arts', h);
+        // 防御側の被ダメージ推しスキル割り込み（対象ごと）
+        this._offerDamageOshiSkill(t, dmg, (finalDmg) => {
+          t.damage += finalDmg;
+          totalDealt += finalDmg;
+          this.log(
+            `「${art.name}」→ ${tCard.name} に ${finalDmg}ダメージ（累計${t.damage}/${this.effectiveHp(t)}）`
+          );
+          if (t.damage >= this.effectiveHp(t)) downed.push(t);
+          after2();
+        });
+      };
+
+      // 全対象に逐次適用（割り込みが挟まるためチェーン）→ 完了後にアーツ後トリガー群
+      const afterAllDamage = () => {
         const cont = () => this._checkTiming(() => this._queuePerformancePending());
         const runners = [];
-        if (target.damage >= this.effectiveHp(target)) {
+        if (downed.length > 0) {
           this._notifySourceDown(h, s.turnPlayer); // 継続効果(ターン修正)の同期通知（ラミィSP等）
           const cardTrig = this.registry.get(topCard(h).number)?.triggers?.onOpponentDown;
-          if (cardTrig) runners.push(cardTrig);
-          if (artDef?.onDownDealt) runners.push(artDef.onDownDealt);
+          for (let d = 0; d < downed.length; d++) { // ダウン体数ぶん（通常は1体）
+            if (cardTrig) runners.push(cardTrig);
+            if (artDef?.onDownDealt) runners.push(artDef.onDownDealt);
+          }
         }
         const onArts = this.registry.get(topCard(h).number)?.triggers?.onArtsUse;
         if (onArts) runners.push(onArts);
-        // 「このアーツで（相手に）ダメージを与えた時」（実際に与えたダメージ量を渡す。ライフスティール等）
-        if (artDef?.onDamageDealt && finalDmg > 0) {
-          const dealt = finalDmg;
+        // 「このアーツで（相手に）ダメージを与えた時」（実際に与えた合計ダメージ量を渡す。ライフスティール等）
+        if (artDef?.onDamageDealt && totalDealt > 0) {
+          const dealt = totalDealt;
           runners.push(function* onDamageDealtWrap(c) { yield* artDef.onDamageDealt(c, dealt); });
         }
         if (runners.length > 0) {
@@ -1191,8 +1239,11 @@ export class Engine {
         cont();
       };
 
-      // 「相手のターンで自分のホロメンが相手からダメージを受ける時に使える」防御側の推しスキル割り込み
-      this._offerDamageOshiSkill(target, dmg, applyAndContinue);
+      const applyNext = (i) => {
+        if (i >= targets.length) { afterAllDamage(); return; }
+        applyToTarget(targets[i], () => applyNext(i + 1));
+      };
+      applyNext(0);
     };
 
     if (artDef?.run) {

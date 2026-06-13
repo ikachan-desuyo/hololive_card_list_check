@@ -215,6 +215,46 @@ export class EffectContext {
     return null;
   }
 
+  /**
+   * 相手に、相手のステージのホロメンを選ばせる決定ポイント（「相手は自身のバックホロメン1人を選ぶ」等）。
+   * 決定ポイントの所有者は相手プレイヤーになる（request.player = 相手）。戻り値は選ばれたエントリ {pos, holomem, top}。
+   * 強制選択（「選ばない」なし）。候補が無ければ null で再開される。
+   */
+  opponentChoosesHolomem({ filter = null, title }) {
+    const oppIdx = 1 - this.playerIdx;
+    const opp = this.opponent;
+    const entries = [];
+    for (const pos of this.engine._stagePositions(opp)) {
+      const holomem = this.engine._holomemAt(opp, pos);
+      const top = holomem.stack[0];
+      if (!filter || filter({ pos, holomem, top })) entries.push({ pos, holomem, top });
+    }
+    return {
+      kind: 'chooseHolomem',
+      player: oppIdx,
+      title,
+      buildOptions: () => entries.map((e) => ({
+        id: `mem_${e.pos.zone}_${e.pos.index}`,
+        label: `${e.top.name}（${e.pos.zone === 'center' ? 'センター' : e.pos.zone === 'collab' ? 'コラボ' : 'バック'}）`,
+        value: e, pos: e.pos, side: 'self',
+      })),
+    };
+  }
+
+  /**
+   * ホロメンを持ち主のコラボポジションへ移動する（バックから。コラボ扱いではない＝onCollab等は誘発しない）。
+   * 相手のバックをコラボに上げさせる効果（凸待ち等）に使う。
+   */
+  moveToCollabOwner(holomem) {
+    const owner = this.state.players.find((p) => p.back.includes(holomem));
+    if (!owner || owner.collab) return false;
+    const i = owner.back.indexOf(holomem);
+    owner.back.splice(i, 1);
+    owner.collab = holomem;
+    this.log(`${holomem.stack[0].name} をコラボポジションへ移動（コラボとしては扱わない）`);
+    return true;
+  }
+
   /** お休み状態のホロメンをアクティブにする (4.3.2) */
   setActive(holomem) {
     if (holomem.rested) {
@@ -232,6 +272,22 @@ export class EffectContext {
     else return; // 既にバック等
     p.back.push(holomem);
     this.log(`${holomem.stack[0].name} をバックポジションへ移動`);
+  }
+
+  /**
+   * 任意の持ち主のホロメンをバックへ移動し、お休みにして「次のリセットステップで非アクティブ」にする (hBP06-088)。
+   * 相手のセンター/コラボを下げる効果に使う（持ち主は自動判定）。
+   */
+  moveToBackRestedSkipReset(holomem) {
+    const owner = this.state.players.find(
+      (p) => p.center === holomem || p.collab === holomem || p.back.includes(holomem));
+    if (!owner) return;
+    if (owner.center === holomem) owner.center = null;
+    else if (owner.collab === holomem) owner.collab = null;
+    if (!owner.back.includes(holomem)) owner.back.push(holomem);
+    holomem.rested = true;
+    holomem.skipNextReset = true;
+    this.log(`${holomem.stack[0].name} をお休みさせてバックポジションへ移動（次のリセットステップで非アクティブ）`);
   }
 
   /** ホロメンを効果でダウンさせる (4.4.9)。HPに関係なく次のチェックタイミングでダウン処理 */

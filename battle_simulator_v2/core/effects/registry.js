@@ -16,6 +16,7 @@
  *       *onDownDealt(ctx) {...},                          // 「このアーツで相手をダウンさせた時」（ダメージ適用後に発火）
  *       *onDamageDealt(ctx, dealt) {...},                 // 「このアーツでダメージを与えた時」（与ダメージ量を受け取る。ライフスティール等）
  *       canUse(ctx) { return bool; },                     // アーツ使用条件（満たさなければ選択肢に出ない）
+ *       redirectTargets(ctx) { return [holomem, ...]; },  // 対象差し替え（「対象のかわりに相手センター＋コラボに与える」等。非空配列で複数対象化）
  *     } },
  *     support: {
  *       canUse(ctx) { return bool; },                    // 追加の使用条件
@@ -44,14 +45,19 @@
  *       *onDown(ctx) {...},                              // このホロメンがダウンした時（アーカイブ前。_processDown で発火）
  *       *onAttach(ctx) {...},                            // このカードを付けた時（supportAttach / attachSupportWithTrigger で発火）
  *       *onOpponentDown(ctx) {...},                      // このホロメンが相手をダウンさせた時（アーツ解決時に発火。選択可）
+ *       *onOpponentPerformanceEnd(ctx) {...},            // 相手のパフォーマンスステップ終了時（防御側で発火。ctx.lifeDecreasedThisPerf でそのステップ中のライフ減少を判定）
  *     },                                                 //   ※ctx.sourceCard=自分, ctx.sourceHolomem=付いた/ダウンした/ダウンさせたホロメン
+ *     specialBloom(h, handCard, engine, ownerIdx) { return bool; }, // 特殊Bloom: true でメインのBloom候補に追加（レベル遷移条件のみ迂回。同名/HP/ターン制限は通常通り）
+ *     // ※ターン修正による機構: kind:'artTargetDamagedBack'（アーツ対象をHP減バックに拡張）/ kind:'reArts'（使ったアーツをもう1回。used フラグで消費）
+ *     //   いずれも ctx.addTurnModifier({kind, ownerIdx, match}) で付与する
  *     artsCostReduceAura(src, target, engine) {          // アーツ必要エール軽減オーラ（[{color,amount}]を返す。engine が実効コスト算出に使用）
  *       return [{ color: '黄', amount: 1 }];             //   src=この能力の持ち主, target=コスト判定対象のホロメン
  *     },
  *     // 常時アウラ＝別ホロメンを恒常強化/保護するギフト（src=持ち主, target=評価対象。味方ステージを走査して合算）
  *     auraArtsPlus(src, target, engine) { return N; },        // 「自分の#0期生全員のアーツ+30」等
  *     auraHpPlus(src, target, engine) { return N; },          // 「自分の〇〇のHP+N」等
- *     auraDamageDelta(src, target, zone, engine) { return -N; },   // 「コラボが受けるダメージ-10」「受けない＝-100000」等
+ *     auraDamageDelta(src, target, zone, engine, kind, attacker) { return -N; }, // 「コラボが受けるダメージ-10」「特殊のみ無効＝kind==='special'で-100000」「相手1stから受けるアーツ-30＝src===target&&attacker条件」等
+ *       // kind='arts'|'special'、attacker=攻撃元ホロメン（無ければnull）。src===target で自己ギフトも表現できる
  *     auraSpecialDmgPlus(src, sourceHolomem, targetEntry, engine) { return N; }, // 「〈X〉が相手センターに与える特殊+20」等
  *     oshiSkill / spOshiSkill: { canUse(engine, idx), *run(ctx) },
  *     onDownOshiSkill: { cost, title, canUse(engine, idx, holomem), apply(engine, idx, holomem) },
