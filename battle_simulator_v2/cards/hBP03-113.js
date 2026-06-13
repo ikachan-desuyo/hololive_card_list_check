@@ -1,0 +1,25 @@
+/**
+ * Risuners (hBP03-113) サポート・ファン
+ *
+ * [サポート効果] [ターンに1回]このファンが付いているホロメンにエールが付いた時、
+ *   このターンの間、このホロメンのアーツ+10。
+ *   → 「（このホロメンに）エールが付いた時」に誘発する効果。
+ *      エンジンに「エールが付いた時」(onCheerAttached) のトリガーディスパッチが
+ *      存在しないため【保留】。実装するには context.js の attachCheer / engine の
+ *      attachCheer 解決時に、付け先ホロメンの装着カードの onCheerAttached を走査して
+ *      誘発する仕組みが必要（誘発時に ctx.addTurnModifier({kind:'artsPlus', amount:10, ...}) を
+ *      ターンに1回だけ積む）。
+ *
+ * 付け先制限のみ実装:
+ *   このファンは、自分の〈アユンダ・リス〉だけに付けられ、1人につき何枚でも付けられる。
+ */
+export default {
+  number: 'hBP03-113',
+  attachRule: {
+    canAttach(holomem) {
+      return holomem.stack[0].name === 'アユンダ・リス';
+    },
+    unlimited: true, // 1人に何枚でも
+  },
+  // 「エールが付いた時アーツ+10」の誘発効果は未実装（保留：onCheerAttached トリガー機構が必要）。
+};
