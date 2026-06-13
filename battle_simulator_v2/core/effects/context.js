@@ -164,11 +164,42 @@ export class EffectContext {
     return drawn;
   }
 
-  /** サイコロを1個振る (5.24) */
+  /** サイコロを1個振る (5.24)。「目をNとして扱う」継続効果に対応 */
   rollDice() {
-    const value = rollDie(this.engine.rng);
-    this.log(`🎲 サイコロ: ${value}`);
+    let value = rollDie(this.engine.rng);
+    const fixed = this.engine.state.modifiers.find(
+      (m) => m.kind === 'diceFixed' && m.ownerIdx === this.playerIdx);
+    if (fixed) {
+      this.log(`🎲 サイコロ: ${value} → ${fixed.value} として扱う（${fixed.description || '効果'}）`);
+      value = fixed.value;
+    } else {
+      this.log(`🎲 サイコロ: ${value}`);
+    }
     return value;
+  }
+
+  /**
+   * アーツの解決中にダメージ修正を積む（「サイコロを振れる：偶数の時、このアーツ+20」等）。
+   * エンジンがアーツのダメージ計算時に artBonus を加算する。
+   */
+  addArtBonus(n, reason = '') {
+    this.artBonus = (this.artBonus || 0) + n;
+    if (n !== 0) this.log(`アーツ${n > 0 ? '+' : ''}${n}${reason ? `（${reason}）` : ''}`);
+  }
+
+  /** ホロメンを効果でダウンさせる (4.4.9)。HPに関係なく次のチェックタイミングでダウン処理 */
+  forceDown(targetEntry, opts = {}) {
+    targetEntry.holomem.forcedDown = true;
+    if (opts.noLifeOnDown) targetEntry.holomem.noLifeOnDown = true;
+    this.log(`${targetEntry.top.name} をダウンさせる${opts.noLifeOnDown ? '（ライフは減らない）' : ''}`);
+  }
+
+  /** HPをすべて回復 (5.23.2) */
+  healAll(holomem) {
+    if (holomem.damage > 0) {
+      this.log(`${holomem.stack[0].name} のHPをすべて回復（${holomem.damage}）`);
+      holomem.damage = 0;
+    }
   }
 
   /** デッキをシャッフルする (5.6) */

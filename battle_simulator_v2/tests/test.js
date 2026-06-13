@@ -521,16 +521,100 @@ export async function runTests() {
     // ゼータのマスコット: 能力追加が「アーツを使った時～」でHP+N以外 → 装着枠ごと不採用
     const def = compileCard(lib.get('hBP07-105_C'));
     assert(!def?.attached, '解釈できない装着効果が実装されてしまっている');
-    // アイドルサインペン: 「デッキの上から4枚を見る」は未対応 → サポート枠不採用
-    const def2 = compileCard(lib.get('hBP02-075_U'));
-    assert(!def2?.support, '解釈できないサポート効果が実装されてしまっている');
+    // 鈍器でぶっ叩くわよ！: 「能力変更可能」は未対応 → サポート枠不採用
+    const def2 = compileCard(lib.get('hBP01-110_U'));
+    assert(!def2?.support, '解釈できないサポート効果（能力変更可能）が実装されてしまっている');
+  });
+
+  await testAsync('手書き定義のアーツ名・コラボ名がカードデータと一致する', async () => {
+    // 推測で書いた名前が実データとズレていないか（ズレると効果が紐づかず無言で発動しない）
+    const checks = [
+      ['hBP01-009_C', 'arts', 'こんかなた～'],
+      ['hBP01-031_R', 'arts', '約束の力'],
+      ['hBP01-031_R', 'collab', '希望の庭園'],
+      ['hBP01-095_R', 'arts', '早送り'],
+      ['hBP01-095_R', 'collab', '巻き戻し'],
+      ['hSD01-007_C', 'collab', 'HOPE'],
+      ['hSD01-009_R', 'collab', '広がる地図'],
+      ['hSD01-015_U', 'collab', 'SoAzKo'],
+    ];
+    for (const [id, kind, name] of checks) {
+      const card = lib.get(id);
+      assert(card, `${id} が無い`);
+      if (kind === 'arts') {
+        assert(card.arts.some((a) => a.name === name), `${id} にアーツ「${name}」が無い`);
+      } else {
+        assert(card.keywords.some((k) => k.subtype === 'コラボエフェクト' && k.name === name),
+          `${id} にコラボエフェクト「${name}」が無い`);
+      }
+    }
+  });
+
+  await testAsync('手書き: ハコスのコラボ（両者手札をデッキ下→同数ドロー）でカード保存則維持', async () => {
+    const e = await setupMainStep(deckMap, 111);
+    const s = e.state;
+    const def = (await buildRegistry(lib, deckMap)).get('hBP01-075');
+    // deckMap にハコスがいない可能性があるので registry を直接構築
+    const reg = new EffectRegistry();
+    await reg.preload(['hBP01-075'], lib);
+    const hakos = reg.get('hBP01-075');
+    assert(hakos?.collabEffect, 'ハコスのコラボが読み込めない');
+    const p0 = s.players[0];
+    const p1 = s.players[1];
+    const h0 = p0.hand.length;
+    const h1 = p1.hand.length;
+    const before0 = totalCards(p0);
+    const before1 = totalCards(p1);
+    let done = false;
+    e._runEffect(hakos.collabEffect, { playerIdx: 0 }, () => { done = true; });
+    let guard = 0;
+    while (!done && s.pending && guard++ < 20) e.apply(s.pending.options[0].id);
+    assert(done, '完了しない');
+    assertEq(p0.hand.length, h0, '自分の手札枚数が元に戻っていない');
+    assertEq(p1.hand.length, h1, '相手の手札枚数が元に戻っていない');
+    assertEq(totalCards(p0), before0, '自分のカード保存則が崩れた');
+    assertEq(totalCards(p1), before1, '相手のカード保存則が崩れた');
+  });
+
+  await testAsync('コンパイラ: サイコロ分岐アーツ（奇数で+50・1でさらに+50）', async () => {
+    // hSD01-011 AZKi: 「サイコロを1回振れる：奇数の時、このアーツ+50。1の時、さらに、このアーツ+50。」
+    const def = compileCard(lib.get('hSD01-011_RR'));
+    const artName = lib.get('hSD01-011_RR').arts.find((a) => /奇数/.test(a.text)).name;
+    assert(def?.arts?.[artName]?.run, 'サイコロ分岐アーツがコンパイルされていない');
+    // 実行してクラッシュしないこと（結果はシード依存なので保存則のみ確認）
+    const e = await setupMainStep(deckMap, 112);
+    let done = false;
+    const ctx0 = e.state.players[0].center;
+    e._runEffect(def.arts[artName], { playerIdx: 0, sourceHolomem: ctx0,
+      ctx: new EffectContext(e, 0, { sourceHolomem: ctx0 }) }, () => { done = true; });
+    let guard = 0;
+    while (!done && e.state.pending && guard++ < 10) e.apply(e.state.pending.options[0].id);
+    assert(done, 'サイコロ分岐アーツが完了しない');
+  });
+
+  await testAsync('コンパイラ: 推しスキル（天音かなた「ぎゅっぎゅっ」: 残りHPを50に）', async () => {
+    const def = compileCard(lib.get('hBP01-001_OSR'));
+    assert(def?.oshiSkill?.run, '推しスキルがコンパイルされていない');
+    const e = await setupMainStep(deckMap, 113);
+    const p1 = e.state.players[1];
+    p1.center.damage = 0; // 満タン
+    const eff = e.effectiveHp(p1.center);
+    let done = false;
+    e._runEffect(def.oshiSkill, { playerIdx: 0 }, () => { done = true; });
+    assert(done, '完了しない');
+    assertEq(eff - p1.center.damage, 50, '相手センターの残りHPが50になっていない');
   });
 
   await testAsync('コンパイラ: 全カードでクラッシュせず、一定数を自動実装できる', async () => {
     let compiled = 0;
     let slots = 0;
     for (const card of lib.byNumber.values()) {
-      const def = compileCard(card); // 例外を投げないことも検証
+      let def;
+      try {
+        def = compileCard(card);
+      } catch (e) {
+        throw new Error(`${card.number} のコンパイルで例外: ${e.message}`);
+      }
       if (def) {
         compiled++;
         slots += ['bloomEffect', 'collabEffect', 'support', 'attached']

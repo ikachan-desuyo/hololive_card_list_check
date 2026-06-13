@@ -177,7 +177,8 @@ export class Engine {
       after();
       return;
     }
-    const ctx = new EffectContext(this, ctxOpts.playerIdx, ctxOpts);
+    // ctxOpts.ctx で外から ctx を渡せる（アーツのボーナス蓄積を受け取るため等）
+    const ctx = ctxOpts.ctx || new EffectContext(this, ctxOpts.playerIdx, ctxOpts);
     let gen;
     try {
       gen = effectDef.run(ctx);
@@ -365,6 +366,7 @@ export class Engine {
     const p = s.players[playerIdx];
     p.turnCount++;
     p.usedLimitedThisTurn = false;
+    p.usedSupportThisTurn = false;
     p.usedCollabThisTurn = false;
     p.usedBatonTouchThisTurn = false;
     // 推しスキルの[ターンに1回]は両プレイヤーともリセットする
@@ -642,7 +644,12 @@ export class Engine {
       const card = topCard(h);
       card.arts.forEach((art, ai) => {
         if (!this._canPayCheers(h.cheers, art.cost)) return;
-        for (const t of targets) {
+        // カード定義による対象制限（「このアーツは相手のセンターホロメンしか対象にできない」等）
+        const artDef = this.registry.getArt(card.number, art.name);
+        const allowedTargets = artDef?.targetZones
+          ? targets.filter((t) => artDef.targetZones.includes(t.zone))
+          : targets;
+        for (const t of allowedTargets) {
           const tName = topCard(opp[t.zone]).name;
           actions.push({
             id: `art_${zone}_${ai}_${t.zone}`,
@@ -838,6 +845,7 @@ export class Engine {
       case 'support': {
         const card = p.hand.splice(action.handIndex, 1)[0];
         if (card.limited) p.usedLimitedThisTurn = true;
+        p.usedSupportThisTurn = true;
         this.log(`${p.name}: サポート ${card.name} を使用`);
         const def = this.registry.get(card.number);
         if (def?.support) {
@@ -857,6 +865,7 @@ export class Engine {
       case 'supportAttach': {
         const card = p.hand.splice(action.handIndex, 1)[0];
         if (card.limited) p.usedLimitedThisTurn = true;
+        p.usedSupportThisTurn = true;
         const h = this._holomemAt(p, action.pos);
         h.attachments.push(card);
         this.log(`${p.name}: ${card.name}〔${card.supportType}〕を ${topCard(h).name} に付けた`);
@@ -913,6 +922,8 @@ export class Engine {
 
     const artDef = this.registry.getArt(card.number, art.name);
     const ctxOpts = { playerIdx: s.turnPlayer, sourceCard: card, sourceHolomem: h };
+    // テキスト効果（段階4）の実行中に積まれたアーツ修正（サイコロ等）を受け取るための参照
+    const runCtx = new EffectContext(this, s.turnPlayer, ctxOpts);
 
     // アーツ解決パイプライン（RULES_SPEC §12 / 12.3.4）
     // 段階4: テキスト効果 → 段階5: 特攻 → 段階6: 数値決定 → 段階7: ダメージ適用
@@ -928,12 +939,15 @@ export class Engine {
       let dmg = art.dmg;
       // 条件付き「このアーツ+N」（カード定義の dmgBonus）
       if (artDef?.dmgBonus) {
-        const ctx = new EffectContext(this, s.turnPlayer, ctxOpts);
-        const bonus = artDef.dmgBonus(ctx) || 0;
+        const bonus = artDef.dmgBonus(runCtx) || 0;
         if (bonus > 0) {
           dmg += bonus;
           this.log(`アーツ効果: +${bonus}`);
         }
+      }
+      // テキスト効果の実行中に積まれた修正（サイコロの結果など）
+      if (runCtx.artBonus) {
+        dmg += runCtx.artBonus;
       }
       // 特攻: 対象の色が一致するなら加算 (12.3.4.3)
       for (const tk of art.tokkou || []) {
@@ -962,7 +976,7 @@ export class Engine {
     };
 
     if (artDef?.run) {
-      this._runEffect(artDef, ctxOpts, resolveDamage);
+      this._runEffect(artDef, { ...ctxOpts, ctx: runCtx }, resolveDamage);
     } else {
       if (art.text) this.log(`TODO(効果未実装) アーツ効果: ${art.text}`);
       resolveDamage();
@@ -987,7 +1001,8 @@ export class Engine {
         const p = s.players[idx];
         const downed = this._stagePositions(p).find((pos) => {
           const h = this._holomemAt(p, pos);
-          return h.damage >= this.effectiveHp(h);
+          // 実効HP以上のダメージ、または効果による強制ダウン (4.4.9)
+          return h.damage >= this.effectiveHp(h) || h.forcedDown;
         });
         if (downed) {
           this._processDown(p, downed, step); // 処理後に step へ再入
