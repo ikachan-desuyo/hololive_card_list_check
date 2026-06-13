@@ -172,12 +172,20 @@ export class EffectSystem {
     return red;
   }
 
-  /** ターン終了時: 「ターンの終わりまで」の修正を消滅させる (7.7.4) */
+  /**
+   * ターン終了時: 「ターンの終わりまで」の修正を消滅させる (7.7.4)。
+   * 複数ターンにまたがる修正は mod.untilTurn（このターン番号の終わりまで有効）で表現し、
+   * state.turn >= untilTurn になったエンドステップで消滅させる（「次の相手のターン終了まで」等）。
+   */
   expireTurnModifiers() {
+    const turn = this.engine.state.turn;
     const before = this.engine.state.modifiers.length;
-    this.engine.state.modifiers = this.engine.state.modifiers.filter((m) => m.duration !== 'turn');
+    this.engine.state.modifiers = this.engine.state.modifiers.filter((m) => {
+      if (m.untilTurn != null) return turn < m.untilTurn; // 指定ターンの終わりまで残す
+      return m.duration !== 'turn';                        // 通常の「このターンの間」
+    });
     if (before !== this.engine.state.modifiers.length) {
-      this.engine.log('ターン中の継続効果が消滅した');
+      this.engine.log('継続効果が消滅した');
     }
   }
 }

@@ -888,15 +888,34 @@ export class Engine {
           p.holoPower.push(p.deck.shift());
         }
         this.log(`${p.name}: ${topCard(h).name} がコラボ（ホロパワー+1）`);
-        // コラボエフェクト (13.2)
+        // コラボエフェクト (13.2) ＋ 他ホロメンの「（自分のホロメンが）コラボした時」傍観トリガー
+        const runners = [];
         const def = this.registry.get(topCard(h).number);
         if (def?.collabEffect) {
           this.log(`《コラボエフェクト》${def.collabEffect.name}`);
-          this._runEffect(def.collabEffect, { playerIdx: s.turnPlayer, sourceCard: topCard(h), sourceHolomem: h }, finish);
+          runners.push({ run: def.collabEffect.run, srcCard: topCard(h), srcH: h });
+        } else {
+          const kw = topCard(h).keywords.find((k) => k.subtype === 'コラボエフェクト');
+          if (kw) this.log(`TODO(効果未実装) コラボエフェクト「${kw.name}」: ${kw.text}`);
+        }
+        for (const pos of this._stagePositions(p)) {
+          const wh = this._holomemAt(p, pos);
+          if (wh === h) continue;
+          const wtrig = this.registry.get(topCard(wh).number)?.triggers?.onCollab;
+          if (wtrig) runners.push({ run: wtrig, srcCard: topCard(wh), srcH: wh });
+        }
+        if (runners.length > 0) {
+          const runNext = (i) => {
+            if (i >= runners.length) { finish(); return; }
+            this._runEffect(
+              { run: runners[i].run },
+              { playerIdx: s.turnPlayer, sourceCard: runners[i].srcCard, sourceHolomem: runners[i].srcH },
+              () => runNext(i + 1),
+            );
+          };
+          runNext(0);
           return;
         }
-        const kw = topCard(h).keywords.find((k) => k.subtype === 'コラボエフェクト');
-        if (kw) this.log(`TODO(効果未実装) コラボエフェクト「${kw.name}」: ${kw.text}`);
         break;
       }
       case 'oshiSkill': {
@@ -987,10 +1006,16 @@ export class Engine {
             ctx.archiveCheer(center, cheer);
           }
           const back = p.back.splice(backIndex, 1)[0];
+          const moved = p.center; // バックポジションへ移動するホロメン
           p.back.push(p.center);
           p.center = back;
           p.usedBatonTouchThisTurn = true;
           ctx.log(`${p.name}: バトンタッチ（${topCard(back).name} がセンターへ）`);
+          // 「バトンタッチしてバックポジションに移動した時」トリガー（AIこより等）
+          const mtrig = ctx.engine.registry.get(moved.stack[0].number)?.triggers?.onBatonMove;
+          if (mtrig) {
+            yield* mtrig(ctx.engine._effectContext(ctx.playerIdx, { sourceCard: moved.stack[0], sourceHolomem: moved }));
+          }
         };
         this._runEffect({ run: payAndSwap }, { playerIdx: s.turnPlayer }, finish);
         return;
@@ -1321,6 +1346,11 @@ export class Engine {
     return createHolomem(card, turn);
   }
 
+  /** 新しい EffectContext を生成（トリガー効果の入れ子実行用） */
+  _effectContext(playerIdx, opts = {}) {
+    return new EffectContext(this, playerIdx, opts);
+  }
+
   _shuffle(arr) {
     shuffle(arr, this.rng);
   }
@@ -1413,12 +1443,19 @@ export class Engine {
    * アーツはエールを消費しない（満たしているかの判定のみ）ため、判定直前に使う。
    */
   _effectiveArtCost(holomem, cost, ownerIdx) {
-    const red = this.effects.artsCostReduction(holomem, ownerIdx);
-    const out = [...cost];
+    return this._applyCostReduction([...cost], this.effects.artsCostReduction(holomem, ownerIdx));
+  }
+
+  /** {色:数} の軽減を適用（正=必要エール減, 負=必要エール増）。コスト配列を返す */
+  _applyCostReduction(out, red) {
     for (const [color, amount] of Object.entries(red)) {
-      for (let i = 0; i < amount; i++) {
-        const idx = out.indexOf(color);
-        if (idx !== -1) out.splice(idx, 1);
+      if (amount > 0) {
+        for (let i = 0; i < amount; i++) {
+          const idx = out.indexOf(color);
+          if (idx !== -1) out.splice(idx, 1);
+        }
+      } else if (amount < 0) {
+        for (let i = 0; i < -amount; i++) out.push(color); // 必要エール増加
       }
     }
     return out;
@@ -1426,15 +1463,7 @@ export class Engine {
 
   /** バトンタッチの必要エールに軽減（「無色-2」等）を適用した実効コストを返す */
   _effectiveBatonCost(holomem, cost, ownerIdx) {
-    const red = this.effects.batonCostReduction(holomem, ownerIdx);
-    const out = [...cost];
-    for (const [color, amount] of Object.entries(red)) {
-      for (let i = 0; i < amount; i++) {
-        const idx = out.indexOf(color);
-        if (idx !== -1) out.splice(idx, 1);
-      }
-    }
-    return out;
+    return this._applyCostReduction([...cost], this.effects.batonCostReduction(holomem, ownerIdx));
   }
 
   /**
