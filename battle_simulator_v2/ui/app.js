@@ -710,6 +710,29 @@ function renderEffectChoiceModal(s) {
   // AIの選択は表示しない（デッキサーチ候補などの非公開情報が見えてしまうため）
   if (isEffect && aiEnabled(s.pending.player)) isEffect = false;
 
+  // --- エール送り（ライフめくり / エールステップ）も盤面クリックで送り先を選ぶ ---
+  // 公開されたエールがどのホロメンに行くかを分かりやすくするため、送り先を金色に光らせる
+  const isCheerSend = s.pending?.type === 'attachCheer' || s.pending?.type === 'attachLifeCheer';
+  if (isCheerSend && !aiEnabled(s.pending.player)) {
+    document.getElementById('choice-modal').classList.remove('active');
+    for (const opt of s.pending.options) {
+      if (!opt.pos) continue;
+      const el = document.querySelector(`[data-drop="${s.pending.player}:mem:${opt.pos.zone}:${opt.pos.index}"]`);
+      if (el) {
+        el.classList.add('choice-target');
+        el.dataset.choiceId = opt.id;
+      }
+    }
+    bar.innerHTML = '';
+    const label = document.createElement('span');
+    const cheerName = s.pending.cheer?.name || 'エール';
+    const src = s.pending.type === 'attachLifeCheer' ? 'ライフの ' : '';
+    label.textContent = `🩷 ${src}${cheerName} を送るホロメンを選択（光っているカードをクリック）`;
+    bar.appendChild(label);
+    bar.classList.add('active');
+    return;
+  }
+
   // サイコロ表示中は次の選択モーダルを出さない（サイコロが隠れて見えなくなるため）
   const sinceDice = Date.now() - diceShownAt;
   if (isEffect && sinceDice < DICE_MODAL_DELAY_MS) {

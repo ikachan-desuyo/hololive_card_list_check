@@ -254,6 +254,12 @@ export class EffectContext {
     this.player.deck.push(...cards);
   }
 
+  /** カードをデッキの上に戻す（公開中にあれば取り除く。先頭の順は cards の順） */
+  deckToTop(cards) {
+    for (const c of cards) this._unreveal(c);
+    this.player.deck.unshift(...cards);
+  }
+
   _unreveal(card) {
     const i = this.player.revealed.indexOf(card);
     if (i !== -1) this.player.revealed.splice(i, 1);
