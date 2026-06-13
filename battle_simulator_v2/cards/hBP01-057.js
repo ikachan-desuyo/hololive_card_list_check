@@ -8,7 +8,7 @@
  * いずれも対象は「相手のコラボホロメン」固定（コラボ枠は最大1人なので選択不要）。
  * コラボホロメンが居なければ何も起きない。
  */
-function dealToOppCollab(ctx) {
+function* dealToOppCollab(ctx) {
   const collab = ctx.holomems('opp', (e) => e.pos.zone === 'collab')[0];
   if (!collab) {
     ctx.log('相手のコラボホロメンが居ないため特殊ダメージは発生しなかった');
@@ -23,14 +23,14 @@ export default {
   collabEffect: {
     name: 'アポイント',
     *run(ctx) {
-      dealToOppCollab(ctx);
+      yield* dealToOppCollab(ctx);
     },
   },
 
   arts: {
     '漆黒の翼で誘おう': {
       *run(ctx) {
-        dealToOppCollab(ctx);
+        yield* dealToOppCollab(ctx);
       },
     },
   },
