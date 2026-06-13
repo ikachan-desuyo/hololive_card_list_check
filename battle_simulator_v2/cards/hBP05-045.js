@@ -2,11 +2,21 @@
  * 猫又おかゆ (hBP05-045) 青・2nd・HP200（#ゲーマーズ）
  * アーツ「僕のコト、大好きになってみない？」(120): 相手のホロメン1人に特殊ダメージ20を与える。
  *   その後、自分のアーカイブのエール1枚を自分の#ゲーマーズを持つバックホロメンに送れる。
- * ※キーワード「自分らしく居られる場所」(ギフト・特殊ダメージ+20の常時アウラ)は
- *   他ホロメンを恒常強化するアウラ機構が未対応のため未実装（CARD_EFFECT_STATUS.md §8）。
+ * ギフト「自分らしく居られる場所」:
+ *   [センターポジション限定]自分の推しホロメンの〈猫又おかゆ〉と自分のステージの〈猫又おかゆ〉全員が
+ *   相手のセンターホロメンに与える特殊ダメージ+20。
+ *   → 常時アウラ（auraSpecialDmgPlus）。自分(おかゆ)がセンターにいる間、
+ *     発生源が〈猫又おかゆ〉で相手センターを対象とする特殊ダメージに+20。
  */
 export default {
   number: 'hBP05-045',
+  // [センター限定] 〈猫又おかゆ〉が相手センターに与える特殊ダメージ+20
+  auraSpecialDmgPlus(src, sourceHolomem, targetEntry, engine) {
+    if (engine._zoneOf(src) !== 'center') return 0;
+    if (src.stack[0].name !== '猫又おかゆ') return 0;
+    if (sourceHolomem?.stack[0].name !== '猫又おかゆ') return 0;
+    return targetEntry.pos.zone === 'center' ? 20 : 0;
+  },
   arts: {
     '僕のコト、大好きになってみない？': {
       *run(ctx) {

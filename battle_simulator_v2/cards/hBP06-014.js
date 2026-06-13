@@ -7,12 +7,28 @@
  *   → arts.run: センター限定を確認し、解決時にステージのコラボ位置にいる#絵ホロメンを対象に
  *     ターン修正（artsPlus+50 / artCostReduce 無色-1）を付与する。
  *
- * ※ キーワード/ギフト「夢紡ぎのアトリエ」（このホロメンがアーツを使った時、ホロパワーを見て1枚公開して
- *    手札に加え、手札1枚をホロパワーにしてシャッフルする）は未実装。
- *    「アーツを使った時(onArtsUse)」トリガーは現状のフックに無い（保留対象）。
+ * ギフト「夢紡ぎのアトリエ」: このホロメンがアーツを使った時、自分のホロパワーを見て1枚を公開し手札に加え、
+ *   手札に加えたなら自分の手札1枚をホロパワーにする。そしてホロパワーをシャッフルする。
+ *   → triggers.onArtsUse（アーツ解決後に発火）
  */
 export default {
   number: 'hBP06-014',
+  triggers: {
+    *onArtsUse(ctx) {
+      const p = ctx.player;
+      if (p.holoPower.length === 0) return;
+      const picked = yield ctx.chooseCard({ cards: p.holoPower, title: 'ホロパワーから手札に加えるカードを選択' });
+      if (!picked) return;
+      p.holoPower.splice(p.holoPower.indexOf(picked), 1);
+      ctx.addToHand(picked);
+      if (p.hand.length > 0) {
+        const back = yield ctx.chooseCard({ cards: p.hand, title: 'ホロパワーにする手札を選択' });
+        if (back) { ctx.removeFromHand(back); p.holoPower.push(back); ctx.log('手札1枚をホロパワーにした'); }
+      }
+      ctx.engine._shuffle(p.holoPower);
+      ctx.log('ホロパワーをシャッフルした');
+    },
+  },
   arts: {
     '色彩のリナシメント': {
       *run(ctx) {

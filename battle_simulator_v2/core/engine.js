@@ -1034,23 +1034,27 @@ export class Engine {
         dmg += mod;
         this.log(`継続効果・装着カードの修正: ${mod > 0 ? '+' : ''}${mod}`);
       }
-      // 受け手の「受けるダメージ」修正（軽減/増加）(5.22.3)
+      // 受け手の「受けるダメージ」修正（軽減/増加）(5.22.3)。常時アウラ/装着分まで反映
       dmg = this._applyDamageReceived(target, dmg);
-      target.damage += dmg;
-      this.log(
-        `「${art.name}」→ ${targetCard.name} に ${dmg}ダメージ` +
-        `（累計${target.damage}/${this.effectiveHp(target)}）`
-      );
-      // 「ダウンさせた時」トリガー（このアーツでダウンが確定した場合）
-      if (target.damage >= this.effectiveHp(target)) {
-        this._notifySourceDown(h, s.turnPlayer); // 継続効果(ターン修正)の同期通知（ラミィSP等）
-        // アタッカーの onOpponentDown（カード共通）＋ このアーツ固有の onDownDealt（「このアーツで〜時」）を順に実行
+
+      // ダメージ適用＋アーツ後トリガー群（ダウンさせた時 → このアーツで → アーツを使った時）
+      const applyAndContinue = (finalDmg) => {
+        target.damage += finalDmg;
+        this.log(
+          `「${art.name}」→ ${targetCard.name} に ${finalDmg}ダメージ` +
+          `（累計${target.damage}/${this.effectiveHp(target)}）`
+        );
+        const cont = () => this._checkTiming(() => this._queuePerformancePending());
         const runners = [];
-        const cardTrig = this.registry.get(topCard(h).number)?.triggers?.onOpponentDown;
-        if (cardTrig) runners.push(cardTrig);
-        if (artDef?.onDownDealt) runners.push(artDef.onDownDealt);
+        if (target.damage >= this.effectiveHp(target)) {
+          this._notifySourceDown(h, s.turnPlayer); // 継続効果(ターン修正)の同期通知（ラミィSP等）
+          const cardTrig = this.registry.get(topCard(h).number)?.triggers?.onOpponentDown;
+          if (cardTrig) runners.push(cardTrig);
+          if (artDef?.onDownDealt) runners.push(artDef.onDownDealt);
+        }
+        const onArts = this.registry.get(topCard(h).number)?.triggers?.onArtsUse;
+        if (onArts) runners.push(onArts);
         if (runners.length > 0) {
-          const cont = () => this._checkTiming(() => this._queuePerformancePending());
           const runNext = (i) => {
             if (i >= runners.length) { cont(); return; }
             this._runEffect(
@@ -1062,9 +1066,11 @@ export class Engine {
           runNext(0);
           return;
         }
-      }
-      // 9.1.2: アーツ1回ごとにチェックタイミング
-      this._checkTiming(() => this._queuePerformancePending());
+        cont();
+      };
+
+      // 「相手のターンで自分のホロメンが相手からダメージを受ける時に使える」防御側の推しスキル割り込み
+      this._offerDamageOshiSkill(target, dmg, applyAndContinue);
     };
 
     if (artDef?.run) {
@@ -1214,6 +1220,47 @@ export class Engine {
     }
 
     runDownTrigger();
+  }
+
+  /**
+   * 「相手のターンで、自分のホロメンが相手からダメージを受ける時に使える」防御側の推しスキル割り込み。
+   * アーツダメージ適用の直前に呼ぶ。使える推しスキルがあれば防御側に決定ポイントを提示し、
+   * 使用時は軽減後のダメージで after を呼ぶ。無ければそのまま after(dmg)。
+   * 定義: oshi の onDamageOshiSkill = { cost, sp?, title, canUse(engine,defIdx,target,dmg), reduce(engine,defIdx,target,dmg)=>N }
+   */
+  _offerDamageOshiSkill(targetHolomem, dmg, after) {
+    const s = this.state;
+    const defIdx = s.players.findIndex((p) => this._stageHolomems(p).includes(targetHolomem));
+    // 攻撃はターンプレイヤー→相手。防御側はターンプレイヤーでない側のみ（自分のアーツの自爆等は対象外）
+    if (defIdx < 0 || defIdx === s.turnPlayer) { after(dmg); return; }
+    const defender = s.players[defIdx];
+    const skill = this.registry.get(defender.oshi.number)?.onDamageOshiSkill;
+    if (!skill) { after(dmg); return; }
+    const used = skill.sp ? defender.usedSpOshiSkillThisGame : defender.usedOshiSkillThisTurn;
+    if (used || defender.holoPower.length < skill.cost) { after(dmg); return; }
+    if (skill.canUse && !skill.canUse(this, defIdx, targetHolomem, dmg)) { after(dmg); return; }
+    this.state.pending = {
+      type: 'effectChoice',
+      player: defIdx,
+      request: { kind: 'confirm', title: skill.title || '推しスキルを使いますか？（受けるダメージ軽減）' },
+      options: [
+        { id: 'yes', label: `${skill.sp ? 'SP' : ''}推しスキルを使う（ホロパワー-${skill.cost}）`, value: true },
+        { id: 'no', label: '使わない', value: false },
+      ],
+      resume: (use) => {
+        let finalDmg = dmg;
+        if (use) {
+          defender.archive.push(...defender.holoPower.splice(0, skill.cost));
+          if (skill.sp) defender.usedSpOshiSkillThisGame = true;
+          else defender.usedOshiSkillThisTurn = true;
+          const red = skill.reduce ? (skill.reduce(this, defIdx, targetHolomem, dmg) || 0) : 0;
+          finalDmg = Math.max(0, dmg - red);
+          this.log(`${defender.name}: 推しスキルで受けるダメージ ${dmg} → ${finalDmg}（-${red}）`);
+        }
+        after(finalDmg);
+      },
+    };
+    this.onChange();
   }
 
   /**

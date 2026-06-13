@@ -1161,15 +1161,16 @@ function compileArt(text) {
 /**
  * 装着カードのコンパイル。
  * 基礎効果（アーツ+N / HP+N / 受けるダメージ±N / 相手センターへの特殊ダメージ+N /
- * ファンの付け先ルール / ◆条件付きHP+N）は確実なので採用する。
- * トリガー型の◆能力（「コラボした時」「ダウンした時」「[ターンに1回]」等）は
- * 未対応だが、その段落だけスキップして基礎効果は活かす（部分採用）。
- * → マスコットの「HP+20」等が確実に効くようになる。
+ * ファンの付け先ルール / ◆条件付きHP+N・アーツ+N）はすべて解釈できる場合のみ採用する。
+ * トリガー型の◆能力（「アーツを使った時」「コラボした時」「ダウンした時」等）など
+ * 解釈できない段落が1つでもあれば、その装着枠は基礎効果ごと不採用にする（安全側／全文解釈できた枠のみ実装）。
+ * → 付け先ルール（ファンの「〈X〉だけに付けられる」）だけは効果ではないため残す。
  */
 function compileAttached(text) {
   const blocks = normalize(text).split(/\n+/).map((b) => b.trim()).filter(Boolean);
   const attached = {};
   const def = {};
+  let tainted = false; // 解釈できない効果段落を含むか（含むなら attached を採用しない）
   let i = 0;
   while (i < blocks.length) {
     const b = blocks[i].replace(/^■/, '').replace(/。$/, '');
@@ -1230,12 +1231,17 @@ function compileAttached(text) {
         attached.artsPlus = (h, e) => (prev ? prev(h, e) : 0) + (h.stack[0].name === name ? n : 0);
         i += 2; continue;
       }
-      // HP+N / アーツ+N 以外の能力追加（トリガー型）は段落ごとスキップ（基礎効果は活かす）
+      // HP+N / アーツ+N 以外の能力追加（トリガー型）は解釈不能 → この枠は不採用にする（安全側）
+      tainted = true;
       i += 2; continue;
     }
-    // 解釈できない段落（トリガー型の常時テキスト等）はスキップして基礎効果を活かす
+    // 解釈できない段落（トリガー型の常時テキスト等）→ この枠は不採用にする（安全側）
+    tainted = true;
     i++;
   }
+  // 解釈できない段落を含む装着枠は、基礎効果ごと不採用（全文解釈できた枠のみ実装する原則）。
+  // ただし付け先ルール（効果ではない配置制限）だけは残す。
+  if (tainted) return def.attachRule ? { attachRule: def.attachRule } : null;
   if (Object.keys(attached).length === 0 && !def.attachRule) return null;
   if (Object.keys(attached).length > 0) def.attached = attached;
   return def;

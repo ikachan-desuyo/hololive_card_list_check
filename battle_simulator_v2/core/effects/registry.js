@@ -46,8 +46,15 @@
  *     artsCostReduceAura(src, target, engine) {          // アーツ必要エール軽減オーラ（[{color,amount}]を返す。engine が実効コスト算出に使用）
  *       return [{ color: '黄', amount: 1 }];             //   src=この能力の持ち主, target=コスト判定対象のホロメン
  *     },
+ *     // 常時アウラ＝別ホロメンを恒常強化/保護するギフト（src=持ち主, target=評価対象。味方ステージを走査して合算）
+ *     auraArtsPlus(src, target, engine) { return N; },        // 「自分の#0期生全員のアーツ+30」等
+ *     auraHpPlus(src, target, engine) { return N; },          // 「自分の〇〇のHP+N」等
+ *     auraDamageDelta(src, target, zone, engine) { return -N; },   // 「コラボが受けるダメージ-10」「受けない＝-100000」等
+ *     auraSpecialDmgPlus(src, sourceHolomem, targetEntry, engine) { return N; }, // 「〈X〉が相手センターに与える特殊+20」等
  *     oshiSkill / spOshiSkill: { canUse(engine, idx), *run(ctx) },
  *     onDownOshiSkill: { cost, title, canUse(engine, idx, holomem), apply(engine, idx, holomem) },
+ *     onDamageOshiSkill: { cost, sp?, title, canUse(engine, defIdx, target, dmg), reduce(engine, defIdx, target, dmg)=>N },
+ *       // 「相手のターンで自分のホロメンが相手からダメージを受ける時に使える：ダメージ-N」（アーツダメージ割り込み）
  *   }
  *
  * 設計原則: カード固有の知識（効果もAI評価も）は必ずこのカード定義に置く。

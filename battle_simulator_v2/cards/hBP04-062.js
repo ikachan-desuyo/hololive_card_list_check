@@ -3,11 +3,22 @@
  * アーツ「最期の一杯」(50 / 紫無):
  *   自分のデッキの上から2枚を見る。その中から、1枚をアーカイブする。
  *   そして残ったカードをデッキの上に戻す。
- * ※ギフト「永遠の休息」（鎌/Death-sensei装着中、#Mythセンターのアーツ+30の継続効果）は
- *   常時継続効果のため未実装（エンジンの継続効果モデル拡張が必要）。
+ * ギフト「永遠の休息」:
+ *   [センター・コラボ限定]このホロメンに〈森カリオペの鎌〉か〈Death-sensei〉が付いている間、
+ *   自分の#Mythを持つセンターホロメンのアーツ+30。
+ *   → 常時アウラ（auraArtsPlus）。自分(カリオペ)がセンター/コラボで鎌/Death-sensei装着中、
+ *     #Mythのセンターホロメンに+30。
  */
 export default {
   number: 'hBP04-062',
+  auraArtsPlus(src, target, engine) {
+    const z = engine._zoneOf(src);
+    if (z !== 'center' && z !== 'collab') return 0;
+    const hasWeapon = src.attachments.some((a) => a.name === '森カリオペの鎌' || a.name === 'Death-sensei');
+    if (!hasWeapon) return 0;
+    if (engine._zoneOf(target) !== 'center') return 0;
+    return (target.stack[0].tags || []).includes('Myth') ? 30 : 0;
+  },
   arts: {
     '最期の一杯': {
       *run(ctx) {

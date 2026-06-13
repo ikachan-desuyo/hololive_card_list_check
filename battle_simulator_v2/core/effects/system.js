@@ -35,6 +35,29 @@ export class EffectSystem {
     return out;
   }
 
+  /**
+   * 常時アウラの合計。ownerIdx 側のステージ上の各ホロメンの効果定義から、fn が返す数値を合算する。
+   * fn(def, sourceHolomem) => number。
+   * 「自分の#0期生全員のアーツ+30」「自分のコラボが受けるダメージ-10」のように、
+   * 別のホロメンを恒常的に強化/保護するギフトを表現する（def.auraArtsPlus 等で宣言）。
+   */
+  _auraSum(ownerIdx, fn) {
+    let total = 0;
+    const p = this.engine.state.players[ownerIdx];
+    if (!p) return 0;
+    for (const src of this.engine._stageHolomems(p)) {
+      const def = this.registry.get(src.stack[0].number);
+      if (def) total += fn(def, src) || 0;
+    }
+    return total;
+  }
+
+  /** holomem の持ち主インデックス（ステージ上に無ければ -1） */
+  _ownerOf(holomem) {
+    return this.engine.state.players.findIndex(
+      (p) => this.engine._stageHolomems(p).includes(holomem));
+  }
+
   /** アーツ+N の合計（装着 + ターン修正） */
   artsBonus(holomem, ownerIdx) {
     let total = 0;
@@ -47,6 +70,8 @@ export class EffectSystem {
       if (mod.match && !mod.match(holomem)) continue;
       total += this._resolveAmount(mod, holomem);
     }
+    // 常時アウラ（味方の別ホロメンが付与するアーツ+N）
+    total += this._auraSum(ownerIdx, (def, src) => def.auraArtsPlus?.(src, holomem, this.engine));
     return total;
   }
 
@@ -61,6 +86,7 @@ export class EffectSystem {
       if (mod.match && !mod.match(holomem)) continue;
       total += this._resolveAmount(mod, holomem);
     }
+    total += this._auraSum(ownerIdx, (def, src) => def.auraHpPlus?.(src, holomem, this.engine));
     return total;
   }
 
@@ -74,6 +100,11 @@ export class EffectSystem {
     let total = 0;
     for (const { attached } of this._attachedDefs(holomem)) {
       total += attached.damageDelta?.(holomem, zone, this.engine) || 0;
+    }
+    // 常時アウラ（味方の別ホロメンが付与する被ダメージ軽減/増加。「コラボが受けるダメージ-10」等）
+    const ownerIdx = this._ownerOf(holomem);
+    if (ownerIdx >= 0) {
+      total += this._auraSum(ownerIdx, (def, src) => def.auraDamageDelta?.(src, holomem, zone, this.engine));
     }
     return total;
   }
@@ -90,6 +121,8 @@ export class EffectSystem {
       if (mod.match && !mod.match(sourceHolomem)) continue;
       total += this._resolveAmount(mod, sourceHolomem);
     }
+    // 常時アウラ（味方の別ホロメンが付与する特殊ダメージ+N。「〈おかゆ〉全員が相手センターに与える特殊+20」等）
+    total += this._auraSum(ownerIdx, (def, src) => def.auraSpecialDmgPlus?.(src, sourceHolomem, targetEntry, this.engine));
     return total;
   }
 
