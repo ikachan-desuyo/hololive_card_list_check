@@ -676,7 +676,9 @@ export class Engine {
     }
 
     // 8.7 バトンタッチ（ターン1回、センター&バック両方アクティブ、エールコスト）
-    if (!p.usedBatonTouchThisTurn && p.center && !p.center.rested) {
+    // 「次の相手のターンの間、相手のセンター/コラボはバトンタッチ・移動・交代できない」(hBP01-005 SP) の制限を受けていないこと
+    const frontlineLocked = s.modifiers.some((m) => m.kind === 'cannotMoveFrontline' && m.ownerIdx === idx);
+    if (!frontlineLocked && !p.usedBatonTouchThisTurn && p.center && !p.center.rested) {
       const cost = this._effectiveBatonCost(p.center, topCard(p.center).batonTouch || [], idx);
       if (this._canPayCheers(p.center.cheers, cost)) {
         p.back.forEach((h, i) => {
@@ -1066,7 +1068,7 @@ export class Engine {
               title: `バトンタッチ: アーカイブするエールを選択（コスト: ${color}）`,
             });
             if (!cheer) return;
-            ctx.archiveCheer(center, cheer);
+            yield* ctx.archiveCheer(center, cheer, { ability: false }); // バトンタッチはコスト置換の対象外
           }
           const back = p.back.splice(backIndex, 1)[0];
           const moved = p.center; // バックポジションへ移動するホロメン
@@ -1178,11 +1180,13 @@ export class Engine {
       }
 
       const downed = [];
+      const dealtList = []; // [{target, zone, dealt}]（攻撃時誘発の推しスキルが参照）
       let totalDealt = 0;
 
       // 1体ぶんのダメージ適用（特攻→被ダメージ修正→推しスキル割り込み→加算）。完了後 after2 を呼ぶ
       const applyToTarget = (t, after2) => {
         const tCard = topCard(t);
+        const tZone = this._zoneOf(t);
         let dmg = baseDmg;
         // 特攻: 対象の色が一致するなら加算 (12.3.4.3)
         for (const tk of art.tokkou || []) {
@@ -1198,6 +1202,7 @@ export class Engine {
           // (kind='arts')
           t.damage += finalDmg;
           totalDealt += finalDmg;
+          if (finalDmg > 0) dealtList.push({ target: t, zone: tZone, dealt: finalDmg });
           this.log(
             `「${art.name}」→ ${tCard.name} に ${finalDmg}ダメージ（累計${t.damage}/${this.effectiveHp(t)}）`
           );
@@ -1208,7 +1213,11 @@ export class Engine {
 
       // 全対象に逐次適用（割り込みが挟まるためチェーン）→ 完了後にアーツ後トリガー群
       const afterAllDamage = () => {
-        const cont = () => this._checkTiming(() => this._queuePerformancePending());
+        // 攻撃時誘発の推しスキル（「ダメージを与えた時」「アーツを使った時」）→ その後にダウン処理（チェックタイミング）
+        const attackInfo = { sourceHolomem: h, art, artName: art.name, dealtList, downed };
+        const realCont = () => this._checkTiming(() => this._queuePerformancePending());
+        const cont = () => this._offerTimingOshiSkills('onDamageDealtOshiSkills', s.turnPlayer, attackInfo,
+          () => this._offerTimingOshiSkills('onArtsUseOshiSkills', s.turnPlayer, attackInfo, realCont));
         const runners = [];
         if (downed.length > 0) {
           this._notifySourceDown(h, s.turnPlayer); // 継続効果(ターン修正)の同期通知（ラミィSP等）
@@ -1409,6 +1418,45 @@ export class Engine {
     }
 
     runDownTrigger();
+  }
+
+  /**
+   * 攻撃側のタイミング誘発推しスキル（「アーツを使った時」「ダメージを与えた時」）を提示する。
+   * skillKey は配列を指す（通常＋SPなど同タイミングで複数定義できる）。各スキルを順に確認の決定ポイントとして出し、
+   * 使用時はコスト支払い＋ skill.run を実行する。skill.run(ctx) は ctx.attackInfo を参照できる。
+   * 定義: oshi の onArtsUseOshiSkills / onDamageDealtOshiSkills = [{ cost, sp?, title, canUse(engine, idx, attackInfo), *run(ctx) }]
+   */
+  _offerTimingOshiSkills(skillKey, ownerIdx, attackInfo, after) {
+    const p = this.state.players[ownerIdx];
+    const skills = this.registry.get(p.oshi.number)?.[skillKey] || [];
+    const list = Array.isArray(skills) ? skills : [skills];
+    const run = (i) => {
+      if (i >= list.length) { after(); return; }
+      const skill = list[i];
+      const used = skill.sp ? p.usedSpOshiSkillThisGame : p.usedOshiSkillThisTurn;
+      if (used || p.holoPower.length < skill.cost || (skill.canUse && !skill.canUse(this, ownerIdx, attackInfo))) {
+        run(i + 1);
+        return;
+      }
+      this.state.pending = {
+        type: 'effectChoice',
+        player: ownerIdx,
+        request: { kind: 'confirm', title: skill.title || '推しスキルを使いますか？' },
+        options: [
+          { id: 'yes', label: `${skill.sp ? 'SP' : ''}推しスキルを使う（ホロパワー-${skill.cost}）`, value: true },
+          { id: 'no', label: '使わない', value: false },
+        ],
+        resume: (use) => {
+          if (!use) { run(i + 1); return; }
+          p.archive.push(...p.holoPower.splice(0, skill.cost));
+          if (skill.sp) p.usedSpOshiSkillThisGame = true;
+          else p.usedOshiSkillThisTurn = true;
+          this._runEffect(skill, { playerIdx: ownerIdx, sourceCard: p.oshi, attackInfo }, () => run(i + 1));
+        },
+      };
+      this.onChange();
+    };
+    run(0);
   }
 
   /**

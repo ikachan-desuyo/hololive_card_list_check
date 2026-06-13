@@ -31,7 +31,7 @@ export default {
         title: 'コスト: アーカイブするエールを選択',
       });
       if (!cheer) return;
-      ctx.archiveCheer(ctx.sourceHolomem, cheer);
+      yield* ctx.archiveCheer(ctx.sourceHolomem, cheer);
       // 効果: お休み中の #秘密結社holoX 1人をアクティブにする
       const target = yield ctx.chooseHolomem({
         side: 'self',

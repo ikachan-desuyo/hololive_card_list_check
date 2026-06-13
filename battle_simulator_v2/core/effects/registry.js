@@ -69,10 +69,13 @@
  *     auraDamageDelta(src, target, zone, engine, kind, attacker) { return -N; }, // 「コラボが受けるダメージ-10」「特殊のみ無効＝kind==='special'で-100000」「相手1stから受けるアーツ-30＝src===target&&attacker条件」等
  *       // kind='arts'|'special'、attacker=攻撃元ホロメン（無ければnull）。src===target で自己ギフトも表現できる
  *     auraSpecialDmgPlus(src, sourceHolomem, targetEntry, engine) { return N; }, // 「〈X〉が相手センターに与える特殊+20」等
- *     oshiSkill / spOshiSkill: { canUse(engine, idx), *run(ctx) },
+ *     oshiSkill / spOshiSkill: { canUse(engine, idx), *run(ctx) },  // メインステップの起動型推しスキル（spは次相手ターンの前衛移動禁止 hBP01-005 等）
  *     onDownOshiSkill: { cost, title, canUse(engine, idx, holomem), apply(engine, idx, holomem) },
  *     onDamageOshiSkill: { cost, sp?, title, canUse(engine, defIdx, target, dmg), reduce(engine, defIdx, target, dmg)=>N },
- *       // 「相手のターンで自分のホロメンが相手からダメージを受ける時に使える：ダメージ-N」（アーツダメージ割り込み）
+ *       // 「相手のターンで自分のホロメンが相手からダメージを受ける時に使える：ダメージ-N」（被ダメージ割り込み。汎用 onDamageReceivedReact と同経路で提示）
+ *     onDiceRollOshiSkill: { cost, sp?, title, canUse(engine, idx, info), apply(engine, idx, info)=>newValue }, // 「自分の〈X〉がサイコロを振った時：振り直す」等（ダイス割り込み。info={roller,rollerCard,value}）
+ *     onArtsUseOshiSkills:    [{ cost, sp?, title, canUse(engine, idx, attackInfo), *run(ctx) }], // 「アーツを使った時に使える」（攻撃時誘発。配列で通常＋SP併記可）
+ *     onDamageDealtOshiSkills: [{ cost, sp?, title, canUse(engine, idx, attackInfo), *run(ctx) }], // 「ダメージを与えた時に使える」（攻撃時誘発。ctx.attackInfo={sourceHolomem,art,artName,dealtList:[{target,zone,dealt}],downed}）
  *   }
  *
  * 設計原則: カード固有の知識（効果もAI評価も）は必ずこのカード定義に置く。

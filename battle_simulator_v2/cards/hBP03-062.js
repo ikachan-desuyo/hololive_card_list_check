@@ -22,7 +22,7 @@ export default {
         title: 'コスト: アーカイブするエールを選択',
       });
       if (!cheer) return;
-      ctx.archiveCheer(ctx.sourceHolomem, cheer);
+      yield* ctx.archiveCheer(ctx.sourceHolomem, cheer);
       const candidates = ctx.deckCards((c) => c.kind === 'holomen' && c.bloomLevel === 'Debut' && ctx.hasTag(c, 'ゲーマーズ'));
       const picked = yield ctx.chooseCard({
         cards: candidates,

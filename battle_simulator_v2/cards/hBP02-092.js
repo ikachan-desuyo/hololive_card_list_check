@@ -42,7 +42,7 @@ export default {
         });
         if (!picked) return;
         const owner = candidates.find((c) => c.cheer === picked);
-        ctx.archiveCheer(owner.holomem, picked);
+        yield* ctx.archiveCheer(owner.holomem, picked);
       }
       // このターンの間、このマスコットが付いているホロメンのアーツ+50
       const target = ctx.sourceHolomem;

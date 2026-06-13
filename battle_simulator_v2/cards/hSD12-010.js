@@ -23,7 +23,7 @@ export default {
           title: 'コスト: アーカイブする紫以外のエールを選択',
         });
         if (!cheer) return;
-        ctx.archiveCheer(ctx.sourceHolomem, cheer);
+        yield* ctx.archiveCheer(ctx.sourceHolomem, cheer);
         const picked = yield ctx.chooseCard({
           cards: ctx.player.archive.filter((c) => c.kind === 'holomem'),
           title: '手札に戻すアーカイブのホロメンを選択',

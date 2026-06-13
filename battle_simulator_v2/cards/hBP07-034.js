@@ -28,7 +28,7 @@ export default {
       });
       if (!picked) return;
       const owner = allCheers.find((x) => x.cheer === picked).holomem;
-      ctx.archiveCheer(owner, picked);
+      yield* ctx.archiveCheer(owner, picked);
       // 効果: デッキから #FLOW #GLOW を持つ Debut/1st/Spot ホロメンを公開して手札へ
       const cand = ctx.deckCards((c) =>
         c.kind === 'holomen' &&

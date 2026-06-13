@@ -18,7 +18,7 @@ export default {
         title: 'コスト: アーカイブするエールを選択',
       });
       if (!cheer) return;
-      ctx.archiveCheer(ctx.sourceHolomem, cheer);
+      yield* ctx.archiveCheer(ctx.sourceHolomem, cheer);
       // 自分のステージのホロメン全員と異なるカード名のDebut
       const stageNames = new Set(ctx.holomems('self').map((e) => e.top.name));
       const cand = ctx.deckCards((c) =>

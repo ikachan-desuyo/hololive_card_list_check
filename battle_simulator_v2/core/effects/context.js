@@ -35,6 +35,8 @@ export class EffectContext {
     this.downedInfo = opts.downedInfo || null;
     // onOpponentPerformanceEnd 用: そのパフォーマンスステップで自分のライフが減ったか
     this.lifeDecreasedThisPerf = opts.lifeDecreasedThisPerf || false;
+    // 攻撃時誘発の推しスキル用: { sourceHolomem, art, artName, dealtList:[{target,zone,dealt}], downed }
+    this.attackInfo = opts.attackInfo || null;
   }
 
   get player() { return this.engine.state.players[this.playerIdx]; }
@@ -221,6 +223,28 @@ export class EffectContext {
           ],
         };
         if (use) value = r.apply(eng, { ...info, value });
+      }
+    }
+    // 自分の推しスキルによるダイス割り込み（「自分の〈X〉がサイコロを振った時：振り直す」hBP02-005 等）
+    const oshiDef = eng.registry.get(this.player.oshi.number)?.onDiceRollOshiSkill;
+    if (oshiDef) {
+      const me = this.player;
+      const used = oshiDef.sp ? me.usedSpOshiSkillThisGame : me.usedOshiSkillThisTurn;
+      const info = { ownerIdx: this.playerIdx, roller: this.sourceHolomem, rollerCard: this.sourceCard, value };
+      if (!used && me.holoPower.length >= oshiDef.cost && (!oshiDef.canUse || oshiDef.canUse(eng, this.playerIdx, info))) {
+        const use = yield {
+          kind: 'confirm', player: this.playerIdx,
+          title: oshiDef.title || '推しスキルを使いますか？（サイコロ）',
+          buildOptions: () => [
+            { id: 'yes', label: `${oshiDef.sp ? 'SP' : ''}推しスキルを使う（ホロパワー-${oshiDef.cost}）`, value: true },
+            { id: 'no', label: '使わない', value: false },
+          ],
+        };
+        if (use) {
+          me.archive.push(...me.holoPower.splice(0, oshiDef.cost));
+          if (oshiDef.sp) me.usedSpOshiSkillThisGame = true; else me.usedOshiSkillThisTurn = true;
+          value = oshiDef.apply(eng, this.playerIdx, { ...info, value });
+        }
       }
     }
     return value;
@@ -492,8 +516,35 @@ export class EffectContext {
     if (i !== -1) this.player.archive.splice(i, 1);
   }
 
-  /** ホロメンに付いているエールを1枚アーカイブする */
-  archiveCheer(holomem, cheer) {
+  /**
+   * ホロメンに付いているエールを1枚アーカイブする。ジェネレータ（呼び出しは `yield* ctx.archiveCheer(...)`）。
+   * opts.ability!==false（＝能力によるアーカイブ）のとき、装着カードのコスト置換
+   * （`def.cheerArchiveReplace`：「アーカイブするエール1枚のかわりにこのカードをアーカイブできる」hBP03-106）を提示する。
+   * バトンタッチ等のシステムコストは opts.ability=false で呼び、置換を提示しない。
+   */
+  *archiveCheer(holomem, cheer, opts = {}) {
+    // 能力によるアーカイブ時のみ、自分のホロメンに付いた置換カードを提示
+    if (opts.ability !== false && this.engine._stageHolomems(this.player).includes(holomem)) {
+      for (const att of [...holomem.attachments]) {
+        const rep = this.engine.registry.get(att.number)?.cheerArchiveReplace;
+        if (!rep) continue;
+        const use = yield {
+          kind: 'confirm', player: this.playerIdx,
+          title: rep.title || `${cheer.name}のかわりに${att.name}をアーカイブする？`,
+          buildOptions: () => [
+            { id: 'yes', label: rep.yesLabel || `${att.name}をアーカイブ`, value: true },
+            { id: 'no', label: `エール（${cheer.name}）をアーカイブ`, value: false },
+          ],
+        };
+        if (use) {
+          const ai = holomem.attachments.indexOf(att);
+          if (ai !== -1) holomem.attachments.splice(ai, 1);
+          this.player.archive.push(att);
+          this.log(`${holomem.stack[0].name}: ${cheer.name}のかわりに${att.name}をアーカイブ`);
+          return; // エールは場に残る
+        }
+      }
+    }
     const i = holomem.cheers.indexOf(cheer);
     if (i !== -1) {
       holomem.cheers.splice(i, 1);

@@ -18,7 +18,7 @@ export default {
         if (!ok) return;
         const cheer = yield ctx.chooseCard({ cards: blues, title: 'アーカイブする青エールを選択' });
         if (!cheer) return;
-        ctx.archiveCheer(ctx.sourceHolomem, cheer);
+        yield* ctx.archiveCheer(ctx.sourceHolomem, cheer);
         // 相手のセンターホロメンに特殊ダメージ10
         const center = ctx.holomems('opp', (e) => e.pos.zone === 'center')[0];
         if (center) yield* ctx.dealSpecialDamage(center, 10);

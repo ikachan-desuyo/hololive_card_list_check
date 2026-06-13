@@ -34,7 +34,7 @@ export default {
         title: 'アーカイブするエールを選択',
       });
       if (!cheer) return;
-      ctx.archiveCheer(src.holomem, cheer);
+      yield* ctx.archiveCheer(src.holomem, cheer);
       // 特殊ダメージ30を10ずつ相手バックに割り振る（3回、各回プレイヤーが対象を選択）
       for (let i = 0; i < 3; i++) {
         const backs = oppBacks();

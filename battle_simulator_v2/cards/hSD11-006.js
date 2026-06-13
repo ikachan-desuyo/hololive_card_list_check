@@ -28,7 +28,7 @@ export default {
             skipLabel: 'これ以上アーカイブしない',
           });
           if (!cheer) break;
-          ctx.archiveCheer(ctx.sourceHolomem, cheer);
+          yield* ctx.archiveCheer(ctx.sourceHolomem, cheer);
           archived++;
         }
         if (archived > 0) {

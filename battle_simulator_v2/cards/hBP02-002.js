@@ -51,7 +51,7 @@ export default {
         title: 'コスト: アーカイブする緑エールを選ぶ',
       });
       if (!cheer) return;
-      ctx.archiveCheer(fromHolomem.holomem, cheer);
+      yield* ctx.archiveCheer(fromHolomem.holomem, cheer);
 
       // エールデッキから1枚公開して自分のホロメンに送る
       if (ctx.player.cheerDeck.length > 0) {

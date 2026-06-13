@@ -36,7 +36,7 @@ export default {
             title: `コスト: アーカイブするエールを選択（${i + 1}/2）`,
           });
           if (!cheer) return;
-          ctx.archiveCheer(ctx.sourceHolomem, cheer);
+          yield* ctx.archiveCheer(ctx.sourceHolomem, cheer);
         }
         ctx.draw(2);
       },

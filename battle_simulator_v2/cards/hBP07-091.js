@@ -32,7 +32,7 @@ export default {
         title: 'アーカイブするエールを選択（コスト）',
       });
       if (!pickedCheer) return;
-      ctx.archiveCheer(cheerEntries.find((e) => e.cheer === pickedCheer).from, pickedCheer);
+      yield* ctx.archiveCheer(cheerEntries.find((e) => e.cheer === pickedCheer).from, pickedCheer);
 
       // --- 本文: アーカイブのファン1枚を自分のホロメンに付ける ---
       const fans = ctx.player.archive.filter(

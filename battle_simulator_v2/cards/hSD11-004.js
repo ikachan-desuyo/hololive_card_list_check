@@ -41,7 +41,7 @@ export default {
         picked.push(entry);
         pool = pool.filter((p) => p.cheer !== sel);
       }
-      for (const { cheer, holomem } of picked) ctx.archiveCheer(holomem, cheer);
+      for (const { cheer, holomem } of picked) yield* ctx.archiveCheer(holomem, cheer);
 
       // アーカイブの〈虎金妃笑虎〉1枚を手札に戻す
       const ret = yield ctx.chooseCard({

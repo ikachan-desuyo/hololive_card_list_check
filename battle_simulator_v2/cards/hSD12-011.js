@@ -47,7 +47,7 @@ export default {
       });
       if (!pick) return;
       const entry = stageCheers.find((s) => s.cheer === pick);
-      ctx.archiveCheer(entry.holomem, pick);
+      yield* ctx.archiveCheer(entry.holomem, pick);
       // アーカイブしたなら、ステージのホロメン1人にこのターン アーツ+40
       const target = yield ctx.chooseHolomem({
         side: 'self',

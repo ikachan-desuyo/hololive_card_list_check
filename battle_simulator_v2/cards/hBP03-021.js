@@ -63,7 +63,7 @@ export default {
           title: 'アーカイブするエールを選択',
         });
         if (!cheer) return;
-        ctx.archiveCheer(backSel.holomem, cheer);
+        yield* ctx.archiveCheer(backSel.holomem, cheer);
         const target = yield ctx.chooseHolomem({
           side: 'opp',
           filter: (e) => e.pos.zone === 'center' || e.pos.zone === 'collab',

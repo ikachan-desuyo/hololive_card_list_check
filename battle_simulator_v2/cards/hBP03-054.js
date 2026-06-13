@@ -38,7 +38,7 @@ export default {
             title: `コスト: アーカイブする紫エールを選択（${i + 1}/4）`,
           });
           if (!cheer) return;
-          ctx.archiveCheer(ctx.sourceHolomem, cheer);
+          yield* ctx.archiveCheer(ctx.sourceHolomem, cheer);
         }
         // 効果: 相手のステージのエール1枚を相手のエールデッキの下に戻す
         const entries = [];

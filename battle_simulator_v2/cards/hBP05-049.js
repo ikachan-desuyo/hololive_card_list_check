@@ -36,7 +36,7 @@ export default {
             cards: [...ctx.sourceHolomem.cheers], title: `コスト: アーカイブするエールを選択（${i + 1}/2）`,
           });
           if (!cheer) return;
-          ctx.archiveCheer(ctx.sourceHolomem, cheer);
+          yield* ctx.archiveCheer(ctx.sourceHolomem, cheer);
         }
         for (const e of ctx.holomems('opp', (x) => x.pos.zone === 'back')) {
           yield* ctx.dealSpecialDamage(e, 30, { noLifeOnDown: true });

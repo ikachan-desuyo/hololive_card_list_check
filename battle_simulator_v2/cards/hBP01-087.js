@@ -27,7 +27,7 @@ export default {
           title: 'アーカイブするエールを選択',
         });
         if (!picked) return;
-        ctx.archiveCheer(ctx.sourceHolomem, picked);
+        yield* ctx.archiveCheer(ctx.sourceHolomem, picked);
         const backs = ctx.holomems('opponent', (e) => e.pos.zone === 'back');
         for (const e of backs) {
           yield* ctx.dealSpecialDamage(e, 20, { noLifeOnDown: true });
@@ -52,7 +52,7 @@ export default {
             title: `アーカイブするエールを選択（${i + 1}/2）`,
           });
           if (!picked) return; // 2枚支払えなければ効果は発生しない（コスト未充足）
-          ctx.archiveCheer(ctx.sourceHolomem, picked);
+          yield* ctx.archiveCheer(ctx.sourceHolomem, picked);
           pool = pool.filter((c) => c !== picked);
         }
         const backs = ctx.holomems('opponent', (e) => e.pos.zone === 'back');

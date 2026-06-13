@@ -24,7 +24,7 @@ export default {
         title: 'コスト: アーカイブする青エールを選択',
       });
       if (!cheer) return;
-      ctx.archiveCheer(ctx.sourceHolomem, cheer);
+      yield* ctx.archiveCheer(ctx.sourceHolomem, cheer);
       ctx.draw(2);
     },
   }],

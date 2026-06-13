@@ -35,7 +35,7 @@ export default {
       });
       if (!cheer) return;
       ctx.markOncePerTurn('hBP03-019:歌う事は楽しい事');
-      ctx.archiveCheer(backSel.holomem, cheer);
+      yield* ctx.archiveCheer(backSel.holomem, cheer);
       // 相手のセンターホロメンかコラボホロメンに特殊ダメージ30
       const target = yield ctx.chooseHolomem({
         side: 'opp',

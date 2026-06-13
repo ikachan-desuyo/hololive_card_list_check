@@ -24,7 +24,7 @@ export default {
             title: `コスト: アーカイブする青エールを選択（${i + 1}/2）`,
           });
           if (!cheer) return; // 途中キャンセル（保存則のため既に払った分は戻せないが、選択必須）
-          ctx.archiveCheer(ctx.sourceHolomem, cheer);
+          yield* ctx.archiveCheer(ctx.sourceHolomem, cheer);
         }
         // 相手センターへ特殊ダメージ30
         const center = ctx.holomems('opp', (e) => e.pos.zone === 'center')[0];

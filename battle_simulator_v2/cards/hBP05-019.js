@@ -21,7 +21,7 @@ export default {
         title: 'コスト: アーカイブするエールを選択',
       });
       if (!cheer) return;
-      ctx.archiveCheer(ctx.sourceHolomem, cheer);
+      yield* ctx.archiveCheer(ctx.sourceHolomem, cheer);
       const target = yield ctx.chooseHolomem({
         side: 'self',
         filter: (e) => ctx.hasTag(e.top, 'ID1期生'),

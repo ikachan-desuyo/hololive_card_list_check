@@ -33,7 +33,7 @@ export default {
         title: 'アーカイブするエールを選択',
       });
       if (!cheer) return;
-      ctx.archiveCheer(holder.holomem, cheer);
+      yield* ctx.archiveCheer(holder.holomem, cheer);
       // 効果: デッキから〈大空スバル〉1枚を公開し手札に加える
       const targets = ctx.deckCards((c) => c.name === '大空スバル');
       if (targets.length > 0) {

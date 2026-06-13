@@ -1005,7 +1005,7 @@ const RUNNERS = {
         const pool = ctx.sourceHolomem.cheers.filter((c) => !cost.filter || cost.filter(c, ctx));
         const cheer = yield ctx.chooseCard({ cards: pool, title: 'アーカイブするエールを選択（コスト）' });
         if (!cheer) return;
-        ctx.archiveCheer(ctx.sourceHolomem, cheer);
+        yield* ctx.archiveCheer(ctx.sourceHolomem, cheer);
       }
       state.costPaid = cost.n;
     } else if (cost.kind === 'taggedCheer') {
@@ -1018,7 +1018,7 @@ const RUNNERS = {
       for (let i = 0; i < cost.n; i++) {
         const cheer = yield ctx.chooseCard({ cards: entry.holomem.cheers, title: 'アーカイブするエールを選択（コスト）' });
         if (!cheer) return;
-        ctx.archiveCheer(entry.holomem, cheer);
+        yield* ctx.archiveCheer(entry.holomem, cheer);
       }
       state.costPaid = cost.n;
     } else if (cost.kind === 'stacked') {
@@ -1300,7 +1300,7 @@ function compileSupport(text) {
           cards: entries.map((e) => e.cheer), title: 'アーカイブするエールを選択（コスト）',
         });
         if (!picked) return;
-        ctx.archiveCheer(entries.find((e) => e.cheer === picked).from, picked);
+        yield* ctx.archiveCheer(entries.find((e) => e.cheer === picked).from, picked);
       }
     });
     norm = norm.slice(m[0].length);

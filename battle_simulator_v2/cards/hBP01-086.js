@@ -39,7 +39,7 @@ export default {
         title: 'アーカイブするエールを選択',
       });
       if (!picked) return; // 支払えなければ効果は発生しない
-      ctx.archiveCheer(holomem, picked);
+      yield* ctx.archiveCheer(holomem, picked);
       const backs = ctx.holomems('opponent', (e) => e.pos.zone === 'back');
       for (const e of backs) {
         yield* ctx.dealSpecialDamage(e, 10, { noLifeOnDown: true });

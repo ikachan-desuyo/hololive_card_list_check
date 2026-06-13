@@ -30,7 +30,7 @@ export default {
       });
       if (!picked) return;
       const from = entries.find((e) => e.cheer === picked).from;
-      ctx.archiveCheer(from, picked);
+      yield* ctx.archiveCheer(from, picked);
 
       // 効果: デッキからBuzz以外の[1stか2nd]ホロメン1枚を公開して手札に加える
       const cand = ctx.deckCards(

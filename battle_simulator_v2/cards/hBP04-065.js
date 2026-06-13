@@ -23,7 +23,7 @@ export default {
       const reds = target.holomem.cheers.filter((c) => c.color === '赤');
       const cheer = yield ctx.chooseCard({ cards: reds, title: 'アーカイブする赤エールを選択' });
       if (!cheer) return;
-      ctx.archiveCheer(target.holomem, cheer);
+      yield* ctx.archiveCheer(target.holomem, cheer);
       ctx.draw(2);
     },
   },

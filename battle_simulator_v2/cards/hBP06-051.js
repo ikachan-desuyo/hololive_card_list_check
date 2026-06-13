@@ -19,7 +19,7 @@ export default {
           title: 'アーカイブするエールを選択',
         });
         if (!cheer) return;
-        ctx.archiveCheer(ctx.sourceHolomem, cheer);
+        yield* ctx.archiveCheer(ctx.sourceHolomem, cheer);
         ctx.draw(1);
       },
     },

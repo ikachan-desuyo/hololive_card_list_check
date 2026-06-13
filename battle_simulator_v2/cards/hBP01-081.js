@@ -47,7 +47,7 @@ export default {
             title: `コスト: アーカイブする青エールを選択（${i + 1}/2）`,
           });
           if (!cheer) return;
-          ctx.archiveCheer(ctx.sourceHolomem, cheer);
+          yield* ctx.archiveCheer(ctx.sourceHolomem, cheer);
         }
         // 重なっているホロメン1枚につき +60
         const recount = Math.max(0, (ctx.sourceHolomem.stack.length || 1) - 1);

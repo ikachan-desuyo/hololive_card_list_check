@@ -27,7 +27,7 @@ export default {
     },
     'Shout in Crisis': {
       *run(ctx) {
-        for (const cheer of [...ctx.sourceHolomem.cheers]) ctx.archiveCheer(ctx.sourceHolomem, cheer);
+        for (const cheer of [...ctx.sourceHolomem.cheers]) yield* ctx.archiveCheer(ctx.sourceHolomem, cheer);
       },
     },
   },

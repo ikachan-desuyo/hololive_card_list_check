@@ -26,7 +26,7 @@ export default {
           title: 'コスト: アーカイブする緑/青エールを選択',
         });
         if (!cheer) return;
-        ctx.archiveCheer(src, cheer);
+        yield* ctx.archiveCheer(src, cheer);
         const target = yield ctx.chooseHolomem({
           side: 'opp',
           filter: (e) => e.pos.zone === 'back',

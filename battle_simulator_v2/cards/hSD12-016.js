@@ -51,7 +51,7 @@ export default {
       });
       if (!picked) return;
       const owner = cheerOptions.find((o) => o.cheer === picked).owner;
-      ctx.archiveCheer(owner, picked);
+      yield* ctx.archiveCheer(owner, picked);
 
       // エールデッキから1枚を公開し、自分のホロメンに送る → エールデッキをシャッフル
       const target = yield ctx.chooseHolomem({
