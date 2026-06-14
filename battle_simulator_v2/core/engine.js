@@ -266,11 +266,13 @@ export class Engine {
    * 受け手の「受けるダメージ」修正を適用した最終ダメージ（0未満にはしない）。
    * @param attacker 攻撃元ホロメン（「相手の1stから受けるアーツ-30」のような攻撃元条件用。無ければnull）
    */
-  _applyDamageReceived(targetHolomem, dmg, kind = 'arts', attacker = null) {
+  _applyDamageReceived(targetHolomem, dmg, kind = 'arts', attacker = null, opts = {}) {
     const zone = this._zoneOf(targetHolomem);
-    const delta = this.effects.damageReceivedDelta(targetHolomem, zone, kind, attacker);
+    let delta = this.effects.damageReceivedDelta(targetHolomem, zone, kind, attacker);
     // 「最初に受けるダメージだけ」等の一発消費(once)修正を使用済みにする（このダメージ機会で消費）
     this.effects.consumeOnceDamageReceivedMods(targetHolomem, zone, kind);
+    // 「このアーツダメージは軽減されない」: 軽減（負のdelta）を無効化する（増加は残す）。hBP06-027/hBP07-075/hBP07-103
+    if (opts.ignoreReduction && delta < 0) delta = 0;
     if (delta === 0) return dmg;
     const adjusted = Math.max(0, dmg + delta);
     if (adjusted !== dmg) {
@@ -1165,8 +1167,28 @@ export class Engine {
         return;
       case 'place': {
         const card = p.hand.splice(action.handIndex, 1)[0];
-        p.back.push(createHolomem(card, s.turn));
+        const placed = createHolomem(card, s.turn);
+        p.back.push(placed);
         this.log(`${p.name}: ${card.name} をバックに出した`);
+        // 登場時トリガー（「自分の〈X〉がステージに出た時」hSD13-014）。自分のステージの各ホロメンの triggers.onEnter を順に実行。
+        const enterRunners = [];
+        for (const wh of this._stageHolomems(p)) {
+          const et = this.registry.get(topCard(wh).number)?.triggers?.onEnter;
+          if (et) enterRunners.push({ run: et, srcH: wh });
+        }
+        if (enterRunners.length > 0) {
+          const enteredInfo = { holomem: placed, card };
+          const runEnter = (i) => {
+            if (i >= enterRunners.length) { finish(); return; }
+            this._runEffect(
+              { run: enterRunners[i].run },
+              { playerIdx: s.turnPlayer, sourceCard: topCard(enterRunners[i].srcH), sourceHolomem: enterRunners[i].srcH, enteredInfo },
+              () => runEnter(i + 1),
+            );
+          };
+          runEnter(0);
+          return;
+        }
         break;
       }
       case 'bloom': {
@@ -1302,7 +1324,15 @@ export class Engine {
           p.revealed.push(card);
           this._runEffect(def.support, { playerIdx: s.turnPlayer, sourceCard: card }, () => {
             p.revealed.splice(p.revealed.indexOf(card), 1);
-            p.archive.push(card);
+            // ctx.markReturnSelfToDeck() が呼ばれていたら、アーカイブせずデッキに戻してシャッフル (hBP07-093)
+            if (p._supportReturnToDeck) {
+              p._supportReturnToDeck = false;
+              p.deck.push(card);
+              this._shuffle(p.deck);
+              this.log(`${card.name} をデッキに戻してシャッフルした`);
+            } else {
+              p.archive.push(card);
+            }
             finish();
           });
           return;
@@ -1319,10 +1349,24 @@ export class Engine {
         const h = this._holomemAt(p, action.pos);
         h.attachments.push(card);
         this.log(`${p.name}: ${card.name}〔${card.supportType}〕を ${topCard(h).name} に付けた`);
-        // 装着時トリガー（「（手札/アーカイブから）付けた時」）。こよりの助手くん等
+        // 装着時トリガー: ①付けたカード自身の onAttach（「（手札/アーカイブから）付けた時」。こよりの助手くん等）
+        //   ②付け先ホロメンの onAttached（「このホロメンに〈X〉が付いた時」hBP07-024）。
+        //   どちらも sourceHolomem=ホスト, sourceCard=付けたカード。
+        const attachRunners = [];
         const trig = this.registry.get(card.number)?.triggers?.onAttach;
-        if (trig) {
-          this._runEffect({ run: trig }, { playerIdx: s.turnPlayer, sourceCard: card, sourceHolomem: h }, finish);
+        if (trig) attachRunners.push(trig);
+        const hostTrig = this.registry.get(topCard(h).number)?.triggers?.onAttached;
+        if (hostTrig) attachRunners.push(hostTrig);
+        if (attachRunners.length > 0) {
+          const runAttach = (i) => {
+            if (i >= attachRunners.length) { finish(); return; }
+            this._runEffect(
+              { run: attachRunners[i] },
+              { playerIdx: s.turnPlayer, sourceCard: card, sourceHolomem: h },
+              () => runAttach(i + 1),
+            );
+          };
+          runAttach(0);
           return;
         }
         break;
@@ -1507,8 +1551,10 @@ export class Engine {
             this.log(`特攻発動！ ${tk.color}+${tk.value}${allColors ? '（全色扱い）' : ''}`);
           }
         }
-        // 受け手の「受けるダメージ」修正（軽減/増加）(5.22.3)。常時アウラ/装着分まで反映
-        dmg = this._applyDamageReceived(t, dmg, 'arts', h);
+        // 受け手の「受けるダメージ」修正（軽減/増加）(5.22.3)。常時アウラ/装着分まで反映。
+        // 「このアーツダメージは軽減されない」効果があれば軽減を無効化する。
+        const noReduce = this._artDamageNotReduced(h, artDef, runCtx, t);
+        dmg = this._applyDamageReceived(t, dmg, 'arts', h, { ignoreReduction: noReduce });
         // 防御側の被ダメージ推しスキル割り込み（対象ごと）
         this._offerDamageOshiSkill(t, dmg, (finalDmg) => {
           // (kind='arts')
@@ -1567,7 +1613,7 @@ export class Engine {
         // 「このアーツで（相手に）ダメージを与えた時」（実際に与えた合計ダメージ量を渡す。ライフスティール等）
         if (artDef?.onDamageDealt && totalDealt > 0) {
           const dealt = totalDealt;
-          runners.push({ run: function* onDamageDealtWrap(c) { yield* artDef.onDamageDealt(c, dealt); }, srcCard: selfCard });
+          runners.push({ run: function* onDamageDealtWrap(c) { yield* artDef.onDamageDealt(c, dealt); }, srcCard: selfCard, attackInfo });
         }
         if (runners.length > 0) {
           const runNext = (i) => {
@@ -2101,7 +2147,35 @@ export class Engine {
    * アーツはエールを消費しない（満たしているかの判定のみ）ため、判定直前に使う。
    */
   _effectiveArtCost(holomem, cost, ownerIdx) {
-    return this._applyCostReduction([...cost], this.effects.artsCostReduction(holomem, ownerIdx));
+    let out = this._applyCostReduction([...cost], this.effects.artsCostReduction(holomem, ownerIdx));
+    // 必要エールの色をすべて無色にする（装着 attached.artsCostAllColorless。hBP02-098/hBP03-100）。
+    // 枚数は維持し、色指定だけ外す（=任意色のエールで支払える）。軽減（枚数減）とは別物。
+    if (this._artCostAllColorless(holomem)) out = out.map(() => COLORLESS);
+    return out;
+  }
+
+  /**
+   * このアーツのダメージが「軽減されない」か。発生源は3種:
+   *   ① アーツ定義 artDef.damageNotReduced(runCtx, target)（hBP06-027/hBP07-075）
+   *   ② 攻撃ホロメンの装着カード attached.artsDamageNotReduced(holomem, engine)（hBP07-103）
+   * @param h 攻撃ホロメン  @param artDef アーツ定義  @param runCtx アーツ実行ctx  @param target 対象
+   */
+  _artDamageNotReduced(h, artDef, runCtx, target) {
+    if (artDef?.damageNotReduced && artDef.damageNotReduced(runCtx, target)) return true;
+    for (const att of h.attachments) {
+      const fn = this.registry.get(att.number)?.attached?.artsDamageNotReduced;
+      if (fn && fn(h, this)) return true;
+    }
+    return false;
+  }
+
+  /** 付いている装着カードが「アーツの必要エール色をすべて無色にする」を持つか */
+  _artCostAllColorless(holomem) {
+    for (const att of holomem.attachments) {
+      const fn = this.registry.get(att.number)?.attached?.artsCostAllColorless;
+      if (fn && fn(holomem, this)) return true;
+    }
+    return false;
   }
 
   /** {色:数} の軽減を適用（正=必要エール減, 負=必要エール増）。コスト配列を返す */

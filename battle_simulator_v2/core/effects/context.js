@@ -35,6 +35,10 @@ export class EffectContext {
     this.downedInfo = opts.downedInfo || null;
     // ダウン時推しスキル(onDownOshiSkill.run)用: ダウンしたホロメン（アーカイブ前。エール・スタックを操作できる）
     this.downedHolomem = opts.downedHolomem || null;
+    // onEnter 用: ステージに出たホロメンの情報 { holomem, card }
+    this.enteredInfo = opts.enteredInfo || null;
+    // onSpecialDamageDealt 用: 与えた特殊ダメージの情報 { source, target, amount }
+    this.specialDealt = opts.specialDealt || null;
     // onOpponentPerformanceEnd 用: そのパフォーマンスステップで自分のライフが減ったか
     this.lifeDecreasedThisPerf = opts.lifeDecreasedThisPerf || false;
     // 攻撃時誘発の推しスキル用: { sourceHolomem, art, artName, dealtList:[{target,zone,dealt}], downed }
@@ -442,6 +446,15 @@ export class EffectContext {
     this.log(`${this.player.name}: エールデッキをシャッフル`);
   }
 
+  /**
+   * このサポート効果の解決後、このカードをアーカイブせずデッキに戻してシャッフルする (hBP07-093)。
+   * support の run 内から呼ぶ。engine のサポート解決後処理がこのフラグを見て、archive のかわりに
+   * deck へ戻し（最後にシャッフル）する。サポート効果以外から呼んでも効果はない。
+   */
+  markReturnSelfToDeck() {
+    this.player._supportReturnToDeck = true;
+  }
+
   /** デッキ内の条件一致カード一覧（非公開領域なので「見つからない」選択も保証される）。
    *  戻り配列に _fromDeck タグを付け、chooseCard がデッキサーチと判定できるようにする（デッキ全体を確認枠に表示）。 */
   deckCards(filter) {
@@ -592,9 +605,18 @@ export class EffectContext {
    */
   *attachSupportWithTrigger(card, holomem) {
     this.attachSupport(card, holomem);
+    // ①付けたカード自身の onAttach（「付けた時」）
     const trig = this.engine.registry.get(card.number)?.triggers?.onAttach;
     if (trig) {
       yield* trig(new EffectContext(this.engine, this.playerIdx, {
+        sourceCard: card,
+        sourceHolomem: holomem,
+      }));
+    }
+    // ②付け先ホロメンの onAttached（「このホロメンに〈X〉が付いた時」hBP07-024）
+    const hostTrig = this.engine.registry.get(holomem.stack[0].number)?.triggers?.onAttached;
+    if (hostTrig) {
+      yield* hostTrig(new EffectContext(this.engine, this.playerIdx, {
         sourceCard: card,
         sourceHolomem: holomem,
       }));
@@ -715,6 +737,17 @@ export class EffectContext {
     holomem.damage = Math.max(0, holomem.damage - n);
     if (before !== holomem.damage) {
       this.log(`${holomem.stack[0].name} のHPを${before - holomem.damage}回復`);
+      // 「自分の能力で回復した時」トリガー（同期・選択なし）。装着カード + ホロメン自身。hBP01-114 等
+      const eng = this.engine;
+      const ownerIdx = eng.state.players.findIndex((p) => eng._stageHolomems(p).includes(holomem));
+      if (ownerIdx >= 0) {
+        for (const att of [...holomem.attachments]) {
+          const fn = eng.registry.get(att.number)?.attached?.onHealed;
+          if (fn) fn(holomem, eng, att, ownerIdx);
+        }
+        const selfFn = eng.registry.get(holomem.stack[0].number)?.onHealed;
+        if (selfFn) selfFn(holomem, eng, ownerIdx);
+      }
     }
   }
 
@@ -762,6 +795,18 @@ export class EffectContext {
 
     targetEntry.holomem.damage += total;
     if (total > 0) this.engine._dispatchDamageReceivedForced(targetEntry.holomem); // 強制被ダメージトリガー (hBP07-108)
+    // 特殊ダメージを「与えた時」のトリガー（発生源=自分側、対象=相手のホロメンの時のみ）。hBP05-028/hBP06-101 等
+    if (total > 0 && this.sourceHolomem && defIdx !== this.playerIdx) {
+      const info = { source: this.sourceHolomem, target: targetEntry.holomem, amount: total };
+      for (const wh of eng._stageHolomems(this.player)) {
+        const wt = eng.registry.get(wh.stack[0].number)?.triggers?.onSpecialDamageDealt;
+        if (wt) yield* wt(new EffectContext(eng, this.playerIdx, { sourceHolomem: wh, specialDealt: info }));
+      }
+      for (const att of this.sourceHolomem.attachments) {
+        const at = eng.registry.get(att.number)?.triggers?.onSpecialDamageDealt;
+        if (at) yield* at(new EffectContext(eng, this.playerIdx, { sourceHolomem: this.sourceHolomem, sourceCard: att, specialDealt: info }));
+      }
+    }
     // 「ライフは減らない」は、この特殊ダメージでダウンが確定した場合のみ適用する。
     // （ダウンに至らなかった場合にフラグを残すと、後から別のダメージで倒された時まで
     //   ライフが減らなくなってしまう）

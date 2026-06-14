@@ -4,8 +4,8 @@
  * [キーワード/ギフト]「闇夜のハンター」:
  *   このホロメンのアーツの対象が自分のアーカイブのエールと同色の相手のホロメンなら、
  *   このホロメンのアーツダメージは軽減されない。
- *   → 【未実装】アーツダメージの軽減無効化（被ダメージ軽減への割り込み）機構が必要なため保留。
- *      ダメージ軽減自体の割り込み機構が用意されたら、対象色判定して軽減無効を立てる形で実装する。
+ *   → arts定義 damageNotReduced(ctx, target) で実装。対象（artTarget）の色が、自分のアーカイブにある
+ *     エールの色のいずれかと一致するなら、このアーツダメージの軽減を無効化する。
  *
  * アーツ「CODE:81800」(70+):
  *   このホロメンにエールが3枚以上付いているなら、お互いのアーカイブのエール1枚につき、このアーツ+10。
@@ -21,6 +21,14 @@ export default {
         const selfArchiveCheer = ctx.player.archive.filter((c) => c.kind === 'cheer').length;
         const oppArchiveCheer = ctx.opponent.archive.filter((c) => c.kind === 'cheer').length;
         return (selfArchiveCheer + oppArchiveCheer) * 10;
+      },
+      // 「闇夜のハンター」: 対象が自分のアーカイブのエールと同色の相手ホロメンなら、このアーツダメージは軽減されない
+      damageNotReduced(ctx, target) {
+        if (!target) return false;
+        const archiveColors = new Set(
+          ctx.player.archive.filter((c) => c.kind === 'cheer').map((c) => c.color),
+        );
+        return archiveColors.has(target.stack[0].color);
       },
     },
   },

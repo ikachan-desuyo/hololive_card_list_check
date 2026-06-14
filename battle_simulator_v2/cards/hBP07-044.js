@@ -4,14 +4,33 @@
  *   自分のデッキの上から2枚をアーカイブする。
  *   その後、自分のアーカイブのスタッフ1枚を手札に戻せる（「戻せる」=任意/0可）。
  *
- * ※キーワード/ギフト「The Show Must Go On」は未実装:
+ * キーワード/ギフト「The Show Must Go On」:
  *   [センター・コラボ限定]相手のターンで、自分のファンが付いているBuzzホロメンが
  *   ダウンした時、推しが〈尾丸ポルカ〉なら自分の減るライフ-1。
- *   → 減るライフを減らす被ダメージ割り込み（ライフ変動の抑制）であり、
- *      エンジンに該当機構が無いため保留。
+ *   → triggers.onAnyDown で実装。ダウン処理はアーカイブ前に走るので、ダウンした自分の
+ *     ファン付きBuzzホロメンに lifeReductionOnDown を加算 → finish() のライフ減少計算で-1される。
+ *     ※onAnyDown はダウンしたホロメン自身を除外して発火するため、ポルカ自身のダウンは対象外
+ *      （ポルカは2ndで Buzz でないため、watcher として他のファン付きBuzzのダウンを拾う想定）。
  */
 export default {
   number: 'hBP07-044',
+  triggers: {
+    // ギフト「The Show Must Go On」: 相手のターンで自分のファン付きBuzzホロメンがダウンした時、推しがポルカなら減るライフ-1
+    *onAnyDown(ctx) {
+      if (ctx.sourceHolomem?.stack[0].name !== '尾丸ポルカ') return;
+      const z = ctx.sourceHolomemPos()?.zone;
+      if (z !== 'center' && z !== 'collab') return;       // [センター・コラボ限定]
+      if (ctx.state.turnPlayer === ctx.playerIdx) return; // 相手のターン
+      if (ctx.player.oshi?.name !== '尾丸ポルカ') return;  // 推しが〈尾丸ポルカ〉
+      const di = ctx.downedInfo;
+      if (!di || di.ownerIdx !== ctx.playerIdx) return;   // 自分のホロメンがダウン
+      const downed = di.holomem;
+      if (!downed.stack[0].buzz) return;                                   // Buzzホロメン
+      if (!downed.attachments.some((a) => a.supportType === 'ファン')) return; // ファンが付いている
+      downed.lifeReductionOnDown = (downed.lifeReductionOnDown || 0) + 1;  // 減るライフ-1
+      ctx.log('尾丸ポルカ「The Show Must Go On」: このダウンで減るライフ-1');
+    },
+  },
   arts: {
     'スタッフファーストです！': {
       *run(ctx) {

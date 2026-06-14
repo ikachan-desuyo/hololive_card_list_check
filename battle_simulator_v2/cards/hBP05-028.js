@@ -2,11 +2,28 @@
  * 獅白ぼたん (hBP05-028) 緑・Buzz・1st・HP250（#5期生）
  * アーツ「ここからが俺たちのスタートだ」(40):
  *   自分の〈獅白ぼたん〉のエール1枚をアーカイブできる：相手のセンターホロメンに特殊ダメージ30を与える。
- * ※キーワード「ちょっと頑張りました」（30以上の特殊ダメージを与えた時1ドロー）は
- *   「特殊ダメージ量トリガー」未対応のため未実装（CARD_EFFECT_STATUS.md §8）。
+ * キーワード「ちょっと頑張りました」:
+ *   [センターポジション限定][ターンに1回]自分の推しホロメンの〈獅白ぼたん〉か自分のステージの
+ *   〈獅白ぼたん〉が相手のホロメンに30以上の特殊ダメージを与えた時、自分のデッキを1枚引く。
+ *   → triggers.onSpecialDamageDealt で実装。engine が dealSpecialDamage 時に自分のステージへ発火する。
+ *     発生源が〈獅白ぼたん〉で30以上、このぼたんがセンターなら[ターンに1回]ドロー1。
+ *     （推しホロメンの〈獅白ぼたん〉が与えた場合は発生源が推し＝レア経路のため、ステージ発生源を主対象とする）
  */
 export default {
   number: 'hBP05-028',
+  triggers: {
+    *onSpecialDamageDealt(ctx) {
+      const self = ctx.sourceHolomem; // 監視者（このぼたん）
+      if (self?.stack[0].name !== '獅白ぼたん') return;
+      if (ctx.engine._zoneOf(self) !== 'center') return; // [センター限定]
+      const info = ctx.specialDealt;
+      if (!info || info.amount < 30) return;              // 30以上の特殊ダメージ
+      if (info.source?.stack[0].name !== '獅白ぼたん') return; // ステージの〈獅白ぼたん〉が与えた
+      if (ctx.oncePerTurnUsed('hBP05-028:draw')) return;  // [ターンに1回]
+      ctx.markOncePerTurn('hBP05-028:draw');
+      ctx.draw(1);
+    },
+  },
   arts: {
     'ここからが俺たちのスタートだ': {
       *run(ctx) {

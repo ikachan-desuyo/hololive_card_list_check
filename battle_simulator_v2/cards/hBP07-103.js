@@ -6,9 +6,8 @@
  *
  * ◆1st以上の〈桃鈴ねね〉に付いていたら能力追加
  *   このホロメンのアーツダメージは軽減されない。
- *   → 【未実装】アーツダメージの軽減無効化（被ダメージ軽減への割り込み）機構が必要なため保留。
- *      （hBP06-027 / hBP07-075 と同様に保留機構。軽減割り込みが用意されたら、
- *       付け先が1st以上の桃鈴ねねの時だけ軽減無効フラグを立てる形で実装する）
+ *   → attached.artsDamageNotReduced で実装。engine のアーツダメージ適用時に、付け先が1st以上の
+ *     〈桃鈴ねね〉なら相手の軽減（負の被ダメージ修正）を無効化する。
  *
  * ツールは、自分のホロメン1人につき1枚だけ付けられる。
  *   → 既定のツール制限（engine._canAttachSupport がツールの重複付けを禁止）に従う。
@@ -26,6 +25,11 @@ export default {
     // 付いている〈桃鈴ねね〉のアーツ+20（常時修正）
     artsPlus(holomem, _engine) {
       return holomem.stack[0].name === '桃鈴ねね' ? 20 : 0;
+    },
+    // ◆1st以上の〈桃鈴ねね〉に付いていたら: このホロメンのアーツダメージは軽減されない
+    artsDamageNotReduced(holomem) {
+      const top = holomem.stack[0];
+      return top.name === '桃鈴ねね' && (top.bloomLevel === '1st' || top.bloomLevel === '2nd');
     },
   },
 };

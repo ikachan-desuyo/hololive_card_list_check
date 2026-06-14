@@ -11,8 +11,10 @@
  *   ・自分の推しホロメンが〈風真いろは〉で、自分のコラボホロメンがいるなら、このアーツ+40。
  *       → dmgBonus で実装。
  *   ・さらに、このホロメンがBuzzホロメンからBloomしているなら、このアーツダメージは軽減されない。
- *       → 「ダメージは軽減されない（被ダメージ軽減の無効化）」は保留機構のため未実装。
- *         （Buzzホロメンからのbloom追跡＋相手側の被ダメージ軽減割り込みへの干渉が必要）
+ *       → arts定義 damageNotReduced で実装。スタックの下（重なり元）に Buzzホロメンがあるなら、
+ *         このアーツダメージの軽減を無効化する。
+ *
+ * [ギフト] 伝えたい想い（再Bloom）は §0-B「再Bloom」機構が必要なため別途。
  */
 export default {
   number: 'hBP06-027',
@@ -23,6 +25,11 @@ export default {
         if (ctx.player.oshi?.name !== '風真いろは') return 0;
         const hasCollab = ctx.holomems('self', (e) => e.pos.zone === 'collab').length > 0;
         return hasCollab ? 40 : 0;
+      },
+      // このホロメンがBuzzホロメンからBloomしているなら、このアーツダメージは軽減されない
+      damageNotReduced(ctx) {
+        const stack = ctx.sourceHolomem?.stack || [];
+        return stack.slice(1).some((c) => c.buzz); // 重なり元（自分より下）にBuzzがある
       },
     },
   },
