@@ -1060,6 +1060,52 @@ export async function runTests() {
     assert(!e._canBloomIgnoreName(spotH, { bloomLevel: '1st', hp: 200 }), 'Spot/cannotBloom にBloомできてしまう');
   });
 
+  await testAsync('推しステージ: はあちゃまなう（〈赤井はあと〉が能力でデッキに戻ると2枚ドロー・ターンに1回）', async () => {
+    const e = await setupMainStep(deckMap, 152);
+    await e.registry.preload(['hBP07-004'], lib);
+    const p0 = e.state.players[0];
+    p0.oshi = lib.getByNumber('hBP07-004');
+    const haatoDebut = [...lib.byNumber.values()].find((c) => c.name === '赤井はあと' && c.bloomLevel === 'Debut');
+    assert(haatoDebut, 'Debut〈赤井はあと〉がライブラリに無い');
+    const ctx = new EffectContext(e, 0, {});
+
+    const h1 = e._createHolomem(lib.getByNumber(haatoDebut.number), 0);
+    p0.back = [h1];
+    const handBefore = p0.hand.length;
+    ctx.returnHolomemToDeck(h1);
+    assertEq(p0.hand.length, handBefore + 2, 'はあちゃまなうで2枚引いていない');
+    assert(!p0.back.includes(h1), 'はあとがバックから除去されていない');
+
+    // [ターンに1回]: 同一ターンの2回目は引かない
+    const h2 = e._createHolomem(lib.getByNumber(haatoDebut.number), 0);
+    p0.back = [h2];
+    const handBefore2 = p0.hand.length;
+    ctx.returnHolomemToDeck(h2);
+    assertEq(p0.hand.length, handBefore2, '[ターンに1回]を超えて引いている');
+  });
+
+  await testAsync('装着: ネリッサの杖（2ndネリッサの能力で手札アーカイブ→相手前衛に特殊20・ターンに1回）', async () => {
+    const e = await setupMainStep(deckMap, 153);
+    await e.registry.preload(['hBP05-061', 'hBP05-083'], lib);
+    const p0 = e.state.players[0]; const p1 = e.state.players[1];
+    const nerissa = e._createHolomem(lib.getByNumber('hBP05-061'), 0);
+    assertEq(nerissa.stack[0].name, 'ネリッサ・レイヴンクロフト', 'テスト用2ndネリッサが用意できていない');
+    assertEq(nerissa.stack[0].bloomLevel, '2nd', '2ndでない');
+    nerissa.attachments = [{ ...lib.getByNumber('hBP05-083') }];
+    p0.center = nerissa; p0.collab = null; p0.back = [];
+    p1.collab = null; // 相手前衛をセンターのみ＝対象1人で自動選択
+    assert(p1.center, '相手センターがいない前提');
+    const before = p1.center.damage;
+    p0.hand = [{ name: 'A', kind: 'support' }, { name: 'B', kind: 'support' }];
+    let done = false;
+    const eff = { * run(ctx) { yield* ctx.archiveHandCard(ctx.player.hand[0]); yield* ctx.archiveHandCard(ctx.player.hand[0]); } };
+    e._runEffect(eff, { playerIdx: 0, sourceHolomem: nerissa }, () => { done = true; });
+    let guard = 0;
+    while (!done && e.state.pending && guard++ < 10) e.apply(e.state.pending.options[0].id);
+    assert(done, '完了しない');
+    assertEq(p1.center.damage, before + 20, '相手前衛に特殊20（ターンに1回）が正しく入っていない');
+  });
+
   await testAsync('コンパイラ: 全カードでクラッシュせず、一定数を自動実装できる', async () => {
     let compiled = 0;
     let slots = 0;

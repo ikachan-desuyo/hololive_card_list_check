@@ -459,6 +459,25 @@ export class EffectContext {
     if (i !== -1) this.player.hand.splice(i, 1);
   }
 
+  /**
+   * 手札のカード1枚を「ホロメンの能力で」アーカイブする（発生源 ctx.sourceHolomem に紐づく）。ジェネレータ。
+   * アーカイブ後、発生源ホロメンの装着カードの onHostHandArchived フックを発火する
+   * （「このツールが付いているホロメンの能力で手札をアーカイブした時」hBP05-083）。
+   * 単純な手札アーカイブとの違いは“発生源ホロメンの能力による”誘発が走る点のみ。
+   */
+  *archiveHandCard(card) {
+    this.removeFromHand(card);
+    this.player.archive.push(card);
+    this.log(`${this.player.name}: ${card.name} を手札からアーカイブ`);
+    const host = this.sourceHolomem;
+    if (host) {
+      for (const att of [...host.attachments]) {
+        const hook = this.engine.registry.get(att.number)?.attached?.onHostHandArchived;
+        if (hook) yield* hook(this, host, att);
+      }
+    }
+  }
+
   /** カードを手札に加える（公開ログ付き）。公開中(revealed)にあれば取り除く */
   addToHand(card, { reveal = true } = {}) {
     this._unreveal(card);
@@ -488,6 +507,33 @@ export class EffectContext {
   deckToTop(cards) {
     for (const c of cards) this._unreveal(c);
     this.player.deck.unshift(...cards);
+  }
+
+  /**
+   * ホロメンを能力でステージからデッキに戻す（はあと推しスキル等）。
+   * 付いているエール/サポートはアーカイブへ、本体スタックはデッキの上/下へ。
+   * 「ホロメンが能力でデッキに戻った時」の誘発（推しステージスキル onReturnedToDeck）を発火する。
+   * 戻したカードの配列（スタック）を返す。
+   */
+  returnHolomemToDeck(holomem, { bottom = true } = {}) {
+    const owner = this.state.players.find((p) => this.engine._stageHolomems(p).includes(holomem));
+    if (!owner) return [];
+    const ownerIdx = this.state.players.indexOf(owner);
+    if (holomem.cheers.length || holomem.attachments.length) {
+      owner.archive.push(...holomem.cheers, ...holomem.attachments);
+      holomem.cheers = [];
+      holomem.attachments = [];
+    }
+    if (owner.center === holomem) owner.center = null;
+    else if (owner.collab === holomem) owner.collab = null;
+    else { const i = owner.back.indexOf(holomem); if (i >= 0) owner.back.splice(i, 1); }
+    const returned = [...holomem.stack];
+    for (const c of returned) this._unreveal(c);
+    if (bottom) owner.deck.push(...returned);
+    else owner.deck.unshift(...returned);
+    this.log(`${returned[0]?.name} をデッキの${bottom ? '下' : '上'}に戻した`);
+    this.engine._dispatchReturnedToDeck(ownerIdx, returned);
+    return returned;
   }
 
   _unreveal(card) {
