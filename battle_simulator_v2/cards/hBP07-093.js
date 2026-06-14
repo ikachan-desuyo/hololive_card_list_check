@@ -39,7 +39,7 @@ export default {
         match: (h) => h === chosen,
         description: `このターン、${chosen.stack[0].name} のアーツ+40`,
       });
-      // サイコロを振る（6以外ならデッキに戻す処理は未実装。上部JSDoc参照）
+      // サイコロを振る（6以外なら markReturnSelfToDeck でデッキに戻す）
       const roll = (yield* ctx.rollDice());
       if (roll !== 6) {
         ctx.markReturnSelfToDeck(); // 6以外: このカードをアーカイブせずデッキに戻してシャッフル（engine が解決後に処理）
