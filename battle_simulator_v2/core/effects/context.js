@@ -185,6 +185,10 @@ export class EffectContext {
       kind: 'confirm',
       player: this.playerIdx,
       title,
+      // デフォルトラベル（発動する/発動しない）= 任意効果の「発動するか」ゲート。
+      // 設定「任意効果の発動確認」がOFFのとき、エンジンが確認を出さず自動で発動(true)する対象。
+      // 中途の選択（独自ラベルの confirm。例「振る/振らない」）は対象外で常に確認する。
+      activation: yesLabel === '発動する' && noLabel === '発動しない',
       buildOptions: () => [
         { id: 'yes', label: yesLabel, value: true },
         { id: 'no', label: noLabel, value: false },

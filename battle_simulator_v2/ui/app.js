@@ -97,6 +97,7 @@ async function startGame() {
       names: ['プレイヤー1', 'プレイヤー2'],
       onChange: render,
       registry,
+      confirmOptionalEffects: getSettings().confirmOptionalEffects !== false, // 任意効果の発動確認（既定ON）
     });
     document.getElementById('setup-screen').style.display = 'none';
     document.getElementById('game-screen').classList.add('active');
@@ -1041,6 +1042,16 @@ function setupSettingsPanel() {
     refreshSettingsUI();
   });
 
+  // 任意効果の発動確認（確認する / 自動で発動）
+  document.getElementById('confirm-optional-buttons').addEventListener('click', (e) => {
+    const v = e.target.dataset?.confirmOptional;
+    if (!v) return;
+    const on = v === 'on';
+    saveSettings({ confirmOptionalEffects: on });
+    if (engine) engine.confirmOptionalEffects = on; // 実行中のゲームにも即反映
+    refreshSettingsUI();
+  });
+
   // AI適用（CPUが操作するプレイヤーの切り替え）
   document.getElementById('ai-buttons').addEventListener('click', (e) => {
     const idx = e.target.dataset?.ai;
@@ -1097,6 +1108,10 @@ function refreshSettingsUI() {
   }
   for (const btn of document.querySelectorAll('#ai-buttons button')) {
     btn.classList.toggle('active', aiEnabled(Number(btn.dataset.ai)));
+  }
+  const confirmOptOn = getSettings().confirmOptionalEffects !== false;
+  for (const btn of document.querySelectorAll('#confirm-optional-buttons button')) {
+    btn.classList.toggle('active', (btn.dataset.confirmOptional === 'on') === confirmOptOn);
   }
   document.getElementById('seed-display').textContent = `シード値: ${currentSeed ?? '-'}`;
 }
