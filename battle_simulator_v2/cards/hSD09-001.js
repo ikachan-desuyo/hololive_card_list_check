@@ -43,10 +43,10 @@ export default {
     canUse(engine, ownerIdx) {
       // アーカイブに赤いホロメンカードが1枚以上ある時のみ使える
       const p = engine.state.players[ownerIdx];
-      return p.archive.some((c) => c && c.kind === 'holomem' && c.color === '赤');
+      return p.archive.some((c) => c && c.kind === 'holomen' && c.color === '赤');
     },
     *run(ctx) {
-      const reds = ctx.player.archive.filter((c) => c && c.kind === 'holomem' && c.color === '赤');
+      const reds = ctx.player.archive.filter((c) => c && c.kind === 'holomen' && c.color === '赤');
       if (reds.length === 0) return;
       const picked = yield ctx.chooseCard({
         cards: reds,

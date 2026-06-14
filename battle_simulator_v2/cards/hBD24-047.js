@@ -49,10 +49,10 @@ export default {
     canUse(engine, ownerIdx) {
       // デッキに紫ホロメンが1枚以上ある時のみ使える
       const p = engine.state.players[ownerIdx];
-      return p.deck.some((c) => c && c.kind === 'holomem' && c.color === '紫');
+      return p.deck.some((c) => c && c.kind === 'holomen' && c.color === '紫');
     },
     *run(ctx) {
-      const purples = ctx.deckCards((c) => c && c.kind === 'holomem' && c.color === '紫');
+      const purples = ctx.deckCards((c) => c && c.kind === 'holomen' && c.color === '紫');
       const picked = yield ctx.chooseCard({
         cards: purples,
         title: '手札に加える紫ホロメンを選択',

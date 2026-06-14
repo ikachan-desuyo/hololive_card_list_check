@@ -17,7 +17,7 @@ export default {
     // ライフ3以下でのみ使える。アーカイブにホロメンがあれば手札補充になる。
     supportValue({ player }) {
       if (player.life.length > 3) return 0;
-      const hasHolomem = player.archive.some((c) => c.kind === 'holomem');
+      const hasHolomem = player.archive.some((c) => c.kind === 'holomen');
       return hasHolomem ? 12 : 0;
     },
   },
@@ -25,10 +25,10 @@ export default {
     canUse(ctx) {
       // ライフが3以下でなければ使えない／戻せるホロメンが無いなら使えない
       if (ctx.player.life.length > 3) return false;
-      return ctx.player.archive.some((c) => c.kind === 'holomem');
+      return ctx.player.archive.some((c) => c.kind === 'holomen');
     },
     *run(ctx) {
-      const cand = ctx.player.archive.filter((c) => c.kind === 'holomem');
+      const cand = ctx.player.archive.filter((c) => c.kind === 'holomen');
       if (cand.length === 0) return;
       const picked = yield ctx.chooseCard({
         cards: cand,

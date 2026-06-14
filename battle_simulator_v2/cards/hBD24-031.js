@@ -49,10 +49,10 @@ export default {
     canUse(engine, ownerIdx) {
       // デッキに青ホロメンが1枚以上ある時のみ使える
       const p = engine.state.players[ownerIdx];
-      return p.deck.some((c) => c && c.kind === 'holomem' && c.color === '青');
+      return p.deck.some((c) => c && c.kind === 'holomen' && c.color === '青');
     },
     *run(ctx) {
-      const blues = ctx.deckCards((c) => c && c.kind === 'holomem' && c.color === '青');
+      const blues = ctx.deckCards((c) => c && c.kind === 'holomen' && c.color === '青');
       const picked = yield ctx.chooseCard({
         cards: blues,
         title: '手札に加える青ホロメンを選択',

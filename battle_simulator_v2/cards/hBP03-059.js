@@ -20,7 +20,7 @@ export default {
       if (looked.length === 0) return;
       // その中から #0期生 を持つホロメン1枚を公開し手札に加える（「1枚」=最大1枚）
       const candidates = looked.filter(
-        (c) => c.kind === 'holomem' && ctx.hasTag(c, '0期生'),
+        (c) => c.kind === 'holomen' && ctx.hasTag(c, '0期生'),
       );
       let toHand = null;
       if (candidates.length > 0) {

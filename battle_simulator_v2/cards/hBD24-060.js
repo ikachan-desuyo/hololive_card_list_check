@@ -49,10 +49,10 @@ export default {
     canUse(engine, ownerIdx) {
       // デッキに黄ホロメンが1枚以上ある時のみ使える
       const p = engine.state.players[ownerIdx];
-      return p.deck.some((c) => c && c.kind === 'holomem' && c.color === '黄');
+      return p.deck.some((c) => c && c.kind === 'holomen' && c.color === '黄');
     },
     *run(ctx) {
-      const yellows = ctx.deckCards((c) => c && c.kind === 'holomem' && c.color === '黄');
+      const yellows = ctx.deckCards((c) => c && c.kind === 'holomen' && c.color === '黄');
       const picked = yield ctx.chooseCard({
         cards: yellows,
         title: '手札に加える黄ホロメンを選択',
