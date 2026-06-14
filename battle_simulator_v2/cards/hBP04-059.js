@@ -12,30 +12,10 @@
  *     特殊ダメージを相手センターへ与える。
  *
  * ダイス回数のカウント方法:
- *   サイコロを振るたびに duration:'turn' の専用モディファイア（kind=DICE_ROLL_MOD）を ownerIdx 付きで積み、
- *   アーツ解決時にその個数を数える。モディファイアはエンドステップで自動消滅する。
- *
- * 保留: 「自分が能力でサイコロを振った回数」は本来このカード以外の能力（他のホロメンのコラボ/推しスキル等）で
- *   振ったぶんも含むが、エンジン共通のダイス回数カウンタが無いため、現状はこのカードのブルームエフェクトで
- *   振った回数のみカウントしている。他カードのダイスを数えるには rollDice 側に共通カウンタを足す必要がある。
+ *   ctx.rollDice() が振るたびに共通モディファイア（kind:'abilityDiceRoll'）を自動で積むため、
+ *   ctx.abilityDiceCountThisTurn() で「このターンに自分が能力で振った回数」を取得する。
+ *   このカード以外の能力（他のホロメンのコラボ/推しスキル等）で振ったぶんも含めて正しく数える。
  */
-
-// このターンに自分が能力でサイコロを振った回数を数えるための専用モディファイア kind
-const DICE_ROLL_MOD = 'ラプラス・ダークネス:abilityDiceRoll';
-
-// このターンの自分のダイス回数を1増やす（エンドステップで自動消滅する duration:'turn' モディファイア）
-function tallyDiceRoll(ctx) {
-  ctx.engine.state.modifiers.push({
-    duration: 'turn', kind: DICE_ROLL_MOD, ownerIdx: ctx.playerIdx,
-  });
-}
-
-// このターンに自分が能力で振ったサイコロの回数
-function abilityDiceCount(ctx) {
-  return ctx.engine.state.modifiers.filter(
-    (m) => m.kind === DICE_ROLL_MOD && m.ownerIdx === ctx.playerIdx).length;
-}
-
 export default {
   number: 'hBP04-059',
   bloomEffect: {
@@ -62,11 +42,10 @@ export default {
       ctx.log(`${ctx.player.name}: ${cost.name} をアーカイブ（「Yes My Dark！」のコスト）`);
       ctx.markOncePerTurn('hBP04-059:YesMyDark');
 
-      // サイコロを3回振る：奇数の回数ぶんドロー
+      // サイコロを3回振る：奇数の回数ぶんドロー（rollDice が回数を共通カウントする）
       let odds = 0;
       for (let i = 0; i < 3; i++) {
         const v = yield* ctx.rollDice();
-        tallyDiceRoll(ctx); // アーツ「吾輩最強伝説」用のダイス回数カウント
         if (v % 2 === 1) odds++;
       }
       if (odds > 0) ctx.draw(odds);
@@ -77,7 +56,7 @@ export default {
     '吾輩最強伝説': {
       *run(ctx) {
         // このターンに自分が能力で振ったサイコロの回数 × 特殊ダメージ10 を相手センターへ
-        const count = abilityDiceCount(ctx);
+        const count = ctx.abilityDiceCountThisTurn();
         if (count <= 0) return;
         const center = ctx.holomems('opp', (e) => e.pos.zone === 'center')[0];
         if (center) {

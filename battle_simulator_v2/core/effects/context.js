@@ -39,6 +39,9 @@ export class EffectContext {
     this.attackInfo = opts.attackInfo || null;
     // onOshiSkillUsed 用: 使った推しスキルの情報 { text, sp }
     this.oshiSkillInfo = opts.oshiSkillInfo || null;
+    // ブルームエフェクトの発動経路（特定スキル経由のBloomを判定する。例: 'SP推しスキル:蘇るオリー'）。
+    // 通常のBloom（手札から）は null。bloomFromArchiveFlow が呼び出し元から受け取って設定する (hBP04-061)
+    this.bloomSourceSkill = opts.bloomSourceSkill || null;
   }
 
   get player() { return this.engine.state.players[this.playerIdx]; }
@@ -194,6 +197,11 @@ export class EffectContext {
    * コントローラー自身に決定ポイントを提示する。
    */
   *rollDice() {
+    // このターンに自分が能力で振ったサイコロの回数を共通カウント（エンドステップで自動消滅）。
+    // 「このターンに自分が能力でサイコロを振った回数」を参照する効果が全カードぶんを数えられる (hBP04-059)
+    this.engine.state.modifiers.push({
+      duration: 'turn', kind: 'abilityDiceRoll', ownerIdx: this.playerIdx,
+    });
     let value = rollDie(this.engine.rng);
     const fixed = this.engine.state.modifiers.find(
       (m) => m.kind === 'diceFixed' && m.ownerIdx === this.playerIdx);
@@ -203,8 +211,34 @@ export class EffectContext {
     } else {
       this.log(`🎲 サイコロ: ${value}`);
     }
+    // 「目を倍として扱う」継続効果 (kind:'diceDouble')。発生源カード（推し含む）が match に合致したら倍化する (hBP08-045)
+    const rollerCard = this.sourceCard || (this.sourceHolomem && this.sourceHolomem.stack[0]) || null;
+    const dbl = this.engine.state.modifiers.find(
+      (m) => m.kind === 'diceDouble' && m.ownerIdx === this.playerIdx && (!m.match || m.match(rollerCard)));
+    if (dbl) {
+      this.log(`🎲 サイコロ: ${value} → ${value * 2} として扱う（${dbl.description || '倍化'}）`);
+      value *= 2;
+    }
     value = yield* this._offerDiceReact(value);
     return value;
+  }
+
+  /** このターンに自分（コントローラー）が能力で振ったサイコロの回数（全カードの能力ぶんを合算） */
+  abilityDiceCountThisTurn() {
+    return this.engine.state.modifiers.filter(
+      (m) => m.kind === 'abilityDiceRoll' && m.ownerIdx === this.playerIdx).length;
+  }
+
+  /**
+   * 「このターンが終了する時、…する」遅延効果を予約する (7.7.3)。
+   * run はジェネレータ関数 *run(ctx)（プレイヤー選択も可）。エンドステップでコントローラー所有ぶんが順に実行される。
+   * 例: hBP08-007 SP「このターンが終了する時、自分のステージのエール3枚をアーカイブする」。
+   */
+  scheduleEndOfTurn(run, label = '') {
+    const s = this.engine.state;
+    (s.endOfTurnEffects || (s.endOfTurnEffects = [])).push({
+      ownerIdx: this.playerIdx, run, label,
+    });
   }
 
   /** ダイス割り込み（自分のステージの装着カードの onDiceRollReact）をコントローラーに順に提示する */
@@ -696,7 +730,7 @@ export class EffectContext {
    * Bloomの通常条件（同名・レベル遷移・HP>ダメージ・ターン制限 8.3）に従う。
    * 使い方: const done = yield* ctx.bloomFromArchiveFlow({ targetFilter, optional });
    */
-  *bloomFromArchiveFlow({ targetFilter = null, optional = false } = {}) {
+  *bloomFromArchiveFlow({ targetFilter = null, optional = false, bloomSourceSkill = null } = {}) {
     const candidates = this.player.archive.filter((card) =>
       card.kind === 'holomen' &&
       this.holomems('self', targetFilter).some((e) => this.engine._canBloom(e.holomem, card)));
@@ -728,6 +762,7 @@ export class EffectContext {
       yield* def.run(new EffectContext(this.engine, this.playerIdx, {
         sourceCard: card,
         sourceHolomem: entry.holomem,
+        bloomSourceSkill, // 特定スキル経由のBloomを判定するブルームエフェクト用 (hBP04-061)
       }));
     }
     return true;

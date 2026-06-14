@@ -41,8 +41,9 @@ export default {
         ctx.player.archive.push(card);
         ctx.log(`${card.name} をアーカイブした`);
       }
-      // アーカイブからBloomできる（任意）
-      yield* ctx.bloomFromArchiveFlow({ optional: true });
+      // アーカイブからBloomできる（任意）。「蘇るオリー」経由のBloomと分かるよう経路マーカーを渡す
+      // （hBP04-061 のブルームエフェクトはこのSP推しスキル経由のBloム時のみ発動する）
+      yield* ctx.bloomFromArchiveFlow({ optional: true, bloomSourceSkill: 'SP推しスキル:蘇るオリー' });
     },
   },
 };
