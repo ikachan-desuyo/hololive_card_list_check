@@ -89,6 +89,7 @@ export default {
         ctx.player.archive.push(card);
       }
       if (looked.length > 0) ctx.log(`成功体験－！！！: 残り${looked.length}枚をアーカイブ`);
+      ctx.recordDeckArchive(looked.length);
     },
   },
 };

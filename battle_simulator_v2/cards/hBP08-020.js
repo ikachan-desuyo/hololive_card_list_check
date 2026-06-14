@@ -5,18 +5,14 @@
  *   自分のデッキの上から1～2枚をアーカイブできる：アーカイブしたカード1枚につき、自分のデッキを1枚引く。
  *   → 任意（できる）。0枚も可なのでまず confirm し、1枚アーカイブ後さらにもう1枚できる（最大2枚）。
  *     アーカイブした枚数分ドローする。
- *     アーカイブした枚数を turn modifier(kind:'deckArchivedThisTurn') に積み、
+ *     アーカイブした枚数を共通カウンタ ctx.recordDeckArchive() に加算し、
  *     アーツ「挑戦のまなざし」の条件判定に使う。
  *
  * アーツ「挑戦のまなざし」(110+):
  *   このターンに自分のデッキからカードを3枚以上アーカイブしていたなら、このアーツ+40。
  *   特攻: 赤+50。
- *   → 「このターンに自分のデッキからアーカイブした枚数」を deckArchivedThisTurn モディファイア合算で判定。
- *
- * 保留: 「このターンに自分のデッキから3枚以上アーカイブ」の枚数カウントは、
- *   このカードのコラボエフェクトが積む deckArchivedThisTurn モディファイアのみを集計する。
- *   他カード（別の「デッキからアーカイブ」効果）が同じカウンタを更新しないため、
- *   それらと併用した場合の合算には対応していない（汎用デッキアーカイブ計数機構が未整備のため）。
+ *   → 「このターンに自分のデッキからアーカイブした枚数」を player.deckArchivedThisTurn（共通カウンタ）で判定。
+ *     コラボ単体では最大2枚なので、他カードのデッキアーカイブ効果（recordDeckArchive で計上）と併用して3枚以上に届く。
  */
 export default {
   number: 'hBP08-020',
@@ -39,11 +35,8 @@ export default {
         archived++;
       }
       if (archived > 0) {
-        // このターンにデッキからアーカイブした枚数を記録（アーツの条件判定用）
-        ctx.addTurnModifier({
-          kind: 'deckArchivedThisTurn', amount: archived, ownerIdx: ctx.playerIdx,
-          description: `このターン、デッキから${archived}枚アーカイブ`,
-        });
+        // このターンにデッキからアーカイブした枚数を共通カウンタに加算（アーツの条件判定用）
+        ctx.recordDeckArchive(archived);
         // アーカイブした枚数分ドロー
         ctx.draw(archived);
       }
@@ -52,10 +45,8 @@ export default {
   arts: {
     '挑戦のまなざし': {
       dmgBonus(ctx) {
-        const count = ctx.engine.state.modifiers
-          .filter((m) => m.kind === 'deckArchivedThisTurn' && m.ownerIdx === ctx.playerIdx)
-          .reduce((sum, m) => sum + (m.amount || 0), 0);
-        return count >= 3 ? 40 : 0;
+        // このターンに自分のデッキから3枚以上アーカイブしていたなら+40（共通カウンタ）
+        return ctx.deckArchivedCountThisTurn() >= 3 ? 40 : 0;
       },
     },
   },

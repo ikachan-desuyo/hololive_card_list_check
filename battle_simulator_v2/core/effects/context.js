@@ -232,8 +232,11 @@ export class EffectContext {
       duration: 'turn', kind: 'abilityDiceRoll', ownerIdx: this.playerIdx,
     });
     let value = rollDie(this.engine.rng);
+    // diceFixed: 「目をNとして扱う」。m.batchOf があれば「1度にちょうど batchOf 個振る時」限定
+    // （hBP04-005「1度に3回振る時」）。rollDiceMany(n) が this._diceBatchSize=n を立てている間だけ一致する。
     const fixed = this.engine.state.modifiers.find(
-      (m) => m.kind === 'diceFixed' && m.ownerIdx === this.playerIdx && !m.used);
+      (m) => m.kind === 'diceFixed' && m.ownerIdx === this.playerIdx && !m.used
+        && (m.batchOf == null || m.batchOf === this._diceBatchSize));
     if (fixed) {
       this.log(`🎲 サイコロ: ${value} → ${fixed.value} として扱う（${fixed.description || '効果'}）`);
       value = fixed.value;
@@ -251,6 +254,24 @@ export class EffectContext {
     }
     value = yield* this._offerDiceReact(value);
     return value;
+  }
+
+  /**
+   * サイコロを「1度に n 個」振る (5.24)。各目の配列を返す。ジェネレータ（`const xs = yield* ctx.rollDiceMany(3)`）。
+   * 振っている間 this._diceBatchSize=n を立て、「1度にちょうど N 個振る時」限定の継続効果
+   * （diceFixed の batchOf。hBP04-005「1度に3回振る時、目をすべて5として扱う」）を一致させる。
+   * 1個ずつの rollDice をそのまま n 回呼ぶので、ファン割り込み・回数カウント(abilityDiceRoll)も従来どおり働く。
+   */
+  *rollDiceMany(n) {
+    const results = [];
+    const prev = this._diceBatchSize;
+    this._diceBatchSize = n;
+    try {
+      for (let i = 0; i < n; i++) results.push(yield* this.rollDice());
+    } finally {
+      this._diceBatchSize = prev; // 入れ子・例外時も元に戻す
+    }
+    return results;
   }
 
   /** このターンに自分（コントローラー）が能力で振ったサイコロの回数（全カードの能力ぶんを合算） */
@@ -488,6 +509,20 @@ export class EffectContext {
   removeFromDeck(card) {
     const i = this.player.deck.indexOf(card);
     if (i !== -1) this.player.deck.splice(i, 1);
+  }
+
+  /**
+   * 「このターンに自分のデッキからアーカイブした枚数」を加算する（hBP08-020「挑戦のまなざし」等が参照）。
+   * デッキ→アーカイブの移動を行ったカードが、移動枚数ぶん呼ぶ（カウント専用＝既存の移動処理は変えない）。
+   * カウンタは player.deckArchivedThisTurn でターン開始時に0へリセットされる。
+   */
+  recordDeckArchive(n = 1) {
+    if (n > 0) this.player.deckArchivedThisTurn = (this.player.deckArchivedThisTurn || 0) + n;
+  }
+
+  /** このターンに自分のデッキからアーカイブした枚数 */
+  deckArchivedCountThisTurn() {
+    return this.player.deckArchivedThisTurn || 0;
   }
 
   removeFromHand(card) {

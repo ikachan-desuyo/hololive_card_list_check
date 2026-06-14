@@ -31,6 +31,7 @@ export default {
       for (let i = 0; i < 2 && ctx.player.deck.length > 0; i++) {
         const c = ctx.player.deck.shift();
         ctx.player.archive.push(c);
+        ctx.recordDeckArchive(1);
         ctx.log(`デッキの上から ${c.name} をアーカイブ`);
       }
       // その後、自分のデッキを1枚引く

@@ -50,6 +50,7 @@ export default {
         }
         const top = ctx.player.deck.shift();
         ctx.player.archive.push(top);
+        ctx.recordDeckArchive(1);
         ctx.log(`${ctx.player.name}: デッキの上から ${top.name} をアーカイブ`);
       },
     },

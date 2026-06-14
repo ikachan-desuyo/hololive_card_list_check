@@ -11,10 +11,8 @@ export default {
     *run(ctx) {
       const ok = yield ctx.confirm('サイコロを3回振りますか？', '振る', '振らない');
       if (!ok) return;
-      let odds = 0;
-      for (let i = 0; i < 3; i++) {
-        if ((yield* ctx.rollDice()) % 2 === 1) odds++;
-      }
+      const rolls = yield* ctx.rollDiceMany(3); // 1度に3回（hBP04-005「総帥のお仕事」が効く単位）
+      const odds = rolls.filter((v) => v % 2 === 1).length;
       if (odds === 0) {
         ctx.log('奇数が出なかったため特殊ダメージなし');
         return;

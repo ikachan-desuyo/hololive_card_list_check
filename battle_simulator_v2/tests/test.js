@@ -617,6 +617,50 @@ export async function runTests() {
     assertEq(e.effects.artsBonus(ally, 0), 0, '次の相手のターン終了後も継続効果が残っている');
   });
 
+  await testAsync('hBP04-005「総帥のお仕事」: 1度に3回振る時だけ目を5固定（2個振りは対象外で不変）', async () => {
+    const drive = (gen) => { let r = gen.next(); while (!r.done) r = gen.next(); return r.value; };
+    const mk = async () => {
+      const e = await setupMainStep(deckMap, 104);
+      await e.registry.preload(['hBP04-005'], lib);
+      e.state.turn = 3; e.state.turnPlayer = 0;
+      return e;
+    };
+    // 修正あり（推しスキル「総帥のお仕事」適用）と、同seed・修正なし を比較する
+    const eOn = await mk();
+    drive(eOn.registry.get('hBP04-005').oshiSkill.run(eOn._effectContext(0, {})));
+    const eOff = await mk(); // 同seed・修正なし → rng は同じ位置から始まる
+
+    // まず2個振り（batchOf:3 と一致しない＝修正対象外）。両者で完全一致するはず
+    const on2 = drive(eOn._effectContext(0, {}).rollDiceMany(2));
+    const off2 = drive(eOff._effectContext(0, {}).rollDiceMany(2));
+    assertEq(on2.join(','), off2.join(','), '2個振りは「総帥のお仕事」の対象外なのに目が変わった');
+
+    // 次に3個振り（batchOf:3 と一致＝全て5固定）。修正ありエンジンでは必ず [5,5,5]
+    const on3 = drive(eOn._effectContext(0, {}).rollDiceMany(3));
+    assertEq(on3.join(','), '5,5,5', '1度に3回振った目が全て5になっていない');
+  });
+
+  await testAsync('hBP08-020「挑戦のまなざし」: このターンにデッキから3枚以上アーカイブで+40（共通カウンタ）', async () => {
+    const e = await setupMainStep(deckMap, 105);
+    await e.registry.preload(['hBP08-020'], lib);
+    e.state.turn = 3;
+    e.state.turnPlayer = 0;
+    const p0 = e.state.players[0];
+    const art = e.registry.get('hBP08-020').arts['挑戦のまなざし'];
+    const ctx = e._effectContext(0, {});
+
+    // 0枚 → +0
+    p0.deckArchivedThisTurn = 0;
+    assertEq(art.dmgBonus(ctx), 0, '0枚アーカイブで+40が出ている');
+    // 2枚（コラボ単体の上限相当）→ まだ+0
+    ctx.recordDeckArchive(2);
+    assertEq(art.dmgBonus(ctx), 0, '2枚アーカイブで+40になってしまっている（3枚以上が条件）');
+    // 他カードのデッキアーカイブ1枚を合算 → 計3枚で+40
+    ctx.recordDeckArchive(1);
+    assertEq(p0.deckArchivedThisTurn, 3, '共通カウンタが3になっていない');
+    assertEq(art.dmgBonus(ctx), 40, 'デッキから3枚アーカイブで+40になっていない');
+  });
+
   await testAsync('相手の手札ステップで自分の手札が増えない', async () => {
     const e = await setupMainStep(deckMap, 21); // P1(先攻)のメインステップ
     // P1のターンを終わらせてP2のターンへ

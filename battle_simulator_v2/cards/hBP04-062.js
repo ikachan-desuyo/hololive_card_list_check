@@ -33,6 +33,7 @@ export default {
           ctx._unreveal(picked);
           ctx.player.archive.push(picked);
           ctx.log(`${picked.name} をアーカイブした`);
+          ctx.recordDeckArchive(1);
           rest.splice(rest.indexOf(picked), 1);
         }
         if (rest.length > 0) ctx.deckToTop(rest); // 残りはデッキの上に戻す

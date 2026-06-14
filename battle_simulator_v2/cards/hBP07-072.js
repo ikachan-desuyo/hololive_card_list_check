@@ -17,11 +17,9 @@ export default {
       });
       if (!target) return;
       const chosen = target.holomem;
-      let odd = 0;
-      for (let i = 0; i < 3; i++) {
-        const v = (yield* ctx.rollDice());
-        if (v % 2 === 1) odd++;
-      }
+      // 1度に3回（hBP04-005「総帥のお仕事」が効く単位）
+      const rolls = yield* ctx.rollDiceMany(3);
+      const odd = rolls.filter((v) => v % 2 === 1).length;
       if (odd === 0) return;
       const amount = odd * 10;
       ctx.addTurnModifier({

@@ -33,6 +33,7 @@ export default {
         if (!card) return;
         ctx._unreveal(card);
         ctx.player.archive.push(card);
+        ctx.recordDeckArchive(1);
         ctx.log(`${ctx.player.name}: ${card.name} をアーカイブした`);
         if (card.kind === 'support') {
           ctx.addArtBonus(30, 'アーカイブしたカードがサポート');

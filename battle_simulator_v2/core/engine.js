@@ -54,6 +54,7 @@ function createPlayerState(name, gameDeck) {
     lifeDamage: 0,          // 未処理のライフダメージ (3.2)
     mulliganCount: 0,
     limitedPlayedThisTurn: 0,
+    deckArchivedThisTurn: 0, // このターンに自分のデッキからアーカイブした枚数（hBP08-020）
     usedCollabThisTurn: false,
     usedBatonTouchThisTurn: false,
     supportsPlayedThisTurn: [], // このターンに使ったサポートのカード名一覧
@@ -517,6 +518,7 @@ export class Engine {
     p.usedCollabThisTurn = false;
     p.usedBatonTouchThisTurn = false;
     p.cheerArchivedThisTurn = false; // このターンに自分のステージのエールをアーカイブしたか（hBP07-088 等）
+    p.deckArchivedThisTurn = 0;      // このターンに自分のデッキからアーカイブしたカード枚数（ctx.recordDeckArchive で加算。hBP08-020）
     p.artsUsedNamesThisTurn = [];    // このターンにアーツを使った自分のホロメン名（hBP05-050 等）
     p.centerArtsUsedNamesThisTurn = []; // このターンにセンターでアーツを使った自分のホロメン名（hBP08-007 等）
     p.supportsPlayedThisTurn = []; // このターンに使ったサポートのカード名一覧（「〈限界飯〉を使っていたなら」等）

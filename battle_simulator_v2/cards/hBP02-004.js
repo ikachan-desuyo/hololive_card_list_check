@@ -45,6 +45,7 @@ export default {
           ctx.player.archive.push(c);
         }
         ctx.log(`${seen.length}枚をアーカイブした`);
+        ctx.recordDeckArchive(seen.length);
       }
     },
   },

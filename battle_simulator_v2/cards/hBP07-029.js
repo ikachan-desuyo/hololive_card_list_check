@@ -38,6 +38,7 @@ export default {
         if (!ok) return;
         const card = ctx.player.deck.shift();
         ctx.player.archive.push(card);
+        ctx.recordDeckArchive(1);
         ctx.log(`${ctx.player.name}: デッキの上の ${card.name} をアーカイブ`);
         ctx.flashReveal(card); // 何をアーカイブしたか画面に見せる
         if (card.kind === 'holomen') {

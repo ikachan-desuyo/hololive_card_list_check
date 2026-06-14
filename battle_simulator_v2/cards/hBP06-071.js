@@ -11,20 +11,18 @@ export default {
   arts: {
     'らぷらすといっしょ！': {
       *run(ctx) {
-        let odds = 0;
-        for (let i = 0; i < 3; i++) {
-          if ((yield* ctx.rollDice()) % 2 === 1) odds++;
-        }
+        // 1度に3回（hBP04-005「総帥のお仕事」が効く単位）
+        const rolls = yield* ctx.rollDiceMany(3);
+        const odds = rolls.filter((v) => v % 2 === 1).length;
         ctx.log(`奇数が${odds}回出た`);
         if (odds > 0) ctx.addArtBonus(odds * 20, `奇数${odds}回ぶんアーツ+${odds * 20}`);
       },
     },
     'みんなかつもくせよ！': {
       *run(ctx) {
-        let odds = 0;
-        for (let i = 0; i < 5; i++) {
-          if ((yield* ctx.rollDice()) % 2 === 1) odds++;
-        }
+        // 1度に5回（「3回振る時」限定の hBP04-005 は対象外。batchOf:3 と一致しない）
+        const rolls = yield* ctx.rollDiceMany(5);
+        const odds = rolls.filter((v) => v % 2 === 1).length;
         ctx.log(`奇数が${odds}回出た`);
         // 奇数が出た回数1回につき、「デッキを1枚引き、相手のセンター/コラボに特殊ダメージ30」を1セット実行
         for (let i = 0; i < odds; i++) {

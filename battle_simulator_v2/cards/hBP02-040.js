@@ -61,6 +61,7 @@ export default {
           ctx.player.archive.push(c);
         }
         if (rest.length > 0) ctx.log(`${ctx.player.name}: 公開した${rest.length}枚をアーカイブした`);
+        ctx.recordDeckArchive(rest.length);
       },
     },
   },

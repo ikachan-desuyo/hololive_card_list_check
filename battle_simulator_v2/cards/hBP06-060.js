@@ -23,6 +23,7 @@ export default {
           ctx.player.archive.push(c);
           ctx.log(`${ctx.player.name}: ${c.name} をアーカイブした`);
         }
+        ctx.recordDeckArchive(cards.length);
         // アーカイブしたなら（=実際に1枚以上アーカイブできたなら）エールデッキの上から1枚を送る
         if (cards.length === 0) return;
         const target = yield ctx.chooseHolomem({

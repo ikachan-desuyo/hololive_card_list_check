@@ -28,6 +28,7 @@ export default {
         ctx.player.archive.push(c);
         ctx.log(`デッキの上から ${c.name} をアーカイブ`);
       }
+      ctx.recordDeckArchive(cards.length);
       // このターンの間、#FLOW GLOW のセンター/コラボのアーツ+20
       const ownerIdx = ctx.playerIdx;
       ctx.addTurnModifier({

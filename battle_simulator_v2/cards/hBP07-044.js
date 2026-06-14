@@ -41,6 +41,7 @@ export default {
           ctx.player.archive.push(c);
           ctx.log(`${c.name} をアーカイブした`);
         }
+        ctx.recordDeckArchive(looked.length);
         // その後、アーカイブのスタッフ1枚を手札に戻せる（任意）
         const staffs = ctx.player.archive.filter(
           (c) => c.kind === 'support' && c.supportType === 'スタッフ',
