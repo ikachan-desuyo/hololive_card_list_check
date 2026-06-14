@@ -560,6 +560,11 @@ export class EffectContext {
       this.log(`${holomem.stack[0].name} の ${cheer.name} をアーカイブ`);
       // 「このターンに自分のステージのエールがアーカイブされた」記録（hBP07-088 のアーツ+30条件 等）
       this.player.cheerArchivedThisTurn = true;
+      // 「自分のエールがアーカイブに置かれた時」の同期トリガー（即時・選択不要。hBP08-031 等）
+      for (const sh of this.engine._stageHolomems(this.player)) {
+        const fn = this.engine.registry.get(sh.stack[0].number)?.onSelfCheerArchived;
+        if (fn) fn(sh, this.engine, this.playerIdx);
+      }
     }
   }
 
@@ -618,6 +623,7 @@ export class EffectContext {
     }
 
     targetEntry.holomem.damage += total;
+    if (total > 0) this.engine._dispatchDamageReceivedForced(targetEntry.holomem); // 強制被ダメージトリガー (hBP07-108)
     // 「ライフは減らない」は、この特殊ダメージでダウンが確定した場合のみ適用する。
     // （ダウンに至らなかった場合にフラグを残すと、後から別のダメージで倒された時まで
     //   ライフが減らなくなってしまう）

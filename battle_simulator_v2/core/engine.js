@@ -189,6 +189,20 @@ export class Engine {
   }
 
   /**
+   * 「相手のターンで、このホロメンがダメージを受けた時」に必ず発火する強制トリガー（選択なし・同期）。
+   * 対象の装着カード定義 attached.onDamageReceivedForced(holomem, engine, self, ownerIdx) を呼ぶ。
+   * 自分のターンに自分が受けた場合は発火しない（相手から受けた時のみ）。(hBP07-108 等)
+   */
+  _dispatchDamageReceivedForced(target) {
+    const ownerIdx = this.state.players.findIndex((p) => this._stageHolomems(p).includes(target));
+    if (ownerIdx < 0 || ownerIdx === this.state.turnPlayer) return;
+    for (const att of [...target.attachments]) {
+      const fn = this.registry.get(att.number)?.attached?.onDamageReceivedForced;
+      if (fn) fn(target, this, att, ownerIdx);
+    }
+  }
+
+  /**
    * 受け手の「受けるダメージ」修正を適用した最終ダメージ（0未満にはしない）。
    * @param attacker 攻撃元ホロメン（「相手の1stから受けるアーツ-30」のような攻撃元条件用。無ければnull）
    */
@@ -406,6 +420,7 @@ export class Engine {
     p.usedCollabThisTurn = false;
     p.usedBatonTouchThisTurn = false;
     p.cheerArchivedThisTurn = false; // このターンに自分のステージのエールをアーカイブしたか（hBP07-088 等）
+    p.artsUsedNamesThisTurn = [];    // このターンにアーツを使った自分のホロメン名（hBP05-050 等）
     p.supportsPlayedThisTurn = []; // このターンに使ったサポートのカード名一覧（「〈限界飯〉を使っていたなら」等）
     // 「直前の相手のターンに自分のホロメンがダウンしていたなら」用。
     // このターン(idx)の間に相手(1-idx)のホロメンがダウンしたら蓄積し、相手の次の自ターンで参照される。
@@ -726,9 +741,12 @@ export class Engine {
     const actions = [];
 
     // 対象: 相手のセンター/コラボ (12.3.3.2)
-    const targets = [];
+    let targets = [];
     if (opp.center) targets.push({ zone: 'center', index: 0 });
     if (opp.collab) targets.push({ zone: 'collab', index: 0 });
+    // 防御側（opp）の常時アウラによるアーツ対象制限（「相手のアーツは自分のコラボしか対象にできない」hBP05-010 等）
+    const allowZones = this.effects.oppArtsTargetZones(opp, 1 - s.turnPlayer);
+    if (allowZones) targets = targets.filter((t) => allowZones.includes(t.zone));
 
     // 指定ホロメンの指定アーツについて、対象ごとのアーツアクションを actions に積む（通常／再アーツ共通）
     const pushArtActions = (h, zone, art, ai, isReArts) => {
@@ -1139,6 +1157,8 @@ export class Engine {
 
     s.perfUsed[action.zone] = true;
     h.lastArtUsedIndex = action.artIndex; // 再アーツ（同じアーツをもう1回）判定用に記録
+    // 「このターンに〈名前〉がアーツを使ったか」判定用に、アーツを使ったホロメン名を記録（hBP05-050 等）
+    (p.artsUsedNamesThisTurn || (p.artsUsedNamesThisTurn = [])).push(topCard(h).name);
     // 再アーツでの使用なら、対応する「もう1回」修正を消費する (hBP07-008)
     if (action.reArts) {
       const reMod = s.modifiers.find(
@@ -1220,6 +1240,7 @@ export class Engine {
           this.log(
             `「${art.name}」→ ${tCard.name} に ${finalDmg}ダメージ（累計${t.damage}/${this.effectiveHp(t)}）`
           );
+          if (finalDmg > 0) this._dispatchDamageReceivedForced(t); // 強制被ダメージトリガー (hBP07-108)
           if (t.damage >= this.effectiveHp(t)) downed.push(t);
           after2();
         });

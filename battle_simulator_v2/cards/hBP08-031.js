@@ -4,11 +4,10 @@
  * [ギフト/キーワード] SPY-C1000:
  *   [センターポジション・コラボポジション限定][ターンに1回]
  *   自分のターンで、自分のエールがアーカイブに置かれた時、自分のデッキを1枚引く。
- *   → 保留: 「自分のエールがアーカイブに置かれた時」を捕捉するトリガーフックが
- *      現状のエンジン/registry に無い（giftEffect は registry 冒頭コメントでも「未対応」）。
- *      onSelfCheerArchive 等の誘発フックが追加されたら、center/collab限定・ターンに1回
- *      （ctx.oncePerTurnUsed/markOncePerTurn）・自分のターン限定で ctx.draw(1) を実装する。
- *      フックが無いため本枠は未実装のまま保留する。
+ *   → onSelfCheerArchived（ステージのエールが archiveCheer でアーカイブされた時に同期発火）で実装。
+ *      自分のターン・センター/コラボ限定・ターンに1回でデッキ1枚ドロー。
+ *      （注: エールデッキからの直接アーカイブ＝下記GWS+の自前アーカイブは archiveCheer を通らないため
+ *       この誘発の対象外。バトンタッチコストや効果によるステージエールのアーカイブで誘発する。）
  *
  * [アーツ] GWS+ (60 / green+any):
  *   自分のエールデッキの上から1枚をアーカイブする。
@@ -18,10 +17,23 @@
  *      各色につき自分のホロメン1人を選んでHP10回復する（同じホロメンを複数回選んでもよい解釈）。
  *      ctx.ownStageCheerColors() で色一覧を取得。色数が0なら回復なし。
  *
- * 保留: ギフト SPY-C1000（エール被アーカイブ誘発フックが無いため）。
  */
 export default {
   number: 'hBP08-031',
+
+  // ギフト SPY-C1000: [センター/コラボ限定][ターン1回]自分のターンで自分のエールがアーカイブされた時、デッキ1枚ドロー
+  onSelfCheerArchived(holomem, engine, ownerIdx) {
+    if (engine.state.turnPlayer !== ownerIdx) return;     // 自分のターンで
+    const zone = engine._zoneOf(holomem);
+    if (zone !== 'center' && zone !== 'collab') return;   // [センター/コラボ限定]
+    if (holomem._spy1000Turn === engine.state.turn) return; // [ターンに1回]
+    holomem._spy1000Turn = engine.state.turn;
+    const p = engine.state.players[ownerIdx];
+    if (p.deck.length > 0) {
+      p.hand.push(p.deck.shift());
+      engine.log(`${p.name}: SPY-C1000 でデッキを1枚引いた`);
+    }
+  },
 
   arts: {
     'GWS+': {

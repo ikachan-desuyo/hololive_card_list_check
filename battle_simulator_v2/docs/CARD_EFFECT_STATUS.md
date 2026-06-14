@@ -54,7 +54,14 @@
 > ※公式データは半角コロン「:」を使うため、`core/cards.js` の `fwColon` でスキルテキストのコロンを全角「：」に正規化（既存パーサ／コンパイラは全角前提）。
 > hBP01〜08・hSD01-19・hBD24・hPR・hYS01 はマルチエージェント並列で実装（各ファイルのJSDocに実装範囲・保留を明記）。
 
-### 保留対応（2026-06-14）— 残り保留 25枚
+### 保留対応（2026-06-14）— 残り保留 20枚
+（追加ラウンド）さらに以下の機構を追加し hBP05-038/050, hBP08-018/031/049, hBP05-010, hBP07-108 を解消（25→20）:
+- **推しスキル使用時誘発** `triggers.onOshiSkillUsed`（`ctx.oshiSkillInfo={text,sp}`）/ **アーツ対象拡張** `kind:'artTargetSecondBack'`（相手2ndバック）
+- **ホロメン個別のターン内アーツ使用履歴** `player.artsUsedNamesThisTurn` / **相手のアーツ対象制限アウラ** `def.oppArtsTargetRestrict`（自分コラボ限定 等）
+- **強制被ダメージトリガー** `attached.onDamageReceivedForced`（相手ターンに受けた時・選択なし）/ **エール被アーカイブ誘発** `def.onSelfCheerArchived`（archiveCheer 経由）
+> 以下は旧「残り25枚」時点の記録。最新の残りは **20枚**（broad/個別機構依存）。
+
+### （参考）保留対応 第1〜2パス記録 — 元の38枚から
 旧セッションで「当時未対応の機構」を理由に保留したカードを2パスで再対応（保留 38→25）。追加した機構:
 - 擬似エール供給 `attached.cheerSupply` / エール付与時 `attached.onCheerAttached` / ターン内エールアーカイブ記録 `player.cheerArchivedThisTurn`
 - 装着カードへの `onArtsUse`・`onOpponentDown`・`onBloom` 通知（ホストのアーツ使用/相手ダウン/Bloom時に発火）

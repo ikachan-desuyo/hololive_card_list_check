@@ -197,6 +197,21 @@ export class EffectSystem {
   }
 
   /**
+   * 防御側（相手のアーツの対象になる側）の常時アウラによる「相手のアーツが取れる対象ゾーン」の制限。
+   * defender のステージ上のカード定義 def.oppArtsTargetRestrict(src, engine) が許可ゾーン配列
+   * （例 ['collab']）を返したら、それらの積集合で制限する。無ければ null（無制限）。(hBP05-010 等)
+   */
+  oppArtsTargetZones(defender, defIdx) {
+    let allow = null;
+    for (const src of this.engine._stageHolomems(defender)) {
+      const def = this.registry.get(src.stack[0].number);
+      const zones = def?.oppArtsTargetRestrict?.(src, this.engine, defender);
+      if (zones) allow = allow ? allow.filter((z) => zones.includes(z)) : [...zones];
+    }
+    return allow;
+  }
+
+  /**
    * ターン終了時: 「ターンの終わりまで」の修正を消滅させる (7.7.4)。
    * 複数ターンにまたがる修正は mod.untilTurn（このターン番号の終わりまで有効）で表現し、
    * state.turn >= untilTurn になったエンドステップで消滅させる（「次の相手のターン終了まで」等）。
