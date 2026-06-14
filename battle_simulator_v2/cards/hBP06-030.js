@@ -5,11 +5,12 @@
  *   （付け先は「他の」指定が無いので、このホロメン自身も対象になりうる。
  *    ツール/マスコット上限・付け先ルールを尊重して _canAttachSupport で絞る。）
  *
- * 【未実装】ギフト「みんなへ感謝の気持ち」:
+ * ギフト「みんなへ感謝の気持ち」:
  *   [コラボポジション限定]相手のターンで、自分のセンターホロメンに付いている〈ルーナイト〉を
  *   アーカイブする時、アーカイブするかわりに自分のバックの〈姫森ルーナ〉に付け替えられる。
- *   → 装着カードのアーカイブ処理に割り込む「アーカイブ置換」機構が現状無いため保留
- *      （被ダメージ/アーカイブ割り込み系。エンジン側のフック追加が必要）。
+ *   → attachArchiveReplace で実装。ダウン処理 finish のアーカイブ直前に
+ *     engine._replaceAttachArchiveGen が自ステージのギフトを提示する。
+ *     ※「アーカイブする時」＝センターホロメンのダウン時に装着カードがアーカイブされる場面を対象とする。
  */
 export default {
   number: 'hBP06-030',
@@ -38,6 +39,29 @@ export default {
         // アーカイブから付けるので「付けた時」トリガーも誘発させる
         yield* ctx.attachSupportWithTrigger(picked, dest.holomem);
       },
+    },
+  },
+
+  // ギフト「みんなへ感謝の気持ち」: 装着〈ルーナイト〉のアーカイブをバックの〈姫森ルーナ〉への付け替えに差し替える
+  attachArchiveReplace: {
+    title: 'ギフト「みんなへ感謝の気持ち」: 〈ルーナイト〉をアーカイブするかわりにバックの〈姫森ルーナ〉に付け替えますか？',
+    canUse(engine, ownerIdx, { downedPos, attachment, giftHolomem }) {
+      if (engine._zoneOf(giftHolomem) !== 'collab') return false;   // [コラボポジション限定]
+      if (engine.state.turnPlayer === ownerIdx) return false;       // 相手のターンで
+      if (downedPos.zone !== 'center') return false;                // 自分のセンターホロメンに付いている
+      if (attachment.name !== 'ルーナイト') return false;            // 〈ルーナイト〉
+      // 付け替え先: バックの〈姫森ルーナ〉が居て、付けられること
+      const p = engine.state.players[ownerIdx];
+      return p.back.some((e) => e.stack[0].name === '姫森ルーナ' && engine._canAttachSupport(e, attachment));
+    },
+    *run(ctx, { attachment }) {
+      const dest = yield ctx.chooseHolomem({
+        side: 'self',
+        filter: (e) => e.pos.zone === 'back' && e.top.name === '姫森ルーナ'
+          && ctx.engine._canAttachSupport(e.holomem, attachment),
+        title: `${attachment.name} を付け替えるバックの〈姫森ルーナ〉を選択`,
+      });
+      return dest ? dest.holomem : null;
     },
   },
 };

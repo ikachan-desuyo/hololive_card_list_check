@@ -65,6 +65,11 @@
  *       canUse(engine, info) { return bool; },          //   info = { defIdx, target, dmg, kind:'arts'|'special', reactor?(ステージ側), attachedCard?(装着側) }
  *       apply(engine, info) { return newDmg; },         //   コスト/副作用を実行し、調整後ダメージを返す（hBP03-105 ファン-30 / hSD13-012 特殊シールド）
  *     },
+ *     attachArchiveReplace: {                           // 「装着カードをアーカイブする時、かわりに別ホロメンへ付け替えられる」（ダウン処理 finish の直前に提示。hBP06-030）
+ *       title, yesLabel,                                //   自ステージのギフトとして提示。差し替えた装着カードはアーカイブされず宛先へ付く
+ *       canUse(engine, ownerIdx, info) { return bool; },//   info = { downedHolomem, downedPos, attachment, giftHolomem }
+ *       *run(ctx, info) { return 宛先ホロメン or null; },//   選択を伴い、付け替え先ホロメンを返す
+ *     },
  *     onDiceRollReact: {                                // 「サイコロを振った時に使える」リアクティブ割り込み（自分のファン等。コントローラー自身が選択）
  *       title, yesLabel,                                //   ctx.rollDice() 内で発火
  *       canUse(engine, info) { return bool; },          //   info = { ownerIdx, roller(振ったホロメン/推しはnull), rollerCard, value, fanCard, fanHolomem }
@@ -83,8 +88,11 @@
  *     auraSpecialDmgPlus(src, sourceHolomem, targetEntry, engine) { return N; }, // 「〈X〉が相手センターに与える特殊+20」等
  *     oshiSkill / spOshiSkill: { canUse(engine, idx), *run(ctx) },  // メインステップの起動型推しスキル（spは次相手ターンの前衛移動禁止 hBP01-005 等）
  *     onDownOshiSkill: { cost, title, canUse(engine, idx, holomem), apply(engine, idx, holomem) },
- *     onDamageOshiSkill: { cost, sp?, title, canUse(engine, defIdx, target, dmg), reduce(engine, defIdx, target, dmg)=>N },
- *       // 「相手のターンで自分のホロメンが相手からダメージを受ける時に使える：ダメージ-N」（被ダメージ割り込み。汎用 onDamageReceivedReact と同経路で提示）
+ *     onDamageOshiSkill: { cost, sp?, title, canUse(engine, defIdx, target, dmg, kind), reduce(engine,..)=>N | *run(ctx,{target,dmg}) | *redirect(ctx,{target,dmg})=>新しい受け手ホロメン },
+ *       // 「相手のターンで自分のホロメンが相手からダメージを受ける時に使える」（被ダメージ割り込み。汎用 onDamageReceivedReact と同経路で提示）
+ *       //   reduce=ダメージ-N（同期）/ run=選択を伴う副作用（generator）/ redirect=受け手を別ホロメンに差し替え（generatorで選んだホロメンを返す。kind==='arts'限定。hSD13-001）
+ *     onCheerArchivedBatchOshiSkill: { cost, sp?, title, canUse(engine, idx, info), *run(ctx) },
+ *       // 「自分の○○ホロメンの能力でエールをアーカイブした時に使える」枚数集計型（効果実行ごとに捨てた枚数を集計し完了時に1回提示。info={count,source}, ctx.cheerArchivedInfo.count=枚数。hSD11-001）
  *     onDiceRollOshiSkill: { cost, sp?, title, canUse(engine, idx, info), apply(engine, idx, info)=>newValue }, // 「自分の〈X〉がサイコロを振った時：振り直す」等（ダイス割り込み。info={roller,rollerCard,value}）
  *     onArtsUseOshiSkills:    [{ cost, sp?, title, canUse(engine, idx, attackInfo), *run(ctx) }], // 「アーツを使った時に使える」（攻撃時誘発。配列で通常＋SP併記可）
  *     onDamageDealtOshiSkills: [{ cost, sp?, title, canUse(engine, idx, attackInfo), *run(ctx) }], // 「ダメージを与えた時に使える」（攻撃時誘発。ctx.attackInfo={sourceHolomem,art,artName,dealtList:[{target,zone,dealt}],downed}）

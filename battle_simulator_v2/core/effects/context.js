@@ -751,6 +751,9 @@ export class EffectContext {
       // ability!==false（能力による）かつ「○○ホロメンの能力で」= this.sourceHolomem を発生源として渡す。
       // [ターン1回]/[ゲーム1回]の使用済みフラグで、同一能力の複数枚アーカイブでも多重発動しない。
       if (opts.ability !== false) {
+        // 「この能力で何枚アーカイブしたか」をこの効果実行(ctx)に集計する。
+        // 効果実行の完了時に枚数ぶんのSP推しスキル（onCheerArchivedBatchOshiSkill, hSD11-001）を1回だけ提示する。
+        this._flowGlowArchiveCount = (this._flowGlowArchiveCount || 0) + 1;
         const od = this.engine.registry.get(this.player.oshi.number)?.onCheerArchivedOshiSkill;
         if (od) {
           const p = this.player;

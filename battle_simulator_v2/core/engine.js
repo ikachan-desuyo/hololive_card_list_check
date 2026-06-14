@@ -288,6 +288,7 @@ export class Engine {
    * 選択後に再開する。完了したら after() を呼ぶ。
    */
   _runEffect(effectDef, ctxOpts, after) {
+    let runCtx = ctxOpts.ctx || null; // この効果実行の ctx（done から参照。枚数集計SP用）
     // 効果完了時に「デッキサーチで確認したのに未シャッフル」のデッキを必ずシャッフルする（確認後シャッフル保証）。
     // ctx.shuffleDeck() を明示的に呼んだ場合は _deckViewedNeedsShuffle が false になっているため二重シャッフルしない。
     const done = () => {
@@ -298,6 +299,13 @@ export class Engine {
           this.log(`${p.name}: デッキをシャッフル（サーチ確認後）`);
         }
       }
+      // 「自分の○○ホロメンの能力でエールをアーカイブした時」枚数ぶんのSP推しスキル（hSD11-001）。
+      // この効果実行(runCtx)で archiveCheer により捨てた枚数を集計し、効果完了時に1回だけ提示する。
+      if (runCtx && runCtx._flowGlowArchiveCount > 0 &&
+          this.registry.get(this.state.players[runCtx.playerIdx]?.oshi.number)?.onCheerArchivedBatchOshiSkill) {
+        this._stepEffect(this._cheerArchiveBatchGen(runCtx), undefined, after);
+        return;
+      }
       after();
     };
     if (!effectDef?.run) {
@@ -306,6 +314,7 @@ export class Engine {
     }
     // ctxOpts.ctx で外から ctx を渡せる（アーツのボーナス蓄積を受け取るため等）
     const ctx = ctxOpts.ctx || new EffectContext(this, ctxOpts.playerIdx, ctxOpts);
+    runCtx = ctx;
     let gen;
     try {
       gen = effectDef.run(ctx);
@@ -1804,22 +1813,26 @@ export class Engine {
     }
 
     const finish = () => {
-      // ホロメンの全カードと付いているカードをアーカイブ (11.3.1.2 / 4.4.7)
-      p.archive.push(...h.stack, ...h.cheers, ...h.attachments);
-      this._removeHolomem(p, pos);
-      // ライフダメージ: 通常1、Buzzは2 (2.11.2.2)。
-      // 「ダウンしてもライフは減らない」特殊ダメージでダウンした場合は0
-      if (h.noLifeOnDown) {
-        this.log(`${p.name} のライフは減らない（効果による）`);
-      } else {
-        // ダウン時に減るライフ枚数: エクストラ「ダウンした時、自分のライフ-N」を優先（非Buzzでも-2の特殊カード対応）、
-        // 無ければ Buzz=2 / 通常=1。さらに「減るライフ-N」(h.lifeReductionOnDown) を差し引く。
-        const baseLifeLoss = card.extraLifeLossOnDown ?? (card.buzz ? 2 : 1);
-        const lifeDmg = Math.max(0, baseLifeLoss - (h.lifeReductionOnDown || 0));
-        p.lifeDamage += lifeDmg;
-        this.log(`${p.name} はライフダメージ${lifeDmg}を受けた`);
-      }
-      next();
+      // 装着カードのアーカイブ差し替え割り込み（hBP06-030「みんなへ感謝の気持ち」）。
+      // 差し替えられた装着カードは h.attachments から除かれ、残りを通常どおりアーカイブする。
+      this._stepEffect(this._replaceAttachArchiveGen(p, h, pos), undefined, () => {
+        // ホロメンの全カードと付いているカードをアーカイブ (11.3.1.2 / 4.4.7)
+        p.archive.push(...h.stack, ...h.cheers, ...h.attachments);
+        this._removeHolomem(p, pos);
+        // ライフダメージ: 通常1、Buzzは2 (2.11.2.2)。
+        // 「ダウンしてもライフは減らない」特殊ダメージでダウンした場合は0
+        if (h.noLifeOnDown) {
+          this.log(`${p.name} のライフは減らない（効果による）`);
+        } else {
+          // ダウン時に減るライフ枚数: エクストラ「ダウンした時、自分のライフ-N」を優先（非Buzzでも-2の特殊カード対応）、
+          // 無ければ Buzz=2 / 通常=1。さらに「減るライフ-N」(h.lifeReductionOnDown) を差し引く。
+          const baseLifeLoss = card.extraLifeLossOnDown ?? (card.buzz ? 2 : 1);
+          const lifeDmg = Math.max(0, baseLifeLoss - (h.lifeReductionOnDown || 0));
+          p.lifeDamage += lifeDmg;
+          this.log(`${p.name} はライフダメージ${lifeDmg}を受けた`);
+        }
+        next();
+      });
     };
 
     // ダウンしたホロメン自身の「ダウンした時」トリガー (13.4 ギフト等)。
@@ -2087,6 +2100,71 @@ export class Engine {
       this.onChange();
     };
     run(0, dmg);
+  }
+
+  /**
+   * 「自分の○○ホロメンの能力でエールをアーカイブした時に使える」枚数集計型のSP推しスキル（hSD11-001）。
+   * 効果実行(runCtx)が完了した時、その実行で archiveCheer により捨てた枚数(_flowGlowArchiveCount)を
+   * info.count として1回だけ提示する。発生源ホロメン(runCtx.sourceHolomem)の色/タグ判定はカードの canUse で行う。
+   */
+  *_cheerArchiveBatchGen(runCtx) {
+    const ownerIdx = runCtx.playerIdx;
+    const count = runCtx._flowGlowArchiveCount || 0;
+    runCtx._flowGlowArchiveCount = 0; // 二重発動防止（読み取り後にクリア）
+    const p = this.state.players[ownerIdx];
+    const od = this.registry.get(p.oshi.number)?.onCheerArchivedBatchOshiSkill;
+    if (!od || count <= 0) return;
+    const used = od.sp ? p.usedSpOshiSkillThisGame : (p.usedOshiSkillThisTurn >= this._oshiSkillCap(ownerIdx));
+    const info = { count, source: runCtx.sourceHolomem };
+    if (used || p.holoPower.length < (od.cost || 0)) return;
+    if (od.canUse && !od.canUse(this, ownerIdx, info)) return;
+    const use = yield {
+      kind: 'confirm', player: ownerIdx,
+      title: od.title || `${od.sp ? 'SP' : ''}推しスキルを使いますか？（アーカイブしたエール${count}枚）`,
+      buildOptions: () => [
+        { id: 'yes', label: `${od.sp ? 'SP' : ''}推しスキルを使う（ホロパワー-${od.cost}）`, value: true },
+        { id: 'no', label: '使わない', value: false },
+      ],
+    };
+    if (!use) return;
+    p.archive.push(...p.holoPower.splice(0, od.cost || 0));
+    if (od.sp) p.usedSpOshiSkillThisGame = true; else p.usedOshiSkillThisTurn += 1;
+    this.log(`${p.name}: ${od.sp ? 'SP' : ''}推しスキル発動（アーカイブしたエール${count}枚ぶん）`);
+    yield* od.run(this._effectContext(ownerIdx, { sourceCard: p.oshi, cheerArchivedInfo: info }));
+  }
+
+  /**
+   * ダウン処理のアーカイブ直前に、装着カードを「アーカイブするかわりに別ホロメンへ付け替える」割り込み（hBP06-030）。
+   * 自ステージのギフト `attachArchiveReplace` を持つホロメンが、ダウンしたホロメン h の各装着カードについて
+   * 差し替えるか提示する。差し替えた装着カードは h.attachments から除かれ、宛先ホロメンに付く（アーカイブされない）。
+   */
+  *_replaceAttachArchiveGen(p, h, pos) {
+    const ownerIdx = this.state.players.indexOf(p);
+    for (const giftH of this._stageHolomems(p)) {
+      const rep = this.registry.get(giftH.stack[0].number)?.attachArchiveReplace;
+      if (!rep) continue;
+      for (const att of [...h.attachments]) {
+        if (!h.attachments.includes(att)) continue; // すでに別ギフトで移動済み
+        const info = { downedHolomem: h, downedPos: pos, attachment: att, giftHolomem: giftH };
+        if (rep.canUse && !rep.canUse(this, ownerIdx, info)) continue;
+        const use = yield {
+          kind: 'confirm', player: ownerIdx,
+          title: rep.title || `${att.name}をアーカイブするかわりに付け替えますか？`,
+          buildOptions: () => [
+            { id: 'yes', label: rep.yesLabel || '付け替える', value: true },
+            { id: 'no', label: `${att.name}をアーカイブ`, value: false },
+          ],
+        };
+        if (!use) continue;
+        // 宛先ホロメンを run が返す（選択を伴う）
+        const dest = yield* rep.run(this._effectContext(ownerIdx, {}), info);
+        if (!dest) continue;
+        const ai = h.attachments.indexOf(att);
+        if (ai !== -1) h.attachments.splice(ai, 1);
+        dest.attachments.push(att);
+        this.log(`${att.name} をアーカイブするかわりに ${dest.stack[0].name} に付け替えた`);
+      }
+    }
   }
 
   /**

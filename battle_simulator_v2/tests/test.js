@@ -506,6 +506,117 @@ export async function runTests() {
     assertEq(def.holoPower.length, 0, 'ホロパワーが-3支払われていない');
   });
 
+  await testAsync('hSD11-001 SP「ニコたんの名を呼ぶがいいさ！」: #FLOW GLOW能力で捨てたエール枚数ぶんの特殊ダメージ', async () => {
+    const e = await setupMainStep(deckMap, 101);
+    await e.registry.preload(['hSD11-001'], lib);
+    e.state.turn = 3;
+    e.state.turnPlayer = 0;
+    const p0 = e.state.players[0];
+    const p1 = e.state.players[1];
+    p0.oshi = { number: 'hSD11-001', name: '虎金妃笑虎' };
+    p0.holoPower = [fakeHolomen(), fakeHolomen()]; // [ホロパワー：-2]
+    p0.usedSpOshiSkillThisGame = false;
+    // 発生源: #FLOW GLOW ホロメン（エール2枚付き）
+    const src = e._createHolomem(fakeHolomen({ name: 'FLOWGLOWホロメン', tags: ['FLOW', 'GLOW'] }), 1);
+    const mkCheer = () => ({ id: 'cheer', number: 'cheer', name: '青エール', kind: 'cheer', color: '青' });
+    src.cheers.push(mkCheer(), mkCheer());
+    p0.center = src;
+    p0.collab = null;
+    p0.back = [];
+    // 相手のセンター（被弾対象）
+    const oppCenter = e._createHolomem(fakeHolomen({ name: '相手センター', hp: 300 }), 1);
+    p1.center = oppCenter;
+    p1.collab = null;
+
+    // #FLOW GLOWホロメンの「能力」でエール2枚をアーカイブする効果を実行
+    const ability = { *run(ctx) {
+      yield* ctx.archiveCheer(src, src.cheers[0]);
+      yield* ctx.archiveCheer(src, src.cheers[0]);
+    } };
+    let finished = false;
+    e._runEffect(ability, { playerIdx: 0, sourceHolomem: src }, () => { finished = true; });
+    // 効果完了後、枚数ぶんのSP推しスキルの確認が出る
+    assert(e.state.pending, 'SP推しスキルの使用確認が出ていない');
+    e.apply('yes');
+    // 相手のセンターorコラボ選択（候補はセンター1人）
+    if (e.state.pending) e.apply(e.state.pending.options[0].id);
+
+    assert(finished, '効果が完了していない');
+    assertEq(oppCenter.damage, 60, 'アーカイブしたエール2枚×30=60の特殊ダメージになっていない');
+    assert(p0.usedSpOshiSkillThisGame, 'SP推しスキルが使用済みになっていない');
+    assertEq(p0.holoPower.length, 0, 'ホロパワーが-2支払われていない');
+  });
+
+  await testAsync('hBP06-030 ギフト「みんなへ感謝の気持ち」: ダウン時、装着ルーナイトをアーカイブせずバックの姫森ルーナへ付け替え', async () => {
+    const e = await setupMainStep(deckMap, 102);
+    await e.registry.preload(['hBP06-030', 'hBP03-105'], lib);
+    e.state.turn = 3;
+    e.state.turnPlayer = 1; // 相手のターン（防御側＝index0）
+    const p0 = e.state.players[0];
+    const p1 = e.state.players[1];
+    p0.oshi = { number: 'NONE', name: 'テスト推し' }; // ダウン時推しスキルの干渉を避ける
+    // index0 のステージ: センター姫森ルーナ（ルーナイト付き）/ コラボ姫森ルーナ（ギフト源）/ バック姫森ルーナ（受け手）
+    const runaCenter = e._createHolomem(lib.get('hBP06-030_R'), 1);
+    const runaCollab = e._createHolomem(lib.get('hBP06-030_R'), 1);
+    const runaBack = e._createHolomem(lib.get('hBP06-030_R'), 1);
+    const runaito = lib.get('hBP03-105_U');
+    runaCenter.attachments.push(runaito);
+    p0.center = runaCenter;
+    p0.collab = runaCollab;
+    p0.back = [runaBack];
+    // 相手側はトリガーの無いダミーで固定
+    p1.center = e._createHolomem(fakeHolomen({ name: 'ダミー' }), 1);
+    p1.collab = null;
+    p1.back = [];
+
+    let downDone = false;
+    e._processDown(p0, { zone: 'center' }, () => { downDone = true; });
+    assert(e.state.pending, '付け替えの使用確認が出ていない');
+    e.apply('yes');
+    // 付け替え先のバック姫森ルーナを選択
+    if (e.state.pending) e.apply(e.state.pending.options[0].id);
+
+    assert(downDone, 'ダウン処理が完了していない');
+    assert(runaBack.attachments.includes(runaito), 'ルーナイトがバックの姫森ルーナに付け替えられていない');
+    assert(!p0.archive.includes(runaito), 'ルーナイトがアーカイブされてしまっている（付け替えに失敗）');
+    assert(p0.center !== runaCenter, 'ダウンしたセンターが場から除かれていない');
+  });
+
+  await testAsync('hBP07-083 ブルームエフェクト「みんなのエナジードリンク」: 全員アーツ+40 / 2nd桃鈴ねね+60、次の相手ターン終了まで継続', async () => {
+    const e = await setupMainStep(deckMap, 103);
+    await e.registry.preload(['hBP07-083'], lib);
+    e.state.turn = 5; // 適当な自分のターン T
+    e.state.turnPlayer = 0;
+    const p0 = e.state.players[0];
+    const p1 = e.state.players[1];
+    const nene = e._createHolomem(fakeHolomen({ name: '桃鈴ねね', bloomLevel: '2nd', color: '黄' }), 1);
+    const ally = e._createHolomem(fakeHolomen({ name: '味方その他', color: '青' }), 1);
+    p0.center = nene; p0.collab = null; p0.back = [ally];
+    const oppH = e._createHolomem(fakeHolomen({ name: '相手ホロメン' }), 1);
+    p1.center = oppH; p1.collab = null; p1.back = [];
+
+    const baseNene = e.effects.artsBonus(nene, 0);
+    let done = false;
+    e._runEffect(
+      { run: e.registry.get('hBP07-083').bloomEffect.run },
+      { playerIdx: 0, sourceHolomem: nene },
+      () => { done = true; },
+    );
+    assert(done, 'ブルームエフェクトが完了していない');
+
+    assertEq(e.effects.artsBonus(nene, 0), baseNene + 100, '2nd桃鈴ねねのアーツ+100（40+60）になっていない');
+    assertEq(e.effects.artsBonus(ally, 0), 40, '味方ホロメンのアーツ+40になっていない');
+    assertEq(e.effects.artsBonus(oppH, 1), 40, '相手ホロメンのアーツ+40になっていない（お互いの全員が対象）');
+
+    // 持続: 自分のターン終了（turn=5のエンドステップ）では消えない
+    e.effects.expireTurnModifiers();
+    assertEq(e.effects.artsBonus(ally, 0), 40, '自分のターン終了で消えてしまっている');
+    // 次の相手のターン（turn=6）終了で消滅
+    e.state.turn = 6;
+    e.effects.expireTurnModifiers();
+    assertEq(e.effects.artsBonus(ally, 0), 0, '次の相手のターン終了後も継続効果が残っている');
+  });
+
   await testAsync('相手の手札ステップで自分の手札が増えない', async () => {
     const e = await setupMainStep(deckMap, 21); // P1(先攻)のメインステップ
     // P1のターンを終わらせてP2のターンへ
