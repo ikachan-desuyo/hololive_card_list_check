@@ -116,6 +116,13 @@ export function normalizeCard(raw) {
       card.oshiSkills.push(parseOshiSkill(skill));
     } else if (skill.type === 'サポート効果') {
       card.supportText = fwColon(skill.name || skill.description || '');
+    } else if (skill.type === 'エクストラ') {
+      // エクストラ「このホロメンはデッキに何枚でも入れられる」等。
+      // keywords にも積んで既存のサーチ判定（kw.text を見る）で拾えるようにする。
+      const text = fwColon(skill.text || skill.name || '');
+      card.keywords.push({ subtype: 'エクストラ', name: '', text });
+      // デッキ構築の同名上限を無視できる印（デッキビルダー等が参照可能）
+      if (text.includes('デッキに何枚でも入れられる')) card.unlimitedInDeck = true;
     }
   }
 

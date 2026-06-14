@@ -7,8 +7,8 @@
  *
  * 対象は「エクストラ『このホロメンはデッキに何枚でも入れられる』」を持つDebutホロメン。
  * このエクストラ能力はキーワード（subtype「エクストラ」）として格納されるため、
- * キーワードのテキストに「デッキに何枚でも」を含むDebutホロメンを候補にする。
- * （現行のカードDBには該当ホロメンが存在しないため、その場合は候補ゼロで何も起きない。）
+ * キーワードのテキストに「デッキに何枚でも」を含むDebutホロメンを候補にする
+ * （エクストラはコレクタが取得し、card_data の該当Debutに keywords として格納される）。
  *
  * 「1～2枚」=「まで」ではないので、候補があれば最低1枚は出す（2枚目は任意）。
  * ステージは最大6人。空きが無い場合はそこで打ち切る。
@@ -30,11 +30,12 @@ export default {
         ctx.shuffleDeck();
         return;
       }
+      const cand1 = ctx.deckCards((c) => isExtraUnlimitedDebut(ctx, c));
       const first = yield ctx.chooseCard({
-        cards: ctx.deckCards((c) => isExtraUnlimitedDebut(ctx, c)),
+        cards: cand1,
         title: 'ステージに出すDebutホロメンを選択（1枚目）',
-        optional: true,
-        skipLabel: '出さない / 見つからなかったことにする',
+        optional: cand1.length === 0, // 「1～2枚」=最低1枚（候補があれば必須）。候補が無い時のみデッキ確認のみで終了可
+        skipLabel: '見つからなかったことにする',
       });
       if (first) {
         ctx.removeFromDeck(first);
