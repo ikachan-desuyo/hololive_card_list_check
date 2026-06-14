@@ -9,7 +9,9 @@
  *     number: 'hBP04-048',
  *     bloomEffect:  { name, *run(ctx) {...} },          // ブルームエフェクト (13.3)
  *     collabEffect: { name, *run(ctx) {...} },          // コラボエフェクト (13.2)
- *     giftEffect:   { name, *run(ctx) {...} },          // ギフト (13.4) ※未対応
+ *     // ギフト (13.4) は専用の giftEffect フックは設けず、効果の性質に応じた各フックで実装する
+ *     //   （被ダメ割り込み onDamageReceivedReact / 常時アウラ auraXxx / 相手アーツ対象制限 oppArtsTargetRestrict /
+ *     //    装着アーカイブ差し替え attachArchiveReplace / 各 triggers など）。
  *     arts: { 'アーツ名': {
  *       *run(ctx) {...},                                 // テキスト効果（パイプライン段階4）
  *       dmgBonus(ctx) { return N; },                     // 条件付き「このアーツ+N」

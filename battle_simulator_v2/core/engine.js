@@ -8,8 +8,8 @@
  *   - 乱数はシード可能（テストの再現性）。Math.random は使わない
  *
  * ルールの根拠は battle_simulator_v2/docs/RULES_SPEC.md（条番号は総合ルール ver.1.9.0）。
- * カード個別効果（キーワード能力・サポート効果・推しスキル効果）は未実装で、
- * 発動タイミングで TODO ログを出す（効果システムは次フェーズ）。
+ * カード個別効果は効果システムで実装済み（手書き定義 cards/<番号>.js ＞ テキストコンパイラ自動実装）。
+ * いずれにも該当しない枠だけ発動タイミングで TODO(効果未実装) ログを出す。実装状況は docs/CARD_EFFECT_STATUS.md 参照。
  */
 
 import { COLORLESS, STAGE_LIMIT, MULLIGAN_LIMIT, INITIAL_HAND, STEP_NAMES, LOSS_REASONS } from './constants.js';
