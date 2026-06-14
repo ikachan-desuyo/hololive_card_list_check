@@ -42,12 +42,9 @@ export default {
       ctx.log(`${ctx.player.name}: ${cost.name} をアーカイブ（「Yes My Dark！」のコスト）`);
       ctx.markOncePerTurn('hBP04-059:YesMyDark');
 
-      // サイコロを3回振る：奇数の回数ぶんドロー（rollDice が回数を共通カウントする）
-      let odds = 0;
-      for (let i = 0; i < 3; i++) {
-        const v = yield* ctx.rollDice();
-        if (v % 2 === 1) odds++;
-      }
+      // サイコロを1度に3回振る：奇数の回数ぶんドロー（rollDiceMany が回数を共通カウントする。hBP04-005が効く単位）
+      const rolls = yield* ctx.rollDiceMany(3);
+      const odds = rolls.filter((v) => v % 2 === 1).length;
       if (odds > 0) ctx.draw(odds);
       else ctx.log('奇数が出なかったためドローなし');
     },

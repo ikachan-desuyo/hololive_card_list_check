@@ -78,7 +78,7 @@ export default {
           if (v % 2 === 1) anyOdd = true;
         }
         if (anyOdd) {
-          ctx.opponent.lifeDamage += 1; // 相手のライフ-1（アーツ解決後の _checkTiming で処理）
+          ctx.reduceOpponentLife(1); // 相手のライフ-1（免疫があれば減らない。_checkTiming で処理）
           ctx.log('SP推しスキル「フブキングダム」: 奇数が出た → 相手のライフ-1');
         } else {
           ctx.log('SP推しスキル「フブキングダム」: 奇数が出なかった（ライフ変動なし）');

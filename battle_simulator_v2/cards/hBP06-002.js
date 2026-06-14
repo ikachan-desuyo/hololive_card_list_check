@@ -28,6 +28,7 @@ export default {
         ctx.player.archive.push(c);
         ctx.log(`デッキの上から ${c.name} をアーカイブ`);
       }
+      ctx.recordDeckArchive(cards.length);
       // このターンの間、#FLOW GLOW のセンター/コラボのアーツ+20
       const ownerIdx = ctx.playerIdx;
       ctx.addTurnModifier({
@@ -58,7 +59,7 @@ export default {
         return (attackInfo.downed || []).some((t) => engine._zoneOf(t) === 'center'); // 相手センターをダウン
       },
       *run(ctx) {
-        ctx.opponent.lifeDamage += 1; // 相手のライフ-1（_checkTiming でライフ処理）
+        ctx.reduceOpponentLife(1); // 相手のライフ-1（免疫があれば減らない。_checkTiming でライフ処理）
         ctx.log('SP推しスキル「生き抜いていくんです！」: 相手のライフ-1');
       },
     },

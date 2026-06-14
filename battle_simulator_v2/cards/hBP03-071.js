@@ -3,17 +3,48 @@
  * ブルームエフェクト「Member sheep おかえり～」:
  *   自分のアーカイブの〈わためいと〉1枚を手札に戻せる。（任意。0枚可＝戻さなくてよい）
  *
- * アーツ「つのまきじゃんけん」(50): ※未実装（保留）
- *   「相手と勝敗が決まるまでじゃんけんできる：自分が勝った時、このターンの間、
- *    このホロメンは赤特攻+30を得る。」
- *   保留理由:
- *     ① じゃんけん（相手の選択を伴い勝敗が決まるまで繰り返す）の機構がエンジンに存在しない。
- *     ② ターン限定の「赤特攻+N」を表す修正種別が無い。特攻はアーツ静的定義 art.tokkou
- *        からのみ読まれ、addTurnModifier に特攻(tokkou)kind が無いため動的付与できない。
- *   → じゃんけん機構＋特攻ターン修正が実装されたら arts.'つのまきじゃんけん' を追加すること。
+ * アーツ「つのまきじゃんけん」(50):
+ *   「相手と勝敗が決まるまでじゃんけんできる：自分が勝った時、このターンの間、このホロメンは赤特攻+30を得る。」
+ *   → arts.run でじゃんけん（自分→相手の順に手を選ぶ。あいこは繰り返し）。自分が勝ったら
+ *     ターン修正 kind:'tokkouPlus'（赤+30, このホロメン限定）を付与。engine の特攻計算がこれを読む。
+ *     あいこ無限ループ防止に上限回数を設ける。
  */
+const JANKEN = ['グー', 'チョキ', 'パー'];
+
 export default {
   number: 'hBP03-071',
+  arts: {
+    'つのまきじゃんけん': {
+      *run(ctx) {
+        const self = ctx.sourceHolomem;
+        if (!self) return;
+        let won = false;
+        for (let round = 0; round < 30; round++) { // あいこは continue。上限はループ保護
+          const myHand = yield {
+            kind: 'confirm', player: ctx.playerIdx, title: `じゃんけん（${round + 1}回目）: 手を選ぶ`,
+            buildOptions: () => JANKEN.map((h, i) => ({ id: `me${i}`, label: h, value: i })),
+          };
+          const oppHand = yield {
+            kind: 'confirm', player: 1 - ctx.playerIdx, title: 'じゃんけん: 手を選ぶ',
+            buildOptions: () => JANKEN.map((h, i) => ({ id: `op${i}`, label: h, value: i })),
+          };
+          ctx.log(`じゃんけん: 自分=${JANKEN[myHand]} / 相手=${JANKEN[oppHand]}`);
+          if (myHand === oppHand) { ctx.log('あいこ → もう一度'); continue; }
+          // グー(0)>チョキ(1)>パー(2)>グー(0)。自分の勝ち条件: 相手の手 ===(自分の手+1)%3
+          won = ((myHand + 1) % 3 === oppHand);
+          ctx.log(won ? 'じゃんけんに勝った！' : 'じゃんけんに負けた');
+          break;
+        }
+        if (won) {
+          ctx.addTurnModifier({
+            kind: 'tokkouPlus', color: '赤', amount: 30, ownerIdx: ctx.playerIdx,
+            match: (hm) => hm === self,
+            description: 'つのまきじゃんけん勝利: このターン このホロメンは赤特攻+30',
+          });
+        }
+      },
+    },
+  },
   bloomEffect: {
     name: 'Member sheep おかえり～',
     *run(ctx) {

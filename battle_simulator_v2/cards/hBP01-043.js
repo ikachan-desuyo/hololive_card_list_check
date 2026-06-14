@@ -20,8 +20,8 @@ export default {
       *run(ctx) {
         const ok = yield ctx.confirm('サイコロを3回振ってこのアーツを強化しますか？');
         if (!ok) return;
-        let sum = 0;
-        for (let i = 0; i < 3; i++) sum += (yield* ctx.rollDice());
+        const rolls = yield* ctx.rollDiceMany(3); // 1度に3回（hBP04-005「総帥のお仕事」が効く単位）
+        const sum = rolls.reduce((a, b) => a + b, 0);
         ctx.addArtBonus(sum * 10, `サイコロ3回の合計${sum}×10`);
       },
     },

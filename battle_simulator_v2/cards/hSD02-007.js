@@ -36,6 +36,7 @@ export default {
         ctx._unreveal(c);
         ctx.player.archive.push(c);
       }
+      ctx.recordDeckArchive(rest.length);
       if (rest.length > 0) ctx.log(`${ctx.player.name}: 残った${rest.length}枚をアーカイブした`);
     },
   },

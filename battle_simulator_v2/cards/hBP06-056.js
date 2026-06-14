@@ -39,6 +39,7 @@ export default {
           ctx._unreveal(c);
           ctx.player.archive.push(c);
         }
+        ctx.recordDeckArchive(revealed.length);
         ctx.log(`${ctx.player.name}: 公開した${revealed.length}枚をアーカイブした`);
       },
     },

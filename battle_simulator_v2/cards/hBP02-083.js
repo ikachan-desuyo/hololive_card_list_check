@@ -11,11 +11,9 @@
  *     どちらか欠ける場合は何も起きない（コストのホロパワーは支払い済み）。
  *     〈紫咲シオン〉が複数いる場合は送り先を選択する。
  *
- * 未実装の制約: 「自分の#魔法を持つイベントはターンに1回しか使えない」
- *   → これは「このカード自身」ではなく「自分のすべての#魔法イベント」の使用回数を
- *     制限する常時制約。他カードのプレイ可否（サポート使用可否）を横断的に制御する
- *     エンジン機構が無いため未実装（保留カテゴリ: 他カードのプレイ制限）。
- *     本カードの主目的（紫エール送り）は実装済み。
+ * 制約: 「自分の#魔法を持つイベントはターンに1回しか使えない」
+ *   → support.canUse で実装。このターンに既に#魔法イベントを使っていたら使えない
+ *     （supportsPlayedThisTurn を countSupportThisTurn で参照）。各#魔法イベントが同じ制約を持つ。
  */
 export default {
   number: 'hBP02-083',
@@ -32,7 +30,10 @@ export default {
   support: {
     canUse(ctx) {
       // ホロパワー1枚をアーカイブできなければ使えない（必須コスト）
-      return ctx.player.holoPower.length >= 1;
+      if (ctx.player.holoPower.length < 1) return false;
+      // #魔法を持つイベントはターンに1枚しか使えない（既にこのターン使っていたら不可）
+      if (ctx.countSupportThisTurn((c) => (c.tags || []).includes('魔法') && c.supportType === 'イベント') > 0) return false;
+      return true;
     },
     *run(ctx) {
       const p = ctx.player;

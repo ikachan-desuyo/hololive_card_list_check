@@ -61,6 +61,7 @@ export default {
         ctx._unreveal(c);
         ctx.player.archive.push(c);
       }
+      ctx.recordDeckArchive(remaining.length);
       if (remaining.length > 0) {
         ctx.log(`${ctx.player.name}: 残り${remaining.length}枚をアーカイブ（${remaining.map((c) => c.name).join(' / ')}）`);
       }

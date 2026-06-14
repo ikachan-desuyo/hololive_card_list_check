@@ -29,10 +29,11 @@ export default {
       const p = engine.state.players[ownerIdx];
       // コスト [ホロパワー：-2]
       p.archive.push(...p.holoPower.splice(0, 2));
-      p.usedOshiSkillThisTurn = true;
+      p.usedOshiSkillThisTurn += 1;
       // デッキの上から2枚をアーカイブ
       const moved = p.deck.splice(0, 2);
       p.archive.push(...moved);
+      p.deckArchivedThisTurn = (p.deckArchivedThisTurn || 0) + moved.length; // デッキ→アーカイブ枚数を計上（hBP08-020）
       engine.log(`推しスキル「PONじゃないもん！！」: デッキ上${moved.length}枚をアーカイブ`);
       // アーカイブの〈ロボ子さん〉1枚を手札に戻す
       const i = p.archive.findIndex((c) => c.name === 'ロボ子さん');

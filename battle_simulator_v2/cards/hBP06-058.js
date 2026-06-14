@@ -38,6 +38,7 @@ export default {
           ctx.player.archive.push(c);
           ctx.log(`デッキの上から ${c.name} をアーカイブ`);
         }
+        ctx.recordDeckArchive(cards.length);
       },
     },
   },

@@ -7,16 +7,25 @@
  * マスコットは、自分のホロメン1人につき1枚だけ付けられる。
  *   （マスコット1人1枚の上限はエンジンの _canAttachSupport が既定で処理）
  *
- * ※「（装着先の）ホロメンがコラボした時」に発火する装着トリガー(onCollab)は
- *   エンジン未対応（triggers は onDown / onAttach / onOpponentDown のみ配線済み）。
- *   常時のアーツ+10のみ実装し、さくらみこ条件のコラボ時アーツ+10は未実装。
- *   装着カードへの onCollab 通知フックが追加されたら、ここに実装すること。
+ * → triggers.onCollab で実装。ホストが〈さくらみこ〉のときコラボで、このターンの間、
+ *   センターの〈さくらみこ〉のアーツ+10。
  */
 export default {
   number: 'hBP03-099',
   attached: {
     artsPlus() {
       return 10;
+    },
+  },
+  triggers: {
+    // ◆〈さくらみこ〉に付いていたら: ホストがコラボした時、このターン センターの〈さくらみこ〉のアーツ+10
+    * onCollab(ctx) {
+      if (ctx.sourceHolomem?.stack[0].name !== 'さくらみこ') return;
+      ctx.addTurnModifier({
+        kind: 'artsPlus', amount: 10, ownerIdx: ctx.playerIdx,
+        match: (hm) => ctx.engine._zoneOf(hm) === 'center' && hm.stack[0].name === 'さくらみこ',
+        description: 'マグチ: このターン センターの〈さくらみこ〉のアーツ+10',
+      });
     },
   },
 };

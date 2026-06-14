@@ -31,6 +31,7 @@ export default {
           const c = ctx.player.deck.shift();
           ctx.player.archive.push(c);
           ctx.log(`デッキの上から ${c.name} をアーカイブ`);
+          ctx.recordDeckArchive(1);
         }
       },
     },

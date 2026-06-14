@@ -35,6 +35,14 @@ export class EffectContext {
     this.downedInfo = opts.downedInfo || null;
     // ダウン時推しスキル(onDownOshiSkill.run)用: ダウンしたホロメン（アーカイブ前。エール・スタックを操作できる）
     this.downedHolomem = opts.downedHolomem || null;
+    // onEnter 用: ステージに出たホロメンの情報 { holomem, card }
+    this.enteredInfo = opts.enteredInfo || null;
+    // onSpecialDamageDealt 用: 与えた特殊ダメージの情報 { source, target, amount }
+    this.specialDealt = opts.specialDealt || null;
+    // onReturnedToDeck 用: デッキに戻ったホロメンの情報 { cards }
+    this.returnedToDeckInfo = opts.returnedToDeckInfo || null;
+    // onCheerArchivedOshiSkill 用: アーカイブされたエールの情報 { source, cheer }
+    this.cheerArchivedInfo = opts.cheerArchivedInfo || null;
     // onOpponentPerformanceEnd 用: そのパフォーマンスステップで自分のライフが減ったか
     this.lifeDecreasedThisPerf = opts.lifeDecreasedThisPerf || false;
     // 攻撃時誘発の推しスキル用: { sourceHolomem, art, artName, dealtList:[{target,zone,dealt}], downed }
@@ -224,11 +232,15 @@ export class EffectContext {
       duration: 'turn', kind: 'abilityDiceRoll', ownerIdx: this.playerIdx,
     });
     let value = rollDie(this.engine.rng);
+    // diceFixed: 「目をNとして扱う」。m.batchOf があれば「1度にちょうど batchOf 個振る時」限定
+    // （hBP04-005「1度に3回振る時」）。rollDiceMany(n) が this._diceBatchSize=n を立てている間だけ一致する。
     const fixed = this.engine.state.modifiers.find(
-      (m) => m.kind === 'diceFixed' && m.ownerIdx === this.playerIdx);
+      (m) => m.kind === 'diceFixed' && m.ownerIdx === this.playerIdx && !m.used
+        && (m.batchOf == null || m.batchOf === this._diceBatchSize));
     if (fixed) {
       this.log(`🎲 サイコロ: ${value} → ${fixed.value} として扱う（${fixed.description || '効果'}）`);
       value = fixed.value;
+      if (fixed.once) fixed.used = true; // 「次に出る目」だけ＝一発消費（hSD01-002）
     } else {
       this.log(`🎲 サイコロ: ${value}`);
     }
@@ -242,6 +254,24 @@ export class EffectContext {
     }
     value = yield* this._offerDiceReact(value);
     return value;
+  }
+
+  /**
+   * サイコロを「1度に n 個」振る (5.24)。各目の配列を返す。ジェネレータ（`const xs = yield* ctx.rollDiceMany(3)`）。
+   * 振っている間 this._diceBatchSize=n を立て、「1度にちょうど N 個振る時」限定の継続効果
+   * （diceFixed の batchOf。hBP04-005「1度に3回振る時、目をすべて5として扱う」）を一致させる。
+   * 1個ずつの rollDice をそのまま n 回呼ぶので、ファン割り込み・回数カウント(abilityDiceRoll)も従来どおり働く。
+   */
+  *rollDiceMany(n) {
+    const results = [];
+    const prev = this._diceBatchSize;
+    this._diceBatchSize = n;
+    try {
+      for (let i = 0; i < n; i++) results.push(yield* this.rollDice());
+    } finally {
+      this._diceBatchSize = prev; // 入れ子・例外時も元に戻す
+    }
+    return results;
   }
 
   /** このターンに自分（コントローラー）が能力で振ったサイコロの回数（全カードの能力ぶんを合算） */
@@ -286,7 +316,7 @@ export class EffectContext {
     const oshiDef = eng.registry.get(this.player.oshi.number)?.onDiceRollOshiSkill;
     if (oshiDef) {
       const me = this.player;
-      const used = oshiDef.sp ? me.usedSpOshiSkillThisGame : me.usedOshiSkillThisTurn;
+      const used = oshiDef.sp ? me.usedSpOshiSkillThisGame : (me.usedOshiSkillThisTurn >= this.engine._oshiSkillCap(this.playerIdx));
       const info = { ownerIdx: this.playerIdx, roller: this.sourceHolomem, rollerCard: this.sourceCard, value };
       if (!used && me.holoPower.length >= oshiDef.cost && (!oshiDef.canUse || oshiDef.canUse(eng, this.playerIdx, info))) {
         const use = yield {
@@ -299,7 +329,7 @@ export class EffectContext {
         };
         if (use) {
           me.archive.push(...me.holoPower.splice(0, oshiDef.cost));
-          if (oshiDef.sp) me.usedSpOshiSkillThisGame = true; else me.usedOshiSkillThisTurn = true;
+          if (oshiDef.sp) me.usedSpOshiSkillThisGame = true; else me.usedOshiSkillThisTurn += 1;
           value = oshiDef.apply(eng, this.playerIdx, { ...info, value });
         }
       }
@@ -442,6 +472,31 @@ export class EffectContext {
     this.log(`${this.player.name}: エールデッキをシャッフル`);
   }
 
+  /**
+   * このサポート効果の解決後、このカードをアーカイブせずデッキに戻してシャッフルする (hBP07-093)。
+   * support の run 内から呼ぶ。engine のサポート解決後処理がこのフラグを見て、archive のかわりに
+   * deck へ戻し（最後にシャッフル）する。サポート効果以外から呼んでも効果はない。
+   */
+  markReturnSelfToDeck() {
+    this.player._supportReturnToDeck = true;
+  }
+
+  /**
+   * 能力で相手のライフを N 減らす（「相手のライフ-N」）。アーツ解決後の _checkTiming で実際のライフ処理が走る。
+   * 相手に「このターン自分のライフは相手の能力で減らない」免疫（kind:'lifeImmuneOpponentAbility'）が
+   * 乗っている場合は減らさない（hBP03-022）。直接 opponent.lifeDamage を加算するかわりに必ずこれを使う。
+   */
+  reduceOpponentLife(n = 1) {
+    const oppIdx = 1 - this.playerIdx;
+    const immune = this.engine.state.modifiers.some(
+      (m) => m.kind === 'lifeImmuneOpponentAbility' && m.ownerIdx === oppIdx);
+    if (immune) {
+      this.log(`${this.opponent.name}: ライフは相手の能力で減らない（免疫）`);
+      return;
+    }
+    this.opponent.lifeDamage += n;
+  }
+
   /** デッキ内の条件一致カード一覧（非公開領域なので「見つからない」選択も保証される）。
    *  戻り配列に _fromDeck タグを付け、chooseCard がデッキサーチと判定できるようにする（デッキ全体を確認枠に表示）。 */
   deckCards(filter) {
@@ -454,6 +509,20 @@ export class EffectContext {
   removeFromDeck(card) {
     const i = this.player.deck.indexOf(card);
     if (i !== -1) this.player.deck.splice(i, 1);
+  }
+
+  /**
+   * 「このターンに自分のデッキからアーカイブした枚数」を加算する（hBP08-020「挑戦のまなざし」等が参照）。
+   * デッキ→アーカイブの移動を行ったカードが、移動枚数ぶん呼ぶ（カウント専用＝既存の移動処理は変えない）。
+   * カウンタは player.deckArchivedThisTurn でターン開始時に0へリセットされる。
+   */
+  recordDeckArchive(n = 1) {
+    if (n > 0) this.player.deckArchivedThisTurn = (this.player.deckArchivedThisTurn || 0) + n;
+  }
+
+  /** このターンに自分のデッキからアーカイブした枚数 */
+  deckArchivedCountThisTurn() {
+    return this.player.deckArchivedThisTurn || 0;
   }
 
   removeFromHand(card) {
@@ -522,10 +591,11 @@ export class EffectContext {
   /**
    * ホロメンを能力でステージからデッキに戻す（はあと推しスキル等）。
    * 付いているエール/サポートはアーカイブへ、本体スタックはデッキの上/下へ。
-   * 「ホロメンが能力でデッキに戻った時」の誘発（推しステージスキル onReturnedToDeck）を発火する。
+   * 「ホロメンが能力でデッキに戻った時」の誘発（推しステージスキル onReturnedToDeck＋ホロメンの
+   * triggers.onReturnedToDeck）を発火する。ジェネレータ（呼び出しは `yield* ctx.returnHolomemToDeck(...)`）。
    * 戻したカードの配列（スタック）を返す。
    */
-  returnHolomemToDeck(holomem, { bottom = true } = {}) {
+  *returnHolomemToDeck(holomem, { bottom = true } = {}) {
     const owner = this.state.players.find((p) => this.engine._stageHolomems(p).includes(holomem));
     if (!owner) return [];
     const ownerIdx = this.state.players.indexOf(owner);
@@ -541,8 +611,15 @@ export class EffectContext {
     for (const c of returned) this._unreveal(c);
     if (bottom) owner.deck.push(...returned);
     else owner.deck.unshift(...returned);
+    owner.holomemReturnedToDeckThisTurn = true; // 「このターンに自分のホロメンがステージからデッキに戻った」記録（hBP07-042）
     this.log(`${returned[0]?.name} をデッキの${bottom ? '下' : '上'}に戻した`);
-    this.engine._dispatchReturnedToDeck(ownerIdx, returned);
+    this.engine._dispatchReturnedToDeck(ownerIdx, returned); // 推しステージスキル onReturnedToDeck（同期）
+    // ホロメンレベルの「（自分のホロメンが）デッキに戻った時」傍観トリガー（選択を伴える）。hBP07-039
+    const ownerObj = this.engine.state.players[ownerIdx];
+    for (const wh of this.engine._stageHolomems(ownerObj)) {
+      const t = this.engine.registry.get(wh.stack[0].number)?.triggers?.onReturnedToDeck;
+      if (t) yield* t(new EffectContext(this.engine, ownerIdx, { sourceHolomem: wh, returnedToDeckInfo: { cards: returned } }));
+    }
     return returned;
   }
 
@@ -592,9 +669,18 @@ export class EffectContext {
    */
   *attachSupportWithTrigger(card, holomem) {
     this.attachSupport(card, holomem);
+    // ①付けたカード自身の onAttach（「付けた時」）
     const trig = this.engine.registry.get(card.number)?.triggers?.onAttach;
     if (trig) {
       yield* trig(new EffectContext(this.engine, this.playerIdx, {
+        sourceCard: card,
+        sourceHolomem: holomem,
+      }));
+    }
+    // ②付け先ホロメンの onAttached（「このホロメンに〈X〉が付いた時」hBP07-024）
+    const hostTrig = this.engine.registry.get(holomem.stack[0].number)?.triggers?.onAttached;
+    if (hostTrig) {
+      yield* hostTrig(new EffectContext(this.engine, this.playerIdx, {
         sourceCard: card,
         sourceHolomem: holomem,
       }));
@@ -696,6 +782,35 @@ export class EffectContext {
         const fn = this.engine.registry.get(sh.stack[0].number)?.onSelfCheerArchived;
         if (fn) fn(sh, this.engine, this.playerIdx);
       }
+      // 「自分の○○ホロメンの能力でエールをアーカイブした時に使える」推しスキル（コスト＋発動確認）。hBP01-008
+      // ability!==false（能力による）かつ「○○ホロメンの能力で」= this.sourceHolomem を発生源として渡す。
+      // [ターン1回]/[ゲーム1回]の使用済みフラグで、同一能力の複数枚アーカイブでも多重発動しない。
+      if (opts.ability !== false) {
+        // 「この能力で何枚アーカイブしたか」をこの効果実行(ctx)に集計する。
+        // 効果実行の完了時に枚数ぶんのSP推しスキル（onCheerArchivedBatchOshiSkill, hSD11-001）を1回だけ提示する。
+        this._flowGlowArchiveCount = (this._flowGlowArchiveCount || 0) + 1;
+        const od = this.engine.registry.get(this.player.oshi.number)?.onCheerArchivedOshiSkill;
+        if (od) {
+          const p = this.player;
+          const used = od.sp ? p.usedSpOshiSkillThisGame : (p.usedOshiSkillThisTurn >= this.engine._oshiSkillCap(this.playerIdx));
+          const info = { source: this.sourceHolomem, cheer };
+          if (!used && p.holoPower.length >= (od.cost || 0) && (!od.canUse || od.canUse(this.engine, this.playerIdx, info))) {
+            const use = yield {
+              kind: 'confirm', player: this.playerIdx,
+              title: od.title || '推しスキルを使いますか？',
+              buildOptions: () => [
+                { id: 'yes', label: `${od.sp ? 'SP' : ''}推しスキルを使う（ホロパワー-${od.cost}）`, value: true },
+                { id: 'no', label: '使わない', value: false },
+              ],
+            };
+            if (use) {
+              p.archive.push(...p.holoPower.splice(0, od.cost || 0));
+              if (od.sp) p.usedSpOshiSkillThisGame = true; else p.usedOshiSkillThisTurn += 1;
+              yield* od.run(new EffectContext(this.engine, this.playerIdx, { sourceCard: p.oshi, cheerArchivedInfo: info }));
+            }
+          }
+        }
+      }
     }
   }
 
@@ -715,6 +830,17 @@ export class EffectContext {
     holomem.damage = Math.max(0, holomem.damage - n);
     if (before !== holomem.damage) {
       this.log(`${holomem.stack[0].name} のHPを${before - holomem.damage}回復`);
+      // 「自分の能力で回復した時」トリガー（同期・選択なし）。装着カード + ホロメン自身。hBP01-114 等
+      const eng = this.engine;
+      const ownerIdx = eng.state.players.findIndex((p) => eng._stageHolomems(p).includes(holomem));
+      if (ownerIdx >= 0) {
+        for (const att of [...holomem.attachments]) {
+          const fn = eng.registry.get(att.number)?.attached?.onHealed;
+          if (fn) fn(holomem, eng, att, ownerIdx);
+        }
+        const selfFn = eng.registry.get(holomem.stack[0].number)?.onHealed;
+        if (selfFn) selfFn(holomem, eng, ownerIdx);
+      }
     }
   }
 
@@ -762,19 +888,87 @@ export class EffectContext {
 
     targetEntry.holomem.damage += total;
     if (total > 0) this.engine._dispatchDamageReceivedForced(targetEntry.holomem); // 強制被ダメージトリガー (hBP07-108)
+    // 特殊ダメージを「与えた時」のトリガー（発生源=自分側、対象=相手のホロメンの時のみ）。hBP05-028/hBP06-101 等
+    if (total > 0 && this.sourceHolomem && defIdx !== this.playerIdx) {
+      const info = { source: this.sourceHolomem, target: targetEntry.holomem, amount: total };
+      for (const wh of eng._stageHolomems(this.player)) {
+        const wt = eng.registry.get(wh.stack[0].number)?.triggers?.onSpecialDamageDealt;
+        if (wt) yield* wt(new EffectContext(eng, this.playerIdx, { sourceHolomem: wh, specialDealt: info }));
+      }
+      for (const att of this.sourceHolomem.attachments) {
+        const at = eng.registry.get(att.number)?.triggers?.onSpecialDamageDealt;
+        if (at) yield* at(new EffectContext(eng, this.playerIdx, { sourceHolomem: this.sourceHolomem, sourceCard: att, specialDealt: info }));
+      }
+      // 「相手のホロメンに特殊ダメージを与えた時に使える」推しスキル（コスト＋発動確認）。hBP06-006
+      // ※[ターン1回]/[ゲーム1回]の使用済みフラグで再帰（自身の特殊ダメージによる再発火）は止まる。
+      const od = eng.registry.get(this.player.oshi.number)?.onSpecialDamageDealtOshiSkill;
+      if (od) {
+        const pp = this.player;
+        const used = od.sp ? pp.usedSpOshiSkillThisGame : (pp.usedOshiSkillThisTurn >= this.engine._oshiSkillCap(this.playerIdx));
+        if (!used && pp.holoPower.length >= (od.cost || 0) && (!od.canUse || od.canUse(eng, this.playerIdx, info))) {
+          const use = yield {
+            kind: 'confirm', player: this.playerIdx,
+            title: od.title || '推しスキルを使いますか？',
+            buildOptions: () => [
+              { id: 'yes', label: `${od.sp ? 'SP' : ''}推しスキルを使う（ホロパワー-${od.cost}）`, value: true },
+              { id: 'no', label: '使わない', value: false },
+            ],
+          };
+          if (use) {
+            pp.archive.push(...pp.holoPower.splice(0, od.cost || 0));
+            if (od.sp) pp.usedSpOshiSkillThisGame = true; else pp.usedOshiSkillThisTurn += 1;
+            yield* od.run(new EffectContext(eng, this.playerIdx, { sourceCard: pp.oshi, specialDealt: info }));
+          }
+        }
+      }
+    }
     // 「ライフは減らない」は、この特殊ダメージでダウンが確定した場合のみ適用する。
     // （ダウンに至らなかった場合にフラグを残すと、後から別のダメージで倒された時まで
     //   ライフが減らなくなってしまう）
     if (targetEntry.holomem.damage >= this.engine.effectiveHp(targetEntry.holomem)) {
       if (opts.noLifeOnDown) targetEntry.holomem.noLifeOnDown = true;
-      // 「ダウンさせた時」トリガー（雪花ラミィSP推しスキル等）
-      this.engine._notifySourceDown(this.sourceHolomem, this.playerIdx);
+      // 「ダウンさせた時」トリガー（雪花ラミィSP推しスキル等）。ダウンしたホロメンを渡す
+      this.engine._notifySourceDown(this.sourceHolomem, this.playerIdx, [targetEntry.holomem]);
     }
     this.log(
       `${targetEntry.top.name} に特殊ダメージ${total}` +
       `${opts.noLifeOnDown ? '（ダウンしてもライフは減らない）' : ''}` +
       `（累計${targetEntry.holomem.damage}/${this.engine.effectiveHp(targetEntry.holomem)}）`
     );
+  }
+
+  /**
+   * 「もう1回Bloom（再Bloom）」可否 (8.3.2-3)。通常Bloomの条件（同名・レベル遷移・新HP>ダメージ・
+   * Spot不可・うつ伏せ不可）は満たす必要があるが、「このターン既にBloom済みは不可」の制限のみ無視する。
+   */
+  canReBloom(holomem, card) {
+    const top = holomem.stack[0];
+    if (!card || card.kind !== 'holomen') return false;
+    if (holomem.faceDown) return false;
+    if (top.bloomLevel === 'Spot') return false;
+    if (top.name !== card.name) return false;           // 同名であること
+    if ((card.hp || 0) <= holomem.damage) return false; // 新HPがダメージより大きいこと
+    if (card.bloomLevel === '1st') return top.bloomLevel === 'Debut' || top.bloomLevel === '1st';
+    if (card.bloomLevel === '2nd') return top.bloomLevel === '1st' || top.bloomLevel === '2nd';
+    return false;
+  }
+
+  /**
+   * 手札のホロメンで holomem を「もう1回Bloom」する。候補選択→Bloom→ブルームエフェクト誘発まで。
+   * Bloomしたら true。「このターンBloom済み不可」のみ迂回する（canReBloom）。
+   */
+  *reBloom(holomem, { title = 'もう1回Bloomするホロメンを選択', optional = true } = {}) {
+    const candidates = this.player.hand.filter((c) => this.canReBloom(holomem, c));
+    if (candidates.length === 0) return false;
+    const card = yield this.chooseCard({ cards: candidates, title, optional, skipLabel: 'Bloomしない' });
+    if (!card) return false;
+    this.removeFromHand(card);
+    holomem.stack.unshift(card);
+    holomem.bloomedTurn = this.state.turn;
+    this.log(`${holomem.stack[1].name} → ${card.name}〔${card.bloomLevel}〕にもう1回Bloom`);
+    const def = this.engine.registry.get(card.number)?.bloomEffect;
+    if (def) { this.log(`《ブルームエフェクト》${def.name}`); yield* this.runBloomEffect(def, card, holomem); }
+    return true;
   }
 
   /**

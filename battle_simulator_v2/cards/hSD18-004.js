@@ -25,6 +25,7 @@ export default {
       if (ctx.player.deck.length > 0) {
         const top = ctx.player.deck.shift();
         ctx.player.archive.push(top);
+        ctx.recordDeckArchive(1);
         ctx.log(`${ctx.player.name}: デッキの上から ${top.name} をアーカイブ`);
       }
       // その後、自分のデッキを1枚引く

@@ -15,9 +15,12 @@ export default {
       if (ctx.player.deck.length === 0) return;
       const ok = yield ctx.confirm('デッキの上から2枚をアーカイブしますか？');
       if (!ok) return;
+      let archivedCount = 0;
       for (let i = 0; i < 2 && ctx.player.deck.length > 0; i++) {
         ctx.player.archive.push(ctx.player.deck.shift());
+        archivedCount++;
       }
+      ctx.recordDeckArchive(archivedCount);
       ctx.log('デッキの上から2枚をアーカイブした');
       const names = new Set();
       for (const e of ctx.holomems('self', (x) => isFlowGlow(ctx, x.top))) names.add(e.top.name);
@@ -41,6 +44,7 @@ export default {
           count++;
         }
         if (count > 0) {
+          ctx.recordDeckArchive(count);
           ctx.log(`デッキの上から${count}枚をアーカイブした`);
           ctx.addArtBonus(count * 20, `アーカイブ${count}枚`);
         }

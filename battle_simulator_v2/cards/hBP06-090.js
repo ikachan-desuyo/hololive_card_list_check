@@ -7,13 +7,9 @@
  *   自分の手札のホロメンを使ってもう1回Bloomできる。
  * LIMITED：ターンに1枚しか使えない。
  *
- * 実装範囲: ドロー2枚のみ実装。
- * 未実装(保留): 「もう1回Bloom」の機構（再ブルーム）はエンジン未対応。
- *   かつ「このターンにDebutからBloomした1stホロメン」を追跡する仕組みも無いため、
- *   ライフ4以下時の再Bloom効果は実装していない。
- *   再Bloom機構が入った際にここを拡張すること。
- * LIMITED（ターン1枚制限）はエンジン側のサポート使用制御で処理される想定のため
- *   このファイルには記述していない。
+ * 実装: ドロー2枚＋ライフ4以下時の再Bloom（ctx.reBloom）。
+ *   「このターンにDebutからBloomした1stホロメン」= bloomedTurn===turn かつ top が1st・直下(stack[1])がDebut。
+ * LIMITED（ターン1枚制限）はエンジン側のサポート使用制御で処理される。
  */
 export default {
   number: 'hBP06-090',
@@ -26,9 +22,19 @@ export default {
   support: {
     *run(ctx) {
       ctx.draw(2);
-      // TODO(効果未実装): 自分のライフが4以下なら、このターンにDebutからBloomした
-      //   1stホロメン1人を手札のホロメンでもう1回Bloomできる。
-      //   再ブルーム機構（保留対象）が未実装のため、この条件付き効果は省略。
+      // その後、自分のライフが4以下なら、このターンにDebutからBloomした1stホロメン1人をもう1回Bloomできる
+      if (ctx.player.life.length > 4) return;
+      const matches = (e) => e.holomem.bloomedTurn === ctx.state.turn
+        && e.top.bloomLevel === '1st'
+        && e.holomem.stack[1]?.bloomLevel === 'Debut'
+        && ctx.player.hand.some((c) => ctx.canReBloom(e.holomem, c));
+      const valid = ctx.holomems('self', matches);
+      if (valid.length === 0) return;
+      const entry = valid.length === 1
+        ? valid[0]
+        : yield ctx.chooseHolomem({ side: 'self', filter: matches, title: 'もう1回Bloomする1stホロメンを選択', optional: true });
+      if (!entry) return;
+      yield* ctx.reBloom(entry.holomem, { title: `${entry.top.name} をもう1回Bloomするホロメンを選択`, optional: true });
     },
   },
 };

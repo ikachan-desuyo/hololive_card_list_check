@@ -4,16 +4,10 @@
  * [サポート効果] このマスコットが付いているホロメンのアーツ+10。
  *   → attached.artsPlus で常時 +10。
  *
- * ◆〈アユンダ・リス〉に付いていたら能力追加（未実装）:
+ * ◆〈アユンダ・リス〉に付いていたら能力追加:
  *   このマスコットが付いているホロメンがコラボした時、自分のステージのエール1枚を、
  *   このホロメンに付け替えられる。
- *   → 「装着カード（マスコット）が、付いているホロメンのコラボ時に発火するトリガー(onCollab)」が
- *      エンジンに存在しないため保留。engine.js のコラボ処理は collab するホロメン自身の
- *      collabEffect しか起動せず、付いているマスコット側へコラボを通知するフックが無い
- *      （規約の保留項目に準ずる。hBP03-098 / hBP07-106 / hBP06-098 と同じ理由）。
- *      attachment への onCollab 通知フックが追加されたら、ここに実装すること
- *      （付け先ホロメンが〈アユンダ・リス〉の時、自分のステージのエール1枚を sourceHolomem に
- *       ctx.moveCheer で付け替える）。
+ *   → triggers.onCollab で実装。自分のステージの任意のエール1枚を選び、ホストへ ctx.moveCheer で付け替え（任意）。
  *
  * マスコットは、自分のホロメン1人につき1枚だけ付けられる
  *   （エンジン既定のマスコット制限で処理されるため attachRule 不要）。
@@ -23,5 +17,25 @@ export default {
   attached: {
     // [サポート効果] 付いているホロメンのアーツ+10
     artsPlus() { return 10; },
+  },
+  triggers: {
+    // ◆〈アユンダ・リス〉に付いていたら: ホストがコラボした時、自分のステージのエール1枚をこのホロメンに付け替えられる（任意）
+    * onCollab(ctx) {
+      const host = ctx.sourceHolomem;
+      if (host?.stack[0].name !== 'アユンダ・リス') return;
+      const all = [];
+      for (const e of ctx.holomems('self')) {
+        for (const ch of e.holomem.cheers) all.push({ cheer: ch, from: e.holomem });
+      }
+      if (all.length === 0) return;
+      const picked = yield ctx.chooseCard({
+        cards: all.map((x) => x.cheer),
+        title: 'このホロメンに付け替えるエールを選択（自分のステージ・任意）',
+        optional: true,
+      });
+      if (!picked) return;
+      const entry = all.find((x) => x.cheer === picked);
+      if (entry && entry.from !== host) ctx.moveCheer(picked, entry.from, host);
+    },
   },
 };

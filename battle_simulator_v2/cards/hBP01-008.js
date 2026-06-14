@@ -3,10 +3,8 @@
  *
  * 推しスキル「レイン・シャーマニズム」[ホロパワー：-1][ターンに1回]:
  *   自分の青ホロメンの能力でエールをアーカイブした時に使える：相手のホロメン1人に特殊ダメージ20を与える。
- *   → 【保留】onSelfCheerArchived（自分のエールがアーカイブされた時の同期フック）は存在するが、
- *     これは推しスキル（コスト＋発動確認＋相手ホロメンへの対象選択を伴う割り込み）であり、かつ
- *     「自分の青ホロメンの能力で」=アーカイブを起こした能力の発生源ホロメンの色判定が要る。
- *     発生源追跡＋推しスキル発動フローの統合が未整備のため未実装。
+ *   → onCheerArchivedOshiSkill で実装。engine の archiveCheer（能力起因）で、推しの当スキルを
+ *     コスト＋発動確認付きで提示する。発生源(info.source)が青ホロメンの時のみ使える。[ターン1回]。
  *
  * SP推しスキル「雨乞い」[ホロパワー：-3][ゲームに1回]:
  *   自分のアーカイブのエール1～5枚を、自分の#IDを持つホロメンに割り振って送る。
@@ -24,7 +22,20 @@ const hasIdHolomem = (engine, p) =>
 export default {
   number: 'hBP01-008',
 
-  // 推しスキル「レイン・シャーマニズム」はエールアーカイブ時のタイミング割り込み型のため未実装（保留）
+  // 推しスキル「レイン・シャーマニズム」[ターン1回]: 青ホロメンの能力でエールをアーカイブした時、相手に特殊ダメージ20
+  onCheerArchivedOshiSkill: {
+    cost: 1,
+    title: '推しスキル「レイン・シャーマニズム」: 相手のホロメン1人に特殊ダメージ20を与えますか？',
+    canUse(engine, ownerIdx, info) {
+      // アーカイブを起こした能力の発生源が青ホロメンであること
+      return !!info.source && info.source.stack[0].color === '青';
+    },
+    *run(ctx) {
+      if (ctx.holomems('opp').length === 0) return;
+      const target = yield ctx.chooseHolomem({ side: 'opp', title: '特殊ダメージ20を与える相手のホロメンを選択' });
+      if (target) yield* ctx.dealSpecialDamage(target, 20);
+    },
+  },
 
   spOshiSkill: {
     name: '雨乞い',

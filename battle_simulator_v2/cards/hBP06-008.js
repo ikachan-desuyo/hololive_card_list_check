@@ -10,13 +10,27 @@
  * [SP推しスキル]「絶対勝ちたい！！！！！！！」[ホロパワー：-1][ゲームに1回]:
  *   自分のセンターホロメンが〈夏色まつり〉なら、このターンの間、自分が使える
  *   LIMITEDのサポートカードの枚数は2枚になる。
- *   → エンジンの LIMITED 使用制限は usedLimitedThisTurn の真偽フラグ管理で、
- *     「ターン中に使えるLIMITED枚数を増やす」継続効果を読み取る仕組みが無いため未実装（保留）。
+ *   → spOshiSkill + ターン修正 kind:'limitedCapBonus' で実装。engine の _limitedCap が
+ *     base1 + 修正で上限を算出し、LIMITED使用判定に使う。
  *
  * コスト([ホロパワー：-N])はエンジン側で処理されるため run 内では支払わない。
  */
 export default {
   number: 'hBP06-008',
+  spOshiSkill: {
+    name: '絶対勝ちたい！！！！！！！',
+    canUse(engine, ownerIdx) {
+      const c = engine.state.players[ownerIdx].center;
+      return !!c && c.stack[0].name === '夏色まつり';
+    },
+    *run(ctx) {
+      if (ctx.player.center?.stack[0].name !== '夏色まつり') return;
+      ctx.addTurnModifier({
+        kind: 'limitedCapBonus', amount: 1, ownerIdx: ctx.playerIdx,
+        description: 'このターン、使えるLIMITEDサポートは2枚になる',
+      });
+    },
+  },
   oshiSkill: {
     *run(ctx) {
       const p = ctx.player;

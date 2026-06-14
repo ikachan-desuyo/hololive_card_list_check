@@ -11,13 +11,30 @@
  * SP推しスキル「バックショット」[ホロパワー：1消費][ゲームに1回]:
  *   自分のステージのホロメンが相手のバックホロメンにダメージを与えた時に使える：
  *   その相手のバックホロメン1人に特殊ダメージ50を与える。
- *   → 【未実装・保留】これは「ダメージを与えた時に使える」タイミング割り込み型の
- *     SP推しスキル。現行エンジンには「自分のホロメンが相手のバックにダメージを与えた」
- *     瞬間に割り込んで推しスキルを起動させる仕組みが無いため保留する。
- *     能動起動型ではないので spOshiSkill としては実装しない。
+ *   → onDamageDealtOshiSkills（攻撃時誘発・sp）で実装。アーツが相手バックにダメージを与えていたら
+ *     （attackInfo.dealtList に zone==='back'）、相手バック1人に特殊50。hBP01-007 と同形。
  */
 export default {
   number: 'hSD03-001',
+  // SP推しスキル「バックショット」: 相手のバックに与えた時、相手バック1人に特殊50（ゲームに1回）
+  onDamageDealtOshiSkills: [
+    {
+      cost: 1,
+      sp: true,
+      title: 'SP推しスキル「バックショット」: 相手のバックホロメン1人に特殊ダメージ50を与えますか？',
+      canUse(engine, ownerIdx, info) {
+        return (info.dealtList || []).some((d) => d.zone === 'back');
+      },
+      *run(ctx) {
+        if (ctx.holomems('opp', (e) => e.pos.zone === 'back').length === 0) return;
+        const entry = yield ctx.chooseHolomem({
+          side: 'opp', filter: (e) => e.pos.zone === 'back',
+          title: '特殊ダメージ50を与える相手のバックホロメンを選択',
+        });
+        if (entry) yield* ctx.dealSpecialDamage(entry, 50);
+      },
+    },
+  ],
   oshiSkill: {
     name: 'ブルーマイク',
     canUse(engine, ownerIdx) {
@@ -41,5 +58,4 @@ export default {
       });
     },
   },
-  // SP推しスキル「バックショット」は割り込みタイミング型のため未実装（上部JSDoc参照）。
 };

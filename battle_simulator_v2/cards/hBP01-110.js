@@ -6,9 +6,8 @@
  *
  * ◆自分の推しホロメンが〈七詩ムメイ〉の時、能力変更可能
  *   [ゲームに1回] 相手のセンターホロメンのエール2枚をアーカイブする。
- *   → 「能力変更可能」（推しによる能力差し替え）＋サポートカードの「ゲームに1回」制限は
- *      エンジンに対応機構が無いため未実装。基本効果のみ提供する（差し替えは任意のため
- *      省略しても基本効果の挙動は正しい）。
+ *   → 推しが〈七詩ムメイ〉かつ未使用（ゲームに1回）なら、基本効果のかわりにこの能力を使うか確認する。
+ *     「ゲームに1回」は player._gameOnce['hBP01-110'] フラグで管理（ターンをまたいで永続）。
  *
  * LIMITED（ターンに1枚しか使えない）はエンジン側で処理する。
  */
@@ -26,6 +25,26 @@ export default {
       return ctx.holomems('opp', (e) => e.holomem.cheers.length > 0).length > 0;
     },
     *run(ctx) {
+      // ◆推しが〈七詩ムメイ〉かつゲームに1回未使用なら、能力変更（相手センターのエール2枚アーカイブ）を選べる
+      const g = (ctx.player._gameOnce = ctx.player._gameOnce || {});
+      if (ctx.player.oshi?.name === '七詩ムメイ' && !g['hBP01-110']) {
+        const useAlt = yield ctx.confirm('能力変更【ゲームに1回】: 相手のセンターホロメンのエール2枚をアーカイブする？（いいえ＝通常効果）');
+        if (useAlt) {
+          g['hBP01-110'] = true;
+          const center = ctx.holomems('opp', (e) => e.pos.zone === 'center')[0];
+          if (!center) { ctx.log('相手のセンターがいないため効果なし'); return; }
+          for (let k = 0; k < 2; k++) {
+            const cheers = [...center.holomem.cheers];
+            if (cheers.length === 0) break;
+            const cheer = cheers.length === 1 ? cheers[0]
+              : yield ctx.chooseCard({ cards: cheers, title: `アーカイブする相手センターのエールを選択（${k + 1}/2）` });
+            if (!cheer) break;
+            const idx = center.holomem.cheers.indexOf(cheer);
+            if (idx !== -1) { center.holomem.cheers.splice(idx, 1); ctx.opponent.archive.push(cheer); ctx.log(`相手センターの ${cheer.name} をアーカイブ`); }
+          }
+          return;
+        }
+      }
       const dice = (yield* ctx.rollDice());
       if (dice > 3) {
         ctx.log('サイコロが4以上のため効果なし');

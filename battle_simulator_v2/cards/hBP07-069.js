@@ -40,7 +40,7 @@ export default {
         // アーカイブに〈フロンティアスピリット〉が4枚あるなら、相手のライフ-1
         const fsCount = ctx.player.archive.filter((c) => c.name === 'フロンティアスピリット').length;
         if (fsCount >= 4) {
-          ctx.opponent.lifeDamage += 1;
+          ctx.reduceOpponentLife(1);
           ctx.log(`相手のライフ-1（アーカイブの〈フロンティアスピリット〉${fsCount}枚）`);
         } else {
           ctx.log(`アーカイブの〈フロンティアスピリット〉は${fsCount}枚のため相手のライフ-1は発動しない`);

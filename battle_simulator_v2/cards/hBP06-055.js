@@ -78,6 +78,7 @@ export default {
           ctx._unreveal(c);
           ctx.player.archive.push(c);
         }
+        ctx.recordDeckArchive(looked.length);
         ctx.log(`公開した${looked.length}枚をアーカイブした`);
 
         // その中にイベントがあるなら、デッキを2枚引く

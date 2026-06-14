@@ -21,6 +21,7 @@ export default {
         ctx.player.archive.push(c);
         ctx.log(`${ctx.player.name}: ${c.name} を公開しアーカイブした`);
       }
+      ctx.recordDeckArchive(seen.length);
       ctx.shuffleDeck();
     },
   },

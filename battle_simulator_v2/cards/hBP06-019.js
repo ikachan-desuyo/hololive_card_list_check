@@ -15,6 +15,7 @@ export default {
       const ok = yield ctx.confirm('デッキの上から1枚をアーカイブして1枚引きますか？', 'する', 'やめる');
       if (!ok) return;
       ctx.player.archive.push(ctx.player.deck.shift());
+      ctx.recordDeckArchive(1);
       ctx.log('デッキの上から1枚をアーカイブした');
       ctx.draw(1);
     },
@@ -24,6 +25,7 @@ export default {
       *run(ctx) {
         if (ctx.player.deck.length === 0) return;
         ctx.player.archive.push(ctx.player.deck.shift());
+        ctx.recordDeckArchive(1);
         ctx.log('デッキの上から1枚をアーカイブした');
       },
     },

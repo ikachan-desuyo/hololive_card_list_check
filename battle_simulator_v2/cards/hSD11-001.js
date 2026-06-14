@@ -12,11 +12,9 @@
  * SP推しスキル「ニコたんの名を呼ぶがいいさ！」[ホロパワー：-2][ゲームに1回]:
  *   自分の#FLOW GLOWを持つホロメンの能力でエールをアーカイブした時に使える：
  *   相手のセンターホロメンかコラボホロメンどちらかに、アーカイブしたエール1枚につき特殊ダメージ30を与える。
- *   → 【保留】onSelfCheerArchived（自分のエールがアーカイブされた時の同期フック）は存在するが、
- *     これは①推しスキル（コスト＋発動確認＋相手前衛への対象選択）であり、②「アーカイブしたエール
- *     1枚につき特殊30」なので“その能力1回で何枚アーカイブしたか”を集計する必要がある（per-cheer の
- *     フックでは枚数を束ねられない）。さらに「#FLOW GLOWホロメンの能力で」=アーカイブを起こした能力の
- *     発生源ホロメンの色判定も要る。これらのイベント単位集計・発生源追跡が未整備のため未実装。
+ *   → onCheerArchivedBatchOshiSkill で実装。エンジンは効果実行(ctx)ごとに archiveCheer の枚数を集計し、
+ *     効果完了時に1回だけこのSP推しスキルを提示する（info.count=その能力で捨てた枚数）。
+ *     「#FLOW GLOWホロメンの能力で」の発生源判定は canUse で info.source（=ctx.sourceHolomem）を見る。
  */
 // #FLOW GLOW はタグが 'FLOW' と 'GLOW' に分割格納されるため両方を確認する
 const isFlowGlow = (top) => !!top && (top.tags || []).includes('FLOW') && (top.tags || []).includes('GLOW');
@@ -64,5 +62,32 @@ export default {
     },
   },
 
-  // SP推しスキル「ニコたんの名を呼ぶがいいさ！」はエールアーカイブ時のタイミング割り込み型のため未実装（保留）
+  // SP推しスキル「ニコたんの名を呼ぶがいいさ！」[ホロパワー：-2][ゲームに1回]:
+  //   自分の#FLOW GLOWホロメンの能力でエールをアーカイブした時に使える：
+  //   相手のセンターorコラボに、アーカイブしたエール1枚につき特殊30。
+  onCheerArchivedBatchOshiSkill: {
+    cost: 2,
+    sp: true,
+    title: 'SP推しスキル「ニコたんの名を呼ぶがいいさ！」を使いますか？',
+    canUse(engine, ownerIdx, info) {
+      // 発生源が自分のステージ上の#FLOW GLOWホロメンであること
+      const src = info.source;
+      if (!src || !src.stack || !isFlowGlow(src.stack[0])) return false;
+      if (!engine._stageHolomems(engine.state.players[ownerIdx]).includes(src)) return false;
+      // 相手にセンターorコラボが居ること（与える対象が必要）
+      const opp = engine.state.players[1 - ownerIdx];
+      return !!opp.center || !!opp.collab;
+    },
+    *run(ctx) {
+      const count = ctx.cheerArchivedInfo?.count || 0;
+      if (count <= 0) return;
+      const target = yield ctx.chooseHolomem({
+        side: 'opp',
+        filter: (e) => e.pos.zone === 'center' || e.pos.zone === 'collab',
+        title: `特殊ダメージ${30 * count}を与える相手のセンターorコラボを選択（エール${count}枚×30）`,
+      });
+      if (!target) return;
+      yield* ctx.dealSpecialDamage(target, 30 * count);
+    },
+  },
 };

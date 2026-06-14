@@ -57,6 +57,7 @@ export default {
         const archiveTop = () => {
           const c = ctx.player.deck.shift();
           ctx.player.archive.push(c);
+          ctx.recordDeckArchive(1);
           ctx.log(`${ctx.player.name}: デッキの上から ${c.name} をアーカイブ`);
         };
         if (ctx.player.deck.length === 0) {

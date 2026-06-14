@@ -5,17 +5,32 @@
  *   自分のアーカイブのエール1枚を自分のホロメンに送る。
  *   → arts.run で実装（hBP02-019 と同じパターン）。
  *
- * ギフト「一緒にゲームしよ」（未実装）:
+ * ギフト「一緒にゲームしよ」:
  *   相手のターンでこのホロメンがダウンした時、自分のアーカイブのLIMITEDのサポートカード1枚を
  *   デッキの下に戻せる。戻したなら、このホロメンをアーカイブするかわりに手札に戻す。
- *   → 主目的は「ダウンしたホロメンをアーカイブするかわりに手札に戻す」だが、
- *      エンジンの _processDown はダウン処理で必ずアーカイブする実装で、
- *      「アーカイブのかわりに手札に戻す」機構が存在しない（バウンス機構が未対応）。
- *      条件部（LIMITEDサポートをデッキ下へ）は手書き可能だが、それ単体ではプレイヤーに
- *      不利益しか与えず、本来の効果（手札に戻す）と切り離して実装するのは不正確なため保留。
+ *   → triggers.onDown で実装。ダウン処理はアーカイブ前に走るので、コスト（アーカイブのLIMITED
+ *     サポート1枚をデッキ下へ）を払えば、このホロメンのスタックを手札へ移す（finish はアーカイブしない）。
  */
 export default {
   number: 'hBP07-084',
+  triggers: {
+    // ギフト「一緒にゲームしよ」: 相手のターンでダウンした時、アーカイブのLIMITEDサポートをデッキ下に戻して、このホロメンを手札に戻す（任意）
+    *onDown(ctx) {
+      if (ctx.state.turnPlayer === ctx.playerIdx) return; // 相手のターン
+      const downed = ctx.sourceHolomem;
+      const limiteds = ctx.player.archive.filter((c) => c.kind === 'support' && c.limited);
+      if (limiteds.length === 0) return;
+      const picked = yield ctx.chooseCard({ cards: limiteds, title: 'アーカイブのLIMITEDサポート1枚をデッキの下に戻して、このホロメンを手札に戻す？（任意）', optional: true });
+      if (!picked) return;
+      ctx.removeFromArchive(picked);
+      ctx.player.deck.push(picked); // デッキの下に戻す
+      // このホロメンをアーカイブするかわりに手札に戻す（スタックを手札へ。finish はアーカイブしない）
+      const cards = [...downed.stack];
+      downed.stack.length = 0;
+      for (const c of cards) ctx.addToHand(c);
+      ctx.log('夏色まつり「一緒にゲームしよ」: アーカイブするかわりに手札に戻した');
+    },
+  },
   arts: {
     'やっぱり、FPSとか？': {
       *run(ctx) {

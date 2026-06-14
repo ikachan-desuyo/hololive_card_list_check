@@ -32,6 +32,7 @@ export default {
       if (ctx.player.deck.length === 0) return;
       const card = ctx.player.deck.shift();
       ctx.player.archive.push(card);
+      ctx.recordDeckArchive(1);
       ctx.log(`${ctx.player.name}: デッキの上から ${card.name} をアーカイブした（森カリオペの鎌）`);
     },
   },

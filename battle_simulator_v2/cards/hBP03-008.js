@@ -31,7 +31,7 @@ export default {
     apply(engine, ownerIdx) {
       const p = engine.state.players[ownerIdx];
       p.archive.push(...p.holoPower.splice(0, 2));
-      p.usedOshiSkillThisTurn = true;
+      p.usedOshiSkillThisTurn += 1;
       new EffectContext(engine, ownerIdx, {}).draw(1);
       engine.log('推しスキル「ホロライブID一家」: デッキを1枚引いた');
     },

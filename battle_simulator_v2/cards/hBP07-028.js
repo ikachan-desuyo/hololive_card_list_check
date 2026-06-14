@@ -36,6 +36,7 @@ export default {
         const top = ctx.player.deck[0];
         ctx.removeFromDeck(top);
         ctx.player.archive.push(top);
+        ctx.recordDeckArchive(1);
         ctx.log(`${ctx.player.name}: ${top.name} をアーカイブした`);
         if (top.kind === 'support') {
           ctx.addArtBonus(50, 'アーカイブしたカードがサポート');

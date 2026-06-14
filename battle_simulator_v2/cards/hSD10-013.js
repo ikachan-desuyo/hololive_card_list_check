@@ -8,21 +8,49 @@
  *   → attachRule（unlimited を付けない＝ツールの標準ルールはエンジン側で1枚制限。
  *      ここでは特別な付け先制限が無いので canAttach は常に true）。
  *
- * ◆#FLOW GLOW を持つホロメンに付いていたら能力追加（未実装）:
+ * ◆#FLOW GLOW を持つホロメンに付いていたら能力追加:
  *   「自分のエンドステップが開始する時、このターンにこのホロメンがアーツを使っていたなら使える：
  *    自分のデッキから #FLOW GLOW を持つ [Debut/Spot ホロメン]1枚を公開しステージに出す。
  *    デッキをシャッフルし、その後このホロメンに付いている〈ふぐ太郎〉1枚をデッキの下に戻す。」
- *   → エンドステップ開始時の誘発フック（onEndStep）がエンジン未実装（engine.js _endStep の TODO）。
- *     さらに「このターンにこのホロメンがアーツを使っていたなら」というアーツ使用済み判定
- *     （onArtsUse相当）も保留機構のため、能力追加部分は未実装。
+ *   → triggers.onEndStepStart（装着カードのエンドステップ開始時トリガー）で実装。
+ *     ホストが#FLOW GLOWで、このターンにアーツを使っていたら（p.artsUsedNamesThisTurn）、
+ *     デッキから#FLOW GLOWのDebut/Spotを1枚出し→シャッフル→このふぐ太郎をデッキの下に戻す（任意）。
  */
+const isFG = (c) => (c.tags || []).includes('FLOW') && (c.tags || []).includes('GLOW');
+
 export default {
   number: 'hSD10-013',
   attached: {
     // 付け先が #FLOW GLOW を持つホロメンの時のみアーツ+10（タグは 'FLOW' と 'GLOW' に分割格納される）
     artsPlus(holomem) {
-      const tags = holomem.stack[0].tags || [];
-      return (tags.includes('FLOW') && tags.includes('GLOW')) ? 10 : 0;
+      return isFG(holomem.stack[0]) ? 10 : 0;
+    },
+  },
+  triggers: {
+    // ◆#FLOW GLOW付与時: 自分のエンドステップ開始時、ホストがこのターンにアーツを使っていたら使える
+    *onEndStepStart(ctx) {
+      if (ctx.state.turnPlayer !== ctx.playerIdx) return; // 自分のエンドステップ
+      const host = ctx.sourceHolomem;
+      const top = host.stack[0];
+      if (!isFG(top)) return;                                            // ◆#FLOW GLOW を持つホロメンに付いていたら
+      if (!(ctx.player.artsUsedNamesThisTurn || []).includes(top.name)) return; // このターンにこのホロメンがアーツを使っていた
+      const cand = ctx.deckCards((c) => c.kind === 'holomen' && isFG(c) && (c.bloomLevel === 'Debut' || c.bloomLevel === 'Spot'));
+      if (cand.length === 0) return;
+      const ok = yield ctx.confirm('ふぐ太郎: デッキから#FLOW GLOWのDebut/Spotを1枚ステージに出す？（ふぐ太郎はデッキの下に戻る）');
+      if (!ok) return;
+      const picked = yield ctx.chooseCard({ cards: cand, title: 'ステージに出す#FLOW GLOWのDebut/Spotホロメンを選択' });
+      if (!picked) { ctx.shuffleDeck(); return; }
+      ctx.removeFromDeck(picked);
+      ctx.flashReveal(picked);
+      ctx.putToBack(picked); // ステージ（バック）に出す（上限なら出ない）
+      ctx.shuffleDeck();
+      // その後、このふぐ太郎をデッキの下に戻す
+      const i = host.attachments.indexOf(ctx.sourceCard);
+      if (i !== -1) {
+        host.attachments.splice(i, 1);
+        ctx.player.deck.push(ctx.sourceCard);
+        ctx.log('ふぐ太郎をデッキの下に戻した');
+      }
     },
   },
   attachRule: {

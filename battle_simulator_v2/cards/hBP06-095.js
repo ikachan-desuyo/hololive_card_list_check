@@ -8,12 +8,10 @@
  * LIMITED：ターンに1枚しか使えない。
  *
  * 実装方針:
- *   - デッキから #ID1期生 ホロメン2枚を公開して手札に加え、シャッフルする部分は実装済み。
- *   - 後段の「エールデッキが0枚なら、このターンの間、#ID1期生 が相手センターをダウンさせた時 相手ライフ-1」は
- *     【未実装】。これは「特定タグのホロメン群が相手の特定ポジションをダウンさせた事を監視する
- *     ターン限定のグローバルなダウントリガー」であり、現エンジンの onOpponentDown は
- *     攻撃ホロメン自身のカード定義しか参照しない（engine._performArt 内）。
- *     ターン修正(addTurnModifier)にもライフ減少を引き起こすダウン監視の仕組みが無いため保留する。
+ *   - デッキから #ID1期生 ホロメン2枚を公開して手札に加え、シャッフルする。
+ *   - 後段「エールデッキ0枚なら、このターンの間、#ID1期生が相手センターをダウンさせた時 相手ライフ-1」は
+ *     ターン修正 kind:'onSourceDown'（match=#ID1期生）で実装。_notifySourceDown がダウン対象配列を渡すので、
+ *     ダウン対象に相手のセンターが含まれていれば相手ライフ-1。
  *     なお発動条件（エールデッキ0枚）はゲーム終盤の限定的な状況であり、主目的のサーチは機能する。
  */
 export default {
@@ -39,10 +37,25 @@ export default {
       }
       ctx.shuffleDeck();
       // その後、自分のエールデッキが0枚なら、このターンの間、
-      // 自分の #ID1期生 ホロメンが相手のセンターをダウンさせた時 相手ライフ-1。
-      // 【未実装】上記JSDoc参照（ターン限定のグローバルなダウン監視トリガーが必要）。
+      // 自分の #ID1期生 ホロメンが相手のセンターをダウンさせた時 相手ライフ-1（ターン修正 onSourceDown）。
       if (ctx.player.cheerDeck.length === 0) {
-        ctx.log('TODO(効果未実装): エールデッキ0枚時の「#ID1期生が相手センターをダウンさせた時 相手ライフ-1」は未対応');
+        const ownerIdx = ctx.playerIdx;
+        ctx.addTurnModifier({
+          kind: 'onSourceDown', ownerIdx,
+          match: (h) => (h.stack[0].tags || []).includes('ID1期生'),
+          onDown: (engine, downedList) => {
+            // ダウンさせた相手にセンターが含まれているか（アーカイブ前なのでゾーン判定可）
+            if (!(downedList || []).some((d) => engine._zoneOf(d) === 'center')) return;
+            const oppIdx = 1 - ownerIdx;
+            const immune = engine.state.modifiers.some(
+              (m) => m.kind === 'lifeImmuneOpponentAbility' && m.ownerIdx === oppIdx);
+            if (immune) return;
+            engine.state.players[oppIdx].lifeDamage += 1;
+            engine.log('IDENTIFY -AREA 15-: #ID1期生が相手センターをダウンさせた → 相手のライフ-1');
+          },
+          description: 'このターン、#ID1期生が相手センターをダウンさせた時 相手のライフ-1',
+        });
+        ctx.log('IDENTIFY -AREA 15-: エールデッキ0枚 → このターン、#ID1期生が相手センターをダウンさせると相手ライフ-1');
       }
     },
   },

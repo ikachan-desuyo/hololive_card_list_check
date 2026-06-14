@@ -3,13 +3,10 @@
  *
  * 推しスキル「総帥のお仕事」[ホロパワー：-2][ターンに1回]:
  *   このターンの間、自分のホロメンの能力でサイコロを1度に3回振る時、そのサイコロの目の数すべてを5として扱う。
- *   → oshiSkill（能動）。addTurnModifier({kind:'diceFixed', value:5}) を積む。
- *     context.js の rollDice() が自分(playerIdx)の diceFixed 修正を参照し、振った目を5に置き換える。
- *   ★保留(過剰適用): カードテキストは「1度に3回振る時」限定だが、エンジンの rollDice は
- *     「1度に何回振るか」をコンテキストに持たない（diceFixed は ownerIdx 単位で全ロールに作用する）。
- *     そのため本実装ではこのターンの自分の全てのダイスロールが5固定になる（=テキストより広い）。
- *     1回振り効果（例: 偶数判定）まで5固定になる点が原文との差異。3回ロール限定の判定機構が
- *     入るまではこの近似で運用する。
+ *   → oshiSkill（能動）。addTurnModifier({kind:'diceFixed', value:5, batchOf:3}) を積む。
+ *     context.js の rollDice() が自分(playerIdx)の diceFixed 修正を参照し、目を5に置き換える。
+ *     batchOf:3 により「1度に3回振る時」＝ rollDiceMany(3) のバッチ中（_diceBatchSize===3）のみ適用される。
+ *     1個ずつの rollDice() や rollDiceMany(5) 等には作用しないため、テキストどおり「3回振る時」限定で正しく効く。
  *
  * SP推しスキル「我ら秘密結社holoX！」[ホロパワー：-3][ゲームに1回]:
  *   自分の#秘密結社holoXを持つホロメン1人を選ぶ。このターンの間、選んだホロメンのアーツは、
@@ -24,14 +21,15 @@ import { COLORS, COLORLESS } from '../core/constants.js';
 export default {
   number: 'hBP04-005',
 
-  // 推しスキル「総帥のお仕事」: このターンの間、自分のダイス目を5として扱う（※過剰適用、上部JSDoc参照）
+  // 推しスキル「総帥のお仕事」: このターンの間、自分のホロメンの能力で「1度に3回振る」サイコロの目をすべて5として扱う
   oshiSkill: {
     *run(ctx) {
       ctx.addTurnModifier({
         kind: 'diceFixed',
         value: 5,
+        batchOf: 3, // 「1度に3回振る時」限定（rollDiceMany(3) のバッチ中のみ適用）
         ownerIdx: ctx.playerIdx,
-        description: 'このターンの間、自分のホロメンの能力で振るサイコロの目をすべて5として扱う',
+        description: 'このターンの間、自分のホロメンの能力で1度に3回振るサイコロの目をすべて5として扱う',
       });
     },
   },

@@ -9,10 +9,24 @@
  *
  * SP推しスキル「時間の典獄」[ホロパワー：-4][ゲームに1回]:
  *   自分のセンターホロメンが2ndの〈オーロ・クロニー〉なら、このターンの後に、もう1回自分のターンを開始する。
- *   → 追加ターン（エクストラターン）の機構がエンジン未対応のため未実装（保留）。
+ *   → spOshiSkill + p._extraTurnPending フラグで実装。エンジンのターン終端処理が、保留中なら
+ *     同じプレイヤーで _startTurn する（ゲーム1回なので無限化しない）。
  */
 export default {
   number: 'hBP07-005',
+  spOshiSkill: {
+    name: '時間の典獄',
+    canUse(engine, ownerIdx) {
+      const c = engine.state.players[ownerIdx].center;
+      return !!c && c.stack[0].name === 'オーロ・クロニー' && c.stack[0].bloomLevel === '2nd';
+    },
+    *run(ctx) {
+      const c = ctx.player.center;
+      if (!c || c.stack[0].name !== 'オーロ・クロニー' || c.stack[0].bloomLevel !== '2nd') return;
+      ctx.player._extraTurnPending = true; // このターンの後にもう1回自分のターンを開始する
+      ctx.log('時間の典獄: このターンの後にもう1回自分のターンを開始する');
+    },
+  },
   oshiSkill: {
     name: '忘却の輪の上で',
     *run(ctx) {
@@ -40,5 +54,4 @@ export default {
       }
     },
   },
-  // SP推しスキル「時間の典獄」は追加ターン機構が未対応のため未実装（保留）
 };

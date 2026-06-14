@@ -3,9 +3,8 @@
  *
  * [ギフト] ウチの大切な家族:
  *   [ターンに1回]このホロメンに〈ミオファ〉が付いた時、自分のデッキを1枚引く。
- *   ※未実装。受け手ホロメン側の「（特定カードが）付いた時」トリガーが必要だが、
- *     エンジンの onAttach は付けられたカード（〈ミオファ〉側）の定義でしか誘発されず、
- *     付け先ホロメンの定義からは反応できない（ホスト側の装着反応フックが無い）。
+ *   → triggers.onAttached（ホスト側の「付いた時」トリガー。engine が装着時にホスト定義の
+ *     onAttached も発火する）で実装。付いたカードが〈ミオファ〉の時、[ターンに1回]デッキを1枚引く。
  *
  * [アーツ] 今日もいっぱい笑っていこう (10+):
  *   自分のデッキの上から1枚をアーカイブできる。
@@ -13,6 +12,16 @@
  */
 export default {
   number: 'hBP07-024',
+  triggers: {
+    // ギフト「ウチの大切な家族」: [ターンに1回]このホロメンに〈ミオファ〉が付いた時、デッキを1枚引く
+    *onAttached(ctx) {
+      if (ctx.sourceCard?.name !== 'ミオファ') return;
+      const host = ctx.sourceHolomem;
+      if (host._mioDrewTurn === ctx.state.turn) return; // [ターンに1回]（ホロメン単位）
+      host._mioDrewTurn = ctx.state.turn;
+      ctx.draw(1);
+    },
+  },
   arts: {
     '今日もいっぱい笑っていこう': {
       *run(ctx) {
@@ -24,6 +33,7 @@ export default {
         if (!card) return;
         ctx._unreveal(card);
         ctx.player.archive.push(card);
+        ctx.recordDeckArchive(1);
         ctx.log(`${ctx.player.name}: ${card.name} をアーカイブした`);
         if (card.kind === 'support') {
           ctx.addArtBonus(30, 'アーカイブしたカードがサポート');

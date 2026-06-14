@@ -3,11 +3,8 @@
  *
  * [キーワード/ギフト] みんなと一緒！:
  *   このホロメンは、異なるカード名のマスコットを2枚まで付けられる。
- *   → 【未実装】ホロメン側の付け先上限緩和ギフト。
- *      エンジンの _canAttachSupport は「付ける側（マスコット）の attachRule」しか参照せず、
- *      付けられる側（このホロメン）の固有ルールを読む口が無い。
- *      そのため標準のマスコット上限（1人1枚）のまま。緩和には engine 側に
- *      ホロメン固有の attach 受け入れルール（giftAttachRule 等）のフックが必要。
+ *   → hostAttachRule.mascot で実装。engine の _canAttachSupport が付け先ホロメンの hostAttachRule を
+ *     参照し、マスコット2枚まで・かつ同名不可（異なるカード名）を許可する。
  *
  * [アーツ] マスコットたちの饗宴 (80+) [特攻: 紫+50]:
  *   自分のステージのマスコット1枚につき、このアーツ+20。
@@ -18,6 +15,15 @@
  */
 export default {
   number: 'hBP02-013',
+  // ギフト「みんなと一緒！」: 異なるカード名のマスコットを2枚まで付けられる
+  hostAttachRule: {
+    mascot(h, card) {
+      const mascots = h.attachments.filter((a) => a.supportType === 'マスコット');
+      if (mascots.length >= 2) return false;                 // 2枚まで
+      if (mascots.some((a) => a.name === card.name)) return false; // 異なるカード名
+      return true;
+    },
+  },
   arts: {
     'マスコットたちの饗宴': {
       dmgBonus(ctx) {
