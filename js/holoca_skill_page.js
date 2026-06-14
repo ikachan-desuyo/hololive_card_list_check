@@ -367,11 +367,14 @@
         const now = Date.now();
         const cacheAge = now - (parseInt(cacheTimestamp) || 0);
         const maxCacheAge = 24 * 60 * 60 * 1000; // 24 hours
+        // アプリのバージョンが変わったらキャッシュを無効化（更新後に古いカードデータが残らないように）
+        const appVer = self.APP_VERSION || '';
+        const versionMatches = localStorage.getItem('dataVersion') === appVer;
 
         let rawData, releaseMapData;
 
-        // Use cached data if available and not too old, or if offline
-        if (cachedCardData && cachedReleaseData && (cacheAge < maxCacheAge || !navigator.onLine)) {
+        // バージョン一致 かつ 24時間以内（またはオフライン）の時だけキャッシュを使う
+        if (cachedCardData && cachedReleaseData && versionMatches && (cacheAge < maxCacheAge || !navigator.onLine)) {
           rawData = JSON.parse(cachedCardData);
           releaseMapData = JSON.parse(cachedReleaseData);
         } else {
@@ -383,10 +386,11 @@
           rawData = await cardRes.json();
           releaseMapData = await releaseRes.json();
 
-          // Cache the data
+          // Cache the data（バージョンも記録）
           localStorage.setItem('cardData', JSON.stringify(rawData));
           localStorage.setItem('releaseData', JSON.stringify(releaseMapData));
           localStorage.setItem('dataTimestamp', now.toString());
+          localStorage.setItem('dataVersion', appVer);
         }
 
         releaseMap = releaseMapData;
