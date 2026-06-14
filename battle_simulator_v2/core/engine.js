@@ -1650,8 +1650,10 @@ export class Engine {
       if (h.noLifeOnDown) {
         this.log(`${p.name} のライフは減らない（効果による）`);
       } else {
-        // 「減るライフ-N」（onDown効果で h.lifeReductionOnDown を立てる）を反映
-        const lifeDmg = Math.max(0, (card.buzz ? 2 : 1) - (h.lifeReductionOnDown || 0));
+        // ダウン時に減るライフ枚数: エクストラ「ダウンした時、自分のライフ-N」を優先（非Buzzでも-2の特殊カード対応）、
+        // 無ければ Buzz=2 / 通常=1。さらに「減るライフ-N」(h.lifeReductionOnDown) を差し引く。
+        const baseLifeLoss = card.extraLifeLossOnDown ?? (card.buzz ? 2 : 1);
+        const lifeDmg = Math.max(0, baseLifeLoss - (h.lifeReductionOnDown || 0));
         p.lifeDamage += lifeDmg;
         this.log(`${p.name} はライフダメージ${lifeDmg}を受けた`);
       }
@@ -1961,19 +1963,29 @@ export class Engine {
 
   /** Bloom可否 (8.3.2-8.3.3) */
   _canBloom(h, card) {
-    if (topCard(h).name !== card.name) return false; // 同名であること
+    if (!this._bloomNameMatches(topCard(h), card)) return false; // 同名（または別名「としても扱う」）であること
     return this._canBloomIgnoreName(h, card);
   }
 
   /**
-   * 同名チェックを除いた Bloom 可否（faceDown/Spot/ターン制限/HP/レベル遷移）。
-   * 「別名のカードにBloomできる」特殊カード（ラムダック等の合体ユニット）の bloomOnto 判定に使う。
+   * Bloom の「同名」判定。エクストラ「このホロメンは〈X〉〈Y〉としても扱う」(card.nameAliases) を考慮し、
+   * 互いの名前/別名のいずれかが一致すれば同名扱い（合体ユニット: ラムダック/miComet/SorAZ/FUWAMOCO 等）。
+   */
+  _bloomNameMatches(baseTop, card) {
+    const baseNames = [baseTop.name, ...(baseTop.nameAliases || [])];
+    const cardNames = [card.name, ...(card.nameAliases || [])];
+    return baseNames.some((n) => cardNames.includes(n));
+  }
+
+  /**
+   * 同名チェックを除いた Bloom 可否（faceDown/Spot/Bloom不可/ターン制限/HP/レベル遷移）。
    */
   _canBloomIgnoreName(h, card) {
     const s = this.state;
     const top = topCard(h);
     if (h.faceDown) return false;
     if (top.bloomLevel === 'Spot') return false;
+    if (top.cannotBloom) return false; // エクストラ「このホロメンはBloomできない」
     if (h.placedTurn === s.turn) return false;       // このターンに出たホロメンは不可
     if (h.bloomedTurn === s.turn) return false;      // このターンにBloom済みは不可
     if (card.hp <= h.damage) return false;           // 新HPがダメージを超えていること（「より大きい」）

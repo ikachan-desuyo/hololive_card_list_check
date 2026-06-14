@@ -117,12 +117,22 @@ export function normalizeCard(raw) {
     } else if (skill.type === 'サポート効果') {
       card.supportText = fwColon(skill.name || skill.description || '');
     } else if (skill.type === 'エクストラ') {
-      // エクストラ「このホロメンはデッキに何枚でも入れられる」等。
-      // keywords にも積んで既存のサーチ判定（kw.text を見る）で拾えるようにする。
+      // エクストラ（永続のカード特性）。keywords にも積んで既存のサーチ判定（kw.text を見る）で拾えるようにする。
       const text = fwColon(skill.text || skill.name || '');
       card.keywords.push({ subtype: 'エクストラ', name: '', text });
-      // デッキ構築の同名上限を無視できる印（デッキビルダー等が参照可能）
+      // ①「このホロメンはデッキに何枚でも入れられる」: デッキ構築の同名上限を無視
       if (text.includes('デッキに何枚でも入れられる')) card.unlimitedInDeck = true;
+      // ②「ダウンした時、自分のライフ-N」: ダウン時に減るライフ枚数（Buzz=2 の明示。非Buzzでも-2の特殊カードあり）
+      const lm = /ダウンした時.*ライフ-(\d+)/.exec(text);
+      if (lm) card.extraLifeLossOnDown = Number(lm[1]);
+      // ③「このホロメンはBloomできない」: Bloム不可（Spotは元々不可だが念のため明示フラグ）
+      if (text.includes('Bloomできない')) card.cannotBloom = true;
+      // ④「このホロメンは〈X〉〈Y〉としても扱う」: 別名（合体ユニット。Bloム・〈名称〉参照で別名も一致）
+      const am = /このホロメンは(.+?)としても扱う/.exec(text);
+      if (am) {
+        const names = am[1].match(/〈([^〉]+)〉/g);
+        if (names) card.nameAliases = names.map((s) => s.replace(/[〈〉]/g, ''));
+      }
     } else if (skill.type === '推しステージスキル') {
       // 推しホロメンの常時能力（永続）。テキストを保持し、効果はカード定義の oshiStageSkill フックで実装する。
       card.oshiStageText = fwColon(skill.text || skill.name || '');

@@ -1037,6 +1037,29 @@ export async function runTests() {
     assert(d2 && p0.holoPower.length === hp0 + 1 && p0.deck.length === dk0 - 1, 'わため: デッキ上1枚がホロパワーに行っていない');
   });
 
+  await testAsync('エクストラ: 名前読み替え（ラムダックが〈角巻わため〉にBloomできる / nameIs別名一致）', async () => {
+    const e = await setupMainStep(deckMap, 150);
+    const ramuduck = lib.getByNumber('hBP06-083'); // ラムダック1st、nameAliases=[角巻わため,大空スバル]
+    assert((ramuduck.nameAliases || []).includes('角巻わため'), 'nameAliases が正規化されていない');
+    const base = e._createHolomem(lib.getByNumber('hBP07-008'), 0); // Debut〈角巻わため〉
+    base.placedTurn = 0;
+    assertEq(base.stack[0].name, '角巻わため', 'テスト用の素体が〈角巻わため〉でない');
+    assert(e._canBloom(base, ramuduck), 'ラムダックが〈角巻わため〉にBloomできない（別名Bloム）');
+    const ctx = new EffectContext(e, 0, {});
+    assert(ctx.nameIs(ramuduck, '角巻わため') && ctx.nameIs(ramuduck, '大空スバル'), 'nameIs が別名に一致しない');
+    assert(!ctx.nameIs(ramuduck, '無関係'), 'nameIs が無関係名に一致している');
+  });
+
+  await testAsync('エクストラ: ダウン時ライフ-2（非Buzz）の正規化 / Bloomできない（Spot）の正規化', async () => {
+    assertEq(lib.getByNumber('hBP07-019').extraLifeLossOnDown, 2, '非Buzzの「ライフ-2」が正規化されていない');
+    assert(lib.getByNumber('hBP01-096').cannotBloom === true, 'Spotの cannotBloom が立っていない');
+    // Buzz は従来どおり（extraLifeLossOnDown が無くても card.buzz=2 経路）/ 通常ホロメンは undefined
+    const e = await setupMainStep(deckMap, 151);
+    // Spot にはBloムできない（同名上位でも不可。_canBloomIgnoreName の Spot/cannotBloom 判定）
+    const spotH = e._createHolomem(lib.getByNumber('hBP01-096'), 0); spotH.placedTurn = 0;
+    assert(!e._canBloomIgnoreName(spotH, { bloomLevel: '1st', hp: 200 }), 'Spot/cannotBloom にBloомできてしまう');
+  });
+
   await testAsync('コンパイラ: 全カードでクラッシュせず、一定数を自動実装できる', async () => {
     let compiled = 0;
     let slots = 0;
