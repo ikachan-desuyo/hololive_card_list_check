@@ -14,19 +14,9 @@
  *   ctx.sourceHolomem の最上段カード名で判定する。ホロメンは1ターン1回しかBloomできないため
  *   「Bloomレベルが上がった時」は自然に満たされる。
  *
- * 保留: 「[センターポジション・コラボポジション限定]相手のセンターホロメンのバトンタッチに必要な
- *   無色+1」は未実装（2026-06 再評価でも保留継続）。
- *   この効果は「装着ツールが付いたホストが前衛(センター/コラボ)に居る間、常時、相手センターの
- *   バトンタッチ必要無色を+1する」という常時アウラ。現行エンジンの batonCostReduce 機構を確認したが、
- *   effects.batonCostReduction(holomem, ownerIdx) が参照するのは
- *     ①ターン修正 kind:'batonCostReduce'（イベントで1回 push する能動型。hBP08-004 推しスキル等）と
- *     ②評価対象ホロメン自身の attachments の batonCostReduceAttached（その装着が「評価対象に」付いている時のみ。
- *       hBP03-111 等）の2つだけ。
- *   本カードはツールが「自分の」ホロメンに付くのに、コストを増やす対象は「相手の」センターなので
- *   ②では届かず、①は常時アウラには使えない（前衛離脱・装着剥がれ時の後始末や毎ターン再付与の機構が無い）。
- *   必要なのは「盤面を走査して装着カードが相手センターのバトンコストにデルタを与える常時アウラ」フック
- *   （auraDamageDelta / artsCostReduceAura の baton 版）。これは core(system.js/engine.js) 側の新機構で、
- *   発明禁止のため保留を維持する。なお下記 onBloom（〈水宮枢〉に付いていた時のドロー）は実装済み。
+ *   「相手のセンターのバトンタッチに必要な無色+1」は oppBatonCostDelta（相手側の常時アウラとして
+ *   effects.batonCostReduction が盤面を走査して評価。負の軽減量＝コスト増）で実装。
+ *   ホスト〈水宮枢〉が前衛(センター/コラボ)に居る間、相手のセンターのバトン必要無色を+1する。
  */
 export default {
   number: 'hBP08-104',
@@ -39,5 +29,14 @@ export default {
       if (top.name !== '水宮枢') return;
       ctx.draw(1);
     },
+  },
+  // ◆〈水宮枢〉に付いていたら: [前衛限定]相手のセンターのバトンタッチに必要な無色+1（軽減-1＝増加）
+  // src=このツールが付いたホスト, target=バトンタッチしようとしている相手ホロメン
+  oppBatonCostDelta(src, target, engine) {
+    if (src.stack[0].name !== '水宮枢') return [];          // ホストが〈水宮枢〉
+    const sz = engine._zoneOf(src);
+    if (sz !== 'center' && sz !== 'collab') return [];       // [センター・コラボ限定]
+    if (engine._zoneOf(target) !== 'center') return [];      // 相手のセンターのバトンのみ
+    return [{ color: '無色', amount: -1 }];
   },
 };

@@ -6,7 +6,7 @@
  *   - キー: フルID（例 "hBP01-024_02_C"）
  *   - number: カードナンバー（例 "hBP01-024"）… デッキ構築の同一判定はこれ
  *   - card_type: 'ホロメン' | 'Buzzホロメン' | '推しホロメン' | 'サポート・○○[・LIMITED]' | 'エール'
- *   - hp: 文字列 / life: 数値 / bloom_level: 'Debut'|'1st'|'2nd'|'Spot' / baton_touch: '無色'
+ *   - hp: 文字列 / life: 数値 / bloom_level: 'Debut'|'1st'|'2nd'|'Spot' / baton_touch: 色配列 ['無色'] / ['無色','無色']（旧: 単一文字列 '無色'）
  *   - skills[]: { type: 'アーツ'|'キーワード'|'推しスキル'|'SP推しスキル'|'サポート効果',
  *                 dmg: '50'|'90+', icons: { main: ['white','any'], tokkou: ['紫+50'] },
  *                 subtype: 'ブルームエフェクト'|'コラボエフェクト'|'ギフト', ... }
@@ -82,7 +82,10 @@ export function normalizeCard(raw) {
     color: raw.color || null,
     hp: raw.hp ? Number(raw.hp) : null,
     bloomLevel: raw.bloom_level || null,
-    batonTouch: raw.baton_touch ? [raw.baton_touch] : [],
+    // baton_touch は色配列 ["無色","無色"]（個数付き）。旧形式の単一文字列 "無色" にも後方互換
+    batonTouch: Array.isArray(raw.baton_touch)
+      ? [...raw.baton_touch]
+      : (raw.baton_touch ? [raw.baton_touch] : []),
     life: raw.life != null ? Number(raw.life) : null,
     tags: raw.tags || [],
     imageUrl: raw.image_url || '',
@@ -121,11 +124,21 @@ export function normalizeCard(raw) {
 
 /** カードライブラリ: 全カードの正規化済みデータを保持 */
 export class CardLibrary {
-  constructor(rawData) {
+  /**
+   * @param rawData card_data.json（外部生成物・変更不可）の中身
+   * @param batonOverride { 番号: 色配列 } のバトンコスト補正（v2側の独立データ）。
+   *   card_data.json の baton_touch は個数を失っている（全て無色1）ため、ここで正しい個数に上書きする。
+   *   card_data.json 自体は一切変更しない（読むだけ）。
+   */
+  constructor(rawData, batonOverride = null) {
     this.cards = new Map();
     this.byNumber = new Map(); // カードナンバー → 代表カード（最初のバリアント）
     for (const [id, raw] of Object.entries(rawData)) {
       const card = normalizeCard({ ...raw, id });
+      // バトンコストの個数補正（番号単位。card_data.json は不変、v2側オーバーライドが正）
+      if (batonOverride && batonOverride[card.number]) {
+        card.batonTouch = [...batonOverride[card.number]];
+      }
       this.cards.set(id, card);
       if (!this.byNumber.has(card.number)) this.byNumber.set(card.number, card);
     }
@@ -138,7 +151,13 @@ export class CardLibrary {
   static async load(url = 'json_file/card_data.json') {
     const res = await fetch(url);
     if (!res.ok) throw new Error(`カードデータの読み込みに失敗: HTTP ${res.status}`);
-    return new CardLibrary(await res.json());
+    // バトンコスト補正データ（v2配下。card_data.json とは別物）。取得失敗時は補正なしで続行。
+    let batonOverride = null;
+    try {
+      const bRes = await fetch(new URL('../data/baton_cost.json', import.meta.url));
+      if (bRes.ok) batonOverride = await bRes.json();
+    } catch { /* 補正データが無くてもカードデータだけで動作する */ }
+    return new CardLibrary(await res.json(), batonOverride);
   }
 
   get(id) {

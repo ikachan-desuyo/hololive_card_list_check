@@ -58,6 +58,8 @@
  *     // ※アーツ対象拡張のターン修正: kind:'artTargetDamagedBack'（HP減バック）/ 'artTargetSecondBack'（相手2ndバック）。ctx.addTurnModifier({kind,ownerIdx,match}) で付与
  *     specialBloom(h, handCard, engine, ownerIdx) { return bool; }, // 特殊Bloom: true でメインのBloom候補に追加（レベル遷移条件のみ迂回。同名/HP/ターン制限は通常通り）
  *     oppArtsTargetRestrict(src, engine, defender) { return ['collab']; }, // 防御側アウラ: 相手のアーツが取れる対象ゾーンを制限（「自分のコラボしか対象にできない」hBP05-010 等。特殊ダメージは別経路で対象外）
+ *     oppBatonCostDelta(src, target, engine) { return [{color:'無色',amount:-1}]; }, // 相手側アウラ: 相手のバトンタッチ必要エールを増減（負=増加。「相手センターのバトン必要無色+1」hBP08-104）
+ *     oppArtsCostDelta(src, target, engine) { return [{color:'無色',amount:-2}]; },  // 相手側アウラ: 相手のアーツ必要エールを増減（負=増加。「相手センターのアーツ必要無色+2」hBP08-053）
  *     onDamageReceivedReact: {                          // 「ダメージを受ける時に使える」リアクティブ割り込み（推しスキル以外。ホロメンギフト/装着ファン）
  *       title, yesLabel,                                //   防御側に決定ポイントを提示。アーツ/特殊どちらのダメージ経路でも発火する
  *       canUse(engine, info) { return bool; },          //   info = { defIdx, target, dmg, kind:'arts'|'special', reactor?(ステージ側), attachedCard?(装着側) }

@@ -179,6 +179,14 @@ export class EffectSystem {
       const adef = this.registry.get(att.number);
       for (const r of adef?.artsCostReduceAttached?.(targetHolomem, this.engine) || []) add(r.color, r.amount);
     }
+    // 相手側の常時アウラによる必要エールの増減（「相手のセンターのアーツ必要無色+2」hBP08-053 等。amount 負値＝増加）
+    const oppP = this.engine.state.players[1 - ownerIdx];
+    if (oppP) {
+      for (const src of this.engine._stageHolomems(oppP)) {
+        const sdef = this.registry.get(src.stack[0].number);
+        for (const r of sdef?.oppArtsCostDelta?.(src, targetHolomem, this.engine) || []) add(r.color, r.amount);
+      }
+    }
     return red;
   }
 
@@ -194,6 +202,17 @@ export class EffectSystem {
     for (const att of holomem.attachments) {
       const adef = this.registry.get(att.number);
       for (const r of adef?.batonCostReduceAttached?.(holomem, this.engine) || []) red[r.color] = (red[r.color] || 0) + r.amount;
+    }
+    // 相手側の常時アウラによるバトンタッチ必要エールの増減（「相手のセンターのバトンに必要な無色+1」hBP08-104 等）。
+    // amount は軽減量（負値＝増加）。相手のステージのホロメン本体と装着カードの oppBatonCostDelta を走査する。
+    const oppP = this.engine.state.players[1 - ownerIdx];
+    if (oppP) {
+      for (const src of this.engine._stageHolomems(oppP)) {
+        const defs = [this.registry.get(src.stack[0].number), ...src.attachments.map((a) => this.registry.get(a.number))];
+        for (const def of defs) {
+          for (const r of def?.oppBatonCostDelta?.(src, holomem, this.engine) || []) red[r.color] = (red[r.color] || 0) + r.amount;
+        }
+      }
     }
     return red;
   }

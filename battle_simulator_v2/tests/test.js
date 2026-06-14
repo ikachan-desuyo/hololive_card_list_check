@@ -200,6 +200,16 @@ export async function runTests() {
     assertEq(lim.limited, true);
   });
 
+  test('バトンコスト補正（baton_cost.json オーバーライド）: 2ndは無色2・Debutは無色1', () => {
+    // card_data.json は baton_touch を全て無色1で持つ（個数欠落）。v2側 data/baton_cost.json で正しい個数に補正。
+    const debut = lib.getByNumber('hBP07-008'); // 角巻わため Debut → ◇（無色1）
+    const second = lib.getByNumber('hBP07-013'); // 角巻わため 2nd → ◇◇（無色2）
+    assert(debut && second, 'hBP07-008 / hBP07-013 が無い');
+    assertEq(debut.batonTouch.length, 1, 'Debut のバトンコストが無色1でない');
+    assertEq(second.batonTouch.length, 2, '2nd のバトンコストが無色2に補正されていない');
+    assert(second.batonTouch.every((c) => c === '無色'), 'バトンコストが無色でない');
+  });
+
   // ---- エンジンのユニットテスト ----
   const dummyDecks = { decks: [{ oshi: fakeHolomen(), deck: [], cheerDeck: [] }, { oshi: fakeHolomen(), deck: [], cheerDeck: [] }] };
   const eng = new Engine({ ...dummyDecks, seed: 1 });

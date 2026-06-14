@@ -20,32 +20,38 @@
  *   相手センターのバトンタッチ必要無色+3。これらが積めば実効コストが5無色以上になり得るため、
  *   素のトップカードではなく実効コストを数える。これにより本条件は実際の対戦で成立し得る。
  *
- * 【保留】ギフト（相手センターのアーツ必要無色+2）は常時効果だが、
- *   アーツ必要エール修正のオーラ機構（artsCostReduceAura）は「対象ホロメンの持ち主自身の
- *   ステージ上のカード」しか走査しない（system.js artsCostReduction: players[ownerIdx] のみ）。
- *   本カードは自分のステージに居て相手のコストを増やすため、現行の機構では表現できない。
- *   ターン修正 kind:'artCostReduce' は一時的（duration:'turn'/untilTurn）で、
- *   「相手センターのバトンタッチ必要無色が5つ以上なら」という動的条件で毎回再評価する常時効果には
- *   合わず、再評価のためのフックも無い。クロスサイドの常時アーツコスト修正オーラが無いため、
- *   ギフトは未実装（保留）を維持する。
+ *   ギフト（相手センターのアーツ必要無色+2）は oppArtsCostDelta（相手側の常時アウラとして
+ *   system.artsCostReduction が盤面走査で評価。負 amount＝必要増）で実装。〈水宮枢〉がセンターに居て、
+ *   相手センターの実効バトン必要無色が5以上の時、相手センターのアーツ必要無色を+2する（動的に毎回再評価）。
  */
 
 import { COLORLESS } from '../core/constants.js';
 
+/** 指定ホロメンのバトンタッチに【実効で】必要な無色の数 */
+function batonColorlessOf(engine, holomem) {
+  const idx = engine.state.players.findIndex((p) => engine._stageHolomems(p).includes(holomem));
+  if (idx < 0) return 0;
+  return engine._effectiveBatonCost(holomem, holomem.stack[0].batonTouch || [], idx)
+    .filter((c) => c === COLORLESS).length;
+}
+
 /** 相手のセンターホロメンのバトンタッチに【実効で】必要な無色の数（≧5 を満たすかの判定用） */
 function oppCenterBatonColorless(ctx) {
   const entry = ctx.holomems('opp', (e) => e.pos.zone === 'center')[0];
-  if (!entry) return 0;
-  const oppIdx = 1 - ctx.playerIdx;
-  // 素のバトンタッチコストに、必要エール修正（batonCostReduce 等。負 amount=必要増）を適用した実効コスト
-  const cost = ctx.engine._effectiveBatonCost(entry.holomem, entry.top.batonTouch || [], oppIdx);
-  return cost.filter((c) => c === COLORLESS).length;
+  return entry ? batonColorlessOf(ctx.engine, entry.holomem) : 0;
 }
 
 export default {
   number: 'hBP08-053',
 
-  // ギフト「しゅぴしゅわ～～っ！！！！」は保留（上記JSDoc参照）。
+  // ギフト「しゅぴしゅわ～～っ！！！！」: [センター限定]相手センターのバトン必要無色5以上なら、相手センターのアーツ必要無色+2
+  // src=このホロメン(あくあ), target=アーツコストを評価される相手ホロメン
+  oppArtsCostDelta(src, target, engine) {
+    if (engine._zoneOf(src) !== 'center') return [];        // [センターポジション限定]
+    if (engine._zoneOf(target) !== 'center') return [];      // 相手のセンターのアーツのみ
+    if (batonColorlessOf(engine, target) < 5) return [];     // 相手センターのバトン必要無色5以上
+    return [{ color: COLORLESS, amount: -2 }];               // 必要無色+2（負の軽減＝増加）
+  },
 
   arts: {
     '届け、この愛': {

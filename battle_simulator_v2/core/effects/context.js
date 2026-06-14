@@ -310,6 +310,21 @@ export class EffectContext {
     return true;
   }
 
+  /**
+   * ホロメンの実効バトンタッチコスト（基礎 batonTouch ＋ 軽減/増加アウラ・ターン修正）を色配列で返す。
+   * 「相手のセンターのバトンタッチに必要な無色がN以上なら」等の条件判定に使う（hBP08-052/053 等）。
+   */
+  effectiveBatonCost(holomem) {
+    const ownerIdx = this.engine.state.players.findIndex((p) => this.engine._stageHolomems(p).includes(holomem));
+    if (ownerIdx < 0) return [];
+    return this.engine._effectiveBatonCost(holomem, holomem.stack[0].batonTouch || [], ownerIdx);
+  }
+
+  /** 実効バトンタッチコストのうち指定色の個数（省略時は無色） */
+  batonCostCount(holomem, color = '無色') {
+    return this.effectiveBatonCost(holomem).filter((c) => c === color).length;
+  }
+
   /** お休み状態のホロメンをアクティブにする (4.3.2) */
   setActive(holomem) {
     if (holomem.rested) {
