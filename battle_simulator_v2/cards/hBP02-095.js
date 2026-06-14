@@ -6,11 +6,7 @@
  *
  * ◆〈宝鐘マリン〉に付いていたら能力追加
  *   [センターポジション限定]このマスコットが付いているホロメンがBloomした時、自分のデッキを1枚引く。
- *   → 【保留（部分未実装）】「付いているホロメンがBloomした時」を捕捉するトリガー機構が
- *      エンジンに無い。Bloom処理 (engine.js _executeMainAction の case 'bloom') は
- *      Bloomしたカード自身の bloomEffect のみを誘発し、付いている装着カードの
- *      トリガーを走査しない。装着カードに「ホスト（付いている先）がBloomした時」フックが
- *      追加されたら、ここに「[センター限定]〈宝鐘マリン〉に付いている時は1ドロー」を足すこと。
+ *   → triggers.onBloom（装着カードのトリガー。engine がホストのBloom時に装着カードの onBloom も発火）。
  *
  * マスコットは、自分のホロメン1人につき1枚だけ付けられる（マスコット標準ルール。
  * エンジン側で制限されるため attachRule は不要）。
@@ -21,6 +17,14 @@ export default {
     // このマスコットが付いているホロメンのアーツ+10
     artsPlus() {
       return 10;
+    },
+  },
+  triggers: {
+    // ◆〈宝鐘マリン〉に付いていたら: [センター限定]ホストがBloomした時、自分のデッキを1枚引く
+    *onBloom(ctx) {
+      if (ctx.sourceHolomem?.stack[0].name !== '宝鐘マリン') return;
+      if (ctx.sourceHolomemPos()?.zone !== 'center') return;
+      ctx.draw(1);
     },
   },
 };

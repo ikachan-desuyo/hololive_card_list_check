@@ -26,6 +26,9 @@
  *       artsPlus(holomem, engine) { return N; },
  *       hpPlus(holomem, engine) { return N; },
  *       specialDmgPlus(sourceHolomem, targetEntry, engine) { return N; },
+ *       damageDelta(holomem, zone, engine, kind, attacker) { return N; }, // 受けるダメージ増減（負=軽減）
+ *       cheerSupply(holomem, engine) { return [{color:'白'}]; }, // アーツ使用時の擬似エール供給（「この装着を○エールとしても扱う」。コスト充足判定のみ・消費しない）
+ *       onCheerAttached(holomem, engine, self) {},          // このホロメンにエールが付いた時（同期・選択不可。即時の継続修正付与等）
  *     },
  *     attachRule: {                                      // 付け先制限（雪民など）
  *       canAttach(holomem) { return bool; },

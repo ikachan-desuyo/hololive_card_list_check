@@ -4,8 +4,7 @@
  *   相手からの特殊ダメージを受けない。
  *   → auraDamageDelta（kind==='special' のみ、自分のバックの #FLOW #GLOW 1st を -∞ 軽減で無効化）
  * アーツ「みんなが居るから幸せだ！」(50+): このターンに自分のステージのエールがアーカイブされていたなら、
- *   このアーツ+30。→ ステージのエールがアーカイブされた記録（cheersArchivedFromStageThisTurn）が必要。
- *   現状そのフラグ未実装のため、+30条件は保留（ベースの50のみ）。
+ *   このアーツ+30。→ ctx.player.cheerArchivedThisTurn（archiveCheer で記録、ターン開始でリセット）を参照。
  */
 export default {
   number: 'hBP07-088',
@@ -18,5 +17,13 @@ export default {
     const tags = top.tags || [];
     if (!tags.includes('FLOW') || !tags.includes('GLOW')) return 0;
     return -1000000; // 特殊ダメージを受けない
+  },
+  arts: {
+    'みんなが居るから幸せだ！': {
+      // このターンに自分のステージのエールがアーカイブされていたなら +30
+      dmgBonus(ctx) {
+        return ctx.player.cheerArchivedThisTurn ? 30 : 0;
+      },
+    },
   },
 };

@@ -441,6 +441,12 @@ export class EffectContext {
   attachCheer(cheer, holomem) {
     holomem.cheers.push(cheer);
     this.log(`${holomem.stack[0].name} に ${cheer.name} を送った`);
+    // 「（このホロメンに）エールが付いた時」の装着カード同期トリガー（hBP03-113 等）。
+    // 効果が即時・選択不要のものに限る（attachCheer はジェネレータでないため）。
+    for (const att of holomem.attachments) {
+      const fn = this.engine.registry.get(att.number)?.attached?.onCheerAttached;
+      if (fn) fn(holomem, this.engine, att);
+    }
   }
 
   /** サポートカード（ファン/マスコット等）をホロメンに付ける */
@@ -550,6 +556,8 @@ export class EffectContext {
       holomem.cheers.splice(i, 1);
       this.player.archive.push(cheer);
       this.log(`${holomem.stack[0].name} の ${cheer.name} をアーカイブ`);
+      // 「このターンに自分のステージのエールがアーカイブされた」記録（hBP07-088 のアーツ+30条件 等）
+      this.player.cheerArchivedThisTurn = true;
     }
   }
 

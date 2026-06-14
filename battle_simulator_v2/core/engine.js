@@ -405,6 +405,7 @@ export class Engine {
     p.usedSupportThisTurn = false;
     p.usedCollabThisTurn = false;
     p.usedBatonTouchThisTurn = false;
+    p.cheerArchivedThisTurn = false; // このターンに自分のステージのエールをアーカイブしたか（hBP07-088 等）
     p.supportsPlayedThisTurn = []; // このターンに使ったサポートのカード名一覧（「〈限界飯〉を使っていたなら」等）
     // 「直前の相手のターンに自分のホロメンがダウンしていたなら」用。
     // このターン(idx)の間に相手(1-idx)のホロメンがダウンしたら蓄積し、相手の次の自ターンで参照される。
@@ -733,7 +734,8 @@ export class Engine {
     const pushArtActions = (h, zone, art, ai, isReArts) => {
       const card = topCard(h);
       const cost = this._effectiveArtCost(h, art.cost, s.turnPlayer);
-      if (!this._canPayCheers(h.cheers, cost)) return;
+      // アーツ使用時のみ、装着カードの「擬似エール供給」（◆〈ときのそら〉に付いていたら白エール扱い 等）を支払いプールに加味
+      if (!this._canPayCheers(this._artCheerPool(h), cost)) return;
       const artDef = this.registry.getArt(card.number, art.name);
       // カード定義によるアーツ使用条件（「アーカイブにサポート4枚以上なければ使えない」等）
       if (artDef?.canUse) {
@@ -1218,28 +1220,40 @@ export class Engine {
         const realCont = () => this._checkTiming(() => this._queuePerformancePending());
         const cont = () => this._offerTimingOshiSkills('onDamageDealtOshiSkills', s.turnPlayer, attackInfo,
           () => this._offerTimingOshiSkills('onArtsUseOshiSkills', s.turnPlayer, attackInfo, realCont));
+        // runners: { run, srcCard } の配列。srcCard は ctx.sourceCard（装着カードのトリガーは装着カードを渡す）
         const runners = [];
+        const selfCard = topCard(h);
         if (downed.length > 0) {
           this._notifySourceDown(h, s.turnPlayer); // 継続効果(ターン修正)の同期通知（ラミィSP等）
-          const cardTrig = this.registry.get(topCard(h).number)?.triggers?.onOpponentDown;
+          const cardTrig = this.registry.get(selfCard.number)?.triggers?.onOpponentDown;
           for (let d = 0; d < downed.length; d++) { // ダウン体数ぶん（通常は1体）
-            if (cardTrig) runners.push(cardTrig);
-            if (artDef?.onDownDealt) runners.push(artDef.onDownDealt);
+            if (cardTrig) runners.push({ run: cardTrig, srcCard: selfCard });
+            if (artDef?.onDownDealt) runners.push({ run: artDef.onDownDealt, srcCard: selfCard });
+          }
+          // 装着カードの「ホストが相手をダウンさせた時」トリガー（hBP02-096 等）
+          for (const att of h.attachments) {
+            const at = this.registry.get(att.number)?.triggers?.onOpponentDown;
+            if (at) runners.push({ run: at, srcCard: att });
           }
         }
-        const onArts = this.registry.get(topCard(h).number)?.triggers?.onArtsUse;
-        if (onArts) runners.push(onArts);
+        const onArts = this.registry.get(selfCard.number)?.triggers?.onArtsUse;
+        if (onArts) runners.push({ run: onArts, srcCard: selfCard });
+        // 装着カードの「ホストがアーツを使った時」トリガー（hBP01-119 等。ctx.sourceHolomem=ホスト, sourceCard=装着）
+        for (const att of h.attachments) {
+          const at = this.registry.get(att.number)?.triggers?.onArtsUse;
+          if (at) runners.push({ run: at, srcCard: att });
+        }
         // 「このアーツで（相手に）ダメージを与えた時」（実際に与えた合計ダメージ量を渡す。ライフスティール等）
         if (artDef?.onDamageDealt && totalDealt > 0) {
           const dealt = totalDealt;
-          runners.push(function* onDamageDealtWrap(c) { yield* artDef.onDamageDealt(c, dealt); });
+          runners.push({ run: function* onDamageDealtWrap(c) { yield* artDef.onDamageDealt(c, dealt); }, srcCard: selfCard });
         }
         if (runners.length > 0) {
           const runNext = (i) => {
             if (i >= runners.length) { cont(); return; }
             this._runEffect(
-              { run: runners[i] },
-              { playerIdx: s.turnPlayer, sourceCard: topCard(h), sourceHolomem: h },
+              { run: runners[i].run },
+              { playerIdx: s.turnPlayer, sourceCard: runners[i].srcCard, sourceHolomem: h },
               () => runNext(i + 1),
             );
           };
@@ -1705,6 +1719,23 @@ export class Engine {
   /** バトンタッチの必要エールに軽減（「無色-2」等）を適用した実効コストを返す */
   _effectiveBatonCost(holomem, cost, ownerIdx) {
     return this._applyCostReduction([...cost], this.effects.batonCostReduction(holomem, ownerIdx));
+  }
+
+  /**
+   * アーツのコスト支払い判定に使うエールプール = ホロメンの実エール ＋ 装着カードの擬似エール供給。
+   * 装着カード定義の attached.cheerSupply(holomem, engine) が [{color}] を返すと、その色のエールを
+   * アーツの必要エール充当に「持っているものとして」加える（「この装着を◯エールとしても扱う」用）。
+   * アーツはエールを消費しない（充足判定のみ）ので擬似エールは仮想オブジェクトでよく、保存則に影響しない。
+   */
+  _artCheerPool(h) {
+    const pool = [...h.cheers];
+    for (const att of h.attachments) {
+      const supply = this.registry.get(att.number)?.attached?.cheerSupply;
+      if (supply) {
+        for (const c of supply(h, this) || []) pool.push({ color: c.color, pseudo: true });
+      }
+    }
+    return pool;
   }
 
   /**
