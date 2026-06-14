@@ -979,6 +979,64 @@ export async function runTests() {
     assert(done3, '(3)完了しない');
   });
 
+  await testAsync('推しステージスキル: AZKi/セシリア/Ina/FUWAMOCO/ルイ/わため', async () => {
+    const e = await setupMainStep(deckMap, 140);
+    await e.registry.preload(['hBP07-006', 'hBP08-002', 'hBP08-006', 'hBP08-003', 'hBP08-005', 'hBP07-001'], lib);
+    const p0 = e.state.players[0]; const p1 = e.state.players[1];
+
+    // AZKi: センター〈AZKi〉にホロパワー×20
+    p0.oshi = lib.getByNumber('hBP07-006');
+    const azki = { stack: [{ name: 'AZKi' }], cheers: [], attachments: [] };
+    p0.center = azki; p0.collab = null; p0.back = [];
+    p0.holoPower = [{}, {}, {}];
+    assertEq(e.effects.artsBonus(azki, 0), 60, 'AZKi: ホロパワー3枚で+60にならない');
+    p0.holoPower = [];
+    assertEq(e.effects.artsBonus(azki, 0), 0, 'AZKi: ホロパワー0で+0にならない');
+
+    // セシリア: blocksReset
+    p0.oshi = lib.getByNumber('hBP08-002');
+    const cecDef = e.registry.get('hBP08-002').oshiStageSkill;
+    assert(cecDef.blocksReset({ stack: [{ name: 'セシリア・イマーグリーン' }] }), 'セシリアがblocksReset対象でない');
+    assert(!cecDef.blocksReset({ stack: [{ name: '別' }] }), '別ホロメンまでblocksReset');
+
+    // Ina: 相手全員が相手推しと異なる色ならエール不要
+    p0.oshi = lib.getByNumber('hBP08-006');
+    const ina = { stack: [{ name: '一伊那尓栖' }], cheers: [], attachments: [] };
+    p0.center = ina; p0.collab = null; p0.back = [];
+    p1.oshi = { color: '赤' };
+    p1.center = { stack: [{ name: 'X', color: '青' }], cheers: [], attachments: [] }; p1.collab = null; p1.back = [];
+    let red = e.effects.artsCostReduction(ina, 0);
+    assert((red['青'] || 0) >= 99 && (red['無色'] || 0) >= 99, 'Ina: 条件成立でエール不要にならない');
+    p1.center = { stack: [{ name: 'Y', color: '赤' }], cheers: [], attachments: [] }; // 推しと同色
+    red = e.effects.artsCostReduction(ina, 0);
+    assert(!(red['青'] >= 99), 'Ina: 推しと同色がいるのに軽減されている');
+
+    // FUWAMOCO: フワワ/モココの赤エールが青コストを払える
+    p0.oshi = lib.getByNumber('hBP08-003');
+    const fuwawa = { stack: [{ name: 'フワワ・アビスガード' }], cheers: [{ color: '赤' }], attachments: [] };
+    assert(e._canPayArtCost(fuwawa, ['青'], 0), 'FUWAMOCO: 赤エールが青コストを払えない');
+    assert(e._canPayArtCost(fuwawa, ['赤'], 0), 'FUWAMOCO: 赤コストを払えない');
+    assert(!e._canPayArtCost({ stack: [{ name: '別' }], cheers: [{ color: '赤' }], attachments: [] }, ['青'], 0), 'FUWAMOCO: 対象外の赤が青を払えている');
+
+    // ルイ: ターン終了時、センター=ルイ&コラボあり→手札4枚までドロー
+    p0.oshi = lib.getByNumber('hBP08-005');
+    const ruiDef = e.registry.get('hBP08-005').oshiStageSkill;
+    p0.center = { stack: [{ name: '鷹嶺ルイ' }] }; p0.collab = { stack: [{ name: 'C' }] }; p0.back = [];
+    p0.hand = [{}, {}];
+    const deckBefore = p0.deck.length;
+    let done = false;
+    e._runEffect({ run: ruiDef.onTurnEnd }, { playerIdx: 0 }, () => { done = true; });
+    assert(done && p0.hand.length === 4 && p0.deck.length === deckBefore - 2, 'ルイ: 4枚までドローしていない');
+
+    // わため: 〈角巻わため〉アーツ使用時、デッキ上1枚をホロパワーに
+    p0.oshi = lib.getByNumber('hBP07-001');
+    const wataDef = e.registry.get('hBP07-001').oshiStageSkill;
+    const hp0 = p0.holoPower.length; const dk0 = p0.deck.length;
+    let d2 = false;
+    e._runEffect({ run: wataDef.onArtsUse }, { playerIdx: 0, sourceHolomem: { stack: [{ name: '角巻わため' }] } }, () => { d2 = true; });
+    assert(d2 && p0.holoPower.length === hp0 + 1 && p0.deck.length === dk0 - 1, 'わため: デッキ上1枚がホロパワーに行っていない');
+  });
+
   await testAsync('コンパイラ: 全カードでクラッシュせず、一定数を自動実装できる', async () => {
     let compiled = 0;
     let slots = 0;

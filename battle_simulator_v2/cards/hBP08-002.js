@@ -19,6 +19,16 @@ function isRestingCecilia(e) {
 
 export default {
   number: 'hBP08-002',
+
+  // 推しステージスキル「Justiceの古代自動人形」:
+  //   自分の〈セシリア・イマーグリーン〉全員は、リセットステップでアクティブにならない（常時）。
+  oshiStageSkill: {
+    name: 'Justiceの古代自動人形',
+    blocksReset(holomem) {
+      return holomem.stack[0].name === 'セシリア・イマーグリーン';
+    },
+  },
+
   oshiSkill: {
     name: 'SPIN TO WIN!',
     canUse(engine, ownerIdx) {

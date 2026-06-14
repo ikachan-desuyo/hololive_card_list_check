@@ -19,6 +19,18 @@
 export default {
   number: 'hBP08-003',
 
+  // 推しステージスキル「準備は出来てるよね！」:
+  //   自分の[〈フワワ・アビスガード〉と〈モココ・アビスガード〉]に付いている赤エールすべては、
+  //   青エールとしても扱う（常時）。アーツのコスト判定で赤エールが青コストも満たせる。
+  oshiStageSkill: {
+    name: '準備は出来てるよね！',
+    cheerColorAlias(holomem, cheer) {
+      const name = holomem.stack[0].name;
+      if (name !== 'フワワ・アビスガード' && name !== 'モココ・アビスガード') return [];
+      return cheer.color === '赤' ? ['青'] : [];
+    },
+  },
+
   oshiSkill: {
     name: 'みんなの笑顔はモココが守る！',
     canUse(engine, ownerIdx) {

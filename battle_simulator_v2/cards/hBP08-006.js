@@ -12,8 +12,29 @@
  * 「すべての色を持つホロメンとして扱う」: kind:'treatedAllColors' のターン修正を付与する。
  *   エンジンの特攻判定（engine._isTreatedAllColors）がこの修正を読み、対象を全色扱いにする。
  */
+import { COLORS, COLORLESS } from '../core/constants.js';
+
 export default {
   number: 'hBP08-006',
+
+  // 推しステージスキル「WORLD DOMINATION」:
+  //   相手のステージのホロメン全員が、相手の推しホロメンと異なる色を持つなら、
+  //   自分の〈一伊那尓栖〉全員のアーツは、エールを必要とせずに使える（常時・条件付き）。
+  oshiStageSkill: {
+    name: 'WORLD DOMINATION',
+    artsCostReduce(holomem, engine, ownerIdx) {
+      if (holomem.stack[0].name !== '一伊那尓栖') return [];
+      const opp = engine.state.players[1 - ownerIdx];
+      const oppHolos = engine._stageHolomems(opp);
+      if (oppHolos.length === 0) return []; // 相手にホロメンがいなければ条件不成立
+      const oppOshiColor = opp.oshi?.color || null; // 「相手の推しホロメン」の色
+      // 相手のステージのホロメン全員が、相手の推しと異なる色
+      const allDiffer = oppHolos.every((h) => h.stack[0].color !== oppOshiColor);
+      if (!allDiffer) return [];
+      // エール不要＝全色＋無色を大量に軽減
+      return [...COLORS, COLORLESS].map((c) => ({ color: c, amount: 99 }));
+    },
+  },
 
   oshiSkill: {
     name: 'Ina\'nisの色彩',

@@ -7,6 +7,17 @@
  */
 export default {
   number: 'hBP07-006',
+
+  // 推しステージスキル「ETERNiTY FRONTiER」: 自分のホロパワー1枚につき、センターの〈AZKi〉のアーツ+20（常時）
+  oshiStageSkill: {
+    name: 'ETERNiTY FRONTiER',
+    artsPlus(holomem, engine, ownerIdx) {
+      const p = engine.state.players[ownerIdx];
+      if (p.center !== holomem || holomem.stack[0].name !== 'AZKi') return 0;
+      return (p.holoPower.length || 0) * 20;
+    },
+  },
+
   oshiSkill: {
     canUse(engine, ownerIdx) {
       return (engine.state.players[ownerIdx].downedCardsLastOppTurn || []).length > 0;

@@ -1,5 +1,20 @@
 // Utility functions for Service Worker operations
-// Version: 4.6.0-BINDER-SETTINGS
+// バージョンは sw-version.js の APP_VERSION が単一ソース。
+
+// ✅ 配信中（ネットワーク最新）の sw-version.js から APP_VERSION を取得する。
+//    更新検知の比較対象（稼働中SWの APP_VERSION と突き合わせる）。
+async function getLiveAppVersion() {
+  try {
+    const resp = await fetch('./sw-version.js', { cache: 'no-cache' });
+    if (!resp.ok) return null;
+    const text = await resp.text();
+    const m = text.match(/APP_VERSION\s*=\s*["']([^"']+)["']/);
+    return m ? m[1] : null;
+  } catch (e) {
+    console.warn('getLiveAppVersion failed:', e);
+    return null;
+  }
+}
 
 // ✅ バージョン比較機能
 function compareVersions(expected, actual) {
@@ -38,106 +53,30 @@ async function getVersionInfo() {
   };
 }
 
-// ✅ ページバージョンをチェックする機能
+// ✅ 更新チェック（単一ソース）
+// 稼働中SWの APP_VERSION と、配信中（ネットワーク最新）の sw-version.js の APP_VERSION を比較する。
+// 配信版が新しければ更新あり＝全ページが対象（アプリ単位で同一バージョン）。
+// 旧実装のように各HTMLの埋め込みマーカーを解析しないので、マーカー不整合による誤検知は起きない。
 async function checkPageVersions() {
-  const outdatedPages = [];
-  
-  for (const [page, expectedVersion] of Object.entries(PAGE_VERSIONS)) {
-    try {
-      // ネットワークから最新のページを取得して比較
-      const response = await fetch(`./${page}`, { cache: 'no-cache' });
-      if (!response.ok) {
-        outdatedPages.push({page, reason: 'fetch_failed', expectedVersion});
-        continue;
-      }
-      
-      const htmlText = await response.text();
-      // より柔軟なバージョン検出：ヘッダーコメントと表示バージョンの両方をチェック
-      const versionMatch = htmlText.match(/<!-- Version: ([\d\.]+-?[A-Za-z-]*)/);
-      const displayVersionMatch = htmlText.match(/\[v([\d\.]+-?[A-Za-z-]*)\]/);
-      
-      let actualVersion = null;
-      if (versionMatch) {
-        actualVersion = versionMatch[1]; // サフィックスを削除しない
-      } else if (displayVersionMatch) {
-        actualVersion = displayVersionMatch[1];
-      }
-      
-      console.log(`Page ${page}: expected=${expectedVersion}, actual=${actualVersion}`);
-      
-      // キャッシュされたバージョンもチェック
-      const cache = await caches.open(CACHE_NAME);
-      const cachedResponse = await cache.match(`./${page}`);
-      let cachedVersion = null;
-      
-      if (cachedResponse) {
-        const cachedText = await cachedResponse.text();
-        const cachedVersionMatch = cachedText.match(/<!-- Version: ([\d\.]+-?[A-Za-z-]*)/);
-        const cachedDisplayVersionMatch = cachedText.match(/\[v([\d\.]+-?[A-Za-z-]*)\]/);
-        
-        if (cachedVersionMatch) {
-          cachedVersion = cachedVersionMatch[1]; // サフィックスを削除しない
-        } else if (cachedDisplayVersionMatch) {
-          cachedVersion = cachedDisplayVersionMatch[1];
-        }
-      }
-      
-      console.log(`Page ${page}: expected=${expectedVersion}, actual=${actualVersion}, cached=${cachedVersion}`);
-
-      // 🛠 Self-heal: if expected and actual are aligned (both new) but cached is older, update cache entry in-place.
-      try {
-        if (
-          actualVersion && expectedVersion && actualVersion === expectedVersion &&
-          cachedVersion && cachedVersion !== actualVersion
-        ) {
-          // Re-put the freshly fetched HTML (htmlText) under canonical key to sync cacheVersion.
-          await cache.put(`./${page}`, new Response(htmlText, { headers: { 'Content-Type': 'text/html' } }));
-          cachedVersion = actualVersion;
-          console.log(`♻️ Self-healed cached HTML for ${page} -> ${cachedVersion}`);
-        }
-      } catch(e) {
-        console.warn('Self-heal cache update failed for', page, e);
-      }
-      
-      // 詳細なバージョン比較とミスマッチの理由を判定
-      let mismatchReason = null;
-      let needsUpdate = false;
-      
-      if (!actualVersion) {
-        mismatchReason = 'actual_version_not_found';
-        needsUpdate = true;
-      } else if (expectedVersion !== actualVersion && compareVersions(expectedVersion, actualVersion)) {
-        mismatchReason = 'expected_vs_actual_mismatch';
-        needsUpdate = true;
-  // Relaxed: only treat as mismatch if cached is newer (not just older) OR expected differs from actual
-  } else if (cachedVersion && actualVersion !== cachedVersion && compareVersions(actualVersion, cachedVersion) && expectedVersion !== actualVersion) {
-        mismatchReason = 'actual_vs_cached_mismatch';
-        needsUpdate = true;
-      }
-      // バージョンが同じ場合は更新不要
-      
-      if (needsUpdate) {
-        outdatedPages.push({
-          page, 
-          reason: mismatchReason || 'version_mismatch', 
-          expectedVersion, 
-          actualVersion, 
-          cachedVersion,
-          details: {
-            expectedVersion,
-            actualVersion: actualVersion || 'unknown',
-            cachedVersion: cachedVersion || 'none',
-            mismatchType: mismatchReason
-          }
-        });
-      }
-    } catch (error) {
-      console.error(`Error checking version for ${page}:`, error);
-      outdatedPages.push({page, reason: 'error', expectedVersion});
+  const liveVersion = await getLiveAppVersion();
+  // 取得失敗時は誤検知を出さない（更新なし扱い）
+  if (!liveVersion) return [];
+  // live <= 稼働中 なら最新（更新なし）
+  if (!compareVersions(liveVersion, APP_VERSION)) return [];
+  // 配信版が新しい → 全ページ更新対象
+  return Object.keys(PAGE_VERSIONS).map((page) => ({
+    page,
+    reason: 'app_version_update',
+    expectedVersion: liveVersion,   // 配信中の新バージョン
+    actualVersion: APP_VERSION,     // 稼働中（このSW）のバージョン
+    cachedVersion: APP_VERSION,
+    details: {
+      expectedVersion: liveVersion,
+      actualVersion: APP_VERSION,
+      cachedVersion: APP_VERSION,
+      mismatchType: 'app_version_update'
     }
-  }
-  
-  return outdatedPages;
+  }));
 }
 
 // ✅ バージョン情報をコンソールに表示
@@ -168,6 +107,7 @@ async function updateCache() {
 // Export functions for Service Worker (using global assignment for compatibility)
 if (typeof self !== 'undefined') {
   self.compareVersions = compareVersions;
+  self.getLiveAppVersion = getLiveAppVersion;
   self.getVersionInfo = getVersionInfo;
   self.checkPageVersions = checkPageVersions;
   self.logVersionInfo = logVersionInfo;
