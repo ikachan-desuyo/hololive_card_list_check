@@ -555,12 +555,13 @@ export class Engine {
         if (oshiStage?.blocksReset?.(h, this, s.turnPlayer)) continue;
         h.rested = false;
       }
-      // 7.2.3: コラボ → バックへ移動してお休み
+      // 7.2.3: コラボ → バックへ移動してお休み（「お休みしない」効果があればアクティブのまま移動）
       if (p.collab) {
-        p.collab.rested = true;
+        const noRest = this._holomemSkipsRestOnReset(p.collab, s.turnPlayer);
+        if (!noRest) p.collab.rested = true;
         p.back.push(p.collab);
         p.collab = null;
-        this.log(`${p.name}: コラボのホロメンをバックに移動（お休み）`);
+        this.log(`${p.name}: コラボのホロメンをバックに移動${noRest ? '（お休みしない）' : '（お休み）'}`);
       }
       // 7.2.6: センターが空ならバックから補充（アクティブ優先）
       this._queueCenterRefill(p, () => this._drawStep());
@@ -2160,6 +2161,20 @@ export class Engine {
     }
     if (card.bloomLevel === '2nd') {
       return top.bloomLevel === '1st' || top.bloomLevel === '2nd';
+    }
+    return false;
+  }
+
+  /**
+   * リセットステップでコラボ→バック移動するホロメンが「お休みしない」か。
+   *   ① ホロメン自身のカード定義 noRestOnReset(holomem, engine, ownerIdx)（hBP03-039）
+   *   ② 継続修正 kind:'noRestOnReset'（match で対象判定。ゲーム継続。hBP06-001 SP）
+   */
+  _holomemSkipsRestOnReset(holomem, ownerIdx) {
+    const def = this.registry.get(holomem.stack[0].number);
+    if (def?.noRestOnReset && def.noRestOnReset(holomem, this, ownerIdx)) return true;
+    for (const m of this.state.modifiers) {
+      if (m.kind === 'noRestOnReset' && m.ownerIdx === ownerIdx && (!m.match || m.match(holomem))) return true;
     }
     return false;
   }

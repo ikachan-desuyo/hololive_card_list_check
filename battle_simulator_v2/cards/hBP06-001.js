@@ -7,12 +7,25 @@
  *   そしてデッキをシャッフルする。
  *   → oshiSkill として実装（能動スキル）。
  *
- * ※SP推しスキル「BIG TROUBLE!!」[ホロパワー：-1][ゲームに1回]:
- *   「このゲームの間、自分の〈ラオーラ・パンテーラ〉全員はリセットステップでお休みしない」は
- *   リセットステップの置換効果（お休みしない）であり、エンジン側が未対応のため未実装。
+ * SP推しスキル「BIG TROUBLE!!」[ホロパワー：-1][ゲームに1回]:
+ *   このゲームの間、自分の〈ラオーラ・パンテーラ〉全員はリセットステップでお休みしない。
+ *   → spOshiSkill + 継続修正 kind:'noRestOnReset'（duration:'game' なのでターン終了で消えない）。
+ *     engine のリセット処理がこの修正を見て、対象（ラオーラ全員）をお休みにしない。
  */
 export default {
   number: 'hBP06-001',
+  spOshiSkill: {
+    name: 'BIG TROUBLE!!',
+    *run(ctx) {
+      ctx.addTurnModifier({
+        kind: 'noRestOnReset',
+        duration: 'game', // ゲーム中ずっと（ターン終了で消えない）
+        ownerIdx: ctx.playerIdx,
+        match: (h) => h.stack[0].name === 'ラオーラ・パンテーラ',
+        description: 'このゲームの間、〈ラオーラ・パンテーラ〉全員はリセットステップでお休みしない',
+      });
+    },
+  },
   oshiSkill: {
     name: 'BIG CAT means…',
     canUse(engine, ownerIdx) {

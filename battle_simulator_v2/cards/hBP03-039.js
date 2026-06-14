@@ -7,10 +7,16 @@
  *
  * ギフト「魔界乃番犬の暴れん坊」: 自分のリセットステップで、自分のセンターホロメンが
  *   〈フワワ・アビスガード〉の時、このホロメンはバックポジションに移動してもお休みしない。
- *   → 未実装（保留機構: リセットでお休みしない・アクティブにならない の割り込み）。
+ *   → noRestOnReset で実装。engine がリセットのコラボ→バック移動時にこのフックを見て、
+ *     センターが〈フワワ・アビスガード〉なら rested にしない（アクティブのまま移動）。
  */
 export default {
   number: 'hBP03-039',
+  // ギフト「魔界乃番犬の暴れん坊」: センターが〈フワワ・アビスガード〉なら、リセットでバックへ移動してもお休みしない
+  noRestOnReset(holomem, engine, ownerIdx) {
+    const center = engine.state.players[ownerIdx].center;
+    return !!center && center.stack[0].name === 'フワワ・アビスガード';
+  },
   arts: {
     'もこもこしてる方': {
       dmgBonus(ctx) {
