@@ -200,13 +200,13 @@ export async function runTests() {
     assertEq(lim.limited, true);
   });
 
-  test('バトンコスト補正（baton_cost.json オーバーライド）: 2ndは無色2・Debutは無色1', () => {
-    // card_data.json は baton_touch を全て無色1で持つ（個数欠落）。v2側 data/baton_cost.json で正しい個数に補正。
+  test('バトンコスト: 2ndは無色2・Debutは無色1（card_data の baton_touch 配列を反映）', () => {
+    // card_data.json の baton_touch はコレクタ修正後「色配列」（個数付き）。collector が全アイコンを収集する。
     const debut = lib.getByNumber('hBP07-008'); // 角巻わため Debut → ◇（無色1）
     const second = lib.getByNumber('hBP07-013'); // 角巻わため 2nd → ◇◇（無色2）
     assert(debut && second, 'hBP07-008 / hBP07-013 が無い');
     assertEq(debut.batonTouch.length, 1, 'Debut のバトンコストが無色1でない');
-    assertEq(second.batonTouch.length, 2, '2nd のバトンコストが無色2に補正されていない');
+    assertEq(second.batonTouch.length, 2, '2nd のバトンコストが無色2でない');
     assert(second.batonTouch.every((c) => c === '無色'), 'バトンコストが無色でない');
   });
 

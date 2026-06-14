@@ -56,10 +56,11 @@
 
 ### バトンタッチコストのデータ修正（2026-06-14）
 card_data.json の `baton_touch` は個数を失い**全ホロメンが無色1**だった（2nd/Buzz 等は本来 ◇◇=無色2、一部 ◇◇◇）。
-card_data.json は外部生成物のため変更せず、**v2ロード層でオーバーライド**する方式で修正:
-- 公式から正しい個数を再取得 → `battle_simulator_v2/data/baton_cost.json`（766番号。`scripts/tools/fix_baton_cost.py --scrape` で再生成）
-- `core/cards.js` の `CardLibrary.load` がこれを読み、`batonTouch` を正しい色配列に上書き（card_data.json は読むのみ・不変）
-- これによりバトンコスト参照カード（hBP08-052/047/004, hBP05-075, hBP03-111 等。既に `_effectiveBatonCost` 経由）が自動的に正しく動作。
+**根本原因はカード収集ツール** `card_list_update/cron_jobs/card_collector` の `parsers/card_parser.py` `parse_detail_info`：
+バトン欄を `find('img')`（先頭1個のみ）で読み、◇→無色の単一文字列にしていた（全アイコン収集の `_parse_baton_touch` は定義のみで未使用）。
+- 修正: `parse_detail_info` のバトンを `find_all('img')` で全アイコン収集し**色配列**（例 ["無色","無色"]）で保存。ついでにデバッグ print を除去。
+- 収集ツールを再実行し `data/card_data.json` を再生成 → `json_file/card_data.json` に反映（**差分は baton_touch のみ**・件数2314不変・他フィールド差分0）。
+- `core/cards.js` の `batonTouch` は配列形式を解釈（旧文字列とも後方互換）。バトンコスト参照カード（hBP08-052/047/004, hBP05-075, hBP03-111 等。既に `_effectiveBatonCost` 経由）が自動的に正しく動作。
 - 併せて相手側コストアウラ `oppBatonCostDelta`／`oppArtsCostDelta` を追加し、**hBP08-053/104** を解消（保留16→15）。
 - 回帰テスト追加（2nd=無色2 / Debut=無色1）。43/43 PASS。
 

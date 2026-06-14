@@ -36,7 +36,6 @@ class CardParser:
                     if key == 'product':
                         tmp_dd = str(dd)
                         self.card_data[key] = transform(tmp_dd.replace('<dd>','').replace('<br/>',',').replace('</dd>','').replace(' ',''))
-                        print("[DEBUG] product = " + transform(tmp_dd.replace('<dd>','').replace('<br/>',',').replace('</dd>','').replace(' ','')))
                     else:
                         self.card_data[key] = transform(dd.text)
         except Exception as e:
@@ -46,8 +45,6 @@ class CardParser:
         """解析詳細信息（顏色、HP等）"""
         try:
             info_detail = self.card_element.find('dl', class_='info_Detail')
-            print("[DEBUG] self.card_element = " + str(self.card_element))
-            # print("[DEBUG] info_detail = " + str(info_detail))
                 
             if not info_detail:
                 # OSR, OUR, SECの場合
@@ -72,8 +69,25 @@ class CardParser:
                     key = dt.text.strip()
                     if key not in CardMappings.DETAIL_MAPPING:
                         continue
-                        
+
                     field_name = CardMappings.DETAIL_MAPPING[key]
+
+                    # バトンタッチは ◇◇（2nd/Buzz 等）のようにアイコンが複数ある。
+                    # find('img')（先頭1個のみ）では個数が失われるため、全 <img> の alt を個数ぶん収集して色配列にする。
+                    if field_name == 'baton_touch':
+                        imgs = BeautifulSoup(str(dd), 'html.parser').find_all('img')
+                        colors = []
+                        for im in imgs:
+                            alt = (im.get('alt') or '').strip()
+                            colors.append('無色' if alt == '◇' else alt)
+                        if colors:
+                            self.card_data['baton_touch'] = colors
+                        else:
+                            txt = dd.text.strip()
+                            if txt:
+                                self.card_data['baton_touch'] = [txt]
+                        continue
+
                     value = dd.text.strip()
                     if value == "":
                         test_soup = BeautifulSoup(str(dd), 'html.parser')

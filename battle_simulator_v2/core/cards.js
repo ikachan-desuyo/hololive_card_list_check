@@ -124,21 +124,11 @@ export function normalizeCard(raw) {
 
 /** カードライブラリ: 全カードの正規化済みデータを保持 */
 export class CardLibrary {
-  /**
-   * @param rawData card_data.json（外部生成物・変更不可）の中身
-   * @param batonOverride { 番号: 色配列 } のバトンコスト補正（v2側の独立データ）。
-   *   card_data.json の baton_touch は個数を失っている（全て無色1）ため、ここで正しい個数に上書きする。
-   *   card_data.json 自体は一切変更しない（読むだけ）。
-   */
-  constructor(rawData, batonOverride = null) {
+  constructor(rawData) {
     this.cards = new Map();
     this.byNumber = new Map(); // カードナンバー → 代表カード（最初のバリアント）
     for (const [id, raw] of Object.entries(rawData)) {
       const card = normalizeCard({ ...raw, id });
-      // バトンコストの個数補正（番号単位。card_data.json は不変、v2側オーバーライドが正）
-      if (batonOverride && batonOverride[card.number]) {
-        card.batonTouch = [...batonOverride[card.number]];
-      }
       this.cards.set(id, card);
       if (!this.byNumber.has(card.number)) this.byNumber.set(card.number, card);
     }
@@ -151,13 +141,7 @@ export class CardLibrary {
   static async load(url = 'json_file/card_data.json') {
     const res = await fetch(url);
     if (!res.ok) throw new Error(`カードデータの読み込みに失敗: HTTP ${res.status}`);
-    // バトンコスト補正データ（v2配下。card_data.json とは別物）。取得失敗時は補正なしで続行。
-    let batonOverride = null;
-    try {
-      const bRes = await fetch(new URL('../data/baton_cost.json', import.meta.url));
-      if (bRes.ok) batonOverride = await bRes.json();
-    } catch { /* 補正データが無くてもカードデータだけで動作する */ }
-    return new CardLibrary(await res.json(), batonOverride);
+    return new CardLibrary(await res.json());
   }
 
   get(id) {
