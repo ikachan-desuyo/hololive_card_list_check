@@ -105,6 +105,7 @@ export class EffectSystem {
     // ターン中の一時的な被ダメージ修正（「このターン自分のバック全員は特殊ダメージを受けない」hSD13-012 等）
     for (const mod of this.engine.state.modifiers) {
       if (mod.kind !== 'damageReceivedDelta') continue;
+      if (mod.used) continue; // 一発消費(once)済みは無視
       if (mod.ownerIdx != null && mod.ownerIdx !== ownerIdx0) continue;
       if (mod.matchKind && mod.matchKind !== kind) continue;
       if (mod.match && !mod.match(holomem, zone, kind)) continue;
@@ -117,6 +118,21 @@ export class EffectSystem {
       total += this._auraSum(ownerIdx, (def, src) => def.auraDamageDelta?.(src, holomem, zone, this.engine, kind, attacker));
     }
     return total;
+  }
+
+  /**
+   * 「最初に受けるダメージだけ」等の一発消費(once)被ダメージ修正を、適用後に使用済みにする。
+   * ダメージ適用直後（_applyDamageReceived）に呼ぶ。対象・ゾーン・種別が一致する once 修正を used=true にする。
+   */
+  consumeOnceDamageReceivedMods(holomem, zone, kind) {
+    const ownerIdx0 = this._ownerOf(holomem);
+    for (const mod of this.engine.state.modifiers) {
+      if (mod.kind !== 'damageReceivedDelta' || !mod.once || mod.used) continue;
+      if (mod.ownerIdx != null && mod.ownerIdx !== ownerIdx0) continue;
+      if (mod.matchKind && mod.matchKind !== kind) continue;
+      if (mod.match && !mod.match(holomem, zone, kind)) continue;
+      mod.used = true;
+    }
   }
 
   /** 特殊ダメージ+N の合計（発生源の装着カード + ターン修正） */

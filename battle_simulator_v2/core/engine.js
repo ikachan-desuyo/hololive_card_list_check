@@ -207,7 +207,10 @@ export class Engine {
    * @param attacker 攻撃元ホロメン（「相手の1stから受けるアーツ-30」のような攻撃元条件用。無ければnull）
    */
   _applyDamageReceived(targetHolomem, dmg, kind = 'arts', attacker = null) {
-    const delta = this.effects.damageReceivedDelta(targetHolomem, this._zoneOf(targetHolomem), kind, attacker);
+    const zone = this._zoneOf(targetHolomem);
+    const delta = this.effects.damageReceivedDelta(targetHolomem, zone, kind, attacker);
+    // 「最初に受けるダメージだけ」等の一発消費(once)修正を使用済みにする（このダメージ機会で消費）
+    this.effects.consumeOnceDamageReceivedMods(targetHolomem, zone, kind);
     if (delta === 0) return dmg;
     const adjusted = Math.max(0, dmg + delta);
     if (adjusted !== dmg) {
@@ -777,6 +780,14 @@ export class Engine {
           }
         });
       }
+      // 対象拡張: カード定義の受動アウラ artTargetExtraTargets（条件付きで相手バック等を常時対象化。hBP08-059）
+      const extraTargets = this.registry.get(card.number)?.artTargetExtraTargets?.(h, this, opp);
+      if (extraTargets && extraTargets.length) {
+        if (usableTargets === targets) usableTargets = [...targets];
+        for (const t of extraTargets) {
+          if (!usableTargets.some((u) => u.zone === t.zone && u.index === t.index)) usableTargets.push(t);
+        }
+      }
       // カード定義による対象制限（「このアーツは相手のセンターホロメンしか対象にできない」等）
       const allowedTargets = artDef?.targetZones
         ? usableTargets.filter((t) => artDef.targetZones.includes(t.zone))
@@ -1276,6 +1287,12 @@ export class Engine {
           const at = this.registry.get(att.number)?.triggers?.onArtsUse;
           if (at) runners.push({ run: at, srcCard: att });
         }
+        // 味方ホロメンがアーツを使った時（自ステージの他のホロメンに発火。ctx.sourceHolomem=監視側, ctx.attackInfo に使用者h。hBP05-066）
+        for (const ally of this._stageHolomems(p)) {
+          if (ally === h) continue;
+          const at = this.registry.get(ally.stack[0].number)?.triggers?.onAllyArtsUse;
+          if (at) runners.push({ run: at, srcCard: ally.stack[0], srcH: ally, attackInfo });
+        }
         // 「このアーツで（相手に）ダメージを与えた時」（実際に与えた合計ダメージ量を渡す。ライフスティール等）
         if (artDef?.onDamageDealt && totalDealt > 0) {
           const dealt = totalDealt;
@@ -1286,7 +1303,7 @@ export class Engine {
             if (i >= runners.length) { cont(); return; }
             this._runEffect(
               { run: runners[i].run },
-              { playerIdx: s.turnPlayer, sourceCard: runners[i].srcCard, sourceHolomem: h },
+              { playerIdx: s.turnPlayer, sourceCard: runners[i].srcCard, sourceHolomem: runners[i].srcH || h, attackInfo: runners[i].attackInfo },
               () => runNext(i + 1),
             );
           };

@@ -5,13 +5,11 @@
  *   自分のステージの異なるカード名の#3期生を持つホロメン1人につき、このアーツ+10。
  *   → dmgBonus: 自分のステージの #3期生 ホロメンのカード名の種類数 × 10。 実装済み。
  *
- * 保留: [キーワード/ギフト] 冬の旅:
+ * [キーワード/ギフト] 冬の旅:
  *   [コラボポジション限定]自分の#3期生を持つセンターホロメンがアーツを使った時、
  *   自分の手札1枚をアーカイブできる：自分のデッキを1枚引く。
- *   → 「（このカード自身ではない）別ポジションのホロメンがアーツを使った時」に
- *     発火するトリガー機構がエンジン未実装（triggers.onArtsUse は使用したホロメン
- *     自身にしか発火しない）。hBP06-066 のギフトと同じ理由で保留。
- *     エンジン側に「味方ホロメンがアーツを使った時」の汎用トリガーが入ったら実装する。
+ *   → triggers.onAllyArtsUse（自ステージの他ホロメンのアーツ使用時に発火。ctx.attackInfo.sourceHolomem=
+ *     使用者）。このカードがコラボ位置で、使用者が#3期生センターなら、手札1枚をアーカイブして1ドロー（任意）。
  */
 export default {
   number: 'hBP05-066',
@@ -25,6 +23,22 @@ export default {
         }
         return names.size * 10;
       },
+    },
+  },
+  triggers: {
+    // ギフト「冬の旅」: [コラボ限定]#3期生センターがアーツを使った時、手札1枚をアーカイブして1ドロー（任意）
+    *onAllyArtsUse(ctx) {
+      if (ctx.sourceHolomemPos()?.zone !== 'collab') return; // [コラボポジション限定]
+      const user = ctx.attackInfo?.sourceHolomem;
+      if (!user || ctx.engine._zoneOf(user) !== 'center' || !(user.stack[0].tags || []).includes('3期生')) return;
+      if (ctx.player.hand.length === 0) return;
+      const card = yield ctx.chooseCard({
+        cards: [...ctx.player.hand], title: '手札1枚をアーカイブして1ドロー（任意）', optional: true, skipLabel: '使わない',
+      });
+      if (!card) return;
+      ctx.removeFromHand(card);
+      ctx.player.archive.push(card);
+      ctx.draw(1);
     },
   },
 };
