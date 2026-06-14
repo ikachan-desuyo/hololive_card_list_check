@@ -299,6 +299,40 @@ export async function runTests() {
     assertEq(p0.center, null, 'ダウンしたホロメンが場から取り除かれていない');
   });
 
+  test('onCollab: コラボしたホロメンの装着カードの onCollab が発火する（新機構）', () => {
+    // 「このカードが付いているホロメンがコラボした時」型の装着トリガーを検証する。
+    // コラボ処理が、コラボしたホロメン（ホスト）の attachments の triggers.onCollab を
+    // sourceHolomem=ホスト で発火することを確認。
+    const reg = new EffectRegistry();
+    reg.defs.set('TEST-CA', {
+      number: 'TEST-CA',
+      triggers: { * onCollab(ctx) { ctx.player.__collabAttFired = ctx.sourceHolomem.stack[0].name; } },
+    });
+    const e2 = new Engine({
+      decks: [
+        { oshi: fakeHolomen({ number: 'OSHI-A' }), deck: [], cheerDeck: [] },
+        { oshi: fakeHolomen({ number: 'OSHI-B' }), deck: [], cheerDeck: [] },
+      ],
+      seed: 1, registry: reg,
+    });
+    const p0 = e2.state.players[0];
+    const p1 = e2.state.players[1];
+    const att = { id: 'TEST-CA_x', number: 'TEST-CA', name: '装着テスト', kind: 'support', supportType: 'マスコット' };
+    p0.back = [{ stack: [fakeHolomen({ name: 'ホスト' })], cheers: [], attachments: [att], damage: 0, rested: false, faceDown: false }];
+    p0.center = { stack: [fakeHolomen({ name: 'C0' })], cheers: [], attachments: [], damage: 0, rested: false, faceDown: false };
+    p0.collab = null;
+    p0.life = [{ name: 'l' }, { name: 'l' }];
+    p0.deck = [fakeHolomen({ name: 'd1' })]; // コラボでデッキ上1枚がホロパワーへ
+    p1.center = { stack: [fakeHolomen({ name: 'C1' })], cheers: [], attachments: [], damage: 0, rested: false, faceDown: false };
+    p1.life = [{ name: 'l' }, { name: 'l' }];
+    e2.state.turnPlayer = 0;
+    e2.state.step = 'main';
+    e2.state.phase = 'playing';
+    e2._executeMainAction({ kind: 'collab', backIndex: 0 });
+    assertEq(p0.collab?.stack[0].name, 'ホスト', 'ホロメンがコラボに移動していない');
+    assertEq(p0.__collabAttFired, 'ホスト', '装着カードの onCollab が発火していない（sourceHolomem=ホスト）');
+  });
+
   // ---- 統合テスト: 実デッキでのプレイアウト ----
   const deckRes = await fetch('../test_deck/' + encodeURIComponent('ラミィデッキ.json'));
   const deckMap = await deckRes.json();

@@ -1228,6 +1228,12 @@ export class Engine {
           const wtrig = this.registry.get(topCard(wh).number)?.triggers?.onCollab;
           if (wtrig) runners.push({ run: wtrig, srcCard: topCard(wh), srcH: wh });
         }
+        // コラボしたホロメンに付いている装着カードの onCollab（「このカードが付いているホロメンがコラボした時」hBP02-089 等）。
+        // sourceHolomem はコラボしたホロメン（=ホスト）、sourceCard は装着カード。
+        for (const att of h.attachments) {
+          const atrig = this.registry.get(att.number)?.triggers?.onCollab;
+          if (atrig) runners.push({ run: atrig, srcCard: att, srcH: h });
+        }
         if (runners.length > 0) {
           const runNext = (i) => {
             if (i >= runners.length) { finish(); return; }

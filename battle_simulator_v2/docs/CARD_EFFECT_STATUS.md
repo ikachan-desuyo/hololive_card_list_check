@@ -45,7 +45,8 @@
 
 | 未対応の機構 | 対象カード |
 |---|---|
-| 装着カードの `onCollab`（付いているホロメンのコラボ時誘発） | hBP02-089, hBP02-091, hBP03-098, hBP03-099, hBP03-102, hBP03-104, hBP04-100, hBP06-098, hBP07-106, hBP07-024（ホスト装着） |
+| ~~装着カードの `onCollab`~~ → **2026-06-15 実装完了**（engine が collab 時にコラボしたホロメンの attachments.triggers.onCollab を sourceHolomem=ホストで発火）。実装: hBP02-089, hBP02-091, hBP03-098, hBP03-099, hBP03-102, hBP03-104, hBP04-100, hBP06-098, hBP07-106 | （完了） |
+| ホストへの `onAttach` 誘発（このホロメンに〈X〉が付いた時） | hBP07-024（〈ミオファ〉が付いた時ドロー。要 onAttach-to-host 検証） |
 | 再Bloom / 特殊Bloom（もう1回Bloom） | hBP02-003, hBP06-027, hBP06-090 |
 | 追加ターン（エクストラターン） | hBP07-005 |
 | アーツの再使用（条件で繰り返し） | hBP01-023, hBP02-007 |

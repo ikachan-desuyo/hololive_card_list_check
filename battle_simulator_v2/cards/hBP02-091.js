@@ -6,9 +6,7 @@
  *
  * ◆〈白上フブキ〉に付いていたら能力追加:
  *   このマスコットが付いているホロメンがコラボした時、自分のアーカイブのマスコット1枚を手札に戻せる。
- *   → 未実装。「装着カードが、付いているホロメンのコラボ時に発火する」フック（onCollab系トリガー）が
- *      エンジンに存在しない（collab 処理はホロメン本体の collabEffect のみ参照）。
- *      この条件付き追加能力は機構不足のため保留。
+ *   → triggers.onCollab で実装（任意。アーカイブのマスコット1枚を手札へ）。
  *
  * マスコットは自分のホロメン1人につき1枚だけ（エンジン既定の _canAttachSupport で担保。attachRule 不要）。
  */
@@ -17,6 +15,16 @@ export default {
   attached: {
     hpPlus() {
       return 20;
+    },
+  },
+  triggers: {
+    // ◆〈白上フブキ〉に付いていたら: ホストがコラボした時、アーカイブのマスコット1枚を手札に戻せる（任意）
+    * onCollab(ctx) {
+      if (ctx.sourceHolomem?.stack[0].name !== '白上フブキ') return;
+      const mascots = ctx.player.archive.filter((c) => c.kind === 'support' && c.supportType === 'マスコット');
+      if (mascots.length === 0) return;
+      const picked = yield ctx.chooseCard({ cards: mascots, title: 'アーカイブから手札に戻すマスコットを選択', optional: true });
+      if (picked) { ctx.removeFromArchive(picked); ctx.addToHand(picked); }
     },
   },
 };
