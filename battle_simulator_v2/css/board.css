@@ -294,6 +294,12 @@ body.dragging [data-drop].drop-ok { z-index: 60; }
 .badge.damage.hp-mid { background: #ef6c00; }
 .badge.damage.hp-low { background: #c62828; }
 .badge.cheers-more { bottom: -16px; left: -18px; background: #00695c; color: #fff; z-index: 5; }
+/* アーツ補正バッジ（左上）: +は青、−は紫で区別 */
+.badge.arts-mod { top: -8px; left: -7px; background: #1565c0; color: #fff; font-weight: bold; }
+.badge.arts-mod.neg { background: #6a1b9a; }
+/* バトンコスト変化バッジ（左上・アーツバッジの下）: 増加は赤系、減少（軽減）は緑系 */
+.badge.baton-mod { top: 14px; left: -7px; background: #ad1457; color: #fff; font-weight: bold; }
+.badge.baton-mod.down { background: #00695c; }
 
 /* 相手側でもバッジ・枚数・ラベルは読める向きに戻す（カードは相手向きのまま） */
 .side.opponent .badge,

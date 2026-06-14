@@ -319,6 +319,42 @@ function escapeText(s) {
   return d.innerHTML;
 }
 
+// アーツ必要コスト（エール）と特攻のアイコン画像（カード一覧と同じ images/ を使用）。
+// コストは日本語色（'赤'…'白'/'無色'）、特攻は {color:'紫', value:50} で来る。
+const COST_ICON_IMG = {
+  赤: 'images/TCG-ColorArtIcon-Red.png',
+  青: 'images/TCG-ColorArtIcon-Blue.png',
+  黄: 'images/TCG-ColorArtIcon-Yellow.png',
+  緑: 'images/TCG-ColorArtIcon-Green.png',
+  紫: 'images/TCG-ColorArtIcon-Purple.png',
+  白: 'images/TCG-ColorArtIcon-White.png',
+  無色: 'images/TCG-ColorArtIcon-Colorless.png',
+};
+const TOKKOU_ICON_IMG = {
+  赤: 'images/tokkou_50_red.png',
+  青: 'images/tokkou_50_blue.png',
+  黄: 'images/tokkou_50_yellow.png',
+  緑: 'images/tokkou_50_green.png',
+  紫: 'images/tokkou_50_purple.png',
+  白: 'images/tokkou_50_white.png',
+};
+
+/** 必要エール1個ぶんの表示（対応画像があれば画像、無ければ文字チップ） */
+function costIconHtml(color) {
+  const src = COST_ICON_IMG[color];
+  return src
+    ? `<img src="${src}" alt="${escapeText(color)}" class="cost-icon" style="height:18px;width:18px;object-fit:contain;vertical-align:middle;">`
+    : `<span class="cost-chip">${escapeText(color)}</span>`;
+}
+
+/** 特攻1件ぶんの表示（+50 は対応画像、それ以外は文字） */
+function tokkouIconHtml(t) {
+  const src = t.value === 50 ? TOKKOU_ICON_IMG[t.color] : null;
+  return src
+    ? `<img src="${src}" alt="特攻:${escapeText(t.color)}+${t.value}" class="tokkou-icon" style="height:26px;object-fit:contain;vertical-align:middle;">`
+    : `${escapeText(t.color)}+${t.value}`;
+}
+
 /** カード1枚の詳細HTML */
 function cardDetailHtml(card) {
   const rows = [];
@@ -332,13 +368,13 @@ function cardDetailHtml(card) {
     rows.push(`<div class="detail-skill"><b>《${escapeText(kw.subtype)}》${escapeText(kw.name)}</b><br>${escapeText(kw.text)}</div>`);
   }
   for (const art of card.arts || []) {
-    const cost = art.cost.map((c) => `<span class="cost-chip">${escapeText(c)}</span>`).join('');
+    const cost = art.cost.length ? art.cost.map(costIconHtml).join(' ') : 'なし';
     rows.push(
       `<div class="detail-skill art">` +
       `<div class="art-head"><b>アーツ: ${escapeText(art.name)}</b>` +
       `<span class="art-dmg">${art.dmg}${art.dmgPlus ? '+' : ''}</span></div>` +
       `<div class="art-cost">コスト: ${cost}` +
-      `${art.tokkou?.length ? `　特攻: ${art.tokkou.map((t) => `${escapeText(t.color)}+${t.value}`).join(', ')}` : ''}</div>` +
+      `${art.tokkou?.length ? `　特攻: ${art.tokkou.map(tokkouIconHtml).join(' ')}` : ''}</div>` +
       `${art.text ? `<div>${escapeText(art.text)}</div>` : ''}` +
       `</div>`
     );
@@ -473,6 +509,14 @@ const hooks = {
   onArchive: (sideIdx) => showArchive(sideIdx),
   // HP表示は装着カード等の修正込みの実効値を使う（基礎HPだと「0なのに生きてる」表示になる）
   effectiveHp: (holomem) => engine.effectiveHp(holomem),
+  // 継続効果・装着・アウラ等によるアーツ補正（±N）。盤面でアーツが盛られているか可視化する
+  artsBonus: (holomem, sideIdx) => engine.effects.artsBonus(holomem, sideIdx),
+  // バトンタッチ必要エールの増減（実効コスト枚数 − 素のバトンコスト枚数）。継続効果で増えていれば可視化
+  batonDelta: (holomem, sideIdx) => {
+    const base = holomem.stack[0].batonTouch || [];
+    const eff = engine._effectiveBatonCost(holomem, base, sideIdx) || [];
+    return eff.length - base.length;
+  },
   // 推しホロメンカード: スキル発動可能なら光らせ、クリックでその場から発動できる
   oshiCanAct: (sideIdx) => oshiSkillActions(sideIdx).length > 0,
   onOshi: (sideIdx, card, ev) => {
