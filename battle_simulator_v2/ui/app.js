@@ -509,6 +509,14 @@ const hooks = {
   onArchive: (sideIdx) => showArchive(sideIdx),
   // HP表示は装着カード等の修正込みの実効値を使う（基礎HPだと「0なのに生きてる」表示になる）
   effectiveHp: (holomem) => engine.effectiveHp(holomem),
+  // 継続効果・装着・アウラ等によるアーツ補正（±N）。盤面でアーツが盛られているか可視化する
+  artsBonus: (holomem, sideIdx) => engine.effects.artsBonus(holomem, sideIdx),
+  // バトンタッチ必要エールの増減（実効コスト枚数 − 素のバトンコスト枚数）。継続効果で増えていれば可視化
+  batonDelta: (holomem, sideIdx) => {
+    const base = holomem.stack[0].batonTouch || [];
+    const eff = engine._effectiveBatonCost(holomem, base, sideIdx) || [];
+    return eff.length - base.length;
+  },
   // 推しホロメンカード: スキル発動可能なら光らせ、クリックでその場から発動できる
   oshiCanAct: (sideIdx) => oshiSkillActions(sideIdx).length > 0,
   onOshi: (sideIdx, card, ev) => {

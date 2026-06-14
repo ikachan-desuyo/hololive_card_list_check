@@ -125,6 +125,28 @@ function holomemEl(holomem, sideIdx, zone, index, hooks) {
     }
   }
 
+  // アーツ補正バッジ（継続効果・装着・アウラ等によるアーツ±N。アーツを持つホロメンのみ・左上）
+  if (!holomem.faceDown && hooks.artsBonus && (holomem.stack[0].arts || []).length) {
+    const bonus = hooks.artsBonus(holomem, sideIdx) || 0;
+    if (bonus !== 0) {
+      const badge = el('div', 'badge arts-mod' + (bonus < 0 ? ' neg' : ''), group);
+      badge.textContent = `⚔${bonus > 0 ? '+' : ''}${bonus}`;
+      badge.title = `継続効果でアーツ${bonus > 0 ? '+' : ''}${bonus}`;
+      badge.style.zIndex = String(lower.length + 3);
+    }
+  }
+
+  // バトンタッチ必要コスト変化バッジ（センターのみ・継続効果でバトン必要エールが増減している時）
+  if (!holomem.faceDown && zone === 'center' && hooks.batonDelta) {
+    const d = hooks.batonDelta(holomem, sideIdx) || 0;
+    if (d !== 0) {
+      const badge = el('div', 'badge baton-mod' + (d < 0 ? ' down' : ''), group);
+      badge.textContent = `🔁${d > 0 ? '+' : ''}${d}`;
+      badge.title = `継続効果でバトンタッチ必要エール${d > 0 ? '+' : ''}${d}`;
+      badge.style.zIndex = String(lower.length + 3);
+    }
+  }
+
   // クリックで詳細（スタック全体 + 付いているカード）
   group.addEventListener('click', (e) => {
     e.stopPropagation();
