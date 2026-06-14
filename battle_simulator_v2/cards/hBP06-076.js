@@ -9,13 +9,22 @@
  * アーツ「まつりちゃんにメロメロになれよ❤︎」(50+):
  *   このアーツの対象が相手の2ndホロメンで、このターンに自分がLIMITEDのイベントを
  *   使っていたなら、このアーツ+70。
- *   → 【未実装】「+70」の条件のうち「このアーツの対象が相手の2ndホロメン」は、
- *     dmgBonus フック（runCtx）にアーツの対象ホロメンが渡されないため判定できない。
- *     対象に依存する条件付きアーツ修正は現状の効果システムでは表現できないため、
- *     このアーツの +70 効果は実装を保留する（dmgBonus は定義しない）。
+ *   → dmgBonus で実装。dmgBonus(ctx) は ctx.artTarget（アーツの対象ホロメン）を参照できる。
+ *     対象が相手の2ndホロメンで、かつこのターンにLIMITEDのイベントを使っていたなら +70。
  */
 export default {
   number: 'hBP06-076',
+  arts: {
+    'まつりちゃんにメロメロになれよ❤︎': {
+      dmgBonus(ctx) {
+        const t = ctx.artTarget;
+        if (!t || t.stack[0].bloomLevel !== '2nd') return 0; // 対象が相手の2ndホロメン
+        // このターンに自分がLIMITEDのイベントを使っていたなら
+        const usedLimitedEvent = ctx.countSupportThisTurn((c) => c.limited && c.supportType === 'イベント') > 0;
+        return usedLimitedEvent ? 70 : 0;
+      },
+    },
+  },
   bloomEffect: {
     name: 'レッツパフォーミング',
     *run(ctx) {
@@ -35,5 +44,4 @@ export default {
       ctx.shuffleDeck();
     },
   },
-  // アーツ「まつりちゃんにメロメロになれよ❤︎」の +70 は対象依存条件のため未実装（上記コメント参照）
 };

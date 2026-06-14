@@ -6,10 +6,11 @@
  *   → oshiSkill として実装。送り先は 1stブルーム の〈モココ・アビスガード〉のみ。
  *     複数いる場合はプレイヤーが選ぶ。
  *
- * ※SP推しスキル「BAU BAU!」[ホロパワー：-2][ゲームに1回]:
- *   「自分の#Adventを持つホロメン1人を選ぶ。このターンの間、選んだホロメンのアーツは、
- *    相手のバックホロメンも対象にできる」は、相手のアーツ対象範囲の変更（対象制限の変更）であり、
- *   エンジン側が未対応のため未実装。
+ * SP推しスキル「BAU BAU!」[ホロパワー：-2][ゲームに1回]:
+ *   自分の#Adventを持つホロメン1人を選ぶ。このターンの間、選んだホロメンのアーツは、
+ *   相手のバックホロメンも対象にできる。
+ *   → spOshiSkill + ターン修正 kind:'artTargetAnyBack'（選んだホロメンに紐づけ）で実装。
+ *     engine のアーツ対象拡張ループが artTargetAnyBack を持つホロメンに相手の全バックを対象として追加する。
  */
 function isMococo1st(e) {
   return e.top.name === 'モココ・アビスガード' && e.top.bloomLevel === '1st';
@@ -37,6 +38,28 @@ export default {
       });
       if (!entry) return;
       ctx.sendCheerFromCheerDeckTop(entry.holomem);
+    },
+  },
+  spOshiSkill: {
+    name: 'BAU BAU!',
+    canUse(engine, ownerIdx) {
+      const p = engine.state.players[ownerIdx];
+      return engine._stageHolomems(p).some((h) => (h.stack[0].tags || []).includes('Advent'));
+    },
+    *run(ctx) {
+      const entry = yield ctx.chooseHolomem({
+        side: 'self',
+        filter: (e) => (e.top.tags || []).includes('Advent'),
+        title: 'このターン アーツが相手のバックも対象にできる #Adventホロメンを選択',
+      });
+      if (!entry) return;
+      const chosen = entry.holomem;
+      ctx.addTurnModifier({
+        kind: 'artTargetAnyBack',
+        ownerIdx: ctx.playerIdx,
+        match: (h) => h === chosen,
+        description: `このターン、${chosen.stack[0].name} のアーツは相手のバックホロメンも対象にできる`,
+      });
     },
   },
 };

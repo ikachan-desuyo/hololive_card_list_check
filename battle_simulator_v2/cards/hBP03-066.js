@@ -7,17 +7,34 @@
  *     ステージ上の〈戌神ころね〉（このホロメン自身を含む）を選んでエールデッキトップを送る。
  *     ※テキストは「自分の〈戌神ころね〉」（別のとは書かれていない）ため、対象を選択させる。
  *
- * [アーツ] 最凶天災 (120+) — 未実装:
+ * [アーツ] 最凶天災 (120+):
  *   「このアーツの対象が相手の2ndホロメンの時、このホロメンに重なっている1stホロメン1枚を
  *    アーカイブできる：このアーツ+50。」
- *   → このアーツの効果は「アーツの対象（相手のどのホロメンを攻撃しているか）」が
- *     相手の2ndホロメンかどうかに依存する。現在のエンジンは、アーツのテキスト効果(*run)や
- *     dmgBonus(ctx) にアーツの対象ホロメンを渡していない（EffectContext に target が無い）。
- *     対象を判定できないため、条件付きコスト+50 は正しく実装できない。保留。
- *     実装にはエンジン側でアーツ対象を ctx に渡す機構が必要。
+ *   → arts.run で実装。ctx.artTarget（アーツの対象ホロメン。engine が runCtx.artTarget に設定）が
+ *     相手の2ndホロメンの時、このホロメンのスタックの1stホロメン1枚をアーカイブして +50（任意）。
  */
 export default {
   number: 'hBP03-066',
+  arts: {
+    '最凶天災': {
+      *run(ctx) {
+        const t = ctx.artTarget;
+        if (!t || t.stack[0].bloomLevel !== '2nd') return;          // 対象が相手の2ndホロメンの時
+        const firsts = ctx.sourceHolomem.stack.filter((c) => c.bloomLevel === '1st'); // 重なっている1stホロメン
+        if (firsts.length === 0) return;
+        const ok = yield ctx.confirm('重なっている1stホロメン1枚をアーカイブしてこのアーツ+50しますか？');
+        if (!ok) return;
+        const card = firsts.length === 1
+          ? firsts[0]
+          : yield ctx.chooseCard({ cards: firsts, title: 'アーカイブする1stホロメンを選択' });
+        if (!card) return;
+        const i = ctx.sourceHolomem.stack.indexOf(card);
+        if (i !== -1) ctx.sourceHolomem.stack.splice(i, 1);
+        ctx.player.archive.push(card);
+        ctx.addArtBonus(50, '重なっている1stホロメンをアーカイブ');
+      },
+    },
+  },
   triggers: {
     *onDown(ctx) {
       if (ctx.player.cheerDeck.length === 0) return;
@@ -31,5 +48,4 @@ export default {
       if (target) ctx.sendCheerFromCheerDeckTop(target.holomem);
     },
   },
-  // arts「最凶天災」の条件付き+50 は対象判定が不可能なため未実装（上記JSDoc参照）。
 };

@@ -919,6 +919,16 @@ export class Engine {
           }
         }
       }
+      // 対象拡張: ターン修正 kind:'artTargetAnyBack' を持つホロメンは相手の全バックを狙える
+      //   （「このターン、選んだホロメンのアーツは相手のバックも対象にできる」hBP03-004 BAU BAU! 等）
+      if (this.effects.hasArtTargetMod('artTargetAnyBack', h, s.turnPlayer)) {
+        if (usableTargets === targets) usableTargets = [...targets];
+        opp.back.forEach((b, bi) => {
+          if (b && !usableTargets.some((t) => t.zone === 'back' && t.index === bi)) {
+            usableTargets.push({ zone: 'back', index: bi });
+          }
+        });
+      }
       // 対象拡張: カード定義の受動アウラ artTargetExtraTargets（条件付きで相手バック等を常時対象化。hBP08-059）
       const extraTargets = this.registry.get(card.number)?.artTargetExtraTargets?.(h, this, opp);
       if (extraTargets && extraTargets.length) {
