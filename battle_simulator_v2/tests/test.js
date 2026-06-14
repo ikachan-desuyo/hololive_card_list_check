@@ -650,6 +650,201 @@ export async function runTests() {
     assertEq(eff - p1.center.damage, 50, '相手センターの残りHPが50になっていない');
   });
 
+  await testAsync('手書き: 全色扱い（treatedAllColors/colorOverrideAll）を特攻判定が読む', async () => {
+    // engine._isTreatedAllColors が色上書きターン修正を読む（特攻ループの消費側。hBP08-006/068/073/074）
+    const e = await setupMainStep(deckMap, 121);
+    const target = e.state.players[1].center;
+    const other = e.state.players[1].back[0] || e.state.players[0].center;
+    assert(!e._isTreatedAllColors(target), '修正前から全色扱いになっている');
+    e.state.modifiers.push({ kind: 'treatedAllColors', ownerIdx: 0, match: (h) => h === target });
+    assert(e._isTreatedAllColors(target), '対象が全色扱いにならない');
+    assert(!e._isTreatedAllColors(other), '無関係なホロメンまで全色扱いになっている');
+    // colorOverrideAll 別名でも機能する（hBP08-074）
+    e.state.modifiers = [{ kind: 'colorOverrideAll', ownerIdx: 0, match: (h) => h === other }];
+    assert(e._isTreatedAllColors(other), 'colorOverrideAll 名が読まれていない');
+  });
+
+  await testAsync('手書き: 推しスキルコスト書き換え（hBP08-060 ギフトでモコちゃん！が-3→-2）', async () => {
+    const e = await setupMainStep(deckMap, 122);
+    // hBP08-060 を既存 engine の registry に追加（_effectiveOshiCost は engine.registry を見る）
+    await e.registry.preload(['hBP08-060'], lib);
+    assert(e.registry.get('hBP08-060')?.oshiSkillCostMod, 'コスト書き換えフックが無い');
+    const p0 = e.state.players[0];
+    const fuwamoco = e._createHolomem(lib.getByNumber('hBP08-060'), 1);
+    const skill = { cost: 3, text: '[ホロパワー：-3][ターンに1回]…モコちゃん！…', sp: false };
+    p0.back = [fuwamoco];
+    p0.collab = null;
+    assertEq(e._effectiveOshiCost(skill, 0), 3, 'バックにいる時はコスト据え置きのはず');
+    p0.back = [];
+    p0.collab = fuwamoco;
+    assertEq(e._effectiveOshiCost(skill, 0), 2, 'コラボにいる時は-3→-2にならない');
+    const other = { cost: 2, text: '[ホロパワー：-2]別のスキル', sp: false };
+    assertEq(e._effectiveOshiCost(other, 0), 2, 'モコちゃん！以外まで軽減されている');
+  });
+
+  await testAsync('手書き: 無限の体力でアクティブ化したホロメンのアーツ+50（hBP06-069）', async () => {
+    const e = await setupMainStep(deckMap, 123);
+    const reg = new EffectRegistry();
+    await reg.preload(['hBP06-069'], lib);
+    const def = reg.get('hBP06-069');
+    const artDef = def?.arts?.['しばきあげパンチング'];
+    assert(artDef?.dmgBonus, 'しばきあげパンチングの dmgBonus が無い');
+    const src = e.state.players[0].center;
+    const ctx = new EffectContext(e, 0, { sourceHolomem: src });
+    assertEq(artDef.dmgBonus(ctx), 0, 'アクティブ化していないのに+50されている');
+    e.state.modifiers.push({
+      kind: 'activatedByOshiSkill', skillName: '無限の体力', ownerIdx: 0, match: (h) => h === src,
+    });
+    assertEq(artDef.dmgBonus(ctx), 50, '無限の体力でアクティブ化したのに+50されない');
+    // 別スキル名の印では発動しない
+    e.state.modifiers = [{ kind: 'activatedByOshiSkill', skillName: '別のスキル', ownerIdx: 0, match: (h) => h === src }];
+    assertEq(artDef.dmgBonus(ctx), 0, '別スキルの印で+50されている');
+  });
+
+  await testAsync('手書き: ブルームエフェクトの発動経路マーカー（hBP04-061 は蘇るオリー経由のみ回復）', async () => {
+    const e = await setupMainStep(deckMap, 124);
+    await e.registry.preload(['hBP04-061'], lib);
+    const def = e.registry.get('hBP04-061');
+    assert(def?.bloomEffect?.run, 'ブルームエフェクトが無い');
+    const p0 = e.state.players[0];
+    const olly = e._createHolomem(lib.getByNumber('hBP04-061'), 1);
+    p0.center = olly; p0.collab = null; p0.back = [];
+
+    // (1) 経路マーカー無し（通常Bloom相当） → 回復しない
+    olly.damage = 100;
+    let done = false;
+    e._runEffect(def.bloomEffect, { playerIdx: 0, sourceHolomem: olly,
+      ctx: new EffectContext(e, 0, { sourceHolomem: olly }) }, () => { done = true; });
+    let guard = 0;
+    while (!done && e.state.pending && guard++ < 10) e.apply(e.state.pending.options[0].id);
+    assert(done, 'マーカー無しの実行が完了しない');
+    assertEq(olly.damage, 100, 'マーカー無しなのに回復している');
+
+    // (2) SP推しスキル「蘇るオリー」経由マーカー → HP全回復
+    olly.damage = 100;
+    done = false;
+    e._runEffect(def.bloomEffect, { playerIdx: 0, sourceHolomem: olly,
+      ctx: new EffectContext(e, 0, { sourceHolomem: olly, bloomSourceSkill: 'SP推しスキル:蘇るオリー' }) },
+    () => { done = true; });
+    guard = 0;
+    while (!done && e.state.pending && guard++ < 10) e.apply(e.state.pending.options[0].id);
+    assert(done, 'マーカー有りの実行が完了しない');
+    assertEq(olly.damage, 0, '蘇るオリー経由なのにHP全回復していない');
+  });
+
+  await testAsync('手書き: サイコロ出目の倍化（diceDouble）と共通ダイス回数カウンタ', async () => {
+    const e = await setupMainStep(deckMap, 125);
+    const p0 = e.state.players[0];
+    const roller = p0.center;
+    const rollerName = roller.stack[0].name;
+    // 発生源カードが roller 名なら出目を倍化
+    e.state.modifiers.push({
+      kind: 'diceDouble', ownerIdx: 0, duration: 'turn',
+      match: (c) => !!c && c.name === rollerName,
+    });
+    const before = e.state.modifiers.filter((m) => m.kind === 'abilityDiceRoll' && m.ownerIdx === 0).length;
+    let result = null;
+    let done = false;
+    const eff = { *run(ctx) { result = yield* ctx.rollDice(); } };
+    e._runEffect(eff, { playerIdx: 0, sourceHolomem: roller, sourceCard: roller.stack[0] }, () => { done = true; });
+    let guard = 0;
+    while (!done && e.state.pending && guard++ < 10) e.apply(e.state.pending.options[0].id);
+    assert(done, 'rollDice が完了しない');
+    // 倍化後の出目は 2..12 の偶数（1..6 を 2 倍）
+    assert(result >= 2 && result <= 12 && result % 2 === 0, `倍化後の出目が不正: ${result}`);
+    // 共通カウンタが1増える
+    const after = e.state.modifiers.filter((m) => m.kind === 'abilityDiceRoll' && m.ownerIdx === 0).length;
+    assertEq(after, before + 1, '共通ダイス回数カウンタが増えていない');
+    assertEq(new EffectContext(e, 0, {}).abilityDiceCountThisTurn(), after, 'abilityDiceCountThisTurn が一致しない');
+  });
+
+  await testAsync('手書き: ターン終了時の遅延効果（scheduleEndOfTurn）が実行・除去される', async () => {
+    const e = await setupMainStep(deckMap, 126);
+    let ran = 0;
+    const ctx = new EffectContext(e, 0, {});
+    ctx.scheduleEndOfTurn(function* () { ran++; }, 'テスト遅延');
+    // 別プレイヤー(1)の遅延効果は今ターン(0)では実行されない
+    new EffectContext(e, 1, {}).scheduleEndOfTurn(function* () { ran += 100; }, '相手の遅延');
+    assertEq((e.state.endOfTurnEffects || []).length, 2, '遅延効果が予約されていない');
+    let done = false;
+    e._runEndOfTurnEffects(() => { done = true; });
+    let guard = 0;
+    while (!done && e.state.pending && guard++ < 10) e.apply(e.state.pending.options[0].id);
+    assert(done, '遅延効果の実行が完了しない');
+    assertEq(ran, 1, 'ターンプレイヤーの遅延効果のみ実行されるはず');
+    assert(!(e.state.endOfTurnEffects || []).some((x) => x.ownerIdx === 0), 'ターンプレイヤーの遅延効果が除去されていない');
+    assert((e.state.endOfTurnEffects || []).some((x) => x.ownerIdx === 1), '相手の遅延効果まで除去されている');
+  });
+
+  await testAsync('手書き: hBP08-007 はターン終了時推しスキル枠（onEndOfTurnOshiSkill）を持つ', async () => {
+    const e = await setupMainStep(deckMap, 127);
+    await e.registry.preload(['hBP08-007'], lib);
+    const def = e.registry.get('hBP08-007');
+    assert(def?.onEndOfTurnOshiSkill?.run, 'ターン終了時推しスキルが無い');
+    assertEq(def.onEndOfTurnOshiSkill.cost, 2, 'コストが2でない');
+    assert(typeof def.onEndOfTurnOshiSkill.canUse === 'function', 'canUse が無い');
+  });
+
+  await testAsync('手書き: アーカイブ起点の起動型Bloom（hBP08-044 光、再び灯りて）', async () => {
+    const e = await setupMainStep(deckMap, 128);
+    await e.registry.preload(['hBP08-044'], lib);
+    const def = e.registry.get('hBP08-044');
+    assert(def?.archiveActivatedAbilities?.[0]?.run, 'アーカイブ起動型能力が無い');
+    const ability = def.archiveActivatedAbilities[0];
+    const p0 = e.state.players[0];
+    // 1st 小鳥遊キアラをセンターに（前のターンに出した扱い＝Bloム可能）
+    const target = e._createHolomem(lib.get('hBP08-043_R'), 0);
+    target.placedTurn = 0;
+    p0.center = target; p0.collab = null; p0.back = [];
+    // アーカイブに キアラ2nd(hBP08-044) ＋ ホロメン9枚（計10枚）
+    const kiara2nd = lib.getByNumber('hBP08-044');
+    p0.archive = [kiara2nd];
+    for (let i = 0; i < 9; i++) p0.archive.push(lib.get('hBP08-041_C'));
+    // canUse: アーカイブ10枚＋Bloム先あり
+    const ctx = new EffectContext(e, 0, { sourceCard: kiara2nd });
+    assert(ability.canUse(ctx), 'アーカイブ10枚＋Bloム先ありなのに使えない');
+    // アーカイブ9枚（10枚未満）なら使えない
+    const ctxShort = new EffectContext(e, 0, { sourceCard: kiara2nd });
+    const saved = p0.archive.pop();
+    assert(!ability.canUse(ctxShort), 'アーカイブ9枚なのに使える判定になっている');
+    p0.archive.push(saved);
+    // 実行: Bloム先を選んでアーカイブから取り出して重ねる
+    const beforeArchive = p0.archive.length;
+    let done = false;
+    e._runEffect(ability, { playerIdx: 0, sourceCard: kiara2nd }, () => { done = true; });
+    let guard = 0;
+    while (!done && e.state.pending && guard++ < 10) e.apply(e.state.pending.options[0].id);
+    assert(done, '実行が完了しない');
+    assertEq(target.stack[0].number, 'hBP08-044', 'センターがhBP08-044にBloomしていない');
+    assertEq(p0.archive.length, beforeArchive - 1, 'アーカイブからキアラ2ndが取り出されていない');
+  });
+
+  await testAsync('手書き: Xコスト推しスキル（hBP08-006）がホロパワーぶん全色扱いを付与', async () => {
+    const e = await setupMainStep(deckMap, 129);
+    await e.registry.preload(['hBP08-006'], lib);
+    const p0 = e.state.players[0];
+    const p1 = e.state.players[1];
+    p0.oshi = lib.getByNumber('hBP08-006');
+    p0.holoPower = [p0.deck.shift(), p0.deck.shift()].filter(Boolean); // ホロパワー2枚
+    assert(p1.center, '相手センターがいない前提');
+    e._queueMainPending();
+    const oshiAct = e.actions().find((a) => a.kind === 'oshiSkill');
+    assert(oshiAct, 'Xコスト推しスキルが提示されていない');
+    assert(/ホロパワー-X/.test(oshiAct.label), 'Xコスト表記になっていない');
+    const hpBefore = p0.holoPower.length;
+    e.apply(oshiAct.id);
+    // サブフロー: 「さらに払う?」は『やめる』(X=1)、対象選択は先頭。main に戻ったら終了
+    let guard = 0;
+    while (e.state.pending && e.state.pending.type !== 'main' && guard++ < 20) {
+      const opts = e.state.pending.options;
+      const stop = opts.find((o) => /やめる/.test(o.label));
+      e.apply((stop || opts[0]).id);
+    }
+    assertEq(p0.holoPower.length, hpBefore - 1, 'ホロパワーが1枚支払われていない（X=1）');
+    const mods = e.state.modifiers.filter((m) => m.kind === 'treatedAllColors' && m.ownerIdx === 0);
+    assertEq(mods.length, 1, '全色扱い修正がX=1ぶん付与されていない');
+  });
+
   await testAsync('コンパイラ: 全カードでクラッシュせず、一定数を自動実装できる', async () => {
     let compiled = 0;
     let slots = 0;

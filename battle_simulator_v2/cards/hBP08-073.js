@@ -10,14 +10,9 @@
  * アーツ「おやつのクッキー抜きだよ！」(90 / 特攻: 青+50): 効果テキスト無し（素点のみ）。
  *   特攻はエンジンのアーツ計算側で処理されるため、ここでの run 実装は不要。
  *
- * 【保留: 「すべての色を持つホロメンとして扱う」消費側が未実装】
- *   選んだ相手ホロメンを全色扱いにする継続効果は、主に相手の被特攻判定
- *   （engine.js のダメージ計算 `if (tCard.color === tk.color)`）で意味を持つが、
- *   エンジンの色参照は装着カードの静的 color を直接読んでおり、「実効色」を差し込む
- *   フックがまだ無い。ここでは意図を残すため kind:'treatedAllColors' のターン修正を
- *   積むが、現状この修正を読む消費側コードは無く、実効果は発生しない（inert）。
- *   推しホロメン版 hBP08-006 と同じ機構。エンジンの特攻判定を実効色参照
- *   （modifiers の treatedAllColors を見る）に置き換えた時点で機能する。
+ * 「すべての色を持つホロメンとして扱う」: 選んだ相手ホロメンに kind:'treatedAllColors' の
+ *   ターン修正を付与する。エンジンの特攻判定（engine._isTreatedAllColors）がこれを読み、
+ *   対象を全色扱いにする（被特攻の色一致でどの特攻色とも一致する）。推しホロメン版 hBP08-006 と同じ機構。
  */
 export default {
   number: 'hBP08-073',
@@ -36,7 +31,7 @@ export default {
         });
         if (!target) break;
         chosen.push(target.holomem);
-        // 保留: この修正を読む消費側はまだ無い（inert）。意図の記録として付与する。
+        // 特攻判定（engine._isTreatedAllColors）が読むターン修正
         ctx.addTurnModifier({
           kind: 'treatedAllColors',
           ownerIdx: ctx.playerIdx,

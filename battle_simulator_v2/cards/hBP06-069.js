@@ -4,8 +4,9 @@
  *   自分の〈ゆび〉が付いているホロメンがいるなら、自分のデッキを1枚引く。
  * アーツ「しばきあげパンチング」(30+):
  *   このターンにこのホロメンが自分の推しスキル「無限の体力」でアクティブになっていたなら、このアーツ+50。
- *   → 推しスキルでアクティブになったか否かの追跡機構（推しスキル使用トリガー）は未実装のため
- *      この +50 ボーナスは保留（実装しない）。ベースダメージ30はエンジンが扱う。
+ *   → 推しスキル「無限の体力」(hBP03-006) がアクティブ化時に積むターン修正
+ *      kind:'activatedByOshiSkill'（skillName:'無限の体力'・match でホロメン限定）を読んで +50。
+ *      ベースダメージ30はエンジンが扱う。
  */
 export default {
   number: 'hBP06-069',
@@ -18,6 +19,18 @@ export default {
       if (hasYubi) ctx.draw(1);
     },
   },
-  // arts「しばきあげパンチング」の +50 は推しスキル「無限の体力」によるアクティブ化の
-  // 追跡が必要で、その機構は未実装のため保留。
+  arts: {
+    'しばきあげパンチング': {
+      // このターンにこのホロメンが「無限の体力」でアクティブになっていたなら +50
+      dmgBonus(ctx) {
+        const activated = ctx.engine.state.modifiers.some(
+          (m) =>
+            m.kind === 'activatedByOshiSkill' &&
+            m.skillName === '無限の体力' &&
+            (!m.match || m.match(ctx.sourceHolomem)),
+        );
+        return activated ? 50 : 0;
+      },
+    },
+  },
 };

@@ -64,6 +64,33 @@ card_data.json の `baton_touch` は個数を失い**全ホロメンが無色1**
 - 併せて相手側コストアウラ `oppBatonCostDelta`／`oppArtsCostDelta` を追加し、**hBP08-053/104** を解消（保留16→15）。
 - 回帰テスト追加（2nd=無色2 / Debut=無色1）。43/43 PASS。
 
+### 保留対応（2026-06-14 第6ラウンド）— 残り保留 3枚
+8つの汎用機構を追加し、保留13枚のうち10枚を解消（**13→3**）。追加した機構とテスト（コアテスト 43→52）:
+
+- **全色扱いの色上書き**（消費側）: `engine._isTreatedAllColors(holomem)` を特攻判定に追加。ターン修正
+  `kind:'treatedAllColors'`/`'colorOverrideAll'`（match でホロメン限定）が乗った対象はどの特攻色とも一致する。
+  → **hBP08-068/073/074** が機能（既存 hBP08-006 の色上書き部分も同時に有効化）。
+- **推しスキル使用時アクティブ化の追跡**: 推しスキル「無限の体力」(hBP03-006) がアクティブ化時に
+  `kind:'activatedByOshiSkill'`（skillName 付き・ホロメン限定）を積む。→ **hBP06-069** アーツ+50。
+- **推しスキルのホロパワーコスト書き換え**: `engine._effectiveOshiCost(skill, ownerIdx)` が自ステージ全ホロメンの
+  `oshiSkillCostMod(skill, holomem, zone, engine, ownerIdx)` を合算。→ **hBP08-060** ギフト（コラボでモコちゃん！を-3→-2）。
+- **ブルームエフェクトの発動経路マーカー**: `ctx.bloomSourceSkill`＋`bloomFromArchiveFlow({bloomSourceSkill})`。
+  → **hBP04-061** ブルームエフェクト（SP推しスキル「蘇るオリー」経由のBloム時のみ回復）。
+- **サイコロ出目の倍化＋共通ダイス回数カウンタ**: `ctx.rollDice()` が `kind:'diceDouble'`（発生源カードを match）で出目を倍化し、
+  毎ロールを `kind:'abilityDiceRoll'` で計上。`ctx.abilityDiceCountThisTurn()`。→ **hBP08-045** コラボ（倍化）/ **hBP04-059**（全カードのダイス回数を合算）。
+- **ターン終了時の遅延効果・起動型推しスキル**: `ctx.scheduleEndOfTurn(run,label)`＋`engine._runEndOfTurnEffects`／
+  `onEndOfTurnOshiSkill`＋`engine._offerEndOfTurnOshiSkill`（7.7.3）。`player.centerArtsUsedNamesThisTurn` を追加。
+  → **hBP08-007**（推しスキル「奏でるメロディー」＝ターン終了時の交代／SP後半のエール3枚アーカイブ遅延）。
+- **アーカイブ起点の起動型能力**: `archiveActivatedAbilities[]` をコントローラーのアーカイブから走査・提示（kind:'archiveActivatedAbility'）。
+  → **hBP08-044** ギフト「光、再び灯りて」（アーカイブのホロメン10枚以上で、このカードを使ってBloム）。
+- **X コスト推しスキル**: engine の oshiSkill 実行で支払うホロパワー枚数を1枚ずつ選ばせ、その枚数を `ctx.payX` で run に渡す。
+  → **hBP08-006**「Ina'nisの色彩」が完動（色上書き機構と合わせて）。
+
+> **残り保留 3枚**（いずれもダメージ割り込みパイプライン／手札アーカイブ属性付けという中核の broad 機構が必要・継続保留）:
+> - **hBP05-002** 推しスキル「IOFORIA~!」… 被ダメージ割り込み中にプレイヤー選択（エール付け替え）を挟む generator 版割り込みが必要（SP側は実装済み）。
+> - **hBP01-005** 推しスキル「女幹部の采配」… 赤ホロメンの能力による手札アーカイブをコスト扱いで肩代わりする置換フックが必要（X コスト自体は対応済み・SP側も実装済み）。
+> - **hBP05-083** ツール追加能力… 「付いているホロメンの能力で手札をアーカイブした時」の発生源属性付きトリガーが必要（アーツ+10は実装済み）。
+
 ### 保留対応（2026-06-14）— 残り保留 15枚（旧16枚時点の記録）
 （第5ラウンド）**oppBatonCostDelta**（相手側アウラで相手のバトン必要エールを増減）を追加し hBP08-104 を解消（17→16）。当初38枚 → **16枚**（22枚解消）。
 （第4ラウンド）さらに **onAllyArtsUse**（味方アーツ使用監視）/ **artTargetExtraTargets**（受動の条件付きアーツ対象拡張）/
@@ -131,13 +158,23 @@ card_data.json の `baton_touch` は個数を失い**全ホロメンが無色1**
 - **タイミング誘発の推しスキル** `onDiceRollOshiSkill`（ダイス時。`_offerDiceReact` 内）／`onArtsUseOshiSkills`・`onDamageDealtOshiSkills`（攻撃時。`_offerTimingOshiSkills` がダメージ解決後に提示。配列で通常＋SP併記可。`ctx.attackInfo` 参照）（hBP02-005 / hBP01-007）
 - **前衛移動ロック** `spOshiSkill` でターン修正 `kind:'cannotMoveFrontline'`（相手側・`untilTurn`で次相手ターン終了まで）を積み、バトンタッチ生成時に参照（hBP01-005 SP）
 - **エールアーカイブのコスト置換** `ctx.archiveCheer(h,cheer,{ability})` をジェネレータ化。`opts.ability!==false` のとき装着カードの `cheerArchiveReplace`（「エール1枚のかわりにこのファンをアーカイブ」）を提示。バトンタッチ等のシステムコストは `ability:false` で対象外（hBP03-106）
+- **全色扱いの色上書き** `engine._isTreatedAllColors(holomem)`（ターン修正 `treatedAllColors`/`colorOverrideAll` を特攻判定で読む。hBP08-006/068/073/074）
+- **推しスキルのアクティブ化追跡** ターン修正 `activatedByOshiSkill`（skillName・ホロメン限定。hBP03-006→hBP06-069）
+- **推しスキルのホロパワーコスト書き換え** `engine._effectiveOshiCost`＋カード def `oshiSkillCostMod`（hBP08-060 がコラボでモコちゃん！を-1）
+- **ブルームエフェクトの発動経路マーカー** `ctx.bloomSourceSkill`＋`bloomFromArchiveFlow({bloomSourceSkill})`（hBP04-061：蘇るオリー経由のみ）
+- **サイコロ出目の倍化＋共通ダイス回数カウンタ** `ctx.rollDice()` が `diceDouble`（発生源 match）で倍化・毎ロールを `abilityDiceRoll` で計上、`ctx.abilityDiceCountThisTurn()`（hBP08-045 / hBP04-059）
+- **ターン終了時の遅延効果・起動型推しスキル** `ctx.scheduleEndOfTurn`＋`engine._runEndOfTurnEffects`／`onEndOfTurnOshiSkill`＋`engine._offerEndOfTurnOshiSkill`、`player.centerArtsUsedNamesThisTurn`（7.7.3。hBP08-007）
+- **アーカイブ起点の起動型能力** カード def `archiveActivatedAbilities[]`（コントローラーのアーカイブを走査・提示。kind:'archiveActivatedAbility'。hBP08-044）
+- **X コスト推しスキル** engine の oshiSkill 実行で支払うホロパワー枚数を1枚ずつ選ばせ、その枚数を `ctx.payX` で run に渡す（hBP08-006）
 
 ### 未対応（保留中）
-**手書き対象のカードは実質すべて実装完了。** 残るのは下記の1ピースのみ（カード1枚の片方のスキル）。
+**手書き対象のカードは残り3枚のみ**（いずれもダメージ割り込みパイプラインの generator 化／手札アーカイブの発生源属性付けという中核の broad 機構が必要）。
 
 | 機構 | 影響 | 必要な改修 |
 |---|---|---|
-| Xコスト推しスキル ＋ 手札アーカイブのコスト置換 | hBP01-005 通常スキル「女幹部の采配」のみ（SPは実装済み） | ①Xコスト推しスキルのエンジン対応（現状メインに非提示）②手札アーカイブをコスト支払いとして行う箇所への置換フック。2機構が要るため保留 |
+| 被ダメージ割り込み中のプレイヤー選択（generator 版） | hBP05-002 推しスキル「IOFORIA~!」（SPは実装済み） | `_offerDamageOshiSkill`（同期 reduce）に、割り込み中の `yield ctx.chooseCard/chooseHolomem` を許す generator 経路が必要（エール付け替え等） |
+| 手札アーカイブのコスト置換 | hBP01-005 推しスキル「女幹部の采配」（X コスト・SP は実装済み） | 「赤ホロメンの能力で手札をアーカイブする」をコスト支払いとして行う箇所への置換フック（hBP03-106 のエール版と同系統の手札版） |
+| 手札アーカイブの発生源属性付きトリガー | hBP05-083 ツール追加能力（アーツ+10は実装済み） | 「付いているホロメンの能力で手札をアーカイブした時」を発火させる、発生源（ホロメン能力）属性付きの手札アーカイブ通知 |
 | （コンパイラ未対応の汎用パターン） | コンパイラ自動実装の範囲外の細部 | コンパイラ拡張 or 個別手書き（カバレッジはテストのログで確認） |
 
 ## 5. 手書き実装カード一覧

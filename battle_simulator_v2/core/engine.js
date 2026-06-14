@@ -189,6 +189,40 @@ export class Engine {
   }
 
   /**
+   * 「このターンの間、すべての色を持つホロメンとして扱う」継続効果が乗っているか (5.x / 個別効果)。
+   * ターン修正 kind:'treatedAllColors' / 'colorOverrideAll'（match でホロメン限定）で表現する。
+   * 主に特攻判定（_performanceActions のダメージ計算）で色一致の判定に使う。
+   * 対象ホロメン自身に乗る効果なので ownerIdx は問わない（誰の攻撃でも全色として扱う）。
+   * (hBP08-006/068/073/074)
+   */
+  _isTreatedAllColors(holomem) {
+    return this.state.modifiers.some(
+      (m) =>
+        (m.kind === 'treatedAllColors' || m.kind === 'colorOverrideAll') &&
+        (!m.match || m.match(holomem)),
+    );
+  }
+
+  /**
+   * 推しスキルの実効ホロパワーコスト（消費枚数）。
+   * 自ステージのホロメン/装着カードのギフト等がコストを書き換える場合に反映する
+   * （カード定義 `oshiSkillCostMod(skill, holomem, zone, engine, ownerIdx)` が必要枚数のデルタを返す。
+   *  例: hBP08-060 のギフトはコラボにいる時「モコちゃん！」の必要ホロパワーを-1）。
+   * X コストはここでは扱わない（呼び出し側で別処理）。
+   */
+  _effectiveOshiCost(skill, ownerIdx) {
+    if (skill.cost === 'X') return skill.cost;
+    let cost = skill.cost;
+    const p = this.state.players[ownerIdx];
+    for (const h of this._stageHolomems(p)) {
+      const zone = this._zoneOf(h);
+      const fn = this.registry.get(topCard(h).number)?.oshiSkillCostMod;
+      if (fn) cost += fn(skill, h, zone, this, ownerIdx) || 0;
+    }
+    return Math.max(0, cost);
+  }
+
+  /**
    * 「相手のターンで、このホロメンがダメージを受けた時」に必ず発火する強制トリガー（選択なし・同期）。
    * 対象の装着カード定義 attached.onDamageReceivedForced(holomem, engine, self, ownerIdx) を呼ぶ。
    * 自分のターンに自分が受けた場合は発火しない（相手から受けた時のみ）。(hBP07-108 等)
@@ -424,6 +458,7 @@ export class Engine {
     p.usedBatonTouchThisTurn = false;
     p.cheerArchivedThisTurn = false; // このターンに自分のステージのエールをアーカイブしたか（hBP07-088 等）
     p.artsUsedNamesThisTurn = [];    // このターンにアーツを使った自分のホロメン名（hBP05-050 等）
+    p.centerArtsUsedNamesThisTurn = []; // このターンにセンターでアーツを使った自分のホロメン名（hBP08-007 等）
     p.supportsPlayedThisTurn = []; // このターンに使ったサポートのカード名一覧（「〈限界飯〉を使っていたなら」等）
     // 「直前の相手のターンに自分のホロメンがダウンしていたなら」用。
     // このターン(idx)の間に相手(1-idx)のホロメンがダウンしたら蓄積し、相手の次の自ターンで参照される。
@@ -627,16 +662,18 @@ export class Engine {
     const oshiDef = this.registry.get(p.oshi.number);
     (p.oshi.oshiSkills || []).forEach((skill, i) => {
       if (skill.sp ? p.usedSpOshiSkillThisGame : p.usedOshiSkillThisTurn) return;
-      if (skill.cost === 'X') return; // X コストは未対応（TODO: 効果システムと同時に対応）
       // 「～時に使える」系はメインステップでは使えない (12.1.5)
       if (/[すし]た?時に使える/.test(skill.text)) return;
-      if (p.holoPower.length < skill.cost) return;
+      const isX = skill.cost === 'X';
+      // X コストは最低1枚のホロパワーを支払う（実際の枚数は使用時に選択）。固定コストは効果コストぶん必要。
+      const effCost = isX ? 1 : this._effectiveOshiCost(skill, idx);
+      if (p.holoPower.length < effCost) return;
       const skillDef = skill.sp ? oshiDef?.spOshiSkill : oshiDef?.oshiSkill;
       if (!skillDef) return;
       if (skillDef.canUse && !skillDef.canUse(this, idx)) return;
       actions.push({
         id: `oshi_${i}`,
-        label: `${skill.sp ? 'SP' : ''}推しスキル発動（ホロパワー-${skill.cost}）`,
+        label: `${skill.sp ? 'SP' : ''}推しスキル発動（ホロパワー-${isX ? 'X' : effCost}）`,
         kind: 'oshiSkill', skillIndex: i,
       });
     });
@@ -693,6 +730,24 @@ export class Engine {
         });
       }
     }
+
+    // アーカイブにある間だけ使える起動型能力（archiveActivatedAbilities）。
+    // 「アーカイブにある時のみ使える」ギフト等（hBP08-044「光、再び灯りて」）。
+    // ※アーカイブ枚数はこの決定ポイント内で変化しないため、archiveIndex で同定して問題ない。
+    p.archive.forEach((card, ai) => {
+      const abilities = this.registry.get(card.number)?.archiveActivatedAbilities;
+      if (!abilities) return;
+      abilities.forEach((ability, abIdx) => {
+        if (ability.oncePerTurn && card._abilityUsedTurn?.[abIdx] === s.turn) return;
+        const ctx = new EffectContext(this, idx, { sourceCard: card });
+        if (ability.canUse && !ability.canUse(ctx)) return;
+        actions.push({
+          id: `archiveAbility_${ai}_${abIdx}`,
+          label: `起動効果: ${ability.name}（アーカイブ: ${card.name}）`,
+          kind: 'archiveActivatedAbility', archiveIndex: ai, abilityIndex: abIdx,
+        });
+      });
+    });
 
     // 8.7 バトンタッチ（ターン1回、センター&バック両方アクティブ、エールコスト）
     // 「次の相手のターンの間、相手のセンター/コラボはバトンタッチ・移動・交代できない」(hBP01-005 SP) の制限を受けていないこと
@@ -829,13 +884,67 @@ export class Engine {
     const p = s.players[s.turnPlayer];
     s.step = 'end';
     this.log(`【${STEP_NAMES.end}】`);
-    // 7.7.4: 「ターンの終わりまで」効果の消滅
-    this.effects.expireTurnModifiers();
-    // TODO(効果システム): 「ターンの終わりに」誘発 (7.7.3)
-    // 7.7.5: センター補充（バックが空ならコラボがいても空のまま）
-    this._queueCenterRefill(p, () => {
-      this._startTurn(1 - s.turnPlayer);
+    // 7.7.3: 「ターンの終わりに」誘発（遅延効果 → ターン終了時の起動型推しスキル）→
+    // 7.7.4: 「ターンの終わりまで」効果の消滅 → 7.7.5: センター補充
+    this._runEndOfTurnEffects(() => {
+      this._offerEndOfTurnOshiSkill(() => {
+        this.effects.expireTurnModifiers();
+        this._queueCenterRefill(p, () => {
+          this._startTurn(1 - s.turnPlayer);
+        });
+      });
     });
+  }
+
+  /**
+   * ターン終了時に遅延発火する強制効果を順に実行する (7.7.3)。
+   * ctx.scheduleEndOfTurn(run, label) で積まれた、ターンプレイヤー所有の効果を実行・除去する。
+   * 例: hBP08-007 SP「このターンが終了する時、自分のステージのエール3枚をアーカイブする」。
+   */
+  _runEndOfTurnEffects(done) {
+    const s = this.state;
+    const all = s.endOfTurnEffects || [];
+    const queue = all.filter((e) => e.ownerIdx === s.turnPlayer);
+    s.endOfTurnEffects = all.filter((e) => e.ownerIdx !== s.turnPlayer);
+    const runNext = (i) => {
+      if (i >= queue.length) { done(); return; }
+      const e = queue[i];
+      this.log(`《ターン終了時》${e.label || ''}`);
+      this._runEffect({ run: e.run }, { playerIdx: e.ownerIdx }, () => runNext(i + 1));
+    };
+    runNext(0);
+  }
+
+  /**
+   * ターン終了時に使える起動型推しスキル（onEndOfTurnOshiSkill）をターンプレイヤーに提示する (7.7.3)。
+   * 「自分のターンが終了する時、…なら使える」型（hBP08-007 推しスキル「奏でるメロディー」）。
+   * 推しスキル[ターンに1回]枠を共有し、ホロパワーコストを支払う。任意（使わない選択可）。
+   */
+  _offerEndOfTurnOshiSkill(done) {
+    const s = this.state;
+    const idx = s.turnPlayer;
+    const p = s.players[idx];
+    const def = this.registry.get(p.oshi?.number)?.onEndOfTurnOshiSkill;
+    if (!def) { done(); return; }
+    const cost = def.cost || 0;
+    // [ターンに1回] 済み・ホロパワー不足・使用条件未達なら提示しない
+    if (p.usedOshiSkillThisTurn) { done(); return; }
+    if (p.holoPower.length < cost) { done(); return; }
+    if (def.canUse && !def.canUse(this, idx)) { done(); return; }
+    this.state.pending = {
+      type: 'endOfTurnOshiSkill', player: idx,
+      options: [
+        { id: 'yes', label: `推しスキルを使う（${def.name} / ホロパワー-${cost}）`, value: true },
+        { id: 'no', label: '使わない', value: false },
+      ],
+      next: (use) => {
+        if (!use) { done(); return; }
+        p.archive.push(...p.holoPower.splice(0, cost));
+        p.usedOshiSkillThisTurn = true;
+        this.log(`${p.name}: 推しスキル発動（${def.name} / ホロパワー-${cost}）`);
+        this._runEffect(def, { playerIdx: idx }, done);
+      },
+    };
   }
 
   // ============ アクションの実行 ============
@@ -919,6 +1028,9 @@ export class Engine {
       }
       case 'stepPause':
         pending.next();
+        break;
+      case 'endOfTurnOshiSkill':
+        pending.next(action.value);
         break;
       case 'effectChoice':
         pending.resume(action.value);
@@ -1025,14 +1137,38 @@ export class Engine {
       }
       case 'oshiSkill': {
         const skill = p.oshi.oshiSkills[action.skillIndex];
-        p.archive.push(...p.holoPower.splice(0, skill.cost));
         if (skill.sp) p.usedSpOshiSkillThisGame = true;
         else p.usedOshiSkillThisTurn = true;
-        this.log(`${p.name}: ${skill.sp ? 'SP' : ''}推しスキル発動（ホロパワー-${skill.cost}）`);
         const def = this.registry.get(p.oshi.number);
         const skillDef = skill.sp ? def?.spOshiSkill : def?.oshiSkill;
         // 推しスキル解決後に「推しスキルを使った時」の味方ホロメンギフトを誘発（hBP05-038/050 等）
         const afterSkill = () => this._dispatchOshiSkillUsed(s.turnPlayer, skill, finish);
+        if (skill.cost === 'X') {
+          // X コスト: 支払うホロパワー枚数を1枚ずつ選ばせ（最低1枚）、その枚数を ctx.payX で run に渡す (hBP08-006)
+          const realRun = skillDef?.run;
+          const wrapper = {
+            *run(ctx) {
+              let n = 0;
+              while (ctx.player.holoPower.length > 0) {
+                if (n >= 1) {
+                  const more = yield ctx.confirm(
+                    `さらにホロパワーをアーカイブする？（${n}枚支払い済み）`, 'アーカイブする', 'やめる');
+                  if (!more) break;
+                }
+                ctx.player.archive.push(ctx.player.holoPower.shift());
+                n++;
+              }
+              ctx.payX = n;
+              ctx.log(`${ctx.player.name}: ${skill.sp ? 'SP' : ''}推しスキル発動（ホロパワー-${n}）`);
+              if (realRun) yield* realRun(ctx);
+            },
+          };
+          this._runEffect(wrapper, { playerIdx: s.turnPlayer, sourceCard: p.oshi }, afterSkill);
+          return;
+        }
+        const effCost = this._effectiveOshiCost(skill, s.turnPlayer);
+        p.archive.push(...p.holoPower.splice(0, effCost));
+        this.log(`${p.name}: ${skill.sp ? 'SP' : ''}推しスキル発動（ホロパワー-${effCost}）`);
         if (skillDef) {
           this._runEffect(skillDef, { playerIdx: s.turnPlayer, sourceCard: p.oshi }, afterSkill);
           return;
@@ -1090,6 +1226,18 @@ export class Engine {
         }
         this.log(`${p.name}: 起動効果「${ability.name}」`);
         this._runEffect(ability, { playerIdx: s.turnPlayer, sourceCard: source, sourceHolomem: h }, finish);
+        return;
+      }
+      case 'archiveActivatedAbility': {
+        const card = p.archive[action.archiveIndex];
+        const ability = this.registry.get(card?.number)?.archiveActivatedAbilities?.[action.abilityIndex];
+        if (!ability) { finish(); return; }
+        if (ability.oncePerTurn) {
+          card._abilityUsedTurn = card._abilityUsedTurn || {};
+          card._abilityUsedTurn[action.abilityIndex] = s.turn;
+        }
+        this.log(`${p.name}: 起動効果「${ability.name}」（アーカイブから）`);
+        this._runEffect(ability, { playerIdx: s.turnPlayer, sourceCard: card }, finish);
         return;
       }
       case 'baton': {
@@ -1170,6 +1318,10 @@ export class Engine {
     h.lastArtUsedIndex = action.artIndex; // 再アーツ（同じアーツをもう1回）判定用に記録
     // 「このターンに〈名前〉がアーツを使ったか」判定用に、アーツを使ったホロメン名を記録（hBP05-050 等）
     (p.artsUsedNamesThisTurn || (p.artsUsedNamesThisTurn = [])).push(topCard(h).name);
+    // 「このターンにセンターでアーツを使ったか」判定用（hBP08-007 ターン終了時推しスキル）
+    if (action.zone === 'center') {
+      (p.centerArtsUsedNamesThisTurn || (p.centerArtsUsedNamesThisTurn = [])).push(topCard(h).name);
+    }
     // 再アーツでの使用なら、対応する「もう1回」修正を消費する (hBP07-008)
     if (action.reArts) {
       const reMod = s.modifiers.find(
@@ -1234,10 +1386,12 @@ export class Engine {
         const tZone = this._zoneOf(t);
         let dmg = baseDmg;
         // 特攻: 対象の色が一致するなら加算 (12.3.4.3)
+        // 「すべての色を持つホロメンとして扱う」継続効果が乗っている対象は、どの特攻色とも一致する
+        const allColors = this._isTreatedAllColors(t);
         for (const tk of art.tokkou || []) {
-          if (tCard.color === tk.color) {
+          if (allColors || tCard.color === tk.color) {
             dmg += tk.value;
-            this.log(`特攻発動！ ${tk.color}+${tk.value}`);
+            this.log(`特攻発動！ ${tk.color}+${tk.value}${allColors ? '（全色扱い）' : ''}`);
           }
         }
         // 受け手の「受けるダメージ」修正（軽減/増加）(5.22.3)。常時アウラ/装着分まで反映

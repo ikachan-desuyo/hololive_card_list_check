@@ -9,29 +9,31 @@
  *   自分のステージのこのホロメン以外の#ID2期生を持つ2ndホロメン1人につき、このアーツ+20。
  *   （特攻: 緑+50）
  *
- * 保留:
- *   - ブルームエフェクトの発動条件「SP推しスキル「蘇るオリー」でBloomした時」を厳密に判定できない。
- *     エンジンはBloom時に常に bloomEffect.run を呼ぶ（通常Bloom／推しスキル「ゾンビ戦術」／
- *     SP推しスキル「蘇るオリー」を区別する情報が ctx に無い）。誤発動を避けるため、
- *     ここでは安全側として bloomEffect の回復処理を発動しない（no-op）。
- *     ※発動経路を識別する仕組み（Bloom元スキルのマーカー等）を context/engine に追加できれば実装可能。
+ * 発動条件「SP推しスキル「蘇るオリー」でBloomした時」:
+ *   hBP02-006 の SP推しスキル「蘇るオリー」がアーカイブからBloomさせる際、bloomFromArchiveFlow に
+ *   bloomSourceSkill:'SP推しスキル:蘇るオリー' を渡す。本ブルームエフェクトは ctx.bloomSourceSkill が
+ *   その値の時だけ発動する（通常Bloom／推しスキル「ゾンビ戦術」経由では発動しない＝厳密解釈）。
  */
 export default {
   number: 'hBP04-061',
 
-  // ブルームエフェクト本体（回復処理）は実装済みだが、発動条件（SP推しスキル経由か）を
-  // 判定できないため安全側で発動しない。条件判定の手段ができ次第、下記 run を有効化する。
-  // bloomEffect: {
-  //   name: 'オリーを見てください！',
-  //   *run(ctx) {
-  //     const target = yield ctx.chooseHolomem({
-  //       side: 'self',
-  //       filter: (e) => e.top.name === 'クレイジー・オリー',
-  //       title: 'HPをすべて回復する〈クレイジー・オリー〉を選択',
-  //     });
-  //     if (target) ctx.healAll(target.holomem);
-  //   },
-  // },
+  // ブルームエフェクト「オリーを見てください！」: SP推しスキル「蘇るオリー」経由のBloム時のみ、
+  // 自分の〈クレイジー・オリー〉1人のHPをすべて回復する。
+  bloomEffect: {
+    name: 'オリーを見てください！',
+    *run(ctx) {
+      // 発動経路の判定: SP推しスキル「蘇るオリー」によるBloム時のみ
+      if (ctx.bloomSourceSkill !== 'SP推しスキル:蘇るオリー') return;
+      const targets = ctx.holomems('self', (e) => e.top.name === 'クレイジー・オリー');
+      if (targets.length === 0) return;
+      const target = yield ctx.chooseHolomem({
+        side: 'self',
+        filter: (e) => e.top.name === 'クレイジー・オリー',
+        title: 'HPをすべて回復する〈クレイジー・オリー〉を選択',
+      });
+      if (target) ctx.healAll(target.holomem);
+    },
+  },
 
   arts: {
     'HOLOROの魂': {

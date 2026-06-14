@@ -35,6 +35,15 @@ export default {
       });
       if (!entry) return;
       ctx.setActive(entry.holomem);
+      // このターン「無限の体力」でアクティブになった印（hBP06-069 のアーツ+50 が参照）。
+      // ホロメン個別に紐づけ、ターン修正なのでエンドステップで自動消滅する。
+      ctx.addTurnModifier({
+        kind: 'activatedByOshiSkill',
+        skillName: '無限の体力',
+        ownerIdx: ctx.playerIdx,
+        match: (h) => h === entry.holomem,
+        description: `${entry.top.name}は「無限の体力」でアクティブになった`,
+      });
     },
   },
 };

@@ -14,14 +14,10 @@
  *     run でアーツ追加効果として、相手の推し色と異なる色のセンター/コラボへ
  *     特殊ダメージ20を与える（条件一致の全員。選択不要）。
  *
- * 【保留: コラボエフェクトの「すべての色を持つ扱い」は現状 inert】
- *   kind:'treatedAllColors' のターン修正を付与するが、エンジンの色参照
- *   （特攻判定 engine.js `if (tCard.color === tk.color)` 等）はカードの静的 color を
- *   直接読んでおり、この修正を読む消費側がまだ無いため実効果は発生しない。
- *   同名の推しホロメン hBP08-006 と同じ既知の制約。エンジンが実効色参照
- *   （modifiers の treatedAllColors を見る）に対応した時点で機能する。
- *   なお、本アーツ自身の対象判定（推し色と異なる色か）は相手ホロメンの
- *   静的 color で判定しており、「全色扱い」修正には依存しない。
+ * コラボエフェクトの「すべての色を持つ扱い」: kind:'treatedAllColors' のターン修正を付与する。
+ *   エンジンの特攻判定（engine._isTreatedAllColors）がこの修正を読み、対象を全色扱いにする。
+ *   なお、本アーツ自身の対象判定（推し色と異なる色か）は相手ホロメンの静的 color で判定しており、
+ *   「全色扱い」修正には依存しない。
  */
 export default {
   number: 'hBP08-068',
@@ -34,7 +30,7 @@ export default {
       const opps = ctx.holomems('opp');
       if (opps.length === 0) return;
       for (const e of opps) {
-        // 保留: この修正を読む消費側はまだ無い（inert）。意図の記録として付与する。
+        // 特攻判定（engine._isTreatedAllColors）が読むターン修正
         ctx.addTurnModifier({
           kind: 'treatedAllColors',
           ownerIdx: ctx.playerIdx,
