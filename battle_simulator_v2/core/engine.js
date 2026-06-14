@@ -74,6 +74,8 @@ export class Engine {
     this.onChange = opts.onChange || (() => {});
     // ステップ境界に「間」を入れる（UIが自動で進めることでドロー等の瞬間を見せる）
     this.stepPauses = opts.stepPauses !== false;
+    // 任意効果の発動確認（true=確認を出す/false=自動発動）。設定で切替。既定は確認する。
+    this.confirmOptionalEffects = opts.confirmOptionalEffects !== false;
     // カード効果システム（registry は事前に preload しておくこと）
     this.registry = opts.registry || new EffectRegistry();
     this.effects = new EffectSystem(this, this.registry);
@@ -304,6 +306,12 @@ export class Engine {
       return;
     }
     const request = r.value; // EffectContext.chooseXxx() が返す選択要求
+    // 任意効果の発動確認（設定OFF時）: 「発動するか」ゲートは確認を出さず自動で発動(true)する。
+    // 公式ルール上 自動能力は強制（任意コスト付きを除く）なので、ゲート対象は任意効果のみ。
+    if (request.kind === 'confirm' && request.activation && this.confirmOptionalEffects === false) {
+      this._stepEffect(gen, true, after);
+      return;
+    }
     const options = request.buildOptions();
     // デッキサーチで確認枠がある場合は、対象が無くても（skipのみ）デッキを見せるためモーダルを表示する
     const showDeckView = request.deckSearch && (request.displayCards || []).length > 0;

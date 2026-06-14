@@ -953,6 +953,32 @@ export async function runTests() {
     assert(done, '完了しない');
   });
 
+  await testAsync('設定: 任意効果の発動確認ON/OFF（OFFは発動ゲートを自動発動、独自ラベルは常に確認）', async () => {
+    const e = await setupMainStep(deckMap, 134);
+
+    // (1) ON（既定）: 「発動する/発動しない」ゲートは確認モーダルを出す
+    e.confirmOptionalEffects = true;
+    let r1 = null; let done1 = false;
+    e._runEffect({ * run(ctx) { r1 = yield ctx.confirm('発動しますか？'); } }, { playerIdx: 0 }, () => { done1 = true; });
+    assert(!done1 && e.state.pending && e.state.pending.request.kind === 'confirm', 'ON: 確認モーダルが出ていない');
+    e.apply(e.state.pending.options.find((o) => o.id === 'yes').id);
+    assert(done1 && r1 === true, 'ON: 「発動する」で完了しない');
+
+    // (2) OFF: 発動ゲートは確認を出さず自動で true（発動）
+    e.confirmOptionalEffects = false;
+    let r2 = null; let done2 = false;
+    e._runEffect({ * run(ctx) { r2 = yield ctx.confirm('発動しますか？'); } }, { playerIdx: 0 }, () => { done2 = true; });
+    assert(done2 && r2 === true, 'OFF: 自動発動(true)で完了していない');
+    assert(!e.state.pending, 'OFF: 余計な pending が残っている');
+
+    // (3) OFF でも独自ラベルの confirm（中途選択）は確認を出す
+    let done3 = false;
+    e._runEffect({ * run(ctx) { yield ctx.confirm('振りますか？', '振る', '振らない'); } }, { playerIdx: 0 }, () => { done3 = true; });
+    assert(!done3 && e.state.pending && e.state.pending.request.kind === 'confirm', 'OFF: 独自ラベルconfirmまで自動化されている');
+    e.apply(e.state.pending.options[0].id);
+    assert(done3, '(3)完了しない');
+  });
+
   await testAsync('コンパイラ: 全カードでクラッシュせず、一定数を自動実装できる', async () => {
     let compiled = 0;
     let slots = 0;
