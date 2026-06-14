@@ -41,7 +41,7 @@ export default {
         const overflow = downed.some((e) =>
           e.holomem.damage - ctx.engine.effectiveHp(e.holomem) >= 50);
         if (!overflow) return;
-        ctx.opponent.lifeDamage += 1;
+        ctx.reduceOpponentLife(1);
         ctx.log('「♰漆黒の翼♰」: 残りHPを50以上オーバーしてダウンさせた → 相手のライフ-1');
       },
     },

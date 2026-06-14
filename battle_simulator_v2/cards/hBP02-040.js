@@ -49,7 +49,7 @@ export default {
           const level = holomems[0].bloomLevel;
           if (holomems.every((c) => c.bloomLevel === level)) {
             ctx.markOncePerTurn(GIFT_KEY);
-            ctx.opponent.lifeDamage += 1;
+            ctx.reduceOpponentLife(1);
             ctx.log(`《最高に激アツ～》公開した3枚が同じBloomレベル（${level}）のホロメン → 相手のライフ-1`);
           }
         }

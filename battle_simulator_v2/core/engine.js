@@ -53,7 +53,7 @@ function createPlayerState(name, gameDeck) {
     back: [],
     lifeDamage: 0,          // 未処理のライフダメージ (3.2)
     mulliganCount: 0,
-    usedLimitedThisTurn: false,
+    limitedPlayedThisTurn: 0,
     usedCollabThisTurn: false,
     usedBatonTouchThisTurn: false,
     supportsPlayedThisTurn: [], // このターンに使ったサポートのカード名一覧
@@ -502,7 +502,7 @@ export class Engine {
     s.turnPlayer = playerIdx;
     const p = s.players[playerIdx];
     p.turnCount++;
-    p.usedLimitedThisTurn = false;
+    p.limitedPlayedThisTurn = 0; // このターンにプレイしたLIMITEDサポートの枚数（cap は _limitedCap）
     p.usedSupportThisTurn = false;
     p.usedCollabThisTurn = false;
     p.usedBatonTouchThisTurn = false;
@@ -752,8 +752,8 @@ export class Engine {
     // 8.6 サポートカードのプレイ
     p.hand.forEach((c, i) => {
       if (c.kind !== CardKind.SUPPORT) return;
-      // LIMITED: ターン1枚、先攻の1ターン目は不可 (8.6.2)
-      if (c.limited && (p.usedLimitedThisTurn || (s.turn === 1 && idx === s.firstPlayer))) return;
+      // LIMITED: ターン1枚（cap は通常1。hBP06-008 SPで2に増やせる）、先攻の1ターン目は不可 (8.6.2)
+      if (c.limited && ((p.limitedPlayedThisTurn || 0) >= this._limitedCap(idx) || (s.turn === 1 && idx === s.firstPlayer))) return;
       // カード固有の使用条件（手札枚数条件など）
       const supportDef = this.registry.get(c.number)?.support;
       if (supportDef?.canUse) {
@@ -851,7 +851,38 @@ export class Engine {
     // 「相手のパフォーマンスステップに自分のライフが減っていたら」判定用に開始時ライフを記録
     s.lifeAtPerfStart = [s.players[0].life.length, s.players[1].life.length];
     this.log(`【${STEP_NAMES.performance}】`);
-    this._queuePerformancePending();
+    // パフォーマンスステップ開始時トリガー（hSD11-006「自分の」/ hBP03-022「相手の」。各カードが turnPlayer で判定）
+    this._dispatchStepStart('onPerformanceStepStart', () => this._queuePerformancePending());
+  }
+
+  /**
+   * ステップ開始時トリガーを両プレイヤーのステージホロメン（＋装着カード）の triggers[key] で順に発火する。
+   * ctx.playerIdx = そのトリガー保持ホロメンの持ち主。「自分の/相手の」ステップ判定は各カードが
+   * ctx.state.turnPlayer と ctx.playerIdx を比較して行う。完了後 after()。
+   */
+  _dispatchStepStart(key, after) {
+    const runners = [];
+    for (let pi = 0; pi < 2; pi++) {
+      const pl = this.state.players[pi];
+      for (const wh of this._stageHolomems(pl)) {
+        const t = this.registry.get(topCard(wh).number)?.triggers?.[key];
+        if (t) runners.push({ run: t, srcCard: topCard(wh), srcH: wh, pi });
+        for (const att of wh.attachments) {
+          const at = this.registry.get(att.number)?.triggers?.[key];
+          if (at) runners.push({ run: at, srcCard: att, srcH: wh, pi });
+        }
+      }
+    }
+    if (runners.length === 0) { after(); return; }
+    const runNext = (i) => {
+      if (i >= runners.length) { after(); return; }
+      this._runEffect(
+        { run: runners[i].run },
+        { playerIdx: runners[i].pi, sourceCard: runners[i].srcCard, sourceHolomem: runners[i].srcH },
+        () => runNext(i + 1),
+      );
+    };
+    runNext(0);
   }
 
   _queuePerformancePending() {
@@ -980,6 +1011,13 @@ export class Engine {
     const p = s.players[s.turnPlayer];
     s.step = 'end';
     this.log(`【${STEP_NAMES.end}】`);
+    // エンドステップ開始時トリガー（hSD10-013「自分のエンドステップが開始する時」等）。
+    // ターン終了処理（推しステージ常時→遅延→ターン終了推しスキル→修正消滅→センター補充）の前に発火する。
+    this._dispatchStepStart('onEndStepStart', () => this._endStepAfterStart(p));
+  }
+
+  _endStepAfterStart(p) {
+    const s = this.state;
     // 7.7.3: 「ターンの終わりに」誘発（推しステージスキルの常時ターン終了効果 → 遅延効果 →
     //   ターン終了時の起動型推しスキル）→ 7.7.4: 効果の消滅 → 7.7.5: センター補充
     this._runOshiStageTurnEnd(() => {
@@ -1314,7 +1352,7 @@ export class Engine {
       }
       case 'support': {
         const card = p.hand.splice(action.handIndex, 1)[0];
-        if (card.limited) p.usedLimitedThisTurn = true;
+        if (card.limited) p.limitedPlayedThisTurn = (p.limitedPlayedThisTurn || 0) + 1;
         p.usedSupportThisTurn = true;
         p.supportsPlayedThisTurn.push(card);
         this.log(`${p.name}: サポート ${card.name} を使用`);
@@ -1343,7 +1381,7 @@ export class Engine {
       }
       case 'supportAttach': {
         const card = p.hand.splice(action.handIndex, 1)[0];
-        if (card.limited) p.usedLimitedThisTurn = true;
+        if (card.limited) p.limitedPlayedThisTurn = (p.limitedPlayedThisTurn || 0) + 1;
         p.usedSupportThisTurn = true;
         p.supportsPlayedThisTurn.push(card);
         const h = this._holomemAt(p, action.pos);
@@ -2125,6 +2163,15 @@ export class Engine {
     return false;
   }
 
+  /** このターンに使えるLIMITEDサポートの枚数上限（通常1。ターン修正 kind:'limitedCapBonus' で増やせる。hBP06-008） */
+  _limitedCap(ownerIdx) {
+    let cap = 1;
+    for (const m of this.state.modifiers) {
+      if (m.kind === 'limitedCapBonus' && m.ownerIdx === ownerIdx) cap += (m.amount || 0);
+    }
+    return cap;
+  }
+
   /** サポート付け上限 (5.17.3): ツール1 / マスコット1（ホロメン1人につき）+ カード固有の制限 */
   _canAttachSupport(h, card) {
     // カード定義に付け先ルールがあれば優先（雪民: 雪花ラミィのみ・何枚でも 等）
@@ -2137,6 +2184,9 @@ export class Engine {
       return !h.attachments.some((a) => a.supportType === 'ツール');
     }
     if (card.supportType === 'マスコット') {
+      // 付け先ホロメン固有の受け入れルール（「異なる名前のマスコットを2枚まで」hBP02-013 等）
+      const hostRule = this.registry.get(topCard(h).number)?.hostAttachRule;
+      if (hostRule?.mascot) return hostRule.mascot(h, card, this);
       return !h.attachments.some((a) => a.supportType === 'マスコット');
     }
     return true; // ファンはカードテキストによる

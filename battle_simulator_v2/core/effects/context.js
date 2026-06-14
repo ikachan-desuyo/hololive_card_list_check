@@ -455,6 +455,22 @@ export class EffectContext {
     this.player._supportReturnToDeck = true;
   }
 
+  /**
+   * 能力で相手のライフを N 減らす（「相手のライフ-N」）。アーツ解決後の _checkTiming で実際のライフ処理が走る。
+   * 相手に「このターン自分のライフは相手の能力で減らない」免疫（kind:'lifeImmuneOpponentAbility'）が
+   * 乗っている場合は減らさない（hBP03-022）。直接 opponent.lifeDamage を加算するかわりに必ずこれを使う。
+   */
+  reduceOpponentLife(n = 1) {
+    const oppIdx = 1 - this.playerIdx;
+    const immune = this.engine.state.modifiers.some(
+      (m) => m.kind === 'lifeImmuneOpponentAbility' && m.ownerIdx === oppIdx);
+    if (immune) {
+      this.log(`${this.opponent.name}: ライフは相手の能力で減らない（免疫）`);
+      return;
+    }
+    this.opponent.lifeDamage += n;
+  }
+
   /** デッキ内の条件一致カード一覧（非公開領域なので「見つからない」選択も保証される）。
    *  戻り配列に _fromDeck タグを付け、chooseCard がデッキサーチと判定できるようにする（デッキ全体を確認枠に表示）。 */
   deckCards(filter) {
