@@ -33,13 +33,14 @@ export default {
 
   support: {
     *run(ctx) {
-      // ① デッキから該当Debutホロメン1枚をステージ（バック）に出す
+      // ① デッキから該当Debutホロメン1枚をステージ（バック）に出す（「1枚を出す」=候補があれば必須）
       if (ctx.engine._stageCount(ctx.player) < 6) {
+        const cand = ctx.deckCards((c) => isExtraUnlimitedDebut(c));
         const picked = yield ctx.chooseCard({
-          cards: ctx.deckCards((c) => isExtraUnlimitedDebut(c)),
+          cards: cand,
           title: 'デッキからステージに出すDebutホロメンを選択',
-          optional: true,
-          skipLabel: '出さない / 見つからなかったことにする',
+          optional: cand.length === 0, // 候補があれば必須。無い時はデッキ確認のみ
+          skipLabel: '見つからなかったことにする',
         });
         if (picked) {
           ctx.removeFromDeck(picked);
@@ -61,8 +62,7 @@ export default {
             : yield ctx.chooseCard({
               cards: cand,
               title: 'アーカイブからステージに出すDebutホロメンを選択',
-              optional: true,
-              skipLabel: '出さない',
+              optional: false, // 「アーカイブのDebut1枚を出す」=候補があれば必須
             });
           if (picked) {
             ctx.removeFromArchive(picked);

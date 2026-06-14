@@ -17,8 +17,8 @@
  *   - 実際に2枚出した場合のみ、手札1枚をデッキの下に戻す（強制。手札が無ければ何もしない）。
  *
  * 保留: なし
- *   （現行カードDBには上記エクストラを持つDebutホロメンが収録されていないため、
- *     実運用では候補が空になり得るが、収録された場合は正しく機能する。）
+ *   （エクストラ「このホロメンはデッキに何枚でも入れられる」はコレクタが取得済みで、
+ *     card_data の該当Debutホロメンに keywords として格納される＝下記 isUnlimitedDebut で判定可能。）
  */
 
 /** エクストラ「このホロメンはデッキに何枚でも入れられる」を持つDebutホロメンか */
@@ -34,15 +34,16 @@ export default {
   support: {
     *run(ctx) {
       let placed = 0;
-      // 1～2枚まで、デッキから対象Debutホロメンを公開してステージに出す
+      // 「1～2枚」=最低1枚（候補があれば必須）、2枚目は任意。デッキから対象Debutを公開してステージに出す
       for (let i = 0; i < 2; i++) {
+        if (ctx.engine._stageCount(ctx.player) >= 6) break; // ステージ満杯なら打ち切り
         const cand = ctx.deckCards(isUnlimitedDebut);
-        if (cand.length === 0) break;
         const picked = yield ctx.chooseCard({
           cards: cand,
-          title: `ステージに出すDebutホロメンを選択（${i + 1}/2・任意）`,
-          optional: true,
-          skipLabel: 'これ以上出さない',
+          title: `ステージに出すDebutホロメンを選択（${i + 1}/2）`,
+          // 1枚目かつ候補ありなら必須。候補が無い時はデッキ確認のみで「見つからなかった」を選べる
+          optional: i > 0 || cand.length === 0,
+          skipLabel: i === 0 ? '見つからなかったことにする' : '1枚だけにする',
         });
         if (!picked) break;
         ctx.flashReveal(picked); // 公開

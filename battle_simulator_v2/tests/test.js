@@ -923,6 +923,36 @@ export async function runTests() {
     assert(done2, '(2)完了しない');
   });
 
+  await testAsync('エクストラ: 「デッキに何枚でも入れられる」Debutを認識し、フレンドリーパソコンの対象になる', async () => {
+    // card_data に エクストラ「何枚でも」Debut が収録され、正規化で keywords + unlimitedInDeck が付く
+    const ex = [...lib.byNumber.values()].find((c) => c.unlimitedInDeck && c.bloomLevel === 'Debut');
+    assert(ex, 'エクストラ「何枚でも」Debutがライブラリに無い（コレクタ未取得？）');
+    assert((ex.keywords || []).some((k) => (k.text || '').includes('デッキに何枚でも')), 'keywordsにエクストラ文言が無い');
+
+    const e = await setupMainStep(deckMap, 133);
+    await e.registry.preload(['hBP05-074'], lib);
+    const def = e.registry.get('hBP05-074');
+    const p0 = e.state.players[0];
+    p0.deck.unshift({ ...lib.getByNumber(ex.number) }); // デッキにエクストラDebutを1枚仕込む
+    let done = false;
+    e._runEffect(def.support, { playerIdx: 0 }, () => { done = true; });
+    // 1枚目の選択にエクストラDebutが候補として出る
+    const opts = e.state.pending ? e.state.pending.options : [];
+    assert(opts.some((o) => o.card && o.card.number === ex.number), 'フレンドリーパソコンがエクストラDebutを候補にできていない');
+    // エクストラDebutを1枚選び、以降はスキップして完了させる
+    let guard = 0; let picked = false;
+    while (!done && e.state.pending && guard++ < 12) {
+      const o = e.state.pending.options;
+      const exOpt = o.find((x) => x.card && x.card.number === ex.number);
+      const skip = o.find((x) => x.id === 'skip');
+      if (exOpt && !picked) { picked = true; e.apply(exOpt.id); }
+      else if (skip) e.apply(skip.id);
+      else e.apply(o[0].id);
+    }
+    assert(picked, 'エクストラDebutを選択できていない');
+    assert(done, '完了しない');
+  });
+
   await testAsync('コンパイラ: 全カードでクラッシュせず、一定数を自動実装できる', async () => {
     let compiled = 0;
     let slots = 0;

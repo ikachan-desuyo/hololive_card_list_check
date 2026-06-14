@@ -110,8 +110,8 @@ class CardParser:
                 if support_skill:
                     skills.append(support_skill)
             
-            # 解析其他技能
-            for skill_div in self.card_element.find_all('div', class_=['oshi', 'sp', 'arts', 'keyword']):
+            # 解析其他技能（'extra' = エクストラ「このホロメンはデッキに何枚でも入れられる」等のキーワード枠）
+            for skill_div in self.card_element.find_all('div', class_=['oshi', 'sp', 'arts', 'keyword', 'extra']):
                 skill = self._parse_skill(skill_div)
                 if skill:
                     skills.append(skill)
@@ -193,8 +193,8 @@ class CardParser:
             # 解析技能文本
             skill_data.update(self._parse_skill_text(skill_text, skill_type))
             
-            # 只在非推し技能時解析技能圖標
-            if skill_type not in ['推しスキル', 'SP推しスキル', 'キーワード']:
+            # 只在非推し技能時解析技能圖標（エクストラはアイコンを持たないため対象外）
+            if skill_type not in ['推しスキル', 'SP推しスキル', 'キーワード', 'エクストラ']:
                 icons = self._parse_skill_icons(skill_div)
                 if icons:
                     skill_data['icons'] = icons

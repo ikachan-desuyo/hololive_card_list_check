@@ -12,7 +12,7 @@
  *       対象は「エクストラ『このホロメンはデッキに何枚でも入れられる』」を持つDebutホロメン。
  *       このエクストラ能力はキーワード（subtype「エクストラ」）として格納されるため、
  *       キーワードのテキストに「デッキに何枚でも」を含むDebutホロメンを候補にする
- *       （hBP03-086 と同じ判定。現行カードDBには該当ホロメンが未収録のため候補ゼロのことが多い）。
+ *       （hBP03-086 と同じ判定。エクストラはコレクタが取得し keywords に格納される）。
  *     ・「1枚をステージに出す」=最低1枚（候補・空きがあれば）。コストを払った以上、
  *       候補があれば出す（出すホロメン自体の選択は許す）。出した/出さないに関わらず、
  *       コストを払って効果を発動したならデッキをシャッフルする。
@@ -51,13 +51,14 @@ export default {
       ctx.player.archive.push(cost);
       ctx.log(`${ctx.player.name}: ${cost.name} をアーカイブ（ダウンさせられる覚悟）`);
 
-      // デッキから該当Debutホロメン1枚をステージ（バック）に出す
+      // デッキから該当Debutホロメン1枚をステージ（バック）に出す（コストを払った以上、候補があれば必須）
       if (ctx.engine._stageCount(ctx.player) < 6) {
+        const cand = ctx.deckCards((c) => isExtraUnlimitedDebut(c));
         const picked = yield ctx.chooseCard({
-          cards: ctx.deckCards((c) => isExtraUnlimitedDebut(c)),
+          cards: cand,
           title: 'ステージに出すDebutホロメンを選択',
-          optional: true,
-          skipLabel: '出さない / 見つからなかったことにする',
+          optional: cand.length === 0, // 候補があれば必須。無い時はデッキ確認のみ
+          skipLabel: '見つからなかったことにする',
         });
         if (picked) {
           ctx.removeFromDeck(picked);
