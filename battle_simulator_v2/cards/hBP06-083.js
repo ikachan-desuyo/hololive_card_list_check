@@ -15,13 +15,8 @@
 export default {
   number: 'hBP06-083',
 
-  // 合体ユニット: このカードは〈角巻わため〉か〈大空スバル〉の上に重ねてBloomできる（別名Bloom）。
-  // レベル遷移・HP・ターン制限は通常のBloomと同じ（engine._canBloomIgnoreName で判定）。
-  bloomOnto(baseHolomem, card, engine) {
-    const baseName = baseHolomem.stack[0]?.name;
-    if (baseName !== '角巻わため' && baseName !== '大空スバル') return false;
-    return engine._canBloomIgnoreName(baseHolomem, card);
-  },
+  // 合体ユニット: エクストラ「このホロメンは〈角巻わため〉〈大空スバル〉としても扱う」を card_data から取得済み
+  //   → card.nameAliases として正規化され、engine._bloomNameMatches が別名Bloomを許可する（ハードコード不要）。
 
   collabEffect: {
     name: 'おしまいのあじまり',

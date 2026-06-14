@@ -64,9 +64,9 @@ export class EffectContext {
     return out;
   }
 
-  /** 名前一致（〈名称〉参照。追加カード名は未対応） */
+  /** 名前一致（〈名称〉参照）。エクストラ「〈X〉〈Y〉としても扱う」(nameAliases) の別名にも一致する */
   nameIs(card, name) {
-    return card.name === name;
+    return card.name === name || (card.nameAliases || []).includes(name);
   }
 
   /** タグ保持判定（#ID など。タグ表記は "ID" のように # 無しで格納されている） */
