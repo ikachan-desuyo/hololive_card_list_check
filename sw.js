@@ -1,5 +1,5 @@
 // Service Worker for offline caching with centralized version management
-// Version: 4.19.0
+// Version: 4.20.0
 // 注意: バージョンアップ時は sw-version.js と合わせてこのコメントも更新すること。
 // （SWの更新検知は sw.js 本体のバイト差分が最速・最確実。importScripts の
 //   sw-version.js だけの変更だと、環境によって検知がHTTPキャッシュのTTL分遅れる）
