@@ -107,12 +107,27 @@ export class EffectContext {
    * カードを1枚選ぶ。optional なら「選ばない」も可（null が返る）。
    * cards: 選択可能なカード / displayCards: 選択不可だが見せるカード
    *   （「デッキの上からN枚を見る」で対象外のカードも公開するために使う）
+   *
+   * デッキサーチ（候補が ctx.deckCards(...) 由来＝デッキ内のカード）の場合は、
+   * 対象の有無にかかわらずデッキ全体を「確認用（選択不可）」として見せる。
+   * deckSearch:true を明示してもよい。確認したら効果完了時に必ずシャッフルされる
+   * （_deckViewedNeedsShuffle フラグ→engine._runEffect で flush。ctx.shuffleDeck() で明示シャッフル済みなら二重シャッフルしない）。
    */
-  chooseCard({ cards, title, optional = false, skipLabel = '選ばない', displayCards = [] }) {
+  chooseCard({ cards, title, optional = false, skipLabel = '選ばない', displayCards = [], deckSearch = undefined }) {
+    const deck = this.player.deck;
+    // デッキサーチ判定: 明示指定 / deckCards(...) のタグ付き配列 / 候補が全てデッキ内
+    const isDeckSearch = deckSearch === true
+      || (cards && cards._fromDeck === true)
+      || (cards.length > 0 && cards.every((c) => deck.includes(c)));
+    if (isDeckSearch && displayCards.length === 0) {
+      displayCards = [...deck]; // デッキ全体を確認用に見せる（対象が無くても確認できる）
+      this.player._deckViewedNeedsShuffle = true; // 確認後のシャッフルを保証する
+    }
     return {
       kind: 'chooseCard',
       player: this.playerIdx,
       title,
+      deckSearch: isDeckSearch,
       displayCards: displayCards.filter((c) => !cards.includes(c)),
       buildOptions: () => [
         ...cards.map((c, i) => ({ id: `card_${i}`, label: c.name, card: c, value: c })),
@@ -412,6 +427,7 @@ export class EffectContext {
   /** デッキをシャッフルする (5.6) */
   shuffleDeck() {
     this.engine._shuffle(this.player.deck);
+    this.player._deckViewedNeedsShuffle = false; // 明示シャッフルでサーチ後シャッフル保証を満たす（二重シャッフル防止）
     this.log(`${this.player.name}: デッキをシャッフル`);
   }
 
@@ -420,9 +436,12 @@ export class EffectContext {
     this.log(`${this.player.name}: エールデッキをシャッフル`);
   }
 
-  /** デッキ内の条件一致カード一覧（非公開領域なので「見つからない」選択も保証される） */
+  /** デッキ内の条件一致カード一覧（非公開領域なので「見つからない」選択も保証される）。
+   *  戻り配列に _fromDeck タグを付け、chooseCard がデッキサーチと判定できるようにする（デッキ全体を確認枠に表示）。 */
   deckCards(filter) {
-    return this.player.deck.filter(filter);
+    const arr = this.player.deck.filter(filter);
+    Object.defineProperty(arr, '_fromDeck', { value: true, enumerable: false });
+    return arr;
   }
 
   /** デッキから特定カードを取り除く（移動前処理） */

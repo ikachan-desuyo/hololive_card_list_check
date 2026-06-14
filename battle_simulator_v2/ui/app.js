@@ -810,6 +810,10 @@ function renderEffectChoiceModal(s) {
   });
 
   const hasCards = s.pending.options.some((o) => o.card);
+  const displayCards = s.pending.request.displayCards || [];
+  const isDeckSearch = !!s.pending.request.deckSearch;
+
+  // --- 上段: 選択可能なカード枠（カード以外の選択肢はフッターのボタンへ） ---
   for (const opt of s.pending.options) {
     if (opt.card) {
       const c = document.createElement('div');
@@ -830,13 +834,29 @@ function renderEffectChoiceModal(s) {
     }
   }
   if (hasCards) footer.appendChild(confirmBtn);
+  // デッキサーチで選べる対象が無い場合の注記（デッキ確認のみ）
+  if (isDeckSearch && !hasCards) {
+    const note = document.createElement('div');
+    note.style.cssText = 'grid-column:1/-1;color:#889;padding:6px 0;';
+    note.textContent = '選択できる対象はありません（デッキを確認できます）';
+    grid.appendChild(note);
+  }
 
-  // 選択対象外だが公開されているカード（「上からN枚見る」の残り等）はグレー表示
-  for (const card of s.pending.request.displayCards || []) {
-    const c = document.createElement('div');
-    c.className = 'archive-grid-card display-only';
-    c.innerHTML = `<img src="${card.imageUrl || ''}" alt="${escapeText(card.name)}" loading="lazy"><div>${escapeText(card.name)}（対象外）</div>`;
-    grid.appendChild(c);
+  // --- 下段: 確認用（選択不可）カード枠。デッキサーチはデッキ全体、その他は「対象外」公開カード ---
+  if (displayCards.length) {
+    const divider = document.createElement('div');
+    divider.className = 'choice-divider';
+    divider.style.cssText = 'grid-column:1/-1;margin:10px 0 4px;padding-top:8px;border-top:1px dashed #556;color:#aab;font-size:0.85em;text-align:center;';
+    divider.textContent = isDeckSearch
+      ? '― デッキ内（確認用・選択不可 / 確認後シャッフルされます）―'
+      : '― 対象外（確認用）―';
+    grid.appendChild(divider);
+    for (const card of displayCards) {
+      const c = document.createElement('div');
+      c.className = 'archive-grid-card display-only';
+      c.innerHTML = `<img src="${card.imageUrl || ''}" alt="${escapeText(card.name)}" loading="lazy"><div>${escapeText(card.name)}</div>`;
+      grid.appendChild(c);
+    }
   }
 }
 

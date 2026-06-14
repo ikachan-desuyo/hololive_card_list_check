@@ -260,8 +260,20 @@ export class Engine {
    * 選択後に再開する。完了したら after() を呼ぶ。
    */
   _runEffect(effectDef, ctxOpts, after) {
-    if (!effectDef?.run) {
+    // 効果完了時に「デッキサーチで確認したのに未シャッフル」のデッキを必ずシャッフルする（確認後シャッフル保証）。
+    // ctx.shuffleDeck() を明示的に呼んだ場合は _deckViewedNeedsShuffle が false になっているため二重シャッフルしない。
+    const done = () => {
+      for (const p of this.state.players) {
+        if (p._deckViewedNeedsShuffle) {
+          p._deckViewedNeedsShuffle = false;
+          this._shuffle(p.deck);
+          this.log(`${p.name}: デッキをシャッフル（サーチ確認後）`);
+        }
+      }
       after();
+    };
+    if (!effectDef?.run) {
+      done();
       return;
     }
     // ctxOpts.ctx で外から ctx を渡せる（アーツのボーナス蓄積を受け取るため等）
@@ -271,10 +283,10 @@ export class Engine {
       gen = effectDef.run(ctx);
     } catch (e) {
       this.log(`⚠️ 効果の開始に失敗: ${e.message}`);
-      after();
+      done();
       return;
     }
-    this._stepEffect(gen, undefined, after);
+    this._stepEffect(gen, undefined, done);
   }
 
   _stepEffect(gen, input, after) {
@@ -293,13 +305,17 @@ export class Engine {
     }
     const request = r.value; // EffectContext.chooseXxx() が返す選択要求
     const options = request.buildOptions();
-    if (options.length === 0 || (options.length === 1 && options[0].id === 'skip')) {
+    // デッキサーチで確認枠がある場合は、対象が無くても（skipのみ）デッキを見せるためモーダルを表示する
+    const showDeckView = request.deckSearch && (request.displayCards || []).length > 0;
+    const onlySkip = options.length === 1 && options[0].id === 'skip';
+    if (options.length === 0 || (onlySkip && !showDeckView)) {
       // 選択肢なし（または「選ばない」のみ）→ null で再開
       this._stepEffect(gen, null, after);
       return;
     }
-    // 強制のカード選択で候補が1枚だけなら自動で確定（確定クリックの手間を省く）
-    if (request.kind === 'chooseCard' && options.length === 1 && options[0].card) {
+    // 強制のカード選択で候補が1枚だけなら自動で確定（確定クリックの手間を省く）。
+    // ただしデッキサーチ（確認枠あり）は、デッキ全体を確認させるため自動確定しない。
+    if (request.kind === 'chooseCard' && options.length === 1 && options[0].card && !showDeckView) {
       this._stepEffect(gen, options[0].value, after);
       return;
     }

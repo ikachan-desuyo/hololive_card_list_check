@@ -885,6 +885,44 @@ export async function runTests() {
     assertEq(oppCenter.damage, before + 20, '[ターンに1回]を超えて反撃している');
   });
 
+  await testAsync('デッキサーチ: 対象の有無に関わらずデッキ全体を確認でき、確認後シャッフルされる', async () => {
+    const e = await setupMainStep(deckMap, 132);
+    const p0 = e.state.players[0];
+    const deckLen = p0.deck.length;
+
+    // (1) 候補ありのサーチ: deckSearch フラグ + デッキ全体が「選択枠 + 確認枠」に分かれて出る
+    let done1 = false;
+    const eff1 = { *run(ctx) {
+      const cand = ctx.deckCards((c) => c.kind === 'holomen');
+      yield ctx.chooseCard({ cards: cand, title: 'test1', optional: true });
+    } };
+    e._runEffect(eff1, { playerIdx: 0 }, () => { done1 = true; });
+    let req = e.state.pending && e.state.pending.request;
+    assert(req && req.deckSearch === true, 'deckSearch フラグが立っていない');
+    const selCount = e.state.pending.options.filter((o) => o.card).length;
+    assert(selCount > 0, '選択候補(ホロメン)が無い前提が崩れている');
+    assertEq(selCount + req.displayCards.length, deckLen, '選択枠+確認枠がデッキ全体に一致しない');
+    // skip で解決 → 確認後シャッフル保証フラグが flush される
+    e.apply(e.state.pending.options.find((o) => o.id === 'skip').id);
+    let guard = 0;
+    while (!done1 && e.state.pending && guard++ < 10) e.apply(e.state.pending.options[0].id);
+    assert(done1, '(1)完了しない');
+    assert(!p0._deckViewedNeedsShuffle, '確認後シャッフル保証フラグが残っている(flushされていない)');
+
+    // (2) 候補0のサーチ: 自動スキップされず、デッキ確認モーダルが出る
+    let done2 = false;
+    const eff2 = { *run(ctx) {
+      const cand = ctx.deckCards((c) => c.name === '___存在しないカード名___');
+      yield ctx.chooseCard({ cards: cand, title: 'test2', optional: true, skipLabel: '見つからなかったことにする' });
+    } };
+    e._runEffect(eff2, { playerIdx: 0 }, () => { done2 = true; });
+    assert(e.state.pending && e.state.pending.request.deckSearch, '候補0でモーダルが出ていない(自動スキップされた)');
+    assert((e.state.pending.request.displayCards || []).length > 0, '候補0でもデッキ確認枠があるべき');
+    assert(!done2, '候補0で即完了してしまっている(モーダルが出ていない)');
+    e.apply(e.state.pending.options.find((o) => o.id === 'skip').id);
+    assert(done2, '(2)完了しない');
+  });
+
   await testAsync('コンパイラ: 全カードでクラッシュせず、一定数を自動実装できる', async () => {
     let compiled = 0;
     let slots = 0;
