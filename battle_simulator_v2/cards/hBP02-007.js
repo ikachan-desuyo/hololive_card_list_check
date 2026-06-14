@@ -16,8 +16,8 @@
  * SP推しスキル「死神ラップ」[ホロパワー：2消費][ゲームに1回]:
  *   自分のセンターホロメンが〈森カリオペ〉の時に使える：
  *   このターンの間、自分の〈森カリオペ〉1人は、アーツを使った後、同じアーツをもう1回使う。
- *   → 「アーツを使った後、同じアーツをもう1回使う」=アーツ使用トリガー＋同一アーツの再実行機構。
- *     onArtsUse トリガー／アーツの再実行は未対応のため未実装（保留）。
+ *   → spOshiSkill + ターン修正 kind:'reArts'（hBP07-008 と同形）。選んだ〈森カリオペ〉に再アーツ権を付与し、
+ *     engine がアーツ使用後に同じアーツの再アーツアクションを提示する。
  */
 const KIANA_NAME = '森カリオペ';
 
@@ -64,7 +64,26 @@ export default {
     },
   },
 
-  // SP推しスキル「死神ラップ」は未実装（保留）。
-  // 「アーツを使った後、同じアーツをもう1回使う」はアーツ使用トリガー＋同一アーツ再実行が必要だが、
-  // onArtsUse トリガーおよびアーツの再実行機構が未対応のため。
+  spOshiSkill: {
+    name: '死神ラップ',
+    canUse(engine, ownerIdx) {
+      // 自分のセンターホロメンが〈森カリオペ〉の時に使える
+      const c = engine.state.players[ownerIdx].center;
+      return !!c && c.stack[0].name === KIANA_NAME;
+    },
+    *run(ctx) {
+      const cands = ctx.holomems('self', (e) => e.top.name === KIANA_NAME);
+      if (cands.length === 0) return;
+      const entry = cands.length === 1
+        ? cands[0]
+        : yield ctx.chooseHolomem({ side: 'self', filter: (e) => e.top.name === KIANA_NAME, title: 'アーツをもう1回使う〈森カリオペ〉を選択' });
+      if (!entry) return;
+      const sel = entry.holomem;
+      ctx.addTurnModifier({
+        kind: 'reArts', ownerIdx: ctx.playerIdx, used: false,
+        match: (hm) => hm === sel,
+        description: `${sel.stack[0].name}はアーツを使った後もう1回同じアーツを使う`,
+      });
+    },
+  },
 };

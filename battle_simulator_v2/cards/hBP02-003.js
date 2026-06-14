@@ -20,6 +20,31 @@
  */
 export default {
   number: 'hBP02-003',
+  // 推しスキル「Ahoy!」: このターンBloomした#3期生1人を、手札のホロメンでもう1回Bloomさせる
+  oshiSkill: {
+    name: 'Ahoy!',
+    canUse(engine, ownerIdx) {
+      const p = engine.state.players[ownerIdx];
+      return engine._stagePositions(p).some((pos) => {
+        const h = engine._holomemAt(p, pos);
+        return h.bloomedTurn === engine.state.turn
+          && (h.stack[0].tags || []).includes('3期生')
+          && p.hand.some((c) => c.kind === 'holomen' && c.name === h.stack[0].name);
+      });
+    },
+    *run(ctx) {
+      const matches = (e) => e.holomem.bloomedTurn === ctx.state.turn
+        && (e.top.tags || []).includes('3期生')
+        && ctx.player.hand.some((c) => ctx.canReBloom(e.holomem, c));
+      const valid = ctx.holomems('self', matches);
+      if (valid.length === 0) return;
+      const entry = valid.length === 1
+        ? valid[0]
+        : yield ctx.chooseHolomem({ side: 'self', filter: matches, title: 'もう1回Bloomさせる#3期生ホロメンを選択' });
+      if (!entry) return;
+      yield* ctx.reBloom(entry.holomem, { title: `${entry.top.name} をもう1回Bloomするホロメンを選択`, optional: false });
+    },
+  },
   spOshiSkill: {
     name: '出航～！',
     canUse(engine, ownerIdx) {

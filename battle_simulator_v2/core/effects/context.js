@@ -840,6 +840,40 @@ export class EffectContext {
   }
 
   /**
+   * 「もう1回Bloom（再Bloom）」可否 (8.3.2-3)。通常Bloomの条件（同名・レベル遷移・新HP>ダメージ・
+   * Spot不可・うつ伏せ不可）は満たす必要があるが、「このターン既にBloom済みは不可」の制限のみ無視する。
+   */
+  canReBloom(holomem, card) {
+    const top = holomem.stack[0];
+    if (!card || card.kind !== 'holomen') return false;
+    if (holomem.faceDown) return false;
+    if (top.bloomLevel === 'Spot') return false;
+    if (top.name !== card.name) return false;           // 同名であること
+    if ((card.hp || 0) <= holomem.damage) return false; // 新HPがダメージより大きいこと
+    if (card.bloomLevel === '1st') return top.bloomLevel === 'Debut' || top.bloomLevel === '1st';
+    if (card.bloomLevel === '2nd') return top.bloomLevel === '1st' || top.bloomLevel === '2nd';
+    return false;
+  }
+
+  /**
+   * 手札のホロメンで holomem を「もう1回Bloom」する。候補選択→Bloom→ブルームエフェクト誘発まで。
+   * Bloomしたら true。「このターンBloom済み不可」のみ迂回する（canReBloom）。
+   */
+  *reBloom(holomem, { title = 'もう1回Bloomするホロメンを選択', optional = true } = {}) {
+    const candidates = this.player.hand.filter((c) => this.canReBloom(holomem, c));
+    if (candidates.length === 0) return false;
+    const card = yield this.chooseCard({ cards: candidates, title, optional, skipLabel: 'Bloomしない' });
+    if (!card) return false;
+    this.removeFromHand(card);
+    holomem.stack.unshift(card);
+    holomem.bloomedTurn = this.state.turn;
+    this.log(`${holomem.stack[1].name} → ${card.name}〔${card.bloomLevel}〕にもう1回Bloom`);
+    const def = this.engine.registry.get(card.number)?.bloomEffect;
+    if (def) { this.log(`《ブルームエフェクト》${def.name}`); yield* this.runBloomEffect(def, card, holomem); }
+    return true;
+  }
+
+  /**
    * ターン終了まで有効な修正を追加（「このターンの間～」）。
    * mod.amount は数値のほか、評価時に再計算する関数 (holomem, engine)=>number も指定できる
    * （「選んだホロメンのエール1枚につき+10」のように対象の状態で変動する修正用）。

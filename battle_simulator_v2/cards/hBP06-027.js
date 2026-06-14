@@ -4,8 +4,8 @@
  * [ギフト] 伝えたい想い:
  *   このホロメンが相手のセンターホロメンをダウンさせた時、自分のこのターンにBloomした
  *   〈風真いろは〉1人を、自分の手札のホロメンを使って、もう1回Bloomできる。
- *   → 「もう1回Bloom（再Bloom）」は保留機構のため未実装。
- *      （相手"センター"ダウン限定の判定および、このターンにBloomしたホロメンの追跡も必要）
+ *   → triggers.onOpponentDown + ctx.reBloom で実装。ダウンさせた相手にセンターが含まれていたら
+ *      （attackInfo.dealtList の zone==='center' かつ downed）、このターンBloomした〈風真いろは〉を再Bloom。
  *
  * [アーツ] 一緒にすてっぷ (160+) main:緑/無/無, 特攻:白+50
  *   ・自分の推しホロメンが〈風真いろは〉で、自分のコラボホロメンがいるなら、このアーツ+40。
@@ -18,6 +18,24 @@
  */
 export default {
   number: 'hBP06-027',
+  triggers: {
+    // ギフト「伝えたい想い」: 相手のセンターをダウンさせた時、このターンBloomした〈風真いろは〉をもう1回Bloomできる
+    *onOpponentDown(ctx) {
+      const ai = ctx.attackInfo;
+      const downedCenter = (ai?.dealtList || []).some((d) => d.zone === 'center' && (ai.downed || []).includes(d.target));
+      if (!downedCenter) return;
+      const matches = (e) => e.holomem.bloomedTurn === ctx.state.turn
+        && e.top.name === '風真いろは'
+        && ctx.player.hand.some((c) => ctx.canReBloom(e.holomem, c));
+      const valid = ctx.holomems('self', matches);
+      if (valid.length === 0) return;
+      const entry = valid.length === 1
+        ? valid[0]
+        : yield ctx.chooseHolomem({ side: 'self', filter: matches, title: 'もう1回Bloomする〈風真いろは〉を選択', optional: true });
+      if (!entry) return;
+      yield* ctx.reBloom(entry.holomem, { title: `${entry.top.name} をもう1回Bloomするホロメンを選択`, optional: true });
+    },
+  },
   arts: {
     '一緒にすてっぷ': {
       // 推しが風真いろは かつ コラボホロメンがいるなら +40

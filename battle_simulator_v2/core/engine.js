@@ -1623,13 +1623,13 @@ export class Engine {
           this._notifySourceDown(h, s.turnPlayer); // 継続効果(ターン修正)の同期通知（ラミィSP等）
           const cardTrig = this.registry.get(selfCard.number)?.triggers?.onOpponentDown;
           for (let d = 0; d < downed.length; d++) { // ダウン体数ぶん（通常は1体）
-            if (cardTrig) runners.push({ run: cardTrig, srcCard: selfCard });
+            if (cardTrig) runners.push({ run: cardTrig, srcCard: selfCard, attackInfo });
             if (artDef?.onDownDealt) runners.push({ run: artDef.onDownDealt, srcCard: selfCard });
           }
           // 装着カードの「ホストが相手をダウンさせた時」トリガー（hBP02-096 等）
           for (const att of h.attachments) {
             const at = this.registry.get(att.number)?.triggers?.onOpponentDown;
-            if (at) runners.push({ run: at, srcCard: att });
+            if (at) runners.push({ run: at, srcCard: att, attackInfo });
           }
         }
         const onArts = this.registry.get(selfCard.number)?.triggers?.onArtsUse;
