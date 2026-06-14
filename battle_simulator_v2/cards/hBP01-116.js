@@ -7,10 +7,9 @@
  * ◆〈天音かなた〉に付いていたら能力追加
  *   [ターンに1回]相手のターンで、このマスコットが付いているホロメンがダメージを
  *   受けた時、相手のセンターホロメンに特殊ダメージ20を与える。
- *   → 【保留】「ダメージを受けた時」に発火する被ダメージ割り込みトリガーの機構が
- *     エンジンに無い（規約の保留機構: 被ダメージ時トリガー）。装着カードを
- *     ソースとする被ダメージトリガーのディスパッチが追加されたら、〈天音かなた〉に
- *     付いている時かつ相手のターンに限定して特殊ダメージ20を実装すること。
+ *   → attached.onDamageReceivedForced で実装（相手ターンに被ダメージで強制発火。hBP07-108 と同経路）。
+ *     〈天音かなた〉に付いている時のみ・[ターンに1回]に限定し、相手センターへ特殊ダメージ20。
+ *     ※テキストに「ライフは減らない」記載が無いため、ダウン時のライフは通常どおり減る。
  *
  * マスコットは、自分のホロメン1人につき1枚だけ付けられる（マスコット共通ルールで
  *   エンジンが制御するため、ここでは付け先制限を書かない＝任意のホロメンに付けられる）。
@@ -20,7 +19,18 @@ export default {
   attached: {
     // このマスコットが付いているホロメンのアーツ+10
     artsPlus() { return 10; },
+
+    // [ターンに1回] 〈天音かなた〉に付いている時、相手ターンに被ダメージで相手センターに特殊20
+    onDamageReceivedForced(holomem, engine, self, ownerIdx) {
+      if (self._counterUsedTurn === engine.state.turn) return; // [ターンに1回]
+      if (holomem.stack[0].name !== '天音かなた') return;
+      const oppCenter = engine.state.players[1 - ownerIdx].center;
+      if (!oppCenter) return;
+      self._counterUsedTurn = engine.state.turn;
+      const dmg = engine._applyDamageReceived(oppCenter, 20, 'special', holomem);
+      if (dmg <= 0) return;
+      oppCenter.damage += dmg;
+      engine.log(`うぱお: ${holomem.stack[0].name}が被ダメージ→相手センターに特殊ダメージ${dmg}`);
+    },
   },
-  // 〈天音かなた〉装着時の[ターンに1回]被ダメージ時特殊ダメージ20は、
-  // 被ダメージ割り込みトリガー機構が未実装のため保留。
 };

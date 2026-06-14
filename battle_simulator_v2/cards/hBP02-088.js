@@ -27,7 +27,7 @@ export default {
       if (!top) return;
       // 1st以上の〈森カリオペ〉に付いている場合のみ能力追加
       if (top.name !== '森カリオペ') return;
-      if (top.bloom_level !== '1st' && top.bloom_level !== '2nd') return;
+      if (top.bloomLevel !== '1st' && top.bloomLevel !== '2nd') return; // 正規化カードは bloomLevel
       // 自分のデッキの上から1枚をアーカイブする
       if (ctx.player.deck.length === 0) return;
       const card = ctx.player.deck.shift();

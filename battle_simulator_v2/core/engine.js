@@ -646,6 +646,24 @@ export class Engine {
           }
         }
       });
+
+      // 別名カードへのBloom（手札カード側の def.bloomOnto。合体ユニット等。hBP06-083 ラムダック → 〈角巻わため〉/〈大空スバル〉）
+      p.hand.forEach((c, i) => {
+        if (c.kind !== CardKind.HOLOMEN) return;
+        const cdef = this.registry.get(c.number);
+        if (!cdef?.bloomOnto) return;
+        for (const pos of this._stagePositions(p)) {
+          const h = this._holomemAt(p, pos);
+          if (this._canBloom(h, c)) continue; // 通常Bloomで既に提示済み（同名）
+          if (cdef.bloomOnto(h, c, this, idx)) {
+            actions.push({
+              id: `bloom_${i}_${pos.zone}_${pos.index}`,
+              label: `${topCard(h).name}（${pos.zone}）を ${c.name}〔${c.bloomLevel}〕にBloom`,
+              kind: 'bloom', handIndex: i, pos,
+            });
+          }
+        }
+      });
     }
 
     // 8.4 コラボ（ターン1回、コラボが空、バックのアクティブなホロメン）
@@ -1888,13 +1906,21 @@ export class Engine {
 
   /** Bloom可否 (8.3.2-8.3.3) */
   _canBloom(h, card) {
+    if (topCard(h).name !== card.name) return false; // 同名であること
+    return this._canBloomIgnoreName(h, card);
+  }
+
+  /**
+   * 同名チェックを除いた Bloom 可否（faceDown/Spot/ターン制限/HP/レベル遷移）。
+   * 「別名のカードにBloomできる」特殊カード（ラムダック等の合体ユニット）の bloomOnto 判定に使う。
+   */
+  _canBloomIgnoreName(h, card) {
     const s = this.state;
     const top = topCard(h);
     if (h.faceDown) return false;
     if (top.bloomLevel === 'Spot') return false;
     if (h.placedTurn === s.turn) return false;       // このターンに出たホロメンは不可
     if (h.bloomedTurn === s.turn) return false;      // このターンにBloom済みは不可
-    if (top.name !== card.name) return false;        // 同名であること
     if (card.hp <= h.damage) return false;           // 新HPがダメージを超えていること（「より大きい」）
     if (card.bloomLevel === '1st') {
       return top.bloomLevel === 'Debut' || top.bloomLevel === '1st';
