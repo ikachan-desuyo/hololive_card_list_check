@@ -4,8 +4,9 @@
  * [キーワード/ギフト] 時界を統べし者:
  *   [センター限定]自分のパフォーマンスステップ開始時、このホロメン以外の自分の〈オーロ・クロニー〉1人を、
  *   このホロメンに重なっているホロメンを使ってBloomできる。
- *   → 特殊Bloom（重なっているカードを別のホロメンへ移して再Bloomする機構）は未実装のため保留。
- *      （CLAUDE規約の「もう一度Bloom・特殊Bloom」保留リストに該当）
+ *   → triggers.onPerformanceStepStart で実装。自分のパフォーマンス開始時、センターのこのオーロの
+ *      重なっているホロメン（stack[1..]）1枚を取り出し、別の〈オーロ・クロニー〉にBloomさせる
+ *      （Bloom条件は canReBloom で判定。ブルームエフェクトも誘発）。
  *
  * [アーツ] You're not ready for me. (80+) icons: 青青無無 / 特攻: 赤+50
  *   このホロメンのエール1枚を自分の他の#Promiseを持つホロメンに付け替えられる。
@@ -16,6 +17,39 @@
  */
 export default {
   number: 'hBP07-056',
+  triggers: {
+    // キーワード「時界を統べし者」: 自分のパフォーマンス開始時、重なっているホロメンを使って別の〈オーロ・クロニー〉をBloom
+    *onPerformanceStepStart(ctx) {
+      if (ctx.state.turnPlayer !== ctx.playerIdx) return;     // 自分のパフォーマンスステップ
+      const self = ctx.sourceHolomem;
+      if (ctx.engine._zoneOf(self) !== 'center') return;      // [センター限定]
+      if (self.stack[0].name !== 'オーロ・クロニー') return;
+      const bloomCards = self.stack.slice(1).filter((c) => c.kind === 'holomen'); // 重なっているホロメン
+      if (bloomCards.length === 0) return;
+      const matches = (e) => e.holomem !== self && e.top.name === 'オーロ・クロニー'
+        && bloomCards.some((c) => ctx.canReBloom(e.holomem, c));
+      const valid = ctx.holomems('self', matches);
+      if (valid.length === 0) return;
+      const entry = valid.length === 1
+        ? valid[0]
+        : yield ctx.chooseHolomem({ side: 'self', filter: matches, title: 'Bloomさせる別の〈オーロ・クロニー〉を選択', optional: true });
+      if (!entry) return;
+      const target = entry.holomem;
+      const usable = bloomCards.filter((c) => ctx.canReBloom(target, c));
+      const card = usable.length === 1
+        ? usable[0]
+        : yield ctx.chooseCard({ cards: usable, title: '重なっているホロメンから使うカードを選択', optional: true });
+      if (!card) return;
+      const i = self.stack.indexOf(card);
+      if (i === -1) return;
+      self.stack.splice(i, 1);          // このホロメンの重なりから取り出す
+      target.stack.unshift(card);       // 別の〈オーロ・クロニー〉にBloom
+      target.bloomedTurn = ctx.state.turn;
+      ctx.log(`時界を統べし者: ${target.stack[1].name} → ${card.name}〔${card.bloomLevel}〕にBloom（重なりを使用）`);
+      const def = ctx.engine.registry.get(card.number)?.bloomEffect;
+      if (def) { ctx.log(`《ブルームエフェクト》${def.name}`); yield* ctx.runBloomEffect(def, card, target); }
+    },
+  },
   arts: {
     "You're not ready for me.": {
       *run(ctx) {

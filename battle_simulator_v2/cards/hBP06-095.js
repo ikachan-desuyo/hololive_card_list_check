@@ -39,10 +39,25 @@ export default {
       }
       ctx.shuffleDeck();
       // その後、自分のエールデッキが0枚なら、このターンの間、
-      // 自分の #ID1期生 ホロメンが相手のセンターをダウンさせた時 相手ライフ-1。
-      // 【未実装】上記JSDoc参照（ターン限定のグローバルなダウン監視トリガーが必要）。
+      // 自分の #ID1期生 ホロメンが相手のセンターをダウンさせた時 相手ライフ-1（ターン修正 onSourceDown）。
       if (ctx.player.cheerDeck.length === 0) {
-        ctx.log('TODO(効果未実装): エールデッキ0枚時の「#ID1期生が相手センターをダウンさせた時 相手ライフ-1」は未対応');
+        const ownerIdx = ctx.playerIdx;
+        ctx.addTurnModifier({
+          kind: 'onSourceDown', ownerIdx,
+          match: (h) => (h.stack[0].tags || []).includes('ID1期生'),
+          onDown: (engine, downedList) => {
+            // ダウンさせた相手にセンターが含まれているか（アーカイブ前なのでゾーン判定可）
+            if (!(downedList || []).some((d) => engine._zoneOf(d) === 'center')) return;
+            const oppIdx = 1 - ownerIdx;
+            const immune = engine.state.modifiers.some(
+              (m) => m.kind === 'lifeImmuneOpponentAbility' && m.ownerIdx === oppIdx);
+            if (immune) return;
+            engine.state.players[oppIdx].lifeDamage += 1;
+            engine.log('IDENTIFY -AREA 15-: #ID1期生が相手センターをダウンさせた → 相手のライフ-1');
+          },
+          description: 'このターン、#ID1期生が相手センターをダウンさせた時 相手のライフ-1',
+        });
+        ctx.log('IDENTIFY -AREA 15-: エールデッキ0枚 → このターン、#ID1期生が相手センターをダウンさせると相手ライフ-1');
       }
     },
   },

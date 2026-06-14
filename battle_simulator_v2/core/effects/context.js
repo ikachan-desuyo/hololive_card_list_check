@@ -39,6 +39,10 @@ export class EffectContext {
     this.enteredInfo = opts.enteredInfo || null;
     // onSpecialDamageDealt 用: 与えた特殊ダメージの情報 { source, target, amount }
     this.specialDealt = opts.specialDealt || null;
+    // onReturnedToDeck 用: デッキに戻ったホロメンの情報 { cards }
+    this.returnedToDeckInfo = opts.returnedToDeckInfo || null;
+    // onCheerArchivedOshiSkill 用: アーカイブされたエールの情報 { source, cheer }
+    this.cheerArchivedInfo = opts.cheerArchivedInfo || null;
     // onOpponentPerformanceEnd 用: そのパフォーマンスステップで自分のライフが減ったか
     this.lifeDecreasedThisPerf = opts.lifeDecreasedThisPerf || false;
     // 攻撃時誘発の推しスキル用: { sourceHolomem, art, artName, dealtList:[{target,zone,dealt}], downed }
@@ -229,10 +233,11 @@ export class EffectContext {
     });
     let value = rollDie(this.engine.rng);
     const fixed = this.engine.state.modifiers.find(
-      (m) => m.kind === 'diceFixed' && m.ownerIdx === this.playerIdx);
+      (m) => m.kind === 'diceFixed' && m.ownerIdx === this.playerIdx && !m.used);
     if (fixed) {
       this.log(`🎲 サイコロ: ${value} → ${fixed.value} として扱う（${fixed.description || '効果'}）`);
       value = fixed.value;
+      if (fixed.once) fixed.used = true; // 「次に出る目」だけ＝一発消費（hSD01-002）
     } else {
       this.log(`🎲 サイコロ: ${value}`);
     }
@@ -551,10 +556,11 @@ export class EffectContext {
   /**
    * ホロメンを能力でステージからデッキに戻す（はあと推しスキル等）。
    * 付いているエール/サポートはアーカイブへ、本体スタックはデッキの上/下へ。
-   * 「ホロメンが能力でデッキに戻った時」の誘発（推しステージスキル onReturnedToDeck）を発火する。
+   * 「ホロメンが能力でデッキに戻った時」の誘発（推しステージスキル onReturnedToDeck＋ホロメンの
+   * triggers.onReturnedToDeck）を発火する。ジェネレータ（呼び出しは `yield* ctx.returnHolomemToDeck(...)`）。
    * 戻したカードの配列（スタック）を返す。
    */
-  returnHolomemToDeck(holomem, { bottom = true } = {}) {
+  *returnHolomemToDeck(holomem, { bottom = true } = {}) {
     const owner = this.state.players.find((p) => this.engine._stageHolomems(p).includes(holomem));
     if (!owner) return [];
     const ownerIdx = this.state.players.indexOf(owner);
@@ -572,7 +578,13 @@ export class EffectContext {
     else owner.deck.unshift(...returned);
     owner.holomemReturnedToDeckThisTurn = true; // 「このターンに自分のホロメンがステージからデッキに戻った」記録（hBP07-042）
     this.log(`${returned[0]?.name} をデッキの${bottom ? '下' : '上'}に戻した`);
-    this.engine._dispatchReturnedToDeck(ownerIdx, returned);
+    this.engine._dispatchReturnedToDeck(ownerIdx, returned); // 推しステージスキル onReturnedToDeck（同期）
+    // ホロメンレベルの「（自分のホロメンが）デッキに戻った時」傍観トリガー（選択を伴える）。hBP07-039
+    const ownerObj = this.engine.state.players[ownerIdx];
+    for (const wh of this.engine._stageHolomems(ownerObj)) {
+      const t = this.engine.registry.get(wh.stack[0].number)?.triggers?.onReturnedToDeck;
+      if (t) yield* t(new EffectContext(this.engine, ownerIdx, { sourceHolomem: wh, returnedToDeckInfo: { cards: returned } }));
+    }
     return returned;
   }
 
@@ -735,6 +747,32 @@ export class EffectContext {
         const fn = this.engine.registry.get(sh.stack[0].number)?.onSelfCheerArchived;
         if (fn) fn(sh, this.engine, this.playerIdx);
       }
+      // 「自分の○○ホロメンの能力でエールをアーカイブした時に使える」推しスキル（コスト＋発動確認）。hBP01-008
+      // ability!==false（能力による）かつ「○○ホロメンの能力で」= this.sourceHolomem を発生源として渡す。
+      // [ターン1回]/[ゲーム1回]の使用済みフラグで、同一能力の複数枚アーカイブでも多重発動しない。
+      if (opts.ability !== false) {
+        const od = this.engine.registry.get(this.player.oshi.number)?.onCheerArchivedOshiSkill;
+        if (od) {
+          const p = this.player;
+          const used = od.sp ? p.usedSpOshiSkillThisGame : p.usedOshiSkillThisTurn;
+          const info = { source: this.sourceHolomem, cheer };
+          if (!used && p.holoPower.length >= (od.cost || 0) && (!od.canUse || od.canUse(this.engine, this.playerIdx, info))) {
+            const use = yield {
+              kind: 'confirm', player: this.playerIdx,
+              title: od.title || '推しスキルを使いますか？',
+              buildOptions: () => [
+                { id: 'yes', label: `${od.sp ? 'SP' : ''}推しスキルを使う（ホロパワー-${od.cost}）`, value: true },
+                { id: 'no', label: '使わない', value: false },
+              ],
+            };
+            if (use) {
+              p.archive.push(...p.holoPower.splice(0, od.cost || 0));
+              if (od.sp) p.usedSpOshiSkillThisGame = true; else p.usedOshiSkillThisTurn = true;
+              yield* od.run(new EffectContext(this.engine, this.playerIdx, { sourceCard: p.oshi, cheerArchivedInfo: info }));
+            }
+          }
+        }
+      }
     }
   }
 
@@ -823,14 +861,36 @@ export class EffectContext {
         const at = eng.registry.get(att.number)?.triggers?.onSpecialDamageDealt;
         if (at) yield* at(new EffectContext(eng, this.playerIdx, { sourceHolomem: this.sourceHolomem, sourceCard: att, specialDealt: info }));
       }
+      // 「相手のホロメンに特殊ダメージを与えた時に使える」推しスキル（コスト＋発動確認）。hBP06-006
+      // ※[ターン1回]/[ゲーム1回]の使用済みフラグで再帰（自身の特殊ダメージによる再発火）は止まる。
+      const od = eng.registry.get(this.player.oshi.number)?.onSpecialDamageDealtOshiSkill;
+      if (od) {
+        const pp = this.player;
+        const used = od.sp ? pp.usedSpOshiSkillThisGame : pp.usedOshiSkillThisTurn;
+        if (!used && pp.holoPower.length >= (od.cost || 0) && (!od.canUse || od.canUse(eng, this.playerIdx, info))) {
+          const use = yield {
+            kind: 'confirm', player: this.playerIdx,
+            title: od.title || '推しスキルを使いますか？',
+            buildOptions: () => [
+              { id: 'yes', label: `${od.sp ? 'SP' : ''}推しスキルを使う（ホロパワー-${od.cost}）`, value: true },
+              { id: 'no', label: '使わない', value: false },
+            ],
+          };
+          if (use) {
+            pp.archive.push(...pp.holoPower.splice(0, od.cost || 0));
+            if (od.sp) pp.usedSpOshiSkillThisGame = true; else pp.usedOshiSkillThisTurn = true;
+            yield* od.run(new EffectContext(eng, this.playerIdx, { sourceCard: pp.oshi, specialDealt: info }));
+          }
+        }
+      }
     }
     // 「ライフは減らない」は、この特殊ダメージでダウンが確定した場合のみ適用する。
     // （ダウンに至らなかった場合にフラグを残すと、後から別のダメージで倒された時まで
     //   ライフが減らなくなってしまう）
     if (targetEntry.holomem.damage >= this.engine.effectiveHp(targetEntry.holomem)) {
       if (opts.noLifeOnDown) targetEntry.holomem.noLifeOnDown = true;
-      // 「ダウンさせた時」トリガー（雪花ラミィSP推しスキル等）
-      this.engine._notifySourceDown(this.sourceHolomem, this.playerIdx);
+      // 「ダウンさせた時」トリガー（雪花ラミィSP推しスキル等）。ダウンしたホロメンを渡す
+      this.engine._notifySourceDown(this.sourceHolomem, this.playerIdx, [targetEntry.holomem]);
     }
     this.log(
       `${targetEntry.top.name} に特殊ダメージ${total}` +

@@ -1621,7 +1621,7 @@ export class Engine {
         const runners = [];
         const selfCard = topCard(h);
         if (downed.length > 0) {
-          this._notifySourceDown(h, s.turnPlayer); // 継続効果(ターン修正)の同期通知（ラミィSP等）
+          this._notifySourceDown(h, s.turnPlayer, downed); // 継続効果(ターン修正)の同期通知（ラミィSP/hBP06-095等）
           const cardTrig = this.registry.get(selfCard.number)?.triggers?.onOpponentDown;
           for (let d = 0; d < downed.length; d++) { // ダウン体数ぶん（通常は1体）
             if (cardTrig) runners.push({ run: cardTrig, srcCard: selfCard, attackInfo });
@@ -2046,13 +2046,13 @@ export class Engine {
    * 「（指定ホロメンが）相手のホロメンをダウンさせた時」のトリガー通知。
    * ダメージ適用時に閾値を超えたら呼ばれる（雪花ラミィSP推しスキル等）。
    */
-  _notifySourceDown(sourceHolomem, ownerIdx) {
+  _notifySourceDown(sourceHolomem, ownerIdx, downedList = []) {
     if (!sourceHolomem) return;
     for (const mod of this.state.modifiers) {
       if (mod.kind !== 'onSourceDown') continue;
       if (mod.ownerIdx !== ownerIdx) continue;
       if (mod.match && !mod.match(sourceHolomem)) continue;
-      mod.onDown?.(this);
+      mod.onDown?.(this, downedList); // downedList = ダウンしたホロメン配列（アーカイブ前。ゾーン判定可。hBP06-095）
     }
   }
 

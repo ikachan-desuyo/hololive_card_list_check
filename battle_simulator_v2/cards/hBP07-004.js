@@ -57,7 +57,7 @@ export default {
       });
       if (back) {
         // 能力でデッキの下に戻す（付属カードはアーカイブ・「デッキに戻った時」誘発も発火）
-        ctx.returnHolomemToDeck(back.holomem, { bottom: true });
+        yield* ctx.returnHolomemToDeck(back.holomem, { bottom: true });
       }
 
       // 2) ステージに残る〈赤井はあと〉1人を選び、このターンの間アーツ+50

@@ -1157,7 +1157,7 @@ export async function runTests() {
     const h1 = e._createHolomem(lib.getByNumber(haatoDebut.number), 0);
     p0.back = [h1];
     const handBefore = p0.hand.length;
-    ctx.returnHolomemToDeck(h1);
+    drive(ctx.returnHolomemToDeck(h1)); // generator化したため drive で駆動
     assertEq(p0.hand.length, handBefore + 2, 'はあちゃまなうで2枚引いていない');
     assert(!p0.back.includes(h1), 'はあとがバックから除去されていない');
 
@@ -1165,7 +1165,7 @@ export async function runTests() {
     const h2 = e._createHolomem(lib.getByNumber(haatoDebut.number), 0);
     p0.back = [h2];
     const handBefore2 = p0.hand.length;
-    ctx.returnHolomemToDeck(h2);
+    drive(ctx.returnHolomemToDeck(h2)); // generator化したため drive で駆動
     assertEq(p0.hand.length, handBefore2, '[ターンに1回]を超えて引いている');
   });
 
