@@ -248,6 +248,57 @@ export async function runTests() {
     assert(eng._canBloom({ ...h, rested: true }, first), 'お休み中にBloomできない');
   });
 
+  test('onDownOshiSkill: 配列・SP・run・downedHolomem（ダウン時推しスキルの新機構）', () => {
+    // 推しの onDownOshiSkill を「通常スキル＋SPスキル」の配列で定義し、
+    // run（対話的ジェネレータ）・sp フラグ（ゲームに1回）・ctx.downedHolomem の受け渡しを検証する。
+    const reg = new EffectRegistry();
+    reg.defs.set('TEST-OSHI-DOWN', {
+      number: 'TEST-OSHI-DOWN',
+      onDownOshiSkill: [
+        {
+          cost: 1, title: 'regular',
+          canUse(engine, ownerIdx) { return engine.state.players[ownerIdx].holoPower.length >= 1; },
+          *run(ctx) { ctx.player.__regularDownedName = ctx.downedHolomem.stack[0].name; },
+        },
+        {
+          sp: true, cost: 2, title: 'sp',
+          canUse(engine, ownerIdx) { return engine.state.players[ownerIdx].holoPower.length >= 2; },
+          *run(ctx) { ctx.player.__spRan = true; },
+        },
+      ],
+    });
+    const oshi = fakeHolomen({ number: 'TEST-OSHI-DOWN', name: '推しテスト', life: 5 });
+    const e2 = new Engine({
+      decks: [
+        { oshi, deck: [], cheerDeck: [] },
+        { oshi: fakeHolomen({ number: 'TEST-OSHI-2', name: '推し2' }), deck: [], cheerDeck: [] },
+      ],
+      seed: 1, registry: reg,
+    });
+    const p0 = e2.state.players[0];
+    p0.center = { stack: [fakeHolomen({ name: 'X' })], cheers: [], attachments: [], damage: 0, rested: false, faceDown: false };
+    p0.holoPower = [{ name: 'hp1' }, { name: 'hp2' }, { name: 'hp3' }];
+    p0.archive = [];
+    p0.life = [{ name: 'l1' }, { name: 'l2' }];
+    e2.state.turnPlayer = 1;   // 相手のターン
+    e2.state.phase = 'playing';
+    let done = false;
+    e2._processDown(p0, { zone: 'center', index: 0 }, () => { done = true; });
+    // 通常ダウン推しスキルの発動確認 → yes（resume を直接駆動して _autoResolve を回避）
+    assertEq(e2.state.pending.type, 'effectChoice', '通常ダウン推しスキルの確認が出ていない');
+    e2.state.pending.resume(true);
+    // SPダウン推しスキルの発動確認 → yes
+    assertEq(e2.state.pending.type, 'effectChoice', 'SPダウン推しスキルの確認が出ていない');
+    e2.state.pending.resume(true);
+    assert(done, 'ダウン処理が完了していない');
+    assertEq(p0.__regularDownedName, 'X', '通常スキルの run が ctx.downedHolomem を受け取れていない');
+    assertEq(p0.__spRan, true, 'SPスキルの run が実行されていない');
+    assertEq(p0.holoPower.length, 0, 'ホロパワーのコスト(1+2)が支払われていない');
+    assertEq(p0.usedOshiSkillThisTurn, true, '通常推しスキルの使用フラグが立っていない');
+    assertEq(p0.usedSpOshiSkillThisGame, true, 'SP推しスキルの使用フラグが立っていない');
+    assertEq(p0.center, null, 'ダウンしたホロメンが場から取り除かれていない');
+  });
+
   // ---- 統合テスト: 実デッキでのプレイアウト ----
   const deckRes = await fetch('../test_deck/' + encodeURIComponent('ラミィデッキ.json'));
   const deckMap = await deckRes.json();
@@ -1104,6 +1155,64 @@ export async function runTests() {
     while (!done && e.state.pending && guard++ < 10) e.apply(e.state.pending.options[0].id);
     assert(done, '完了しない');
     assertEq(p1.center.damage, before + 20, '相手前衛に特殊20（ターンに1回）が正しく入っていない');
+  });
+
+  await testAsync('推しスキル: IOFORIA~!（被ダメージ割り込み中にエール付け替え・generator版）', async () => {
+    const e = await setupMainStep(deckMap, 154);
+    await e.registry.preload(['hBP05-002'], lib);
+    const p0 = e.state.players[0]; const p1 = e.state.players[1];
+    p0.oshi = lib.getByNumber('hBP05-002'); // アイラニ・イオフィフティーン（#ID1期生）
+    p0.holoPower = [{}];
+    e.state.turnPlayer = 1; // 相手(p1)のターン
+    const target = { stack: [{ name: 'T', tags: ['ID1期生'], hp: 100, arts: [], bloomLevel: 'Debut' }], cheers: [{ name: 'cheerX', color: '白' }], attachments: [] };
+    const dest = { stack: [{ name: 'D', tags: ['ID1期生'], hp: 100, arts: [], bloomLevel: 'Debut' }], cheers: [], attachments: [] };
+    p0.center = target; p0.back = [dest]; p0.collab = null;
+
+    let done = false;
+    const atk = { * run(ctx) { yield* ctx.dealSpecialDamage({ holomem: target, top: target.stack[0] }, 30); } };
+    e._runEffect(atk, { playerIdx: 1 }, () => { done = true; });
+    let guard = 0;
+    while (!done && e.state.pending && guard++ < 15) {
+      const opts = e.state.pending.options;
+      const yes = opts.find((o) => o.id === 'yes');
+      e.apply((yes || opts[0]).id);
+    }
+    assert(done, 'IOFORIA~! の割り込みが完了しない');
+    assertEq(target.cheers.length, 0, '対象からエールが外れていない');
+    assertEq(dest.cheers.length, 1, '他の#ID1期生にエールが付け替えられていない');
+    assert(p0.usedOshiSkillThisTurn === true, '推しスキルが使用済みになっていない（コスト/回数処理）');
+  });
+
+  await testAsync('推しスキル: 女幹部の采配（赤ホロメンの手札アーカイブをホロパワーで置換）', async () => {
+    const e = await setupMainStep(deckMap, 155);
+    await e.registry.preload(['hBP01-005'], lib);
+    const p0 = e.state.players[0];
+    p0.oshi = lib.getByNumber('hBP01-005');
+    p0.holoPower = [{ name: 'hp1' }, { name: 'hp2' }];
+
+    // 赤ホロメンの能力で手札アーカイブ → 置換「はい」: 手札は残り、ホロパワー1枚がアーカイブ
+    const redHost = { stack: [{ name: 'R', color: '赤' }], cheers: [], attachments: [] };
+    p0.center = redHost;
+    const handCard = { name: 'H', kind: 'support' };
+    p0.hand = [handCard];
+    const hpBefore = p0.holoPower.length; const arcBefore = p0.archive.length;
+    let done = false;
+    e._runEffect({ * run(ctx) { yield* ctx.archiveHandCard(handCard); } }, { playerIdx: 0, sourceHolomem: redHost }, () => { done = true; });
+    let guard = 0;
+    while (!done && e.state.pending && guard++ < 5) { const yes = e.state.pending.options.find((o) => o.id === 'yes'); e.apply((yes || e.state.pending.options[0]).id); }
+    assert(done, '完了しない');
+    assert(p0.hand.includes(handCard), '手札カードが残っていない（置換されていない）');
+    assertEq(p0.holoPower.length, hpBefore - 1, 'ホロパワーが1枚減っていない');
+    assertEq(p0.archive.length, arcBefore + 1, 'ホロパワーがアーカイブされていない');
+
+    // 非赤ホロメンでは置換オファー無し（通常どおり手札をアーカイブ）
+    const blueHost = { stack: [{ name: 'B', color: '青' }], cheers: [], attachments: [] };
+    p0.center = blueHost;
+    const h2 = { name: 'H2', kind: 'support' }; p0.hand = [h2];
+    let done2 = false;
+    e._runEffect({ * run(ctx) { yield* ctx.archiveHandCard(h2); } }, { playerIdx: 0, sourceHolomem: blueHost }, () => { done2 = true; });
+    assert(done2 && !e.state.pending, '非赤で余計な確認が出た');
+    assert(!p0.hand.includes(h2) && p0.archive.includes(h2), '非赤で手札がアーカイブされていない');
   });
 
   await testAsync('コンパイラ: 全カードでクラッシュせず、一定数を自動実装できる', async () => {

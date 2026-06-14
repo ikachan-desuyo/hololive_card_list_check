@@ -22,13 +22,13 @@ export default {
       if (!p.collab) return false;
       const collabName = p.collab.stack[0].name;
       // 同名のホロメンがデッキにあること
-      return p.deck.some((c) => c.kind === 'holomem' && c.name === collabName);
+      return p.deck.some((c) => c.kind === 'holomen' && c.name === collabName);
     },
     *run(ctx) {
       const collabEntry = ctx.holomems('self', (e) => e.pos.zone === 'collab')[0];
       if (!collabEntry) return;
       const collabName = collabEntry.top.name;
-      const cand = ctx.deckCards((c) => c.kind === 'holomem' && c.name === collabName);
+      const cand = ctx.deckCards((c) => c.kind === 'holomen' && c.name === collabName);
       const picked = yield ctx.chooseCard({
         cards: cand,
         title: `デッキから〈${collabName}〉1枚を公開して手札に加える`,

@@ -6,10 +6,9 @@
  *    → attached.artsPlus で常時 +10（複数枚付けたら各 +10 が加算される）。
  *
  *  ■このファンが付いているホロメンがダメージを受ける時、このファンをアーカイブする。
- *    → 【保留】「ダメージを受ける時」に割り込んで装着カードを自らアーカイブする機構が
- *      エンジンに無い（被ダメージ割り込み＝受ける時イベントフック未実装。規約の保留機構に該当）。
- *      被ダメージ時トリガー（attached 用 onReceiveDamage 等）が追加されたら、
- *      このファンを ctx でアーカイブする定義を足すこと。
+ *    → attached.onDamageReceivedForced で実装（強制・選択なし。hBP07-108 と同型）。
+ *      ※engine の強制被ダメージトリガーは「相手のターンに被弾した時」に発火する（自分ターンの自傷は対象外）。
+ *      テキストにターン制限は無いが、被弾の大半は相手ターンのため実用上はこの近似で足りる。
  *
  * このファンは、自分の〈紫咲シオン〉だけに付けられ、1人につき何枚でも付けられる。
  *    → attachRule.canAttach + unlimited で実装。
@@ -19,6 +18,15 @@ export default {
   attached: {
     // ■このファンが付いているホロメンのアーツ+10
     artsPlus() { return 10; },
+    // ■このファンが付いているホロメンがダメージを受ける時、このファンをアーカイブする（強制・選択なし）
+    onDamageReceivedForced(holomem, engine, self, ownerIdx) {
+      const i = holomem.attachments.indexOf(self);
+      if (i !== -1) {
+        holomem.attachments.splice(i, 1);
+        engine.state.players[ownerIdx].archive.push(self);
+        engine.log(`${holomem.stack[0].name}: ダメージを受けたため 塩っ子 をアーカイブ`);
+      }
+    },
   },
   attachRule: {
     canAttach(holomem) {
@@ -26,5 +34,4 @@ export default {
     },
     unlimited: true, // 1人に何枚でも
   },
-  // 「ダメージを受ける時このファンをアーカイブする」は被ダメージ割り込み機構が未実装のため保留。
 };

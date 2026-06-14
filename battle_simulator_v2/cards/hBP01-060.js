@@ -20,9 +20,8 @@ export default {
         title: 'コスト: アーカイブする手札を選択',
       });
       if (!card) return;
-      ctx.removeFromHand(card);
-      ctx.player.archive.push(card);
-      ctx.log('手札1枚をアーカイブした');
+      // 「ホロメンの能力で手札をアーカイブ」共通プリミティブ（推し「女幹部の采配」のコスト置換にも対応）
+      yield* ctx.archiveHandCard(card);
       ctx.draw(2);
     },
   },

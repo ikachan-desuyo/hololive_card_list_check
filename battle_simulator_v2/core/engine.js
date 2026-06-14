@@ -257,6 +257,9 @@ export class Engine {
       const fn = this.registry.get(att.number)?.attached?.onDamageReceivedForced;
       if (fn) fn(target, this, att, ownerIdx);
     }
+    // ダウンしたホロメン自身のカード定義の被ダメージ後トリガー（同期・選択なし。例: 大神ミオ「緑の地母神」HP回復。hBP07-029）
+    const selfFn = this.registry.get(target.stack[0].number)?.onDamageReceivedForced;
+    if (selfFn) selfFn(target, this, ownerIdx);
   }
 
   /**
@@ -900,6 +903,21 @@ export class Engine {
             usableTargets.push({ zone: 'back', index: bi });
           }
         });
+      }
+      // 対象拡張: アーツ定義の extraTargetZones（「このアーツは相手のバックホロメンも対象にできる」等。アーツ単位。hSD12-004）
+      if (artDef?.extraTargetZones && artDef.extraTargetZones.length) {
+        if (usableTargets === targets) usableTargets = [...targets];
+        for (const ez of artDef.extraTargetZones) {
+          if (ez === 'back') {
+            opp.back.forEach((b, bi) => {
+              if (b && !usableTargets.some((t) => t.zone === 'back' && t.index === bi)) {
+                usableTargets.push({ zone: 'back', index: bi });
+              }
+            });
+          } else if (opp[ez] && !usableTargets.some((t) => t.zone === ez)) {
+            usableTargets.push({ zone: ez, index: 0 });
+          }
+        }
       }
       // 対象拡張: カード定義の受動アウラ artTargetExtraTargets（条件付きで相手バック等を常時対象化。hBP08-059）
       const extraTargets = this.registry.get(card.number)?.artTargetExtraTargets?.(h, this, opp);
@@ -1702,25 +1720,38 @@ export class Engine {
 
     // 「（ホロメンが）ダウンした時に使える」推しスキル (11.3.1.1 / 12.1.5.2)
     // 例: 雪花ラミィ「愛してる」— ダウンしたホロメンのファンを手札に戻す
-    const skillDef = this.registry.get(p.oshi.number)?.onDownOshiSkill;
-    if (skillDef?.canUse?.(this, ownerIdx, h)) {
+    // 定義は単体オブジェクトまたは配列（通常推しスキル＋SP推しスキルが共にダウン誘発の場合）を許容。
+    // 各スキルは sd.sp(=SP推しスキル/ゲームに1回) と sd.run(対話的ジェネレータ) に対応:
+    //   - sd.run があれば: エンジンがコスト(ホロパワー)と使用フラグを処理してから run を実行する。
+    //   - sd.run が無ければ(旧方式): sd.apply 自身がコスト＋使用フラグを処理する。
+    const rawDownSkill = this.registry.get(p.oshi.number)?.onDownOshiSkill;
+    const downSkills = Array.isArray(rawDownSkill) ? rawDownSkill : (rawDownSkill ? [rawDownSkill] : []);
+    const offerDownSkill = (si) => {
+      if (si >= downSkills.length) { runDownTrigger(); return; }
+      const sd = downSkills[si];
+      if (!sd.canUse?.(this, ownerIdx, h)) { offerDownSkill(si + 1); return; }
       this.state.pending = {
         type: 'effectChoice',
         player: ownerIdx,
-        request: { kind: 'confirm', title: skillDef.title || '推しスキルを使いますか？' },
+        request: { kind: 'confirm', title: sd.title || '推しスキルを使いますか？' },
         options: [
-          { id: 'yes', label: `推しスキルを使う（ホロパワー-${skillDef.cost}）`, value: true },
+          { id: 'yes', label: `推しスキルを使う（ホロパワー-${sd.cost}）`, value: true },
           { id: 'no', label: '使わない', value: false },
         ],
         resume: (use) => {
-          if (use) skillDef.apply(this, ownerIdx, h);
-          runDownTrigger();
+          if (!use) { offerDownSkill(si + 1); return; }
+          if (sd.run) {
+            p.archive.push(...p.holoPower.splice(0, sd.cost || 0));
+            if (sd.sp) p.usedSpOshiSkillThisGame = true; else p.usedOshiSkillThisTurn = true;
+            this._runEffect({ run: sd.run }, { playerIdx: ownerIdx, downedHolomem: h }, () => offerDownSkill(si + 1));
+          } else {
+            sd.apply(this, ownerIdx, h);
+            offerDownSkill(si + 1);
+          }
         },
       };
-      return;
-    }
-
-    runDownTrigger();
+    };
+    offerDownSkill(0);
   }
 
   /**
@@ -1797,26 +1828,42 @@ export class Engine {
     const defender = this.state.players[defIdx];
     const out = [];
 
-    // ① 推しスキル（「受ける時に使える推しスキル：ダメージ-N」）
+    // ① 推しスキル（「受ける時に使える推しスキル」）
+    //   reduce: 受けるダメージ-N（同期）。run: 選択を伴う副作用（エール付け替え等。generator）。
     const skill = this.registry.get(defender.oshi.number)?.onDamageOshiSkill;
     if (skill) {
       out.push({ build: (curDmg) => {
         const used = skill.sp ? defender.usedSpOshiSkillThisGame : defender.usedOshiSkillThisTurn;
         if (used || defender.holoPower.length < skill.cost) return null;
         if (skill.canUse && !skill.canUse(this, defIdx, target, curDmg)) return null;
-        return {
-          title: skill.title || '推しスキルを使いますか？（受けるダメージ軽減）',
+        const eng = this;
+        const payAndMark = () => {
+          defender.archive.push(...defender.holoPower.splice(0, skill.cost));
+          if (skill.sp) defender.usedSpOshiSkillThisGame = true;
+          else defender.usedOshiSkillThisTurn = true;
+        };
+        const desc = {
+          title: skill.title || '推しスキルを使いますか？',
           yesLabel: `${skill.sp ? 'SP' : ''}推しスキルを使う（ホロパワー-${skill.cost}）`,
-          apply: (d) => {
-            defender.archive.push(...defender.holoPower.splice(0, skill.cost));
-            if (skill.sp) defender.usedSpOshiSkillThisGame = true;
-            else defender.usedOshiSkillThisTurn = true;
+        };
+        if (skill.run) {
+          // 選択を伴う割り込み（generator）。ダメージは変更しない副作用。
+          desc.run = function* (ctx) {
+            payAndMark();
+            eng.log(`${defender.name}: ${skill.sp ? 'SP' : ''}推しスキル発動（ホロパワー-${skill.cost}）`);
+            yield* skill.run(ctx, { target, dmg: curDmg });
+          };
+        } else {
+          // 既存: 受けるダメージ軽減（同期）
+          desc.apply = (d) => {
+            payAndMark();
             const red = skill.reduce ? (skill.reduce(this, defIdx, target, d) || 0) : 0;
             const fin = Math.max(0, d - red);
             this.log(`${defender.name}: 推しスキルで受けるダメージ ${d} → ${fin}（-${red}）`);
             return fin;
-          },
-        };
+          };
+        }
+        return desc;
       } });
     }
 
@@ -1878,7 +1925,15 @@ export class Engine {
           { id: 'yes', label: r.yesLabel, value: true },
           { id: 'no', label: '使わない', value: false },
         ],
-        resume: (use) => run(i + 1, use ? r.apply(curDmg) : curDmg),
+        resume: (use) => {
+          if (!use) { run(i + 1, curDmg); return; }
+          if (r.run) {
+            // 選択を伴う割り込み（generator・ダメージ非変更）はエフェクトランナーで実行してから次へ
+            this._runEffect({ run: r.run }, { playerIdx: defIdx }, () => run(i + 1, curDmg));
+          } else {
+            run(i + 1, r.apply ? r.apply(curDmg) : curDmg);
+          }
+        },
       };
       this.onChange();
     };

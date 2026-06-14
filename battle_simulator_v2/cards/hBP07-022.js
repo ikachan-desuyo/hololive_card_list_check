@@ -9,10 +9,9 @@
  * ギフト「筋肉は裏切らない！」:
  *   [コラボポジション限定]相手のターンで、自分の#3期生を持つセンターホロメンがダウンした時、
  *   そのホロメンを含め重なっているホロメンすべてを手札に戻す。
- *   → 【未実装/保留】このカード自身ではなく「別のホロメン（センターの#3期生）がダウンした時」を
- *      監視する効果。エンジンの triggers.onDown はダウンしたホロメン自身とその装着カードにしか
- *      発火しないため、コラボにいるこのカードが他ホロメンのダウンを監視する機構（任意ホロメンのダウン監視）が
- *      必要で、現状は未対応。
+ *   → triggers.onAnyDown（任意ホロメンのダウン監視）で実装。コラボにいるこのノエルが、
+ *      相手のターンに自分のセンター#3期生のダウンを検知し、重なっているホロメンを手札へ戻す
+ *      （アーカイブ前の onAnyDown 段階で downedInfo.holomem.stack を手札へ移すため archive されない）。
  */
 export default {
   number: 'hBP07-022',
@@ -35,6 +34,24 @@ export default {
           description: `このターン、${top.name} のアーツ必要無色-${amount}`,
         });
       },
+    },
+  },
+  triggers: {
+    // ギフト「筋肉は裏切らない！」: [コラボ限定]相手のターンで自分の#3期生センターがダウンした時、重なっているホロメンすべてを手札に戻す
+    *onAnyDown(ctx) {
+      const self = ctx.sourceHolomem;
+      if (self?.stack[0].name !== '白銀ノエル') return;
+      if (ctx.sourceHolomemPos()?.zone !== 'collab') return;  // [コラボポジション限定]
+      if (ctx.state.turnPlayer === ctx.playerIdx) return;     // 相手のターン
+      const di = ctx.downedInfo;
+      if (!di || di.ownerIdx !== ctx.playerIdx) return;       // ダウンしたのが自分のホロメン
+      if (di.zone !== 'center') return;                       // センターホロメン
+      const downed = di.holomem;
+      if (!(downed.stack[0].tags || []).includes('3期生')) return; // #3期生
+      const cards = [...downed.stack];
+      downed.stack.length = 0;
+      for (const c of cards) ctx.addToHand(c);
+      ctx.log(`白銀ノエル「筋肉は裏切らない！」: 重なっているホロメン${cards.length}枚を手札に戻した`);
     },
   },
 };

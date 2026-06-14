@@ -19,10 +19,10 @@
 export default {
   number: 'hSD10-013',
   attached: {
-    // 付け先が #FLOW GLOW を持つホロメンの時のみアーツ+10
+    // 付け先が #FLOW GLOW を持つホロメンの時のみアーツ+10（タグは 'FLOW' と 'GLOW' に分割格納される）
     artsPlus(holomem) {
-      const top = holomem.stack[0];
-      return (top.tags || []).includes('FLOW GLOW') ? 10 : 0;
+      const tags = holomem.stack[0].tags || [];
+      return (tags.includes('FLOW') && tags.includes('GLOW')) ? 10 : 0;
     },
   },
   attachRule: {

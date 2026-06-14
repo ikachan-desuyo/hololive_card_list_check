@@ -23,5 +23,12 @@ export default {
       return 20;
     },
   },
-  // 「〈癒月ちょこ〉に付いていたらBloom時にHP20回復」はホストBloomトリガーが未実装のため保留。
+  triggers: {
+    // ◆〈癒月ちょこ〉に付いていたら: ホストがBloomした時、このホロメン(ホスト)のHP20回復
+    * onBloom(ctx) {
+      const host = ctx.sourceHolomem;
+      if (host?.stack[0].name !== '癒月ちょこ') return;
+      ctx.heal(host, 20);
+    },
+  },
 };

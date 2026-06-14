@@ -4,11 +4,11 @@
  *   自分のお休みしている〈戌神ころね〉1人をアクティブにする。
  *   （〈戌神ころね〉= 名前が「戌神ころね」のホロメン）
  *
- * ※SP推しスキル「ウォウウォウウォウウォウ」[ホロパワー：-3][ゲームに1回]は
- *   「自分の黄ホロメンがダウンした時に使える」タイミング割り込み型推しスキルのため未実装。
- *   エンジン側にダウン時の推しスキル発動割り込み機構が無く、規約上の保留対象。
- *   （内容: そのホロメンのエール1枚を他のホロメンに付け替え、ダウンしたホロメンを含め
- *    重なっているホロメンの中から1枚を手札に戻す）
+ * SP推しスキル「ウォウウォウウォウウォウ」[ホロパワー：-3][ゲームに1回]:
+ *   自分の黄ホロメンがダウンした時に使える（ターン制限なし）：
+ *   そのホロメンのエール1枚を自分の他のホロメンに付け替え、
+ *   ダウンしたホロメンを含め重なっているホロメンの中から1枚を手札に戻す。
+ *   → ダウン処理中に使えるSP推しスキル (11.3.1.1) として onDownOshiSkill(sp:true).run で実装。
  */
 
 // お休みしている「戌神ころね」（重なりの一番上の名前で判定）
@@ -44,6 +44,48 @@ export default {
         match: (h) => h === entry.holomem,
         description: `${entry.top.name}は「無限の体力」でアクティブになった`,
       });
+    },
+  },
+
+  // SP推しスキル「ウォウウォウウォウウォウ」: 自分の黄ホロメンがダウンした時（ターン制限なし）
+  onDownOshiSkill: {
+    sp: true,
+    cost: 3,
+    title: 'SP推しスキル「ウォウウォウウォウウォウ」: エール1枚を付け替え、重なっているホロメン1枚を手札に戻しますか？',
+    canUse(engine, ownerIdx, downedHolomem) {
+      const p = engine.state.players[ownerIdx];
+      return !p.usedSpOshiSkillThisGame &&                   // ゲームに1回
+        p.holoPower.length >= 3 &&                           // [ホロパワー：-3]
+        downedHolomem.stack[0].color === '黄';               // 黄ホロメン
+    },
+    *run(ctx) {
+      const downed = ctx.downedHolomem;
+      if (!downed) return;
+      // 1) そのホロメンのエール1枚を自分の他のホロメンに付け替え
+      const others = ctx.holomems('self', (e) => e.holomem !== downed);
+      if (downed.cheers.length > 0 && others.length > 0) {
+        const cheer = downed.cheers.length === 1
+          ? downed.cheers[0]
+          : yield ctx.chooseCard({ cards: [...downed.cheers], title: '付け替えるエール1枚を選択', optional: true });
+        if (cheer) {
+          const entry = yield ctx.chooseHolomem({
+            side: 'self', filter: (e) => e.holomem !== downed,
+            title: `${cheer.name} を付け替える自分のホロメンを選択`,
+          });
+          if (entry) ctx.moveCheer(cheer, downed, entry.holomem);
+        }
+      }
+      // 2) 重なっているホロメン（スタック）の中から1枚を手札に戻す
+      if (downed.stack.length > 0) {
+        const card = downed.stack.length === 1
+          ? downed.stack[0]
+          : yield ctx.chooseCard({ cards: [...downed.stack], title: '手札に戻すホロメンを選択（重なっているカード）' });
+        if (card) {
+          const idx = downed.stack.indexOf(card);
+          if (idx !== -1) downed.stack.splice(idx, 1);
+          ctx.addToHand(card);
+        }
+      }
     },
   },
 };

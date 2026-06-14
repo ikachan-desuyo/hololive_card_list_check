@@ -21,5 +21,11 @@ export default {
     // ■このマスコットが付いているホロメンのHP+20
     hpPlus() { return 20; },
   },
-  // 「百鬼あやめ限定のBloom時ドロー1」はBloom時トリガー(attachment用onBloom)が未実装のため保留。
+  triggers: {
+    // ◆〈百鬼あやめ〉に付いていたら: ホストがBloomした時、自分のデッキを1枚引く
+    * onBloom(ctx) {
+      if (ctx.sourceHolomem?.stack[0].name !== '百鬼あやめ') return;
+      ctx.draw(1);
+    },
+  },
 };

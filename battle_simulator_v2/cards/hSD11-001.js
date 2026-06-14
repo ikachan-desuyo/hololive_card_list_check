@@ -12,14 +12,18 @@
  * SP推しスキル「ニコたんの名を呼ぶがいいさ！」[ホロパワー：-2][ゲームに1回]:
  *   自分の#FLOW GLOWを持つホロメンの能力でエールをアーカイブした時に使える：
  *   相手のセンターホロメンかコラボホロメンどちらかに、アーカイブしたエール1枚につき特殊ダメージ30を与える。
- *   → 「#FLOW GLOWホロメンの能力でエールをアーカイブした時」を監視して発火する
- *     タイミング割り込み型の推しスキル。エンジン側に「エールがアーカイブされた時」の
- *     監視機構が無いため未実装（保留）。
+ *   → 【保留】onSelfCheerArchived（自分のエールがアーカイブされた時の同期フック）は存在するが、
+ *     これは①推しスキル（コスト＋発動確認＋相手前衛への対象選択）であり、②「アーカイブしたエール
+ *     1枚につき特殊30」なので“その能力1回で何枚アーカイブしたか”を集計する必要がある（per-cheer の
+ *     フックでは枚数を束ねられない）。さらに「#FLOW GLOWホロメンの能力で」=アーカイブを起こした能力の
+ *     発生源ホロメンの色判定も要る。これらのイベント単位集計・発生源追跡が未整備のため未実装。
  */
+// #FLOW GLOW はタグが 'FLOW' と 'GLOW' に分割格納されるため両方を確認する
+const isFlowGlow = (top) => !!top && (top.tags || []).includes('FLOW') && (top.tags || []).includes('GLOW');
 const hasFlowGlowEmpty = (engine, p) =>
   engine._stagePositions(p).some((pos) => {
     const h = engine._holomemAt(p, pos);
-    return (h.stack[0].tags || []).includes('FLOW GLOW') && h.cheers.length === 0;
+    return isFlowGlow(h.stack[0]) && h.cheers.length === 0;
   });
 
 export default {
@@ -38,7 +42,7 @@ export default {
       // 送り先（エールが付いていない#FLOW GLOWホロメン1人）を先に確定
       const target = yield ctx.chooseHolomem({
         side: 'self',
-        filter: (e) => ctx.hasTag(e.top, 'FLOW GLOW') && e.holomem.cheers.length === 0,
+        filter: (e) => isFlowGlow(e.top) && e.holomem.cheers.length === 0,
         title: 'エールを送る#FLOW GLOWホロメン1人を選択（エールが付いていない）',
       });
       if (!target) return;

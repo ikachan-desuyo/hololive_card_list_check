@@ -25,7 +25,7 @@ function isAdventHolomemOrCheer(card) {
   const tags = card.tags || [];
   const hasAdvent = tags.includes('Advent');
   if (!hasAdvent) return false;
-  return card.kind === 'holomem' || card.kind === 'cheer';
+  return card.kind === 'holomen' || card.kind === 'cheer';
 }
 
 export default {

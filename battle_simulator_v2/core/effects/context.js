@@ -33,6 +33,8 @@ export class EffectContext {
     this.sourceHolomem = opts.sourceHolomem || null;
     // onAnyDown 用: ダウンしたホロメンの情報 { holomem, card, ownerIdx, zone }
     this.downedInfo = opts.downedInfo || null;
+    // ダウン時推しスキル(onDownOshiSkill.run)用: ダウンしたホロメン（アーカイブ前。エール・スタックを操作できる）
+    this.downedHolomem = opts.downedHolomem || null;
     // onOpponentPerformanceEnd 用: そのパフォーマンスステップで自分のライフが減ったか
     this.lifeDecreasedThisPerf = opts.lifeDecreasedThisPerf || false;
     // 攻撃時誘発の推しスキル用: { sourceHolomem, art, artName, dealtList:[{target,zone,dealt}], downed }
@@ -466,9 +468,17 @@ export class EffectContext {
    * 単純な手札アーカイブとの違いは“発生源ホロメンの能力による”誘発が走る点のみ。
    */
   *archiveHandCard(card) {
+    // 推しスキルによる「手札アーカイブのコスト置換」（hBP01-005 女幹部の采配: 赤ホロメンの能力での
+    // 手札アーカイブ1枚につき、ホロパワー1枚をかわりにアーカイブできる）。置換されたら手札カードは残す。
+    const oshiDef = this.engine.registry.get(this.player.oshi?.number);
+    if (oshiDef?.handArchiveCostReplace) {
+      const replaced = yield* oshiDef.handArchiveCostReplace(this, this.sourceHolomem, card);
+      if (replaced) return; // ホロパワーで代替済み（手札カードはアーカイブしない）
+    }
     this.removeFromHand(card);
     this.player.archive.push(card);
     this.log(`${this.player.name}: ${card.name} を手札からアーカイブ`);
+    // 発生源ホロメンの能力で手札をアーカイブした時の誘発（hBP05-083 ネリッサの杖）
     const host = this.sourceHolomem;
     if (host) {
       for (const att of [...host.attachments]) {
@@ -654,6 +664,9 @@ export class EffectContext {
       for (const att of [...holomem.attachments]) {
         const rep = this.engine.registry.get(att.number)?.cheerArchiveReplace;
         if (!rep) continue;
+        // 条件付き置換（例: おかにゃん=猫又おかゆに付いていて青エールを捨てる時のみ）。
+        // canReplace 未定義なら常に提示（hBP03-106 等の無条件置換と後方互換）。
+        if (rep.canReplace && !rep.canReplace(cheer, holomem, this.engine)) continue;
         const use = yield {
           kind: 'confirm', player: this.playerIdx,
           title: rep.title || `${cheer.name}のかわりに${att.name}をアーカイブする？`,
@@ -736,7 +749,14 @@ export class EffectContext {
             { id: 'no', label: '使わない', value: false },
           ],
         };
-        if (use) total = Math.max(0, r.apply(total));
+        if (use) {
+          if (r.run) {
+            // 選択を伴う割り込み（generator・ダメージ非変更）。防御側のコンテキストで実行
+            yield* r.run(new EffectContext(eng, defIdx, {}));
+          } else if (r.apply) {
+            total = Math.max(0, r.apply(total));
+          }
+        }
       }
     }
 

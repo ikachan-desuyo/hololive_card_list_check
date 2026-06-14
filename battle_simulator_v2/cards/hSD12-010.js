@@ -14,7 +14,7 @@ export default {
         // コスト: このホロメンに付いている「紫以外」のエール1枚をアーカイブ
         const nonPurple = ctx.sourceHolomem.cheers.filter((c) => c.color !== '紫');
         if (nonPurple.length === 0) return; // コストを払えない
-        const archiveHolomems = ctx.player.archive.filter((c) => c.kind === 'holomem');
+        const archiveHolomems = ctx.player.archive.filter((c) => c.kind === 'holomen');
         if (archiveHolomems.length === 0) return; // 効果対象がいない
         const ok = yield ctx.confirm('紫以外のエール1枚をアーカイブして、アーカイブのホロメン1枚を手札に戻しますか？');
         if (!ok) return;
@@ -25,7 +25,7 @@ export default {
         if (!cheer) return;
         yield* ctx.archiveCheer(ctx.sourceHolomem, cheer);
         const picked = yield ctx.chooseCard({
-          cards: ctx.player.archive.filter((c) => c.kind === 'holomem'),
+          cards: ctx.player.archive.filter((c) => c.kind === 'holomen'),
           title: '手札に戻すアーカイブのホロメンを選択',
         });
         if (!picked) return;

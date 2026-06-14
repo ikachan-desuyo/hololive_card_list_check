@@ -30,7 +30,20 @@ export default {
       return total;
     },
   },
-  // ◆2ndの〈角巻わため〉付与時の追加能力のうち、
-  //   「このホロメンがアーツを使った時、サイコロを振り3か5なら自分の他のホロメン1人に特殊ダメージ50」は
-  //   onArtsUse（アーツを使った時）トリガーが未対応のため未実装。
+  triggers: {
+    // ◆2ndの〈角巻わため〉センター時: アーツを使った時サイコロを1回振る。3か5なら、このホロメン以外の自分のホロメン1人に特殊ダメージ50
+    * onArtsUse(ctx) {
+      const host = ctx.sourceHolomem;
+      if (host?.stack[0].name !== '角巻わため' || host.stack[0].bloomLevel !== '2nd') return;
+      if (ctx.engine._zoneOf(host) !== 'center') return;
+      const v = yield* ctx.rollDice();
+      if (v !== 3 && v !== 5) return;
+      if (ctx.holomems('self', (e) => e.holomem !== host).length === 0) return;
+      const entry = yield ctx.chooseHolomem({
+        side: 'self', filter: (e) => e.holomem !== host,
+        title: '特殊ダメージ50を与える自分のホロメン（このホロメン以外）を選択',
+      });
+      if (entry) yield* ctx.dealSpecialDamage(entry, 50);
+    },
+  },
 };

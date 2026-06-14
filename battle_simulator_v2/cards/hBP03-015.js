@@ -5,14 +5,19 @@
  *   自分の#ReGLOSSを持つバックホロメンが4人以上いる時、このホロメンのアーツ+40。
  *   → dmgBonus で実装。
  *
- * ※ギフト/キーワード「メランコリャック」（[センターポジション限定]自分の#ReGLOSSを持つ
- *   コラボホロメンが受けるダメージ-20）は未実装。
- *   エンジンの「受けるダメージ」修正(damageDelta)は受け手に付いた装着カードからのみ集計され、
- *   別ホロメン（このホロメン）が他のホロメンへ被ダメージ軽減アウラを与える機構が無いため。
- *   （保留リスト: 被ダメージ割り込み / 他ホロメンを恒常強化する常時アウラ）
+ * ギフト/キーワード「メランコリャック」: [センターポジション限定]自分の#ReGLOSSを持つ
+ *   コラボホロメンが受けるダメージ-20。
+ *   → auraDamageDelta（常時アウラ）で実装。はじめがセンターにいる間、#ReGLOSSのコラボの被ダメージ-20。
  */
 export default {
   number: 'hBP03-015',
+  // キーワード「メランコリャック」: [センター限定]自分の#ReGLOSSコラボが受けるダメージ-20（常時アウラ）
+  auraDamageDelta(src, target, zone, engine) {
+    if (engine._zoneOf(src) !== 'center') return 0;          // [センター限定]（はじめ自身）
+    if (zone !== 'collab') return 0;                         // コラボホロメン
+    if (!(target.stack[0].tags || []).includes('ReGLOSS')) return 0; // #ReGLOSS
+    return -20;
+  },
   arts: {
     'これが番長の実力ってやつよ': {
       dmgBonus(ctx) {

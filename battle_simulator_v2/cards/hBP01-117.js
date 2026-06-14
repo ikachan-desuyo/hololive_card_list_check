@@ -7,10 +7,8 @@
  * ◆〈七詩ムメイ〉に付いていたら能力追加
  *   相手のターンで、このマスコットが付いているホロメンがダメージを受ける時、
  *   このマスコットをアーカイブできる：このマスコットが付いていたホロメンが受けるダメージ-30。
- *   → 【保留】被ダメージ割り込み（受けるダメージ-N）の機構がエンジンに無い。
- *     「ダメージを受ける時」に発火し、コスト（自身をアーカイブ）を払って受けるダメージを
- *     軽減するフックが未実装のため、この追加能力は未対応。
- *     （規約の保留機構「被ダメージ割り込み(受けるダメージ-N)」に準ずる）
+ *   → onDamageReceivedReact（被ダメージ割り込み・任意）で実装。〈七詩ムメイ〉に付いていて
+ *     相手のターンに被弾する時、このマスコットをアーカイブして受けるダメージ-30。
  *
  * 付け先制限: マスコットの標準ルール（自分のホロメン1人につき1枚）は
  *   engine._canAttachSupport が既定で担保するため attachRule は不要。
@@ -22,5 +20,24 @@ export default {
     // このマスコットが付いているホロメンのアーツ+10
     artsPlus() { return 10; },
   },
-  // 〈七詩ムメイ〉に付いた時の「受けるダメージ-30」は被ダメージ割り込み機構が未実装のため保留。
+  // ◆〈七詩ムメイ〉に付いていたら: 相手のターンに被弾する時、このマスコットをアーカイブして受けるダメージ-30（任意）
+  onDamageReceivedReact: {
+    title: 'フレンドをアーカイブして受けるダメージ-30？',
+    yesLabel: 'アーカイブする（-30）',
+    canUse(engine, info) {
+      return info.target.stack[0].name === '七詩ムメイ' &&
+        engine.state.turnPlayer !== info.defIdx &&   // 相手のターン
+        info.dmg > 0;
+    },
+    apply(engine, info) {
+      const t = info.target;
+      const i = t.attachments.indexOf(info.attachedCard);
+      if (i !== -1) {
+        t.attachments.splice(i, 1);
+        engine.state.players[info.defIdx].archive.push(info.attachedCard);
+        engine.log(`${t.stack[0].name}: フレンドをアーカイブ → 受けるダメージ-30`);
+      }
+      return Math.max(0, info.dmg - 30);
+    },
+  },
 };

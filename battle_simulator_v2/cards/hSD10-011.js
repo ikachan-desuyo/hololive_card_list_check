@@ -16,8 +16,8 @@ export default {
     canUse(ctx) {
       const stage = ctx.engine._stageHolomems(ctx.player);
       if (stage.length === 0) return false;
-      // ステージのホロメン全員が #FLOW GLOW を持つ
-      return stage.every((h) => ctx.hasTag(h.stack[0], 'FLOW GLOW'));
+      // ステージのホロメン全員が #FLOW GLOW を持つ（タグは 'FLOW' と 'GLOW' に分割格納される）
+      return stage.every((h) => ctx.hasTag(h.stack[0], 'FLOW') && ctx.hasTag(h.stack[0], 'GLOW'));
     },
     *run(ctx) {
       // 送り先候補（センター・コラボのみ）。それぞれ最大2枚まで。
