@@ -4,33 +4,38 @@
  * [サポート効果]
  *  ■このファンが付いているホロメンがアーツを使う時、自分の推しホロメンが〈ベスティア・ゼータ〉なら、
  *    このファンを白エールとしても扱う。
- *    → 【保留】装着ファンを「白エール」としてアーツの必要エールに充当する機構がエンジンに無い。
- *      アーツの支払い判定 engine._canPayCheers は付いているホロメンの実エール（h.cheers）のみを
- *      参照しており、装着カードを擬似エールとしてプールに加えるフックが存在しない
- *      （engine._effectiveArtCost / _canPayCheers 参照）。規約の保留機構（擬似エール供給）に準ずる。
- *      同系統の保留: hBP01-118（白）, hBP01-126（赤）, hBP03-107（赤）, hBP03-110（紫）。
- *      エンジンに擬似エール供給フックが追加されたら、ここに「自分の推しが〈ベスティア・ゼータ〉の時に
- *      アーツ使用時に白エール1個を供給する」定義を足すこと。
+ *    → attached.cheerSupply で実装（アーツ使用時に白エール1個を擬似供給）。
  *
  *  ■相手のターンで、このファンが付いているホロメンがダメージを受けた時、このファンをアーカイブする。
- *    → 【保留】「ホロメンがダメージを受けた時」に発火する被ダメージトリガーのフックがエンジンに無い
- *      （実装可能なフックは triggers.onDown / onAttach / onOpponentDown / onArtsUse と
- *       推しスキルの onDamageOshiSkill[=ダメージ軽減]のみで、装着カードを被ダメージ時に
- *       アーカイブへ送るトリガーは存在しない）。規約の保留機構（被ダメージ割り込み類）に準ずる。
- *      被ダメージトリガーのディスパッチが追加されたら、相手ターン判定
- *      （ctx.state.turnPlayer !== ctx.playerIdx）の上で ctx.archive 系で自身をアーカイブする定義を足すこと。
+ *    → attached.onDamageReceivedForced で実装。engine が「相手のターンに付いているホロメンがダメージを
+ *      受けた時」に強制（選択なし）で発火する（任意割り込みの onDamageReceivedReact とは別経路）。
+ *      発火時にこのファンを attachments から外し、持ち主のアーカイブへ送る（ダメージ値は変更しない）。
  *
  * このファンは、自分の〈ベスティア・ゼータ〉だけに付けられ、1人につき何枚でも付けられる。
  *    → attachRule で実装。
  */
 export default {
   number: 'hBP07-108',
+  attached: {
+    // ■アーツを使う時、自分の推しが〈ベスティア・ゼータ〉なら、このファンを白エールとしても扱う（擬似エール供給）
+    cheerSupply(holomem, engine) {
+      const owner = engine.state.players.find((p) => engine._stageHolomems(p).includes(holomem));
+      return owner && owner.oshi && owner.oshi.name === 'ベスティア・ゼータ' ? [{ color: '白' }] : [];
+    },
+    // ■相手のターンで、このファンが付いているホロメンがダメージを受けた時、このファンをアーカイブする（強制・選択なし）
+    onDamageReceivedForced(holomem, engine, self, ownerIdx) {
+      const i = holomem.attachments.indexOf(self);
+      if (i !== -1) {
+        holomem.attachments.splice(i, 1);
+        engine.state.players[ownerIdx].archive.push(self);
+        engine.log(`${holomem.stack[0].name}: ダメージを受けたため Zecretary をアーカイブ`);
+      }
+    },
+  },
   attachRule: {
     canAttach(holomem) {
       return holomem.stack[0].name === 'ベスティア・ゼータ';
     },
     unlimited: true, // 1人に何枚でも
   },
-  // 「アーツ使用時このファンを白エールとしても扱う」「相手ターンの被ダメージ時に自身をアーカイブ」は
-  // それぞれ擬似エール供給機構 / 被ダメージトリガー機構が未実装のため保留。
 };

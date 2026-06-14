@@ -16,14 +16,9 @@
  *     （このカードは自分のターンに使う＝turn T。自分のエンドステップ(turn T)では
  *      T < T+1 なので残り、次の相手ターン(turn T+1)のエンドステップで消滅）。
  *
- * 保留: 「最初に受けるアーツダメージ」の "最初の1回だけ" という一発消費は、
- *   エンジンの被ダメージ経路（system.js damageReceivedDelta）が修正を summ するだけで
- *   消費フラグを立てる仕組みを持たないため厳密には enforce できない。
- *   reArts のように engine 側で used を立てる専用処理が無い。
- *   そのため本実装では「次の相手ターン中、センターで受けるアーツダメージは（複数回でも）-300」
- *   となり、稀に過剰軽減になり得る（安全側＝防御側有利だが厳密にはオーバー）。
- *   一発消費を正しく実装するには engine の damageReceivedDelta 適用箇所に
- *   「適用後にその modifier を used/除去する」フックを追加する必要があり、ここでは保留。
+ *   「最初に受けるアーツダメージ」の一発消費は once:true で表現。engine._applyDamageReceived が
+ *   ダメージ適用時に effects.consumeOnceDamageReceivedMods で該当 once 修正を used=true にするため、
+ *   2回目以降のアーツダメージには適用されない（最初の1回だけ-300）。
  */
 export default {
   number: 'hBP08-094',
@@ -50,6 +45,7 @@ export default {
         // 対象本人が「センターポジションで」受けるアーツダメージのみ -300
         match: (h, zone, kind) => h === selected && zone === 'center' && kind === 'arts',
         amount: -300,
+        once: true, // 「最初に受けるアーツダメージ」だけ＝適用後に used 化（consumeOnceDamageReceivedMods）
         // 次の相手のターン終了まで有効（自分のターン=turn のエンドでは消えない）
         untilTurn: ctx.state.turn + 1,
         description: `${entry.top.name} が次の相手ターン中にセンターで受けるアーツダメージ-300`,

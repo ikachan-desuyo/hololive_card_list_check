@@ -3,14 +3,8 @@
  *
  * [キーワード:ギフト]「深淵からの愛情」:
  *   自分のステージに赤エールが6枚以上あるなら、このホロメンのアーツは、相手のDebut以外のバックホロメンも対象にできる。
- *   → 保留: これは「アーツの対象拡張」を常時（条件付き）行う受動ギフトだが、
- *     エンジンの対象生成（_performanceActions）が現状で消費するのは
- *     kind:'artTargetDamagedBack'（HP減バック拡張）のみで、
- *     「Debut以外のバックも対象にできる」種別を読む処理が無い。
- *     受動ギフトには run のフックも無く（ターン修正を能動的に積む契機が無い）、
- *     現状では実効する手段が無いため未実装とする（hBP08-018 と同様の保留）。
- *     エンジン側に「赤エール6枚以上なら相手のDebut以外バックも対象可」の判定を
- *     追加した時点で有効化すること。
+ *   → artTargetExtraTargets（受動アウラ。engine._performanceActions が対象生成時に評価）で実装。
+ *     自分のステージの赤エールが6枚以上なら、相手のDebut以外のバックホロメンを対象に追加する。
  *
  * アーツ「ふわふわバウンダリースパナー」(80+ / 特攻[白+50]):
  *   このターンに自分の〈モココ・アビスガード〉がアーツを使っていたなら、このアーツ+50。
@@ -25,12 +19,25 @@
  *     付け替え先が居なければ付け替えできない（任意効果なので何もしないだけ）。
  *     基本ダメージ80・特攻[白+50] はエンジンが素点処理する。
  *
- * 保留: ギフト「深淵からの愛情」の対象拡張（上記）。アーツは全文実装。
  */
 const MOCOCO = 'モココ・アビスガード';
 
 export default {
   number: 'hBP08-059',
+
+  // ギフト「深淵からの愛情」: 自分のステージに赤エール6枚以上なら、このホロメンのアーツは相手のDebut以外バックも対象にできる
+  artTargetExtraTargets(h, engine, opp) {
+    const owner = engine.state.players.find((p) => engine._stageHolomems(p).includes(h));
+    if (!owner) return [];
+    let red = 0;
+    for (const sh of engine._stageHolomems(owner)) red += (sh.cheers || []).filter((c) => c.color === '赤').length;
+    if (red < 6) return [];
+    const extra = [];
+    opp.back.forEach((b, bi) => {
+      if (b && b.stack[0].bloomLevel !== 'Debut') extra.push({ zone: 'back', index: bi });
+    });
+    return extra;
+  },
 
   arts: {
     'ふわふわバウンダリースパナー': {

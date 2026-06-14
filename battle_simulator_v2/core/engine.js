@@ -189,11 +189,28 @@ export class Engine {
   }
 
   /**
+   * 「相手のターンで、このホロメンがダメージを受けた時」に必ず発火する強制トリガー（選択なし・同期）。
+   * 対象の装着カード定義 attached.onDamageReceivedForced(holomem, engine, self, ownerIdx) を呼ぶ。
+   * 自分のターンに自分が受けた場合は発火しない（相手から受けた時のみ）。(hBP07-108 等)
+   */
+  _dispatchDamageReceivedForced(target) {
+    const ownerIdx = this.state.players.findIndex((p) => this._stageHolomems(p).includes(target));
+    if (ownerIdx < 0 || ownerIdx === this.state.turnPlayer) return;
+    for (const att of [...target.attachments]) {
+      const fn = this.registry.get(att.number)?.attached?.onDamageReceivedForced;
+      if (fn) fn(target, this, att, ownerIdx);
+    }
+  }
+
+  /**
    * 受け手の「受けるダメージ」修正を適用した最終ダメージ（0未満にはしない）。
    * @param attacker 攻撃元ホロメン（「相手の1stから受けるアーツ-30」のような攻撃元条件用。無ければnull）
    */
   _applyDamageReceived(targetHolomem, dmg, kind = 'arts', attacker = null) {
-    const delta = this.effects.damageReceivedDelta(targetHolomem, this._zoneOf(targetHolomem), kind, attacker);
+    const zone = this._zoneOf(targetHolomem);
+    const delta = this.effects.damageReceivedDelta(targetHolomem, zone, kind, attacker);
+    // 「最初に受けるダメージだけ」等の一発消費(once)修正を使用済みにする（このダメージ機会で消費）
+    this.effects.consumeOnceDamageReceivedMods(targetHolomem, zone, kind);
     if (delta === 0) return dmg;
     const adjusted = Math.max(0, dmg + delta);
     if (adjusted !== dmg) {
@@ -405,6 +422,8 @@ export class Engine {
     p.usedSupportThisTurn = false;
     p.usedCollabThisTurn = false;
     p.usedBatonTouchThisTurn = false;
+    p.cheerArchivedThisTurn = false; // このターンに自分のステージのエールをアーカイブしたか（hBP07-088 等）
+    p.artsUsedNamesThisTurn = [];    // このターンにアーツを使った自分のホロメン名（hBP05-050 等）
     p.supportsPlayedThisTurn = []; // このターンに使ったサポートのカード名一覧（「〈限界飯〉を使っていたなら」等）
     // 「直前の相手のターンに自分のホロメンがダウンしていたなら」用。
     // このターン(idx)の間に相手(1-idx)のホロメンがダウンしたら蓄積し、相手の次の自ターンで参照される。
@@ -725,15 +744,19 @@ export class Engine {
     const actions = [];
 
     // 対象: 相手のセンター/コラボ (12.3.3.2)
-    const targets = [];
+    let targets = [];
     if (opp.center) targets.push({ zone: 'center', index: 0 });
     if (opp.collab) targets.push({ zone: 'collab', index: 0 });
+    // 防御側（opp）の常時アウラによるアーツ対象制限（「相手のアーツは自分のコラボしか対象にできない」hBP05-010 等）
+    const allowZones = this.effects.oppArtsTargetZones(opp, 1 - s.turnPlayer);
+    if (allowZones) targets = targets.filter((t) => allowZones.includes(t.zone));
 
     // 指定ホロメンの指定アーツについて、対象ごとのアーツアクションを actions に積む（通常／再アーツ共通）
     const pushArtActions = (h, zone, art, ai, isReArts) => {
       const card = topCard(h);
       const cost = this._effectiveArtCost(h, art.cost, s.turnPlayer);
-      if (!this._canPayCheers(h.cheers, cost)) return;
+      // アーツ使用時のみ、装着カードの「擬似エール供給」（◆〈ときのそら〉に付いていたら白エール扱い 等）を支払いプールに加味
+      if (!this._canPayCheers(this._artCheerPool(h), cost)) return;
       const artDef = this.registry.getArt(card.number, art.name);
       // カード定義によるアーツ使用条件（「アーカイブにサポート4枚以上なければ使えない」等）
       if (artDef?.canUse) {
@@ -747,6 +770,23 @@ export class Engine {
         opp.back.forEach((b, bi) => {
           if (b && b.damage > 0) usableTargets.push({ zone: 'back', index: bi });
         });
+      }
+      // 対象拡張: ターン修正 kind:'artTargetSecondBack' を持つホロメンは相手の2ndバックも狙える (hBP08-018)
+      if (this.effects.hasArtTargetMod('artTargetSecondBack', h, s.turnPlayer)) {
+        if (usableTargets === targets) usableTargets = [...targets];
+        opp.back.forEach((b, bi) => {
+          if (b && b.stack[0].bloomLevel === '2nd' && !usableTargets.some((t) => t.zone === 'back' && t.index === bi)) {
+            usableTargets.push({ zone: 'back', index: bi });
+          }
+        });
+      }
+      // 対象拡張: カード定義の受動アウラ artTargetExtraTargets（条件付きで相手バック等を常時対象化。hBP08-059）
+      const extraTargets = this.registry.get(card.number)?.artTargetExtraTargets?.(h, this, opp);
+      if (extraTargets && extraTargets.length) {
+        if (usableTargets === targets) usableTargets = [...targets];
+        for (const t of extraTargets) {
+          if (!usableTargets.some((u) => u.zone === t.zone && u.index === t.index)) usableTargets.push(t);
+        }
       }
       // カード定義による対象制限（「このアーツは相手のセンターホロメンしか対象にできない」等）
       const allowedTargets = artDef?.targetZones
@@ -991,12 +1031,15 @@ export class Engine {
         this.log(`${p.name}: ${skill.sp ? 'SP' : ''}推しスキル発動（ホロパワー-${skill.cost}）`);
         const def = this.registry.get(p.oshi.number);
         const skillDef = skill.sp ? def?.spOshiSkill : def?.oshiSkill;
+        // 推しスキル解決後に「推しスキルを使った時」の味方ホロメンギフトを誘発（hBP05-038/050 等）
+        const afterSkill = () => this._dispatchOshiSkillUsed(s.turnPlayer, skill, finish);
         if (skillDef) {
-          this._runEffect(skillDef, { playerIdx: s.turnPlayer, sourceCard: p.oshi }, finish);
+          this._runEffect(skillDef, { playerIdx: s.turnPlayer, sourceCard: p.oshi }, afterSkill);
           return;
         }
         this.log(`TODO(効果未実装) 推しスキル: ${skill.text}`);
-        break;
+        afterSkill();
+        return;
       }
       case 'support': {
         const card = p.hand.splice(action.handIndex, 1)[0];
@@ -1125,6 +1168,8 @@ export class Engine {
 
     s.perfUsed[action.zone] = true;
     h.lastArtUsedIndex = action.artIndex; // 再アーツ（同じアーツをもう1回）判定用に記録
+    // 「このターンに〈名前〉がアーツを使ったか」判定用に、アーツを使ったホロメン名を記録（hBP05-050 等）
+    (p.artsUsedNamesThisTurn || (p.artsUsedNamesThisTurn = [])).push(topCard(h).name);
     // 再アーツでの使用なら、対応する「もう1回」修正を消費する (hBP07-008)
     if (action.reArts) {
       const reMod = s.modifiers.find(
@@ -1206,6 +1251,7 @@ export class Engine {
           this.log(
             `「${art.name}」→ ${tCard.name} に ${finalDmg}ダメージ（累計${t.damage}/${this.effectiveHp(t)}）`
           );
+          if (finalDmg > 0) this._dispatchDamageReceivedForced(t); // 強制被ダメージトリガー (hBP07-108)
           if (t.damage >= this.effectiveHp(t)) downed.push(t);
           after2();
         });
@@ -1218,28 +1264,46 @@ export class Engine {
         const realCont = () => this._checkTiming(() => this._queuePerformancePending());
         const cont = () => this._offerTimingOshiSkills('onDamageDealtOshiSkills', s.turnPlayer, attackInfo,
           () => this._offerTimingOshiSkills('onArtsUseOshiSkills', s.turnPlayer, attackInfo, realCont));
+        // runners: { run, srcCard } の配列。srcCard は ctx.sourceCard（装着カードのトリガーは装着カードを渡す）
         const runners = [];
+        const selfCard = topCard(h);
         if (downed.length > 0) {
           this._notifySourceDown(h, s.turnPlayer); // 継続効果(ターン修正)の同期通知（ラミィSP等）
-          const cardTrig = this.registry.get(topCard(h).number)?.triggers?.onOpponentDown;
+          const cardTrig = this.registry.get(selfCard.number)?.triggers?.onOpponentDown;
           for (let d = 0; d < downed.length; d++) { // ダウン体数ぶん（通常は1体）
-            if (cardTrig) runners.push(cardTrig);
-            if (artDef?.onDownDealt) runners.push(artDef.onDownDealt);
+            if (cardTrig) runners.push({ run: cardTrig, srcCard: selfCard });
+            if (artDef?.onDownDealt) runners.push({ run: artDef.onDownDealt, srcCard: selfCard });
+          }
+          // 装着カードの「ホストが相手をダウンさせた時」トリガー（hBP02-096 等）
+          for (const att of h.attachments) {
+            const at = this.registry.get(att.number)?.triggers?.onOpponentDown;
+            if (at) runners.push({ run: at, srcCard: att });
           }
         }
-        const onArts = this.registry.get(topCard(h).number)?.triggers?.onArtsUse;
-        if (onArts) runners.push(onArts);
+        const onArts = this.registry.get(selfCard.number)?.triggers?.onArtsUse;
+        if (onArts) runners.push({ run: onArts, srcCard: selfCard });
+        // 装着カードの「ホストがアーツを使った時」トリガー（hBP01-119 等。ctx.sourceHolomem=ホスト, sourceCard=装着）
+        for (const att of h.attachments) {
+          const at = this.registry.get(att.number)?.triggers?.onArtsUse;
+          if (at) runners.push({ run: at, srcCard: att });
+        }
+        // 味方ホロメンがアーツを使った時（自ステージの他のホロメンに発火。ctx.sourceHolomem=監視側, ctx.attackInfo に使用者h。hBP05-066）
+        for (const ally of this._stageHolomems(p)) {
+          if (ally === h) continue;
+          const at = this.registry.get(ally.stack[0].number)?.triggers?.onAllyArtsUse;
+          if (at) runners.push({ run: at, srcCard: ally.stack[0], srcH: ally, attackInfo });
+        }
         // 「このアーツで（相手に）ダメージを与えた時」（実際に与えた合計ダメージ量を渡す。ライフスティール等）
         if (artDef?.onDamageDealt && totalDealt > 0) {
           const dealt = totalDealt;
-          runners.push(function* onDamageDealtWrap(c) { yield* artDef.onDamageDealt(c, dealt); });
+          runners.push({ run: function* onDamageDealtWrap(c) { yield* artDef.onDamageDealt(c, dealt); }, srcCard: selfCard });
         }
         if (runners.length > 0) {
           const runNext = (i) => {
             if (i >= runners.length) { cont(); return; }
             this._runEffect(
-              { run: runners[i] },
-              { playerIdx: s.turnPlayer, sourceCard: topCard(h), sourceHolomem: h },
+              { run: runners[i].run },
+              { playerIdx: s.turnPlayer, sourceCard: runners[i].srcCard, sourceHolomem: runners[i].srcH || h, attackInfo: runners[i].attackInfo },
               () => runNext(i + 1),
             );
           };
@@ -1418,6 +1482,31 @@ export class Engine {
     }
 
     runDownTrigger();
+  }
+
+  /**
+   * 「（自分が）推しスキルを使った時」の味方ホロメンギフトを誘発する。
+   * ownerIdx のステージ上の各ホロメンの triggers.onOshiSkillUsed を順に実行し、完了後 after()。
+   * ctx.oshiSkillInfo = { text, sp }（使った推しスキルの本文・SPか）。
+   */
+  _dispatchOshiSkillUsed(ownerIdx, skill, after) {
+    const p = this.state.players[ownerIdx];
+    const runners = [];
+    for (const h of this._stageHolomems(p)) {
+      const trig = this.registry.get(h.stack[0].number)?.triggers?.onOshiSkillUsed;
+      if (trig) runners.push({ run: trig, srcH: h });
+    }
+    if (runners.length === 0) { after(); return; }
+    const info = { text: skill.text || '', sp: !!skill.sp };
+    const runNext = (i) => {
+      if (i >= runners.length) { after(); return; }
+      this._runEffect(
+        { run: runners[i].run },
+        { playerIdx: ownerIdx, sourceCard: runners[i].srcH.stack[0], sourceHolomem: runners[i].srcH, oshiSkillInfo: info },
+        () => runNext(i + 1),
+      );
+    };
+    runNext(0);
   }
 
   /**
@@ -1705,6 +1794,23 @@ export class Engine {
   /** バトンタッチの必要エールに軽減（「無色-2」等）を適用した実効コストを返す */
   _effectiveBatonCost(holomem, cost, ownerIdx) {
     return this._applyCostReduction([...cost], this.effects.batonCostReduction(holomem, ownerIdx));
+  }
+
+  /**
+   * アーツのコスト支払い判定に使うエールプール = ホロメンの実エール ＋ 装着カードの擬似エール供給。
+   * 装着カード定義の attached.cheerSupply(holomem, engine) が [{color}] を返すと、その色のエールを
+   * アーツの必要エール充当に「持っているものとして」加える（「この装着を◯エールとしても扱う」用）。
+   * アーツはエールを消費しない（充足判定のみ）ので擬似エールは仮想オブジェクトでよく、保存則に影響しない。
+   */
+  _artCheerPool(h) {
+    const pool = [...h.cheers];
+    for (const att of h.attachments) {
+      const supply = this.registry.get(att.number)?.attached?.cheerSupply;
+      if (supply) {
+        for (const c of supply(h, this) || []) pool.push({ color: c.color, pseudo: true });
+      }
+    }
+    return pool;
   }
 
   /**

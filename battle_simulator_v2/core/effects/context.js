@@ -37,6 +37,8 @@ export class EffectContext {
     this.lifeDecreasedThisPerf = opts.lifeDecreasedThisPerf || false;
     // 攻撃時誘発の推しスキル用: { sourceHolomem, art, artName, dealtList:[{target,zone,dealt}], downed }
     this.attackInfo = opts.attackInfo || null;
+    // onOshiSkillUsed 用: 使った推しスキルの情報 { text, sp }
+    this.oshiSkillInfo = opts.oshiSkillInfo || null;
   }
 
   get player() { return this.engine.state.players[this.playerIdx]; }
@@ -308,6 +310,21 @@ export class EffectContext {
     return true;
   }
 
+  /**
+   * ホロメンの実効バトンタッチコスト（基礎 batonTouch ＋ 軽減/増加アウラ・ターン修正）を色配列で返す。
+   * 「相手のセンターのバトンタッチに必要な無色がN以上なら」等の条件判定に使う（hBP08-052/053 等）。
+   */
+  effectiveBatonCost(holomem) {
+    const ownerIdx = this.engine.state.players.findIndex((p) => this.engine._stageHolomems(p).includes(holomem));
+    if (ownerIdx < 0) return [];
+    return this.engine._effectiveBatonCost(holomem, holomem.stack[0].batonTouch || [], ownerIdx);
+  }
+
+  /** 実効バトンタッチコストのうち指定色の個数（省略時は無色） */
+  batonCostCount(holomem, color = '無色') {
+    return this.effectiveBatonCost(holomem).filter((c) => c === color).length;
+  }
+
   /** お休み状態のホロメンをアクティブにする (4.3.2) */
   setActive(holomem) {
     if (holomem.rested) {
@@ -441,6 +458,12 @@ export class EffectContext {
   attachCheer(cheer, holomem) {
     holomem.cheers.push(cheer);
     this.log(`${holomem.stack[0].name} に ${cheer.name} を送った`);
+    // 「（このホロメンに）エールが付いた時」の装着カード同期トリガー（hBP03-113 等）。
+    // 効果が即時・選択不要のものに限る（attachCheer はジェネレータでないため）。
+    for (const att of holomem.attachments) {
+      const fn = this.engine.registry.get(att.number)?.attached?.onCheerAttached;
+      if (fn) fn(holomem, this.engine, att);
+    }
   }
 
   /** サポートカード（ファン/マスコット等）をホロメンに付ける */
@@ -550,6 +573,13 @@ export class EffectContext {
       holomem.cheers.splice(i, 1);
       this.player.archive.push(cheer);
       this.log(`${holomem.stack[0].name} の ${cheer.name} をアーカイブ`);
+      // 「このターンに自分のステージのエールがアーカイブされた」記録（hBP07-088 のアーツ+30条件 等）
+      this.player.cheerArchivedThisTurn = true;
+      // 「自分のエールがアーカイブに置かれた時」の同期トリガー（即時・選択不要。hBP08-031 等）
+      for (const sh of this.engine._stageHolomems(this.player)) {
+        const fn = this.engine.registry.get(sh.stack[0].number)?.onSelfCheerArchived;
+        if (fn) fn(sh, this.engine, this.playerIdx);
+      }
     }
   }
 
@@ -608,6 +638,7 @@ export class EffectContext {
     }
 
     targetEntry.holomem.damage += total;
+    if (total > 0) this.engine._dispatchDamageReceivedForced(targetEntry.holomem); // 強制被ダメージトリガー (hBP07-108)
     // 「ライフは減らない」は、この特殊ダメージでダウンが確定した場合のみ適用する。
     // （ダウンに至らなかった場合にフラグを残すと、後から別のダメージで倒された時まで
     //   ライフが減らなくなってしまう）

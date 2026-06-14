@@ -26,7 +26,12 @@
  *       artsPlus(holomem, engine) { return N; },
  *       hpPlus(holomem, engine) { return N; },
  *       specialDmgPlus(sourceHolomem, targetEntry, engine) { return N; },
+ *       damageDelta(holomem, zone, engine, kind, attacker) { return N; }, // 受けるダメージ増減（負=軽減）
+ *       cheerSupply(holomem, engine) { return [{color:'白'}]; }, // アーツ使用時の擬似エール供給（「この装着を○エールとしても扱う」。コスト充足判定のみ・消費しない）
+ *       onCheerAttached(holomem, engine, self) {},          // このホロメンにエールが付いた時（同期・選択不可。即時の継続修正付与等）
+ *       onDamageReceivedForced(holomem, engine, self, ownerIdx) {}, // 相手ターンに付いているホロメンがダメージを受けた時の強制トリガー（同期・選択なし。自身をアーカイブ等）
  *     },
+ *     onSelfCheerArchived(holomem, engine, ownerIdx) {},     // 自分のステージのエールがアーカイブされた時（同期・選択不可。archiveCheer 経由。hBP08-031）
  *     attachRule: {                                      // 付け先制限（雪民など）
  *       canAttach(holomem) { return bool; },
  *       unlimited: true,                                 // 1人に何枚でも
@@ -46,8 +51,15 @@
  *       *onAttach(ctx) {...},                            // このカードを付けた時（supportAttach / attachSupportWithTrigger で発火）
  *       *onOpponentDown(ctx) {...},                      // このホロメンが相手をダウンさせた時（アーツ解決時に発火。選択可）
  *       *onOpponentPerformanceEnd(ctx) {...},            // 相手のパフォーマンスステップ終了時（防御側で発火。ctx.lifeDecreasedThisPerf でそのステップ中のライフ減少を判定）
+ *       *onOshiSkillUsed(ctx) {...},                      // 自分が推しスキルを使った時（自ステージのホロメンに発火。ctx.oshiSkillInfo={text,sp} で種別判定）
+ *       *onAllyArtsUse(ctx) {...},                        // 自分の他のホロメンがアーツを使った時（自ステージの他ホロメンに発火。ctx.attackInfo.sourceHolomem=使用者）
  *     },                                                 //   ※ctx.sourceCard=自分, ctx.sourceHolomem=付いた/ダウンした/ダウンさせたホロメン
+ *     artTargetExtraTargets(h, engine, opp) { return [{zone:'back',index}]; }, // 受動アウラ: このホロメンのアーツが追加で取れる相手対象（条件付き常時拡張。hBP08-059）
+ *     // ※アーツ対象拡張のターン修正: kind:'artTargetDamagedBack'（HP減バック）/ 'artTargetSecondBack'（相手2ndバック）。ctx.addTurnModifier({kind,ownerIdx,match}) で付与
  *     specialBloom(h, handCard, engine, ownerIdx) { return bool; }, // 特殊Bloom: true でメインのBloom候補に追加（レベル遷移条件のみ迂回。同名/HP/ターン制限は通常通り）
+ *     oppArtsTargetRestrict(src, engine, defender) { return ['collab']; }, // 防御側アウラ: 相手のアーツが取れる対象ゾーンを制限（「自分のコラボしか対象にできない」hBP05-010 等。特殊ダメージは別経路で対象外）
+ *     oppBatonCostDelta(src, target, engine) { return [{color:'無色',amount:-1}]; }, // 相手側アウラ: 相手のバトンタッチ必要エールを増減（負=増加。「相手センターのバトン必要無色+1」hBP08-104）
+ *     oppArtsCostDelta(src, target, engine) { return [{color:'無色',amount:-2}]; },  // 相手側アウラ: 相手のアーツ必要エールを増減（負=増加。「相手センターのアーツ必要無色+2」hBP08-053）
  *     onDamageReceivedReact: {                          // 「ダメージを受ける時に使える」リアクティブ割り込み（推しスキル以外。ホロメンギフト/装着ファン）
  *       title, yesLabel,                                //   防御側に決定ポイントを提示。アーツ/特殊どちらのダメージ経路でも発火する
  *       canUse(engine, info) { return bool; },          //   info = { defIdx, target, dmg, kind:'arts'|'special', reactor?(ステージ側), attachedCard?(装着側) }

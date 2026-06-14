@@ -51,9 +51,42 @@
 
 > 手書き合計 **990枚**（= index.js 登録キー数）。カードデータ更新（2314件/1222番号）に伴い、未実装だった251枚（hBP08/hBD24/hBP04・05積み残し/hSD14-19/hPR/hYS01）をマルチエージェント並列で一括実装。**未実装(TODO)=0**。ブラウザテスト 42/42 PASS・全990枚 import 0エラー・自動コンパイル387種。
 > **実装状況の正本は [CARD_EFFECT_CHECKLIST.md](CARD_EFFECT_CHECKLIST.md)**（`tests/coverage-export.html` ＋ `scripts/tools/build-effect-checklist.py` で再生成）。手書き990＋自動コンパイル37＝効果要1027すべて実装、バニラ195。
-> ※うち28枚は一部のサブ効果が未対応機構依存のため当該部分のみ保留（各ファイルのJSDocに「保留:」と明記）。本体効果は実装済み。
 > ※公式データは半角コロン「:」を使うため、`core/cards.js` の `fwColon` でスキルテキストのコロンを全角「：」に正規化（既存パーサ／コンパイラは全角前提）。
 > hBP01〜08・hSD01-19・hBD24・hPR・hYS01 はマルチエージェント並列で実装（各ファイルのJSDocに実装範囲・保留を明記）。
+
+### バトンタッチコストのデータ修正（2026-06-14）
+card_data.json の `baton_touch` は個数を失い**全ホロメンが無色1**だった（2nd/Buzz 等は本来 ◇◇=無色2、一部 ◇◇◇）。
+**根本原因はカード収集ツール** `card_list_update/cron_jobs/card_collector` の `parsers/card_parser.py` `parse_detail_info`：
+バトン欄を `find('img')`（先頭1個のみ）で読み、◇→無色の単一文字列にしていた（全アイコン収集の `_parse_baton_touch` は定義のみで未使用）。
+- 修正: `parse_detail_info` のバトンを `find_all('img')` で全アイコン収集し**色配列**（例 ["無色","無色"]）で保存。ついでにデバッグ print を除去。
+- 収集ツールを再実行し `data/card_data.json` を再生成 → `json_file/card_data.json` に反映（**差分は baton_touch のみ**・件数2314不変・他フィールド差分0）。
+- `core/cards.js` の `batonTouch` は配列形式を解釈（旧文字列とも後方互換）。バトンコスト参照カード（hBP08-052/047/004, hBP05-075, hBP03-111 等。既に `_effectiveBatonCost` 経由）が自動的に正しく動作。
+- 併せて相手側コストアウラ `oppBatonCostDelta`／`oppArtsCostDelta` を追加し、**hBP08-053/104** を解消（保留16→15）。
+- 回帰テスト追加（2nd=無色2 / Debut=無色1）。43/43 PASS。
+
+### 保留対応（2026-06-14）— 残り保留 15枚（旧16枚時点の記録）
+（第5ラウンド）**oppBatonCostDelta**（相手側アウラで相手のバトン必要エールを増減）を追加し hBP08-104 を解消（17→16）。当初38枚 → **16枚**（22枚解消）。
+（第4ラウンド）さらに **onAllyArtsUse**（味方アーツ使用監視）/ **artTargetExtraTargets**（受動の条件付きアーツ対象拡張）/
+**once 付き被ダメージ修正**（「最初に受けるダメージだけ」`consumeOnceDamageReceivedMods`）を追加し、hBP05-066/hBP08-059/hBP08-094 を解消（20→17）。
+残り17枚は: 全色扱いの色上書き(hBP08-068/073/074) / ダイスの振り回数文脈・出目倍化(hBP04-005/059,hBP08-045) / 手札アーカイブのコスト置換＋Xコスト推し(hBP01-005) / 被ダメージ割り込み中の選択(hBP05-002) / 手札被アーカイブ誘発(hBP05-083) / ターン終了時の起動型推しスキル・遅延効果(hBP08-007) / デッキアーカイブ枚数カウント(hBP08-020) / アーカイブ起点の起動型ギフト(hBP08-044) / 推しコスト書き換え(hBP08-060) / バトン増コストの装着オーラ(hBP08-104) / 特定推しスキルでのアクティブ化追跡(hBP06-069) / Bloom経路マーカー(hBP04-061) / バトンコスト無色5以上の判定(hBP08-053 ※v2のバトンコストモデル上は成立しないため事実上対象外)。
+
+#### （前ラウンド記録）残り20枚時点
+さらに以下の機構を追加し hBP05-038/050, hBP08-018/031/049, hBP05-010, hBP07-108 を解消（25→20）:
+- **推しスキル使用時誘発** `triggers.onOshiSkillUsed`（`ctx.oshiSkillInfo={text,sp}`）/ **アーツ対象拡張** `kind:'artTargetSecondBack'`（相手2ndバック）
+- **ホロメン個別のターン内アーツ使用履歴** `player.artsUsedNamesThisTurn` / **相手のアーツ対象制限アウラ** `def.oppArtsTargetRestrict`（自分コラボ限定 等）
+- **強制被ダメージトリガー** `attached.onDamageReceivedForced`（相手ターンに受けた時・選択なし）/ **エール被アーカイブ誘発** `def.onSelfCheerArchived`（archiveCheer 経由）
+> 以下は旧「残り25枚」時点の記録。最新の残りは **20枚**（broad/個別機構依存）。
+
+### （参考）保留対応 第1〜2パス記録 — 元の38枚から
+旧セッションで「当時未対応の機構」を理由に保留したカードを2パスで再対応（保留 38→25）。追加した機構:
+- 擬似エール供給 `attached.cheerSupply` / エール付与時 `attached.onCheerAttached` / ターン内エールアーカイブ記録 `player.cheerArchivedThisTurn`
+- 装着カードへの `onArtsUse`・`onOpponentDown`・`onBloom` 通知（ホストのアーツ使用/相手ダウン/Bloom時に発火）
+- **推しスキル使用時誘発** `triggers.onOshiSkillUsed`（自ステージのホロメンギフトに発火。`ctx.oshiSkillInfo={text,sp}` で種別判定。`_dispatchOshiSkillUsed`）
+- **アーツ対象拡張** `kind:'artTargetSecondBack'`（相手2ndバックも対象。`effects.hasArtTargetMod` で `_performanceActions` が消費）
+- 相手の決定ポイントを使った任意効果（onDown中に相手へ confirm 系の決定を提示）/ 追加Bloom（`def.specialBloom`）/ 攻撃時誘発推しスキル（既存 onDamageDealtOshiSkills）
+
+解消（計13枚）: hBP01-118/126, hBP03-110/113/107(部分), hBP01-119, hBP02-095/096/001, hBP07-088, hBP05-084/038/050(ギフト部分), hBP08-018/102, hSD10-004。
+> 残る **25枚**は、影響範囲が広い／個別機構が必要なものとして保留継続（各JSDocの「保留:」参照）。主な未対応機構: 全色扱いの色上書き / ダイスの振り回数文脈・出目倍化 / 手札アーカイブのコスト置換＋Xコスト推し / 被ダメージ割り込み中の選択 / 相手のアーツ対象制限 / デッキからのアーカイブ枚数カウント / エール被アーカイブ誘発 / 強制被ダメージトリガー / ホロメン個別のターン内アーツ使用履歴 / ターン終了時の起動型推しスキル・遅延効果 / Bloom経路マーカー / 推しスキルのコスト書き換え 等。
 
 ## 4. エンジン機構ステータス
 

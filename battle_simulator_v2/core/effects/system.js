@@ -105,6 +105,7 @@ export class EffectSystem {
     // ターン中の一時的な被ダメージ修正（「このターン自分のバック全員は特殊ダメージを受けない」hSD13-012 等）
     for (const mod of this.engine.state.modifiers) {
       if (mod.kind !== 'damageReceivedDelta') continue;
+      if (mod.used) continue; // 一発消費(once)済みは無視
       if (mod.ownerIdx != null && mod.ownerIdx !== ownerIdx0) continue;
       if (mod.matchKind && mod.matchKind !== kind) continue;
       if (mod.match && !mod.match(holomem, zone, kind)) continue;
@@ -117,6 +118,21 @@ export class EffectSystem {
       total += this._auraSum(ownerIdx, (def, src) => def.auraDamageDelta?.(src, holomem, zone, this.engine, kind, attacker));
     }
     return total;
+  }
+
+  /**
+   * 「最初に受けるダメージだけ」等の一発消費(once)被ダメージ修正を、適用後に使用済みにする。
+   * ダメージ適用直後（_applyDamageReceived）に呼ぶ。対象・ゾーン・種別が一致する once 修正を used=true にする。
+   */
+  consumeOnceDamageReceivedMods(holomem, zone, kind) {
+    const ownerIdx0 = this._ownerOf(holomem);
+    for (const mod of this.engine.state.modifiers) {
+      if (mod.kind !== 'damageReceivedDelta' || !mod.once || mod.used) continue;
+      if (mod.ownerIdx != null && mod.ownerIdx !== ownerIdx0) continue;
+      if (mod.matchKind && mod.matchKind !== kind) continue;
+      if (mod.match && !mod.match(holomem, zone, kind)) continue;
+      mod.used = true;
+    }
   }
 
   /** 特殊ダメージ+N の合計（発生源の装着カード + ターン修正） */
@@ -163,6 +179,14 @@ export class EffectSystem {
       const adef = this.registry.get(att.number);
       for (const r of adef?.artsCostReduceAttached?.(targetHolomem, this.engine) || []) add(r.color, r.amount);
     }
+    // 相手側の常時アウラによる必要エールの増減（「相手のセンターのアーツ必要無色+2」hBP08-053 等。amount 負値＝増加）
+    const oppP = this.engine.state.players[1 - ownerIdx];
+    if (oppP) {
+      for (const src of this.engine._stageHolomems(oppP)) {
+        const sdef = this.registry.get(src.stack[0].number);
+        for (const r of sdef?.oppArtsCostDelta?.(src, targetHolomem, this.engine) || []) add(r.color, r.amount);
+      }
+    }
     return red;
   }
 
@@ -179,6 +203,17 @@ export class EffectSystem {
       const adef = this.registry.get(att.number);
       for (const r of adef?.batonCostReduceAttached?.(holomem, this.engine) || []) red[r.color] = (red[r.color] || 0) + r.amount;
     }
+    // 相手側の常時アウラによるバトンタッチ必要エールの増減（「相手のセンターのバトンに必要な無色+1」hBP08-104 等）。
+    // amount は軽減量（負値＝増加）。相手のステージのホロメン本体と装着カードの oppBatonCostDelta を走査する。
+    const oppP = this.engine.state.players[1 - ownerIdx];
+    if (oppP) {
+      for (const src of this.engine._stageHolomems(oppP)) {
+        const defs = [this.registry.get(src.stack[0].number), ...src.attachments.map((a) => this.registry.get(a.number))];
+        for (const def of defs) {
+          for (const r of def?.oppBatonCostDelta?.(src, holomem, this.engine) || []) red[r.color] = (red[r.color] || 0) + r.amount;
+        }
+      }
+    }
     return red;
   }
 
@@ -187,9 +222,28 @@ export class EffectSystem {
    * ターン修正 kind:'artTargetDamagedBack'（match でホロメンを限定）で表現する (hBP07-086)。
    */
   artCanTargetDamagedBack(holomem, ownerIdx) {
+    return this.hasArtTargetMod('artTargetDamagedBack', holomem, ownerIdx);
+  }
+
+  /** 指定 kind のアーツ対象拡張ターン修正を、このホロメンが持っているか（match でホロメン限定可） */
+  hasArtTargetMod(kind, holomem, ownerIdx) {
     return this.engine.state.modifiers.some((m) =>
-      m.kind === 'artTargetDamagedBack' && m.ownerIdx === ownerIdx &&
-      (!m.match || m.match(holomem)));
+      m.kind === kind && m.ownerIdx === ownerIdx && (!m.match || m.match(holomem)));
+  }
+
+  /**
+   * 防御側（相手のアーツの対象になる側）の常時アウラによる「相手のアーツが取れる対象ゾーン」の制限。
+   * defender のステージ上のカード定義 def.oppArtsTargetRestrict(src, engine) が許可ゾーン配列
+   * （例 ['collab']）を返したら、それらの積集合で制限する。無ければ null（無制限）。(hBP05-010 等)
+   */
+  oppArtsTargetZones(defender, defIdx) {
+    let allow = null;
+    for (const src of this.engine._stageHolomems(defender)) {
+      const def = this.registry.get(src.stack[0].number);
+      const zones = def?.oppArtsTargetRestrict?.(src, this.engine, defender);
+      if (zones) allow = allow ? allow.filter((z) => zones.includes(z)) : [...zones];
+    }
+    return allow;
   }
 
   /**

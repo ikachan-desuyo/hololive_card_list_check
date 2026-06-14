@@ -6,7 +6,7 @@
  *   - キー: フルID（例 "hBP01-024_02_C"）
  *   - number: カードナンバー（例 "hBP01-024"）… デッキ構築の同一判定はこれ
  *   - card_type: 'ホロメン' | 'Buzzホロメン' | '推しホロメン' | 'サポート・○○[・LIMITED]' | 'エール'
- *   - hp: 文字列 / life: 数値 / bloom_level: 'Debut'|'1st'|'2nd'|'Spot' / baton_touch: '無色'
+ *   - hp: 文字列 / life: 数値 / bloom_level: 'Debut'|'1st'|'2nd'|'Spot' / baton_touch: 色配列 ['無色'] / ['無色','無色']（旧: 単一文字列 '無色'）
  *   - skills[]: { type: 'アーツ'|'キーワード'|'推しスキル'|'SP推しスキル'|'サポート効果',
  *                 dmg: '50'|'90+', icons: { main: ['white','any'], tokkou: ['紫+50'] },
  *                 subtype: 'ブルームエフェクト'|'コラボエフェクト'|'ギフト', ... }
@@ -82,7 +82,10 @@ export function normalizeCard(raw) {
     color: raw.color || null,
     hp: raw.hp ? Number(raw.hp) : null,
     bloomLevel: raw.bloom_level || null,
-    batonTouch: raw.baton_touch ? [raw.baton_touch] : [],
+    // baton_touch は色配列 ["無色","無色"]（個数付き）。旧形式の単一文字列 "無色" にも後方互換
+    batonTouch: Array.isArray(raw.baton_touch)
+      ? [...raw.baton_touch]
+      : (raw.baton_touch ? [raw.baton_touch] : []),
     life: raw.life != null ? Number(raw.life) : null,
     tags: raw.tags || [],
     imageUrl: raw.image_url || '',

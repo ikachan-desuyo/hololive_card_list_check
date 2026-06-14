@@ -14,12 +14,9 @@
  *     run では推しが〈ときのそら〉の時だけ、自分（このホロメン）以外の〈ときのそら〉1人を選ばせ、
  *     選んだホロメンに「相手の2ndバックも対象にできる」ターン修正を付与する。
  *
- * 保留: 「選んだホロメンのアーツが相手の2ndバックも対象にできる」対象拡張は、
- *   エンジン（_performanceActions の対象生成）が現状この修正種別を消費しない。
- *   既存の kind:'artTargetDamagedBack'（HP減バック拡張・hBP07-086）と同形の機構として
- *   kind:'artTargetSecondBack' のターン修正を付与しておくが、エンジン側の対象生成に
- *   この種別を読む処理を追加するまで実効しない（付与しても落ちはしない）。
- *   選択フローと推し条件・他のときのそら限定は実装済み。
+ *   「選んだホロメンのアーツが相手の2ndバックも対象にできる」対象拡張は、付与するターン修正
+ *   kind:'artTargetSecondBack' を engine._performanceActions が消費して実効化する
+ *   （既存の artTargetDamagedBack と同形。effects.hasArtTargetMod で判定）。
  */
 const NAME = 'ときのそら';
 

@@ -15,11 +15,25 @@
  */
 export default {
   number: 'hBP03-113',
+  attached: {
+    // [ターンに1回] このファンが付いているホロメンにエールが付いた時、このターンの間このホロメンのアーツ+10。
+    // attachCheer から同期で呼ばれる（即時・選択不要）。ターン1回はホロメン単位で制御。
+    onCheerAttached(holomem, engine) {
+      if (holomem._risunersBonusTurn === engine.state.turn) return; // ターンに1回
+      holomem._risunersBonusTurn = engine.state.turn;
+      const ownerIdx = engine.state.players.findIndex((p) => engine._stageHolomems(p).includes(holomem));
+      if (ownerIdx < 0) return;
+      engine.state.modifiers.push({
+        duration: 'turn', kind: 'artsPlus', ownerIdx, amount: 10,
+        match: (h) => h === holomem,
+        description: 'Risuners: エールが付いたのでこのターン アーツ+10',
+      });
+    },
+  },
   attachRule: {
     canAttach(holomem) {
       return holomem.stack[0].name === 'アユンダ・リス';
     },
     unlimited: true, // 1人に何枚でも
   },
-  // 「エールが付いた時アーツ+10」の誘発効果は未実装（保留：onCheerAttached トリガー機構が必要）。
 };
