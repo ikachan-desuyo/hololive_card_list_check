@@ -25,9 +25,8 @@ export default {
             skipLabel: 'これ以上アーカイブしない',
           });
           if (!card) break;
-          ctx.removeFromHand(card);
-          ctx.player.archive.push(card);
-          ctx.log(`${card.name} をアーカイブした`);
+          // 「ホロメンの能力で手札をアーカイブ」共通プリミティブ（装着カードの onHostHandArchived 誘発も発火。杖 hBP05-083）
+          yield* ctx.archiveHandCard(card);
           const singers = ctx.holomems('self', (e) => ctx.hasTag(e.top, '歌'));
           if (singers.length === 0) continue;
           const target = yield ctx.chooseHolomem({

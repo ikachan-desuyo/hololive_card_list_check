@@ -3,9 +3,9 @@
  *
  * 推しステージスキル「はあちゃまなう」[ターンに1回]:
  *   自分のターンで、自分の〈赤井はあと〉が自分の能力でステージからデッキに戻った時、自分のデッキを2枚引く。
- *   → 保留: 「ホロメンが自分の能力でステージからデッキに戻った時」を発火させる汎用イベントが
- *     エンジンに無い（deckToBottom 等は領域移動プリミティブで発生源・トリガー通知を持たない）。
- *     全デッキ戻し箇所への発生源属性付き通知（broad機構）が必要なため未実装。
+ *   → ctx.returnHolomemToDeck（能力でホロメンをデッキに戻す共通プリミティブ）が
+ *     engine._dispatchReturnedToDeck 経由で oshiStageSkill.onReturnedToDeck を発火する。
+ *     下記推しスキルがこのプリミティブを使うため、〈赤井はあと〉が戻ると本ステージスキルが誘発する。
  *
  * 推しスキル「ワールドワイドな最強アイドル！」[ホロパワー：-2][ターンに1回]:
  *   自分のバックポジションのDebutホロメンの〈赤井はあと〉1人をデッキの下に戻す。
@@ -21,6 +21,23 @@
  */
 export default {
   number: 'hBP07-004',
+
+  // 推しステージスキル「はあちゃまなう」[ターンに1回]:
+  //   自分のターンで〈赤井はあと〉が能力でデッキに戻った時、デッキを2枚引く。
+  oshiStageSkill: {
+    name: 'はあちゃまなう',
+    onReturnedToDeck(engine, ownerIdx, cards) {
+      if (engine.state.turnPlayer !== ownerIdx) return; // 自分のターン限定
+      const p = engine.state.players[ownerIdx];
+      if (p._haachamaNowTurn === engine.state.turn) return; // [ターンに1回]
+      if (!cards.some((c) => c.name === '赤井はあと')) return;
+      p._haachamaNowTurn = engine.state.turn;
+      let drawn = 0;
+      for (let i = 0; i < 2 && p.deck.length > 0; i++) { p.hand.push(p.deck.shift()); drawn++; }
+      engine.log(`はあちゃまなう: 〈赤井はあと〉がデッキに戻った→${drawn}枚引く`);
+    },
+  },
+
   oshiSkill: {
     name: 'ワールドワイドな最強アイドル！',
     // 戻す対象が必須なので、いなければ使用不可
@@ -39,16 +56,8 @@ export default {
         title: 'デッキの下に戻すバックの Debut〈赤井はあと〉を選択',
       });
       if (back) {
-        const h = back.holomem;
-        // 付いているエール／サポートはアーカイブへ
-        if (h.cheers.length || h.attachments.length) {
-          ctx.player.archive.push(...h.cheers, ...h.attachments);
-          ctx.log(`${back.top.name} の付属カードをアーカイブ`);
-        }
-        // ホロメンをステージから取り除き、本体（スタック）をデッキの下へ
-        ctx.engine._removeHolomem(ctx.player, back.pos);
-        ctx.deckToBottom(h.stack);
-        ctx.log(`${back.top.name} をデッキの下に戻した`);
+        // 能力でデッキの下に戻す（付属カードはアーカイブ・「デッキに戻った時」誘発も発火）
+        ctx.returnHolomemToDeck(back.holomem, { bottom: true });
       }
 
       // 2) ステージに残る〈赤井はあと〉1人を選び、このターンの間アーツ+50
