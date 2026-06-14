@@ -29,7 +29,7 @@ export default {
       const p = engine.state.players[ownerIdx];
       // コスト [ホロパワー：-2]
       p.archive.push(...p.holoPower.splice(0, 2));
-      p.usedOshiSkillThisTurn = true;
+      p.usedOshiSkillThisTurn += 1;
       // デッキの上から2枚をアーカイブ
       const moved = p.deck.splice(0, 2);
       p.archive.push(...moved);

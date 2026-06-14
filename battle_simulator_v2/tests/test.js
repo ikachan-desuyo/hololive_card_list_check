@@ -294,7 +294,7 @@ export async function runTests() {
     assertEq(p0.__regularDownedName, 'X', '通常スキルの run が ctx.downedHolomem を受け取れていない');
     assertEq(p0.__spRan, true, 'SPスキルの run が実行されていない');
     assertEq(p0.holoPower.length, 0, 'ホロパワーのコスト(1+2)が支払われていない');
-    assertEq(p0.usedOshiSkillThisTurn, true, '通常推しスキルの使用フラグが立っていない');
+    assertEq(p0.usedOshiSkillThisTurn, 1, '通常推しスキルの使用回数が1になっていない');
     assertEq(p0.usedSpOshiSkillThisGame, true, 'SP推しスキルの使用フラグが立っていない');
     assertEq(p0.center, null, 'ダウンしたホロメンが場から取り除かれていない');
   });
@@ -475,6 +475,35 @@ export async function runTests() {
     p.back.push(lamy);
     assertEq(e.effects.artsBonus(lamy, 0), 10, 'アーツ+10が乗っていない');
     assertEq(e.effectiveHp(lamy), 110, 'HP90+20=110になっていない');
+  });
+
+  await testAsync('hSD13-001 推しスキル「秩序の先駆者」: アーツダメージの受け手を[Buzz/2nd]赤ホロメンに差し替え', async () => {
+    const e = await setupMainStep(deckMap, 99);
+    await e.registry.preload(['hSD13-001'], lib); // 推しの効果定義を登録
+    e.state.turn = 3;
+    e.state.turnPlayer = 0;        // 攻撃側=P1
+    const def = e.state.players[1]; // 防御側=P2（推しが hSD13-001）
+    def.oshi = { number: 'hSD13-001', name: 'エリザベス・ローズ・ブラッドフレイム' };
+    def.holoPower = [fakeHolomen(), fakeHolomen(), fakeHolomen()]; // [ホロパワー：-3]
+    def.usedOshiSkillThisTurn = 0;
+    const original = e._createHolomem(fakeHolomen({ name: '元の対象', color: '青' }), 1);
+    const redirectTgt = e._createHolomem(fakeHolomen({ name: '受け手', color: '赤', bloomLevel: '2nd' }), 1);
+    def.center = original;
+    def.collab = null;
+    def.back = [redirectTgt];
+
+    let captured = null;
+    e._offerDamageOshiSkill(original, 50, (finalDmg, redirectTo) => { captured = { finalDmg, redirectTo }; });
+    assert(e.state.pending, '推しスキルの使用確認が出ていない');
+    e.apply('yes'); // 推しスキルを使う
+    // 受け手選択（候補は赤2ndの1人）
+    if (e.state.pending) e.apply(e.state.pending.options[0].id);
+
+    assert(captured, 'ダメージ適用コールバックが呼ばれていない');
+    assertEq(captured.redirectTo, redirectTgt, '受け手が[Buzz/2nd]赤ホロメンに差し替わっていない');
+    assertEq(captured.finalDmg, 50, '差し替え後もダメージ値が保持されていない（「そのダメージ」を移す）');
+    assertEq(def.usedOshiSkillThisTurn, 1, '推しスキル使用回数が加算されていない');
+    assertEq(def.holoPower.length, 0, 'ホロパワーが-3支払われていない');
   });
 
   await testAsync('相手の手札ステップで自分の手札が増えない', async () => {
@@ -1214,7 +1243,7 @@ export async function runTests() {
     assert(done, 'IOFORIA~! の割り込みが完了しない');
     assertEq(target.cheers.length, 0, '対象からエールが外れていない');
     assertEq(dest.cheers.length, 1, '他の#ID1期生にエールが付け替えられていない');
-    assert(p0.usedOshiSkillThisTurn === true, '推しスキルが使用済みになっていない（コスト/回数処理）');
+    assert(p0.usedOshiSkillThisTurn >= 1, '推しスキルが使用済みになっていない（コスト/回数処理）');
   });
 
   await testAsync('推しスキル: 女幹部の采配（赤ホロメンの手札アーカイブをホロパワーで置換）', async () => {
@@ -1399,7 +1428,7 @@ export async function runTests() {
     p0.center.attachments.push(yukimin);
     p0.back.push(e._createHolomem(lib.get('hBP02-042_C'), 1)); // 全滅回避
     p0.holoPower.push(p0.deck.shift());
-    p0.usedOshiSkillThisTurn = false;
+    p0.usedOshiSkillThisTurn = 0;
     // センターを倒す
     p0.center.damage = e.effectiveHp(p0.center);
     s.pending = null;

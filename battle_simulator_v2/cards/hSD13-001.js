@@ -4,9 +4,11 @@
  * 推しスキル「秩序の先駆者」[ホロパワー：-3][ターンに1回]:
  *   自分のホロメン1人が相手からアーツダメージを受ける時、自分のステージの[Buzzか2nd]の
  *   赤ホロメン1人を選べる：そのダメージを、選んだホロメンがかわりに受ける。
- *   → 「アーツダメージを受ける時」に割り込んでダメージ対象を変更する
- *     タイミング割り込み型の推しスキル。エンジンに被ダメージ割り込み／対象変更の
- *     機構が無いため未実装（保留）。
+ *   → 「アーツダメージを受ける時」に割り込んで受け手を差し替える割り込み推しスキル。
+ *     onDamageOshiSkill.redirect（generatorで選んだホロメンを返す）で実装。
+ *     エンジンは _offerDamageOshiSkill の after に redirectTo を渡し、算出済みのダメージ値を
+ *     その受け手へ移す（特攻/軽減は元の対象基準で確定済みの「そのダメージ」を移し替える）。
+ *     redirect は kind==='arts' のときのみ提示される（特殊ダメージには出ない）。
  *
  * SP推しスキル「JUST LIKE THAT」[ホロパワー：-3][ゲームに1回]:
  *   自分のアーカイブの#Justiceを持つホロメン1枚をステージに出す。その後、自分のアーカイブの
@@ -18,7 +20,32 @@
 export default {
   number: 'hSD13-001',
 
-  // 推しスキル「秩序の先駆者」は被アーツダメージの割り込み（対象変更）型のため未実装（保留）
+  // 推しスキル「秩序の先駆者」[ホロパワー：-3][ターンに1回]:
+  //   自分のホロメンが相手からアーツダメージを受ける時、[Buzzか2nd]の赤ホロメン1人にかわりに受けさせる。
+  onDamageOshiSkill: {
+    cost: 3,
+    title: '推しスキル「秩序の先駆者」: このアーツダメージを[Buzzか2nd]の赤ホロメン1人にかわりに受けさせますか？',
+    canUse(engine, defIdx) {
+      const p = engine.state.players[defIdx];
+      // 受け手候補（自分のステージの[Buzzか2nd]の赤ホロメン）が1人以上いること
+      return engine._stageHolomems(p).some((h) => {
+        const top = h.stack[0];
+        const isRed = top.color === '赤' || engine._isTreatedAllColors(h);
+        return isRed && (top.bloomLevel === 'Buzz' || top.bloomLevel === '2nd');
+      });
+    },
+    *redirect(ctx) {
+      const entry = yield ctx.chooseHolomem({
+        side: 'self',
+        filter: (e) => {
+          const isRed = e.top.color === '赤' || ctx.engine._isTreatedAllColors(e.holomem);
+          return isRed && (e.top.bloomLevel === 'Buzz' || e.top.bloomLevel === '2nd');
+        },
+        title: 'かわりにダメージを受ける[Buzzか2nd]の赤ホロメンを選択',
+      });
+      return entry ? entry.holomem : null; // 選んだホロメンを返す（= 新しい受け手）
+    },
+  },
 
   spOshiSkill: {
     name: 'JUST LIKE THAT',

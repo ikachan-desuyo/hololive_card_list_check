@@ -295,7 +295,7 @@ export class EffectContext {
     const oshiDef = eng.registry.get(this.player.oshi.number)?.onDiceRollOshiSkill;
     if (oshiDef) {
       const me = this.player;
-      const used = oshiDef.sp ? me.usedSpOshiSkillThisGame : me.usedOshiSkillThisTurn;
+      const used = oshiDef.sp ? me.usedSpOshiSkillThisGame : (me.usedOshiSkillThisTurn >= this.engine._oshiSkillCap(this.playerIdx));
       const info = { ownerIdx: this.playerIdx, roller: this.sourceHolomem, rollerCard: this.sourceCard, value };
       if (!used && me.holoPower.length >= oshiDef.cost && (!oshiDef.canUse || oshiDef.canUse(eng, this.playerIdx, info))) {
         const use = yield {
@@ -308,7 +308,7 @@ export class EffectContext {
         };
         if (use) {
           me.archive.push(...me.holoPower.splice(0, oshiDef.cost));
-          if (oshiDef.sp) me.usedSpOshiSkillThisGame = true; else me.usedOshiSkillThisTurn = true;
+          if (oshiDef.sp) me.usedSpOshiSkillThisGame = true; else me.usedOshiSkillThisTurn += 1;
           value = oshiDef.apply(eng, this.playerIdx, { ...info, value });
         }
       }
@@ -754,7 +754,7 @@ export class EffectContext {
         const od = this.engine.registry.get(this.player.oshi.number)?.onCheerArchivedOshiSkill;
         if (od) {
           const p = this.player;
-          const used = od.sp ? p.usedSpOshiSkillThisGame : p.usedOshiSkillThisTurn;
+          const used = od.sp ? p.usedSpOshiSkillThisGame : (p.usedOshiSkillThisTurn >= this.engine._oshiSkillCap(this.playerIdx));
           const info = { source: this.sourceHolomem, cheer };
           if (!used && p.holoPower.length >= (od.cost || 0) && (!od.canUse || od.canUse(this.engine, this.playerIdx, info))) {
             const use = yield {
@@ -767,7 +767,7 @@ export class EffectContext {
             };
             if (use) {
               p.archive.push(...p.holoPower.splice(0, od.cost || 0));
-              if (od.sp) p.usedSpOshiSkillThisGame = true; else p.usedOshiSkillThisTurn = true;
+              if (od.sp) p.usedSpOshiSkillThisGame = true; else p.usedOshiSkillThisTurn += 1;
               yield* od.run(new EffectContext(this.engine, this.playerIdx, { sourceCard: p.oshi, cheerArchivedInfo: info }));
             }
           }
@@ -866,7 +866,7 @@ export class EffectContext {
       const od = eng.registry.get(this.player.oshi.number)?.onSpecialDamageDealtOshiSkill;
       if (od) {
         const pp = this.player;
-        const used = od.sp ? pp.usedSpOshiSkillThisGame : pp.usedOshiSkillThisTurn;
+        const used = od.sp ? pp.usedSpOshiSkillThisGame : (pp.usedOshiSkillThisTurn >= this.engine._oshiSkillCap(this.playerIdx));
         if (!used && pp.holoPower.length >= (od.cost || 0) && (!od.canUse || od.canUse(eng, this.playerIdx, info))) {
           const use = yield {
             kind: 'confirm', player: this.playerIdx,
@@ -878,7 +878,7 @@ export class EffectContext {
           };
           if (use) {
             pp.archive.push(...pp.holoPower.splice(0, od.cost || 0));
-            if (od.sp) pp.usedSpOshiSkillThisGame = true; else pp.usedOshiSkillThisTurn = true;
+            if (od.sp) pp.usedSpOshiSkillThisGame = true; else pp.usedOshiSkillThisTurn += 1;
             yield* od.run(new EffectContext(eng, this.playerIdx, { sourceCard: pp.oshi, specialDealt: info }));
           }
         }

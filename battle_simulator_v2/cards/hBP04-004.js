@@ -27,7 +27,7 @@ export default {
     apply(engine, ownerIdx, downedHolomem) {
       const p = engine.state.players[ownerIdx];
       p.archive.push(...p.holoPower.splice(0, 1));
-      p.usedOshiSkillThisTurn = true;
+      p.usedOshiSkillThisTurn += 1;
       const i = downedHolomem.attachments.findIndex((a) => a.supportType === 'ファン');
       const fan = downedHolomem.attachments.splice(i, 1)[0];
       p.hand.push(fan);

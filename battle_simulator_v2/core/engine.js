@@ -58,7 +58,7 @@ function createPlayerState(name, gameDeck) {
     usedBatonTouchThisTurn: false,
     supportsPlayedThisTurn: [], // このターンに使ったサポートのカード名一覧
     downedCardsLastOppTurn: [], // 直前の相手ターンにダウンした自分のホロメンのカード一覧
-    usedOshiSkillThisTurn: false,
+    usedOshiSkillThisTurn: 0, // このターンに使った（通常）推しスキルの回数。上限は _oshiSkillCap（通常1）
     usedSpOshiSkillThisGame: false,
     turnCount: 0,           // このプレイヤーの何ターン目か
   };
@@ -517,7 +517,7 @@ export class Engine {
     s.players[1 - playerIdx].downedCardsLastOppTurn = [];
     // 推しスキルの[ターンに1回]は両プレイヤーともリセットする
     // （「相手のターンでダウンした時に使える」等、相手ターン中に使うスキルがあるため）
-    for (const pl of s.players) pl.usedOshiSkillThisTurn = false;
+    for (const pl of s.players) pl.usedOshiSkillThisTurn = 0;
     this.log(`―― ターン${s.turn}: ${p.name} のターン ――`);
     this._resetStep();
   }
@@ -734,7 +734,7 @@ export class Engine {
     // 効果が実装済みのスキルのみ提示する（未実装スキルでコストだけ払う事故を防ぐ）
     const oshiDef = this.registry.get(p.oshi.number);
     (p.oshi.oshiSkills || []).forEach((skill, i) => {
-      if (skill.sp ? p.usedSpOshiSkillThisGame : p.usedOshiSkillThisTurn) return;
+      if (skill.sp ? p.usedSpOshiSkillThisGame : (p.usedOshiSkillThisTurn >= this._oshiSkillCap(idx))) return;
       // 「～時に使える」系はメインステップでは使えない (12.1.5)
       if (/[すし]た?時に使える/.test(skill.text)) return;
       const isX = skill.cost === 'X';
@@ -911,12 +911,14 @@ export class Engine {
     if (allowZones) targets = targets.filter((t) => allowZones.includes(t.zone));
 
     // 指定ホロメンの指定アーツについて、対象ごとのアーツアクションを actions に積む（通常／再アーツ共通）
-    const pushArtActions = (h, zone, art, ai, isReArts) => {
+    const pushArtActions = (h, zone, art, ai, isReArts, srcCard) => {
       const card = topCard(h);
+      const fromCard = srcCard || card;        // アーツの出どころ（借用時は別カード。hBP07-048）
+      const borrowed = fromCard !== card;
       const cost = this._effectiveArtCost(h, art.cost, s.turnPlayer);
       // アーツ使用時のみ、装着カードの「擬似エール供給」＋推しステージのエール色エイリアスを支払いプールに加味
       if (!this._canPayArtCost(h, cost, s.turnPlayer)) return;
-      const artDef = this.registry.getArt(card.number, art.name);
+      const artDef = this.registry.getArt(fromCard.number, art.name);
       // カード定義によるアーツ使用条件（「アーカイブにサポート4枚以上なければ使えない」等）
       if (artDef?.canUse) {
         const cctx = new EffectContext(this, s.turnPlayer, { sourceCard: card, sourceHolomem: h });
@@ -980,9 +982,11 @@ export class Engine {
         const tName = topCard(this._targetHolomem(opp, t)).name;
         const zoneLabel = t.zone === 'center' ? 'センター' : t.zone === 'collab' ? 'コラボ' : 'バック';
         actions.push({
-          id: `art${isReArts ? 're' : ''}_${zone}_${ai}_${t.zone}_${t.index}`,
-          label: `${card.name}「${art.name}」(${art.dmg}${art.dmgPlus ? '+' : ''})${isReArts ? '【再アーツ】' : ''} → 相手${zoneLabel} ${tName}`,
+          id: `art${isReArts ? 're' : ''}${borrowed ? `b${fromCard.number}` : ''}_${zone}_${ai}_${t.zone}_${t.index}`,
+          label: `${borrowed ? `[借用]${fromCard.name}` : card.name}「${art.name}」(${art.dmg}${art.dmgPlus ? '+' : ''})${isReArts ? '【再アーツ】' : ''} → 相手${zoneLabel} ${tName}`,
           kind: 'art', zone, artIndex: ai, target: t, reArts: isReArts || undefined,
+          // 借用アーツ（hBP07-048）: 解決時にこのアーツオブジェクト/出どころカードを使う
+          artObj: borrowed ? art : undefined, artFrom: borrowed ? fromCard.number : undefined,
         });
       }
     };
@@ -993,6 +997,14 @@ export class Engine {
       if (!s.perfUsed[zone]) {
         // 通常のアーツ使用 (9.2.1.2-5)
         topCard(h).arts.forEach((art, ai) => pushArtActions(h, zone, art, ai, false));
+        // アーツ枠借用（hBP07-048）: このホロメンが他ホロメンのアーツを使えるなら、その候補も追加
+        const borrowDef = this.registry.get(topCard(h).number)?.artsBorrow;
+        if (borrowDef) {
+          for (const other of this._stageHolomems(p)) {
+            if (other === h || !borrowDef(topCard(h), other, this)) continue;
+            topCard(other).arts.forEach((art, ai) => pushArtActions(h, zone, art, ai, false, topCard(other)));
+          }
+        }
       } else if (h.lastArtUsedIndex != null) {
         // 再アーツ: このターン「同じアーツをもう1回使える」修正を持つホロメンは直前のアーツを再使用できる (hBP07-008)
         const reMod = s.modifiers.find(
@@ -1027,7 +1039,14 @@ export class Engine {
         this._offerEndOfTurnOshiSkill(() => {
           this.effects.expireTurnModifiers();
           this._queueCenterRefill(p, () => {
-            this._startTurn(1 - s.turnPlayer);
+            // 追加ターン（hBP07-005「時間の典獄」）: 保留中なら同じプレイヤーがもう1回ターンを行う（ゲーム1回なので無限化しない）
+            if (p._extraTurnPending) {
+              p._extraTurnPending = false;
+              this.log(`${p.name}: 追加ターンを得た`);
+              this._startTurn(s.turnPlayer);
+            } else {
+              this._startTurn(1 - s.turnPlayer);
+            }
           });
         });
       });
@@ -1077,7 +1096,7 @@ export class Engine {
     if (!def) { done(); return; }
     const cost = def.cost || 0;
     // [ターンに1回] 済み・ホロパワー不足・使用条件未達なら提示しない
-    if (p.usedOshiSkillThisTurn) { done(); return; }
+    if (p.usedOshiSkillThisTurn >= this._oshiSkillCap(idx)) { done(); return; }
     if (p.holoPower.length < cost) { done(); return; }
     if (def.canUse && !def.canUse(this, idx)) { done(); return; }
     this.state.pending = {
@@ -1089,7 +1108,7 @@ export class Engine {
       next: (use) => {
         if (!use) { done(); return; }
         p.archive.push(...p.holoPower.splice(0, cost));
-        p.usedOshiSkillThisTurn = true;
+        p.usedOshiSkillThisTurn += 1;
         this.log(`${p.name}: 推しスキル発動（${def.name} / ホロパワー-${cost}）`);
         this._runEffect(def, { playerIdx: idx }, done);
       },
@@ -1313,7 +1332,7 @@ export class Engine {
       case 'oshiSkill': {
         const skill = p.oshi.oshiSkills[action.skillIndex];
         if (skill.sp) p.usedSpOshiSkillThisGame = true;
-        else p.usedOshiSkillThisTurn = true;
+        else p.usedOshiSkillThisTurn += 1;
         const def = this.registry.get(p.oshi.number);
         const skillDef = skill.sp ? def?.spOshiSkill : def?.oshiSkill;
         // 推しスキル解決後に「推しスキルを使った時」の味方ホロメンギフトを誘発（hBP05-038/050 等）
@@ -1509,7 +1528,7 @@ export class Engine {
     const opp = s.players[1 - s.turnPlayer];
     const h = p[action.zone];
     const card = topCard(h);
-    const art = card.arts[action.artIndex];
+    const art = action.artObj || card.arts[action.artIndex]; // 借用アーツ(hBP07-048)は action.artObj を使う
 
     s.perfUsed[action.zone] = true;
     h.lastArtUsedIndex = action.artIndex; // 再アーツ（同じアーツをもう1回）判定用に記録
@@ -1527,7 +1546,7 @@ export class Engine {
     }
     this.log(`${card.name} のアーツ「${art.name}」！${action.reArts ? '（再アーツ）' : ''}`);
 
-    const artDef = this.registry.getArt(card.number, art.name);
+    const artDef = this.registry.getArt(action.artFrom || card.number, art.name); // 借用アーツは出どころカードの定義を使う
     const ctxOpts = { playerIdx: s.turnPlayer, sourceCard: card, sourceHolomem: h };
     // テキスト効果（段階4）の実行中に積まれたアーツ修正（サイコロ等）を受け取るための参照
     const runCtx = new EffectContext(this, s.turnPlayer, ctxOpts);
@@ -1580,7 +1599,6 @@ export class Engine {
       // 1体ぶんのダメージ適用（特攻→被ダメージ修正→推しスキル割り込み→加算）。完了後 after2 を呼ぶ
       const applyToTarget = (t, after2) => {
         const tCard = topCard(t);
-        const tZone = this._zoneOf(t);
         let dmg = baseDmg;
         // 特攻: 対象の色が一致するなら加算 (12.3.4.3)
         // 「すべての色を持つホロメンとして扱う」継続効果が乗っている対象は、どの特攻色とも一致する
@@ -1591,21 +1609,35 @@ export class Engine {
             this.log(`特攻発動！ ${tk.color}+${tk.value}${allColors ? '（全色扱い）' : ''}`);
           }
         }
+        // ターン修正による特攻（「このターン、このホロメンは○特攻+N を得る」hBP03-071 じゃんけん勝利時 等）
+        for (const m of this.state.modifiers) {
+          if (m.kind !== 'tokkouPlus' || m.ownerIdx !== s.turnPlayer) continue;
+          if (m.match && !m.match(h)) continue;
+          if (allColors || tCard.color === m.color) {
+            dmg += m.amount;
+            this.log(`特攻（継続効果）！ ${m.color}+${m.amount}${allColors ? '（全色扱い）' : ''}`);
+          }
+        }
         // 受け手の「受けるダメージ」修正（軽減/増加）(5.22.3)。常時アウラ/装着分まで反映。
         // 「このアーツダメージは軽減されない」効果があれば軽減を無効化する。
         const noReduce = this._artDamageNotReduced(h, artDef, runCtx, t);
         dmg = this._applyDamageReceived(t, dmg, 'arts', h, { ignoreReduction: noReduce });
-        // 防御側の被ダメージ推しスキル割り込み（対象ごと）
-        this._offerDamageOshiSkill(t, dmg, (finalDmg) => {
+        // 防御側の被ダメージ推しスキル割り込み（対象ごと）。
+        // redirectTo があれば「そのダメージを、選んだホロメンがかわりに受ける」(hSD13-001)。
+        // ＝既に算出済みのダメージ値を別ホロメンに移す（特攻/軽減は元の対象基準で確定済み）。
+        this._offerDamageOshiSkill(t, dmg, (finalDmg, redirectTo) => {
           // (kind='arts')
-          t.damage += finalDmg;
+          const recv = redirectTo || t;
+          const recvCard = topCard(recv);
+          if (redirectTo) this.log(`ダメージの受け手を変更: ${tCard.name} → ${recvCard.name}`);
+          recv.damage += finalDmg;
           totalDealt += finalDmg;
-          if (finalDmg > 0) dealtList.push({ target: t, zone: tZone, dealt: finalDmg });
+          if (finalDmg > 0) dealtList.push({ target: recv, zone: this._zoneOf(recv), dealt: finalDmg });
           this.log(
-            `「${art.name}」→ ${tCard.name} に ${finalDmg}ダメージ（累計${t.damage}/${this.effectiveHp(t)}）`
+            `「${art.name}」→ ${recvCard.name} に ${finalDmg}ダメージ（累計${recv.damage}/${this.effectiveHp(recv)}）`
           );
-          if (finalDmg > 0) this._dispatchDamageReceivedForced(t); // 強制被ダメージトリガー (hBP07-108)
-          if (t.damage >= this.effectiveHp(t)) downed.push(t);
+          if (finalDmg > 0) this._dispatchDamageReceivedForced(recv); // 強制被ダメージトリガー (hBP07-108)
+          if (recv.damage >= this.effectiveHp(recv)) downed.push(recv);
           after2();
         });
       };
@@ -1844,7 +1876,7 @@ export class Engine {
           if (!use) { offerDownSkill(si + 1); return; }
           if (sd.run) {
             p.archive.push(...p.holoPower.splice(0, sd.cost || 0));
-            if (sd.sp) p.usedSpOshiSkillThisGame = true; else p.usedOshiSkillThisTurn = true;
+            if (sd.sp) p.usedSpOshiSkillThisGame = true; else p.usedOshiSkillThisTurn += 1; // ダウン時推しスキル使用
             this._runEffect({ run: sd.run }, { playerIdx: ownerIdx, downedHolomem: h }, () => offerDownSkill(si + 1));
           } else {
             sd.apply(this, ownerIdx, h);
@@ -1894,7 +1926,7 @@ export class Engine {
     const run = (i) => {
       if (i >= list.length) { after(); return; }
       const skill = list[i];
-      const used = skill.sp ? p.usedSpOshiSkillThisGame : p.usedOshiSkillThisTurn;
+      const used = skill.sp ? p.usedSpOshiSkillThisGame : (p.usedOshiSkillThisTurn >= this._oshiSkillCap(ownerIdx));
       if (used || p.holoPower.length < skill.cost || (skill.canUse && !skill.canUse(this, ownerIdx, attackInfo))) {
         run(i + 1);
         return;
@@ -1911,7 +1943,7 @@ export class Engine {
           if (!use) { run(i + 1); return; }
           p.archive.push(...p.holoPower.splice(0, skill.cost));
           if (skill.sp) p.usedSpOshiSkillThisGame = true;
-          else p.usedOshiSkillThisTurn = true;
+          else p.usedOshiSkillThisTurn += 1;
           this._runEffect(skill, { playerIdx: ownerIdx, sourceCard: p.oshi, attackInfo }, () => run(i + 1));
         },
       };
@@ -1935,20 +1967,29 @@ export class Engine {
     const skill = this.registry.get(defender.oshi.number)?.onDamageOshiSkill;
     if (skill) {
       out.push({ build: (curDmg) => {
-        const used = skill.sp ? defender.usedSpOshiSkillThisGame : defender.usedOshiSkillThisTurn;
+        const used = skill.sp ? defender.usedSpOshiSkillThisGame : (defender.usedOshiSkillThisTurn >= this._oshiSkillCap(defIdx));
         if (used || defender.holoPower.length < skill.cost) return null;
-        if (skill.canUse && !skill.canUse(this, defIdx, target, curDmg)) return null;
+        // redirect（受け手差し替え）は「アーツダメージを受ける時」限定 (hSD13-001)。特殊ダメージには出さない。
+        if (skill.redirect && kind !== 'arts') return null;
+        if (skill.canUse && !skill.canUse(this, defIdx, target, curDmg, kind)) return null;
         const eng = this;
         const payAndMark = () => {
           defender.archive.push(...defender.holoPower.splice(0, skill.cost));
           if (skill.sp) defender.usedSpOshiSkillThisGame = true;
-          else defender.usedOshiSkillThisTurn = true;
+          else defender.usedOshiSkillThisTurn += 1;
         };
         const desc = {
           title: skill.title || '推しスキルを使いますか？',
           yesLabel: `${skill.sp ? 'SP' : ''}推しスキルを使う（ホロパワー-${skill.cost}）`,
         };
-        if (skill.run) {
+        if (skill.redirect) {
+          // 受け手差し替え型（generator・選んだホロメンを返す）。ダメージ値は変えず受け手だけ変更。
+          desc.redirect = function* (ctx) {
+            payAndMark();
+            eng.log(`${defender.name}: ${skill.sp ? 'SP' : ''}推しスキル発動（ホロパワー-${skill.cost}）`);
+            return yield* skill.redirect(ctx, { target, dmg: curDmg });
+          };
+        } else if (skill.run) {
           // 選択を伴う割り込み（generator）。ダメージは変更しない副作用。
           desc.run = function* (ctx) {
             payAndMark();
@@ -2029,7 +2070,13 @@ export class Engine {
         ],
         resume: (use) => {
           if (!use) { run(i + 1, curDmg); return; }
-          if (r.run) {
+          if (r.redirect) {
+            // 受け手差し替え（generator が選んだホロメンを返す）。リダイレクトが起きたら
+            // 以降の割り込みは提示せず、選ばれたホロメンへ即適用する（割り込みの完結）。
+            let chosen = null;
+            const captureRun = function* (ctx) { chosen = yield* r.redirect(ctx); };
+            this._runEffect({ run: captureRun }, { playerIdx: defIdx }, () => after(curDmg, chosen || null));
+          } else if (r.run) {
             // 選択を伴う割り込み（generator・ダメージ非変更）はエフェクトランナーで実行してから次へ
             this._runEffect({ run: r.run }, { playerIdx: defIdx }, () => run(i + 1, curDmg));
           } else {
@@ -2177,6 +2224,22 @@ export class Engine {
       if (m.kind === 'noRestOnReset' && m.ownerIdx === ownerIdx && (!m.match || m.match(holomem))) return true;
     }
     return false;
+  }
+
+  /**
+   * このターンに使える「（通常の）推しスキル」の回数上限（通常1）。装着カードの oshiSkillCapBonus で増やせる
+   * （「推しスキルの[ターン1回]を[ターン2回]に変更」hBP02-087）。usedOshiSkillThisTurn は使用回数カウント。
+   */
+  _oshiSkillCap(ownerIdx) {
+    let cap = 1;
+    const p = this.state.players[ownerIdx];
+    if (!p) return cap;
+    for (const h of this._stageHolomems(p)) {
+      for (const att of h.attachments) {
+        cap += this.registry.get(att.number)?.oshiSkillCapBonus?.(h, this, ownerIdx) || 0;
+      }
+    }
+    return cap;
   }
 
   /** このターンに使えるLIMITEDサポートの枚数上限（通常1。ターン修正 kind:'limitedCapBonus' で増やせる。hBP06-008） */
