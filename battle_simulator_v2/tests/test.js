@@ -845,6 +845,46 @@ export async function runTests() {
     assertEq(mods.length, 1, '全色扱い修正がX=1ぶん付与されていない');
   });
 
+  await testAsync('手書き: わため推しスキル「角ドリルしたろか？」がステージの〈角巻わため〉に+100', async () => {
+    const e = await setupMainStep(deckMap, 130);
+    await e.registry.preload(['hBP07-001'], lib);
+    const def = e.registry.get('hBP07-001');
+    assert(def?.oshiSkill?.run, '角ドリルが無い');
+    const p0 = e.state.players[0];
+    const watame = e._createHolomem(lib.getByNumber('hBP07-009'), 0); // 白〈角巻わため〉Debut
+    assertEq(watame.stack[0].name, '角巻わため', 'テスト用わためが用意できていない');
+    p0.center = watame; p0.collab = null; p0.back = [];
+    assertEq(e.effects.artsBonus(watame, 0), 0, '事前に+0でない');
+    let done = false;
+    e._runEffect(def.oshiSkill, { playerIdx: 0 }, () => { done = true; });
+    let guard = 0;
+    while (!done && e.state.pending && guard++ < 5) e.apply(e.state.pending.options[0].id);
+    assert(done, '完了しない');
+    assertEq(e.effects.artsBonus(watame, 0), 100, '角ドリルで〈角巻わため〉に+100されない');
+  });
+
+  await testAsync('手書き: チャキ丸の被ダメージ反撃（1st風真いろは装着時・相手センターに特殊20）', async () => {
+    const e = await setupMainStep(deckMap, 131);
+    await e.registry.preload(['hSD06-011'], lib);
+    const def = e.registry.get('hSD06-011');
+    assert(def?.attached?.onDamageReceivedForced, '反撃トリガーが無い');
+    // 防御側 = p1（ownerIdx 1）、相手ターンは p0。1st〈風真いろは〉にチャキ丸を装着。
+    const host = e._createHolomem(lib.getByNumber('hBP01-050'), 0); // 風真いろは 1st
+    assertEq(host.stack[0].name, '風真いろは', 'テスト用ホストが用意できていない');
+    const tool = { ...lib.getByNumber('hSD06-011') };
+    host.attachments = [tool];
+    e.state.players[1].back = [host];
+    const oppCenter = e.state.players[0].center;
+    assert(oppCenter, '相手センターがいない前提');
+    const before = oppCenter.damage;
+    // 相手ターン(p0)に host が被ダメージ → 強制反撃
+    def.attached.onDamageReceivedForced(host, e, tool, 1);
+    assertEq(oppCenter.damage, before + 20, '相手センターに特殊20が入っていない');
+    // [ターンに1回]: 同一ターンの2回目は発火しない
+    def.attached.onDamageReceivedForced(host, e, tool, 1);
+    assertEq(oppCenter.damage, before + 20, '[ターンに1回]を超えて反撃している');
+  });
+
   await testAsync('コンパイラ: 全カードでクラッシュせず、一定数を自動実装できる', async () => {
     let compiled = 0;
     let slots = 0;

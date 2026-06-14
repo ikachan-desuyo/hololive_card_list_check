@@ -14,7 +14,8 @@ export default {
       // 「5人以下の時」= ステージに出す余地がある（上限6人）必要があるので 5 以下を条件にする
       if (ctx.engine._stageCount(ctx.player) > 5) return;
       const candidates = ctx.deckCards(
-        (c) => c.name === '角巻わため' && c.bloom_level === 'Debut',
+        // 正規化済みカードは bloomLevel（camelCase）。c.bloom_level は undefined になるので使わない
+        (c) => c.name === '角巻わため' && c.bloomLevel === 'Debut',
       );
       if (candidates.length === 0) return;
       const ok = yield ctx.confirm('デッキからDebutの〈角巻わため〉をステージに出しますか？');

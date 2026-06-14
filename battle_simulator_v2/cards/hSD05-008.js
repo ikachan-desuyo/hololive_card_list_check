@@ -10,7 +10,7 @@ export default {
       *run(ctx) {
         const target = yield ctx.chooseHolomem({
           side: 'self',
-          filter: (e) => ctx.hasTag(e.top, 'ReGLOSS') && e.top.bloom_level === 'Debut',
+          filter: (e) => ctx.hasTag(e.top, 'ReGLOSS') && e.top.bloomLevel === 'Debut',
           title: 'このターン アーツ+40する #ReGLOSS Debutホロメンを選択',
           optional: true,
         });
