@@ -15,10 +15,9 @@
  *     → auraDamageDelta（kind==='arts' 限定の常時アウラ）で実装。条件成立時、自分のホロメン全員の
  *       アーツ被ダメージを実質無効化（-100000）。
  *
- * 未実装（保留対象）:
  * - アーツ「百鬼乱舞 -朧月-」の使用制限
  *     「このアーツは、自分のライフが2以下でなければコラボポジションでは使えない」
- *     → アーツ単位の使用可否(canUse)を判定するフックがエンジンに無いため未実装（制限は強制されない）。
+ *     → arts.canUse で実装（コラボにいてライフが3以上なら使えない）。
  */
 export default {
   number: 'hBP06-039',
@@ -36,6 +35,11 @@ export default {
   },
   arts: {
     '百鬼乱舞 -朧月-': {
+      // 「このアーツは、自分のライフが2以下でなければコラボポジションでは使えない」
+      canUse(ctx) {
+        if (ctx.engine._zoneOf(ctx.sourceHolomem) === 'collab' && ctx.player.life.length > 2) return false;
+        return true;
+      },
       *run(ctx) {
         // 自分の推しホロメンが〈百鬼あやめ〉でなければ効果なし
         if (ctx.player.oshi?.name !== '百鬼あやめ') return;

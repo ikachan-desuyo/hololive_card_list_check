@@ -570,6 +570,7 @@ export class EffectContext {
     for (const c of returned) this._unreveal(c);
     if (bottom) owner.deck.push(...returned);
     else owner.deck.unshift(...returned);
+    owner.holomemReturnedToDeckThisTurn = true; // 「このターンに自分のホロメンがステージからデッキに戻った」記録（hBP07-042）
     this.log(`${returned[0]?.name} をデッキの${bottom ? '下' : '上'}に戻した`);
     this.engine._dispatchReturnedToDeck(ownerIdx, returned);
     return returned;

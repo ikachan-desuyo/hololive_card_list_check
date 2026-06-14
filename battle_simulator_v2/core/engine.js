@@ -503,6 +503,7 @@ export class Engine {
     const p = s.players[playerIdx];
     p.turnCount++;
     p.limitedPlayedThisTurn = 0; // このターンにプレイしたLIMITEDサポートの枚数（cap は _limitedCap）
+    p.holomemReturnedToDeckThisTurn = false; // このターンに自分のホロメンがステージからデッキに戻ったか（hBP07-042）
     p.usedSupportThisTurn = false;
     p.usedCollabThisTurn = false;
     p.usedBatonTouchThisTurn = false;
