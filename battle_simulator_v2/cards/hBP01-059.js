@@ -20,9 +20,8 @@ export default {
           title: 'コスト: アーカイブする手札を選択',
         });
         if (!cost) return;
-        ctx.removeFromHand(cost);
-        ctx.player.archive.push(cost);
-        ctx.log(`${ctx.player.name}: ${cost.name} をアーカイブした`);
+        // 「ホロメンの能力で手札をアーカイブ」共通プリミティブ（推し「女幹部の采配」のコスト置換にも対応）
+        yield* ctx.archiveHandCard(cost);
 
         // 効果: デッキからBuzz以外の1stホロメンを公開して手札へ
         const candidates = ctx.deckCards((c) =>

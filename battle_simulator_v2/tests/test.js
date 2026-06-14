@@ -1106,6 +1106,64 @@ export async function runTests() {
     assertEq(p1.center.damage, before + 20, '相手前衛に特殊20（ターンに1回）が正しく入っていない');
   });
 
+  await testAsync('推しスキル: IOFORIA~!（被ダメージ割り込み中にエール付け替え・generator版）', async () => {
+    const e = await setupMainStep(deckMap, 154);
+    await e.registry.preload(['hBP05-002'], lib);
+    const p0 = e.state.players[0]; const p1 = e.state.players[1];
+    p0.oshi = lib.getByNumber('hBP05-002'); // アイラニ・イオフィフティーン（#ID1期生）
+    p0.holoPower = [{}];
+    e.state.turnPlayer = 1; // 相手(p1)のターン
+    const target = { stack: [{ name: 'T', tags: ['ID1期生'], hp: 100, arts: [], bloomLevel: 'Debut' }], cheers: [{ name: 'cheerX', color: '白' }], attachments: [] };
+    const dest = { stack: [{ name: 'D', tags: ['ID1期生'], hp: 100, arts: [], bloomLevel: 'Debut' }], cheers: [], attachments: [] };
+    p0.center = target; p0.back = [dest]; p0.collab = null;
+
+    let done = false;
+    const atk = { * run(ctx) { yield* ctx.dealSpecialDamage({ holomem: target, top: target.stack[0] }, 30); } };
+    e._runEffect(atk, { playerIdx: 1 }, () => { done = true; });
+    let guard = 0;
+    while (!done && e.state.pending && guard++ < 15) {
+      const opts = e.state.pending.options;
+      const yes = opts.find((o) => o.id === 'yes');
+      e.apply((yes || opts[0]).id);
+    }
+    assert(done, 'IOFORIA~! の割り込みが完了しない');
+    assertEq(target.cheers.length, 0, '対象からエールが外れていない');
+    assertEq(dest.cheers.length, 1, '他の#ID1期生にエールが付け替えられていない');
+    assert(p0.usedOshiSkillThisTurn === true, '推しスキルが使用済みになっていない（コスト/回数処理）');
+  });
+
+  await testAsync('推しスキル: 女幹部の采配（赤ホロメンの手札アーカイブをホロパワーで置換）', async () => {
+    const e = await setupMainStep(deckMap, 155);
+    await e.registry.preload(['hBP01-005'], lib);
+    const p0 = e.state.players[0];
+    p0.oshi = lib.getByNumber('hBP01-005');
+    p0.holoPower = [{ name: 'hp1' }, { name: 'hp2' }];
+
+    // 赤ホロメンの能力で手札アーカイブ → 置換「はい」: 手札は残り、ホロパワー1枚がアーカイブ
+    const redHost = { stack: [{ name: 'R', color: '赤' }], cheers: [], attachments: [] };
+    p0.center = redHost;
+    const handCard = { name: 'H', kind: 'support' };
+    p0.hand = [handCard];
+    const hpBefore = p0.holoPower.length; const arcBefore = p0.archive.length;
+    let done = false;
+    e._runEffect({ * run(ctx) { yield* ctx.archiveHandCard(handCard); } }, { playerIdx: 0, sourceHolomem: redHost }, () => { done = true; });
+    let guard = 0;
+    while (!done && e.state.pending && guard++ < 5) { const yes = e.state.pending.options.find((o) => o.id === 'yes'); e.apply((yes || e.state.pending.options[0]).id); }
+    assert(done, '完了しない');
+    assert(p0.hand.includes(handCard), '手札カードが残っていない（置換されていない）');
+    assertEq(p0.holoPower.length, hpBefore - 1, 'ホロパワーが1枚減っていない');
+    assertEq(p0.archive.length, arcBefore + 1, 'ホロパワーがアーカイブされていない');
+
+    // 非赤ホロメンでは置換オファー無し（通常どおり手札をアーカイブ）
+    const blueHost = { stack: [{ name: 'B', color: '青' }], cheers: [], attachments: [] };
+    p0.center = blueHost;
+    const h2 = { name: 'H2', kind: 'support' }; p0.hand = [h2];
+    let done2 = false;
+    e._runEffect({ * run(ctx) { yield* ctx.archiveHandCard(h2); } }, { playerIdx: 0, sourceHolomem: blueHost }, () => { done2 = true; });
+    assert(done2 && !e.state.pending, '非赤で余計な確認が出た');
+    assert(!p0.hand.includes(h2) && p0.archive.includes(h2), '非赤で手札がアーカイブされていない');
+  });
+
   await testAsync('コンパイラ: 全カードでクラッシュせず、一定数を自動実装できる', async () => {
     let compiled = 0;
     let slots = 0;

@@ -51,8 +51,8 @@ export default {
             skipLabel: 'これ以上アーカイブしない',
           });
           if (!card) break;
-          ctx.removeFromHand(card);
-          ctx.player.archive.push(card);
+          // 「ホロメンの能力で手札をアーカイブ」共通プリミティブ（推し「女幹部の采配」のコスト置換にも対応）
+          yield* ctx.archiveHandCard(card);
           count++;
         }
         if (count === 0) return;

@@ -3,9 +3,10 @@
  * 推しスキル「女幹部の采配」[ホロパワー-X][ターンに1回]:
  *   自分の赤ホロメンの能力で手札をアーカイブする時に使える：アーカイブする手札1枚につき
  *   自分のホロパワー1枚を、かわりにアーカイブできる。
- *   → ★保留: 「手札をアーカイブするコスト」をホロパワーで肩代わりする置換効果。Xコストかつ
- *     手札アーカイブをコスト支払いとして行う箇所への置換フックが必要（hBP03-106 と同系統）。
- *     ※Xコスト推しスキルはエンジン側で元々メインに提示されない（未対応）。
+ *   → handArchiveCostReplace で実装。ctx.archiveHandCard（手札アーカイブ共通プリミティブ）が、
+ *     発生源が赤ホロメンの時にこのフックを呼び、各手札アーカイブをホロパワー1枚アーカイブに置換するか
+ *     プレイヤーに確認する。Xコストは置換した枚数ぶんのホロパワー。
+ *     [ターンに1回]＝発動した発生源（ホロメンの1能力）に限り継続して置換でき、別の発生源では再使用不可。
  * SP推しスキル「ホークアイ」[ホロパワー-2][ゲームに1回]:
  *   次の相手のターンの間、相手のセンターホロメンとコラボホロメンは、バトンタッチ、移動、交代できない。
  *   → spOshiSkill。ターン修正 kind:'cannotMoveFrontline'（相手側・次の相手ターン終了まで）を積む。
@@ -13,6 +14,26 @@
  */
 export default {
   number: 'hBP01-005',
+
+  // 推しスキル「女幹部の采配」: 赤ホロメンの能力での手札アーカイブを、ホロパワー1枚アーカイブに置換できる。
+  //   ctx.archiveHandCard から呼ばれる。replaced=true を返すと手札カードは残り、ホロパワーが代わりにアーカイブされる。
+  * handArchiveCostReplace(ctx, host, card) {
+    if (!host || host.stack[0].color !== '赤') return false; // 赤ホロメンの能力のみ
+    const p = ctx.player;
+    if (p.holoPower.length === 0) return false; // 払うホロパワーが無い
+    // [ターンに1回]: 既にこのターン別の発生源で使っていたら不可（同一発生源の能力中は継続可）
+    if (p._saihaiUsedTurn === ctx.state.turn && p._saihaiHost !== host) return false;
+    const ok = yield ctx.confirm(
+      `推しスキル「女幹部の采配」: 「${card.name}」のかわりにホロパワー1枚をアーカイブする？`,
+      'ホロパワーで代替する', '手札をアーカイブする');
+    if (!ok) return false;
+    p.archive.push(p.holoPower.shift());
+    p._saihaiUsedTurn = ctx.state.turn;
+    p._saihaiHost = host;
+    ctx.log(`女幹部の采配: 「${card.name}」のかわりにホロパワー1枚をアーカイブ（手札に残す）`);
+    return true;
+  },
+
   spOshiSkill: {
     canUse(engine, idx) {
       const opp = engine.state.players[1 - idx];

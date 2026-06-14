@@ -466,9 +466,17 @@ export class EffectContext {
    * 単純な手札アーカイブとの違いは“発生源ホロメンの能力による”誘発が走る点のみ。
    */
   *archiveHandCard(card) {
+    // 推しスキルによる「手札アーカイブのコスト置換」（hBP01-005 女幹部の采配: 赤ホロメンの能力での
+    // 手札アーカイブ1枚につき、ホロパワー1枚をかわりにアーカイブできる）。置換されたら手札カードは残す。
+    const oshiDef = this.engine.registry.get(this.player.oshi?.number);
+    if (oshiDef?.handArchiveCostReplace) {
+      const replaced = yield* oshiDef.handArchiveCostReplace(this, this.sourceHolomem, card);
+      if (replaced) return; // ホロパワーで代替済み（手札カードはアーカイブしない）
+    }
     this.removeFromHand(card);
     this.player.archive.push(card);
     this.log(`${this.player.name}: ${card.name} を手札からアーカイブ`);
+    // 発生源ホロメンの能力で手札をアーカイブした時の誘発（hBP05-083 ネリッサの杖）
     const host = this.sourceHolomem;
     if (host) {
       for (const att of [...host.attachments]) {
@@ -736,7 +744,14 @@ export class EffectContext {
             { id: 'no', label: '使わない', value: false },
           ],
         };
-        if (use) total = Math.max(0, r.apply(total));
+        if (use) {
+          if (r.run) {
+            // 選択を伴う割り込み（generator・ダメージ非変更）。防御側のコンテキストで実行
+            yield* r.run(new EffectContext(eng, defIdx, {}));
+          } else if (r.apply) {
+            total = Math.max(0, r.apply(total));
+          }
+        }
       }
     }
 

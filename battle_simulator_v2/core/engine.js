@@ -1797,26 +1797,42 @@ export class Engine {
     const defender = this.state.players[defIdx];
     const out = [];
 
-    // ① 推しスキル（「受ける時に使える推しスキル：ダメージ-N」）
+    // ① 推しスキル（「受ける時に使える推しスキル」）
+    //   reduce: 受けるダメージ-N（同期）。run: 選択を伴う副作用（エール付け替え等。generator）。
     const skill = this.registry.get(defender.oshi.number)?.onDamageOshiSkill;
     if (skill) {
       out.push({ build: (curDmg) => {
         const used = skill.sp ? defender.usedSpOshiSkillThisGame : defender.usedOshiSkillThisTurn;
         if (used || defender.holoPower.length < skill.cost) return null;
         if (skill.canUse && !skill.canUse(this, defIdx, target, curDmg)) return null;
-        return {
-          title: skill.title || '推しスキルを使いますか？（受けるダメージ軽減）',
+        const eng = this;
+        const payAndMark = () => {
+          defender.archive.push(...defender.holoPower.splice(0, skill.cost));
+          if (skill.sp) defender.usedSpOshiSkillThisGame = true;
+          else defender.usedOshiSkillThisTurn = true;
+        };
+        const desc = {
+          title: skill.title || '推しスキルを使いますか？',
           yesLabel: `${skill.sp ? 'SP' : ''}推しスキルを使う（ホロパワー-${skill.cost}）`,
-          apply: (d) => {
-            defender.archive.push(...defender.holoPower.splice(0, skill.cost));
-            if (skill.sp) defender.usedSpOshiSkillThisGame = true;
-            else defender.usedOshiSkillThisTurn = true;
+        };
+        if (skill.run) {
+          // 選択を伴う割り込み（generator）。ダメージは変更しない副作用。
+          desc.run = function* (ctx) {
+            payAndMark();
+            eng.log(`${defender.name}: ${skill.sp ? 'SP' : ''}推しスキル発動（ホロパワー-${skill.cost}）`);
+            yield* skill.run(ctx, { target, dmg: curDmg });
+          };
+        } else {
+          // 既存: 受けるダメージ軽減（同期）
+          desc.apply = (d) => {
+            payAndMark();
             const red = skill.reduce ? (skill.reduce(this, defIdx, target, d) || 0) : 0;
             const fin = Math.max(0, d - red);
             this.log(`${defender.name}: 推しスキルで受けるダメージ ${d} → ${fin}（-${red}）`);
             return fin;
-          },
-        };
+          };
+        }
+        return desc;
       } });
     }
 
@@ -1878,7 +1894,15 @@ export class Engine {
           { id: 'yes', label: r.yesLabel, value: true },
           { id: 'no', label: '使わない', value: false },
         ],
-        resume: (use) => run(i + 1, use ? r.apply(curDmg) : curDmg),
+        resume: (use) => {
+          if (!use) { run(i + 1, curDmg); return; }
+          if (r.run) {
+            // 選択を伴う割り込み（generator・ダメージ非変更）はエフェクトランナーで実行してから次へ
+            this._runEffect({ run: r.run }, { playerIdx: defIdx }, () => run(i + 1, curDmg));
+          } else {
+            run(i + 1, r.apply ? r.apply(curDmg) : curDmg);
+          }
+        },
       };
       this.onChange();
     };

@@ -8,9 +8,10 @@
  *     『エール1枚をどのホロメンへ付け替えるか』という2段階のプレイヤー選択（どのエール・どの付け先）を伴う。
  *     エンジンの onDamageOshiSkill は同期 reduce()=>数値 のみ対応で、割り込み中に
  *     yield ctx.chooseCard / chooseHolomem を挟めない（プレイヤー選択ができない）。
- *   ★保留: この推しスキルは未実装。選択を伴う付け替えを被ダメージ割り込み中に行う機構
- *     （generator 版の onDamageOshiSkill 等）が無いため、安全側で見送る。
- *     ダメージ軽減効果も持たないため、reduce で副作用だけ実行する近似も自動選択になり不適切。
+ *   → onDamageOshiSkill（被ダメージ割り込み）の generator 版 run で実装。
+ *     アーツ/特殊どちらの被ダメージでも、防御側に決定ポイントを提示し、エール1枚を選んで
+ *     他の#ID1期生に付け替える（ダメージ自体は変更しない）。コスト[ホロパワー：-1]・[ターンに1回]は
+ *     エンジンの割り込み機構が処理する。
  *
  * SP推しスキル「Kekuatan Iofi」[ホロパワー：-3][ゲームに1回]:
  *   自分のステージのエール2枚をアーカイブすることで、自分のデッキから、#ID1期生を持つホロメン2枚を
@@ -26,7 +27,35 @@ const ID1KISEI = 'ID1期生';
 export default {
   number: 'hBP05-002',
 
-  // 推しスキル「IOFORIA~!」: 保留（上部JSDoc参照）。被ダメージ割り込み中の選択付き付け替えは未対応。
+  // 推しスキル「IOFORIA~!」[ホロパワー：-1][ターンに1回]:
+  //   相手のターンで、自分の#ID1期生が相手からダメージを受ける時に使える：
+  //   そのホロメンのエール1枚を自分の他の#ID1期生に付け替える（被ダメージ割り込み・generator）。
+  onDamageOshiSkill: {
+    cost: 1,
+    title: '推しスキル「IOFORIA~!」: エール1枚を他の#ID1期生に付け替えますか？',
+    canUse(engine, defIdx, target) {
+      if (engine.state.turnPlayer === defIdx) return false; // 相手のターン限定
+      if (!(target.stack[0].tags || []).includes(ID1KISEI)) return false; // 対象が#ID1期生
+      if (target.cheers.length === 0) return false; // 付け替えるエールが必要
+      // 付け替え先（他の#ID1期生）がいること
+      return engine._stageHolomems(engine.state.players[defIdx])
+        .some((h) => h !== target && (h.stack[0].tags || []).includes(ID1KISEI));
+    },
+    * run(ctx, { target }) {
+      if (target.cheers.length === 0) return;
+      const cheer = target.cheers.length === 1
+        ? target.cheers[0]
+        : yield ctx.chooseCard({ cards: [...target.cheers], title: '付け替えるエールを選択' });
+      if (!cheer) return;
+      const dest = yield ctx.chooseHolomem({
+        side: 'self',
+        filter: (e) => e.holomem !== target && ctx.hasTag(e.top, ID1KISEI),
+        title: 'エールの付け替え先（自分の他の#ID1期生）を選択',
+      });
+      if (!dest) return;
+      ctx.moveCheer(cheer, target, dest.holomem);
+    },
+  },
 
   spOshiSkill: {
     name: 'Kekuatan Iofi',
