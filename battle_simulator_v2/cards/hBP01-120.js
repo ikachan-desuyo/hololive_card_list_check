@@ -21,6 +21,13 @@ export default {
     // このマスコットが付いているホロメンのアーツ+10
     artsPlus() { return 10; },
   },
-  // 〈鷹嶺ルイ〉装着時の「センターでアーツを使った時1ドロー」は、
-  // アーツ使用時(onArtsUse)トリガー機構が未実装のため保留。
+  triggers: {
+    // ◆〈鷹嶺ルイ〉に付いていたら: ホストがセンターでアーツを使った時、自分のデッキを1枚引く
+    * onArtsUse(ctx) {
+      const host = ctx.sourceHolomem;
+      if (host?.stack[0].name !== '鷹嶺ルイ') return;
+      if (ctx.engine._zoneOf(host) !== 'center') return;
+      ctx.draw(1);
+    },
+  },
 };

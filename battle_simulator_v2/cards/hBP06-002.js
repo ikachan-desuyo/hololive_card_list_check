@@ -9,10 +9,13 @@
  * SP推しスキル「生き抜いていくんです！」[ホロパワー：-1][ゲームに1回]:
  *   自分のデッキの枚数が5枚以下で、自分の#FLOW GLOWを持つホロメンが相手のセンターホロメンを
  *   ダウンさせた時に使える：相手のライフ-1。
- *   → 「ダウンさせた時に使える」タイミング割り込み型のSP推しスキル。
- *     ホロメンのダウン監視＋SP推しスキルのトリガー発火機構が未対応のため未実装（保留）。
+ *   → 攻撃側の「ダメージを与えた時／ダウンさせた時」タイミング推しスキルなので
+ *     onDamageDealtOshiSkills(sp:true) で実装。attackInfo.sourceHolomem(攻撃者)が #FLOW GLOW、
+ *     attackInfo.downed に相手のセンターが含まれ、自分のデッキ5枚以下を条件に
+ *     opponent.lifeDamage += 1（アーツ解決後の _checkTiming でライフ処理される）。
  */
 const isFlowGlow = (ctx, top) => ctx.hasTag(top, 'FLOW') && ctx.hasTag(top, 'GLOW');
+const cardIsFlowGlow = (top) => !!top && (top.tags || []).includes('FLOW') && (top.tags || []).includes('GLOW');
 
 export default {
   number: 'hBP06-002',
@@ -41,5 +44,23 @@ export default {
       });
     },
   },
-  // SP推しスキル「生き抜いていくんです！」はダウン時トリガー型のため未実装（保留）
+
+  // SP推しスキル「生き抜いていくんです！」: #FLOW GLOWのホロメンが相手のセンターをダウンさせた時、デッキ5枚以下なら相手のライフ-1
+  onDamageDealtOshiSkills: [
+    {
+      sp: true,
+      cost: 1,
+      title: 'SP推しスキル「生き抜いていくんです！」: 相手のライフ-1しますか？',
+      canUse(engine, ownerIdx, attackInfo) {
+        const p = engine.state.players[ownerIdx];
+        if (p.deck.length > 5) return false;                          // 自分のデッキ5枚以下
+        if (!cardIsFlowGlow(attackInfo.sourceHolomem?.stack[0])) return false; // 攻撃者が#FLOW GLOW
+        return (attackInfo.downed || []).some((t) => engine._zoneOf(t) === 'center'); // 相手センターをダウン
+      },
+      *run(ctx) {
+        ctx.opponent.lifeDamage += 1; // 相手のライフ-1（_checkTiming でライフ処理）
+        ctx.log('SP推しスキル「生き抜いていくんです！」: 相手のライフ-1');
+      },
+    },
+  ],
 };

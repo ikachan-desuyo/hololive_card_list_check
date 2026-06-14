@@ -248,6 +248,57 @@ export async function runTests() {
     assert(eng._canBloom({ ...h, rested: true }, first), 'お休み中にBloomできない');
   });
 
+  test('onDownOshiSkill: 配列・SP・run・downedHolomem（ダウン時推しスキルの新機構）', () => {
+    // 推しの onDownOshiSkill を「通常スキル＋SPスキル」の配列で定義し、
+    // run（対話的ジェネレータ）・sp フラグ（ゲームに1回）・ctx.downedHolomem の受け渡しを検証する。
+    const reg = new EffectRegistry();
+    reg.defs.set('TEST-OSHI-DOWN', {
+      number: 'TEST-OSHI-DOWN',
+      onDownOshiSkill: [
+        {
+          cost: 1, title: 'regular',
+          canUse(engine, ownerIdx) { return engine.state.players[ownerIdx].holoPower.length >= 1; },
+          *run(ctx) { ctx.player.__regularDownedName = ctx.downedHolomem.stack[0].name; },
+        },
+        {
+          sp: true, cost: 2, title: 'sp',
+          canUse(engine, ownerIdx) { return engine.state.players[ownerIdx].holoPower.length >= 2; },
+          *run(ctx) { ctx.player.__spRan = true; },
+        },
+      ],
+    });
+    const oshi = fakeHolomen({ number: 'TEST-OSHI-DOWN', name: '推しテスト', life: 5 });
+    const e2 = new Engine({
+      decks: [
+        { oshi, deck: [], cheerDeck: [] },
+        { oshi: fakeHolomen({ number: 'TEST-OSHI-2', name: '推し2' }), deck: [], cheerDeck: [] },
+      ],
+      seed: 1, registry: reg,
+    });
+    const p0 = e2.state.players[0];
+    p0.center = { stack: [fakeHolomen({ name: 'X' })], cheers: [], attachments: [], damage: 0, rested: false, faceDown: false };
+    p0.holoPower = [{ name: 'hp1' }, { name: 'hp2' }, { name: 'hp3' }];
+    p0.archive = [];
+    p0.life = [{ name: 'l1' }, { name: 'l2' }];
+    e2.state.turnPlayer = 1;   // 相手のターン
+    e2.state.phase = 'playing';
+    let done = false;
+    e2._processDown(p0, { zone: 'center', index: 0 }, () => { done = true; });
+    // 通常ダウン推しスキルの発動確認 → yes（resume を直接駆動して _autoResolve を回避）
+    assertEq(e2.state.pending.type, 'effectChoice', '通常ダウン推しスキルの確認が出ていない');
+    e2.state.pending.resume(true);
+    // SPダウン推しスキルの発動確認 → yes
+    assertEq(e2.state.pending.type, 'effectChoice', 'SPダウン推しスキルの確認が出ていない');
+    e2.state.pending.resume(true);
+    assert(done, 'ダウン処理が完了していない');
+    assertEq(p0.__regularDownedName, 'X', '通常スキルの run が ctx.downedHolomem を受け取れていない');
+    assertEq(p0.__spRan, true, 'SPスキルの run が実行されていない');
+    assertEq(p0.holoPower.length, 0, 'ホロパワーのコスト(1+2)が支払われていない');
+    assertEq(p0.usedOshiSkillThisTurn, true, '通常推しスキルの使用フラグが立っていない');
+    assertEq(p0.usedSpOshiSkillThisGame, true, 'SP推しスキルの使用フラグが立っていない');
+    assertEq(p0.center, null, 'ダウンしたホロメンが場から取り除かれていない');
+  });
+
   // ---- 統合テスト: 実デッキでのプレイアウト ----
   const deckRes = await fetch('../test_deck/' + encodeURIComponent('ラミィデッキ.json'));
   const deckMap = await deckRes.json();

@@ -4,10 +4,9 @@
  * [キーワード/ギフト]「緑の地母神」:
  *   [ターンに1回]相手のターンで、このホロメンがダメージを受けた時、
  *   このホロメンにサポートカードが付いているなら、このホロメンのHP50回復。
- *   → 未実装（保留）。エンジンに「ダメージを受けた時」のトリガーフック
- *     （被ダメージ割り込み系）が存在しないため実装できない。
- *     triggers には onDown / onAttach / onOpponentDown しか無く、
- *     「受けた時」を捕捉する手段が無い。
+ *   → onDamageReceivedForced（カード定義の被ダメージ後トリガー・同期）で実装。engine が
+ *     「相手のターンに被弾した後」に発火する。サポートが付いていれば [ターンに1回] HP50回復
+ *     （ダメージカウンタを最大50戻す）。
  *
  * [アーツ]「Upright Leading」(130+ / 特攻 黄+50):
  *   自分のデッキの上から1枚をアーカイブできる。
@@ -17,6 +16,20 @@
  */
 export default {
   number: 'hBP07-029',
+  // キーワード「緑の地母神」: [ターンに1回]相手のターンに被弾後、サポートが付いていればHP50回復
+  onDamageReceivedForced(holomem, engine, ownerIdx) {
+    const key = 'hBP07-029:heal';
+    const used = engine.state.modifiers.some(
+      (m) => m.kind === 'oncePerTurnUsed' && m.key === key && m.ownerIdx === ownerIdx);
+    if (used) return;
+    if (holomem.attachments.length === 0) return; // サポートカードが付いているなら
+    engine.state.modifiers.push({ duration: 'turn', kind: 'oncePerTurnUsed', key, ownerIdx });
+    const before = holomem.damage;
+    holomem.damage = Math.max(0, holomem.damage - 50);
+    if (holomem.damage !== before) {
+      engine.log(`大神ミオ「緑の地母神」: HP50回復（ダメージ ${before} → ${holomem.damage}）`);
+    }
+  },
   arts: {
     'Upright Leading': {
       *run(ctx) {

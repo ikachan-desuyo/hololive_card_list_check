@@ -24,6 +24,13 @@ export default {
     // このマスコットが付いているホロメンのHP+10
     hpPlus() { return 10; },
   },
-  // 〈白上フブキ〉装着時の「相手をダウンさせた時：エールデッキ上から1枚を自分のホロメンに送る」は、
-  // 装着カードを発生源とする onOpponentDown 配線がエンジン未対応のため保留。
+  triggers: {
+    // ◆〈白上フブキ〉に付いていたら: ホストが相手をダウンさせた時、エールデッキの上から1枚を自分のホロメンに送る
+    * onOpponentDown(ctx) {
+      if (ctx.sourceHolomem?.stack[0].name !== '白上フブキ') return;
+      if (ctx.player.cheerDeck.length === 0) return;
+      const entry = yield ctx.chooseHolomem({ side: 'self', title: 'エールを送る自分のホロメンを選択' });
+      if (entry) ctx.sendCheerFromCheerDeckTop(entry.holomem);
+    },
+  },
 };

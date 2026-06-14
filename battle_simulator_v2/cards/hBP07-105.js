@@ -18,4 +18,14 @@ export default {
   attached: {
     artsPlus() { return 10; },
   },
+  triggers: {
+    // ◆〈ベスティア・ゼータ〉に付いていたら: ホストがアーツを使った時、アーカイブのファン1枚を手札に戻す
+    * onArtsUse(ctx) {
+      if (ctx.sourceHolomem?.stack[0].name !== 'ベスティア・ゼータ') return;
+      const fans = ctx.player.archive.filter((c) => c.kind === 'support' && c.supportType === 'ファン');
+      if (fans.length === 0) return;
+      const picked = yield ctx.chooseCard({ cards: fans, title: 'アーカイブから手札に戻すファンを選択', optional: true });
+      if (picked) { ctx.removeFromArchive(picked); ctx.addToHand(picked); }
+    },
+  },
 };

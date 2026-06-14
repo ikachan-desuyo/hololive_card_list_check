@@ -24,6 +24,13 @@ export default {
     // ■このツールが付いているホロメンのアーツ+20
     artsPlus() { return 20; },
   },
-  // 「アーツを使った時の自傷特殊ダメージ10」と「アキ・ローゼンタール限定の回復時ドロー」は
-  // アーツ使用時トリガー / 回復イベントトリガーが未実装のため保留。
+  triggers: {
+    // ■このツールが付いているホロメンがアーツを使った時、このホロメンに特殊ダメージ10（自傷）
+    * onArtsUse(ctx) {
+      const host = ctx.sourceHolomem;
+      if (!host) return;
+      yield* ctx.dealSpecialDamage({ holomem: host, top: host.stack[0] }, 10);
+    },
+  },
+  // 〈アキ・ローゼンタール〉限定の「回復した時ドロー」は回復イベントトリガーが未整備のため未実装（保留）。
 };

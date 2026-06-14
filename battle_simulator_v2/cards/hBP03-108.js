@@ -4,15 +4,13 @@
  * [サポート効果] このファンが付いているホロメンが能力でサイコロを振った時、
  *   このファンをアーカイブできる：そのサイコロの結果をすべて無くし、
  *   はじめからサイコロを振り直す。
- *   → 「サイコロを振った時」に割り込んで振り直す（任意・コストとして自身をアーカイブ）
- *      タイミング割り込み機構が必要。(yield* ctx.rollDice()) の結果に対して
- *      装着ファンが介入して再ロールするフックがエンジンに無いため【保留】。
- *      実装するには rollDice 解決時に、振った holomem に付いた装着カードの
- *      「サイコロ振り直し」介入を走査するディスパッチが必要。
+ *   → onDiceRollReact（ダイス割り込み。付いているホロメン自身が振った時のみ。ファンをアーカイブして振り直し）。
+ *      hBP01-123（野うさぎ同盟）と同型。
  *
- * 付け先制限のみ実装:
- *   このファンは、自分の〈赤井はあと〉だけに付けられ、1人につき何枚でも付けられる。
+ * 付け先: 自分の〈赤井はあと〉だけ・1人につき何枚でも。
  */
+import { rollDie } from '../core/rng.js';
+
 export default {
   number: 'hBP03-108',
   attachRule: {
@@ -21,5 +19,22 @@ export default {
     },
     unlimited: true, // 1人に何枚でも
   },
-  // サイコロ振り直しの割り込み効果は未実装（保留）。
+  onDiceRollReact: {
+    title: 'はあとんをアーカイブして、サイコロを振り直す？',
+    yesLabel: 'アーカイブする（振り直し）',
+    canUse(engine, info) {
+      return info.roller && info.roller === info.fanHolomem; // 付いているホロメン自身が振った時
+    },
+    apply(engine, info) {
+      const h = info.fanHolomem;
+      const i = h.attachments.indexOf(info.fanCard);
+      if (i !== -1) {
+        h.attachments.splice(i, 1);
+        engine.state.players[info.ownerIdx].archive.push(info.fanCard);
+      }
+      const newValue = rollDie(engine.rng);
+      engine.log(`はあとんをアーカイブ → サイコロを振り直し: ${newValue}`);
+      return newValue;
+    },
+  },
 };

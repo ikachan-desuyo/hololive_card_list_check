@@ -33,6 +33,8 @@ export class EffectContext {
     this.sourceHolomem = opts.sourceHolomem || null;
     // onAnyDown 用: ダウンしたホロメンの情報 { holomem, card, ownerIdx, zone }
     this.downedInfo = opts.downedInfo || null;
+    // ダウン時推しスキル(onDownOshiSkill.run)用: ダウンしたホロメン（アーカイブ前。エール・スタックを操作できる）
+    this.downedHolomem = opts.downedHolomem || null;
     // onOpponentPerformanceEnd 用: そのパフォーマンスステップで自分のライフが減ったか
     this.lifeDecreasedThisPerf = opts.lifeDecreasedThisPerf || false;
     // 攻撃時誘発の推しスキル用: { sourceHolomem, art, artName, dealtList:[{target,zone,dealt}], downed }
@@ -662,6 +664,9 @@ export class EffectContext {
       for (const att of [...holomem.attachments]) {
         const rep = this.engine.registry.get(att.number)?.cheerArchiveReplace;
         if (!rep) continue;
+        // 条件付き置換（例: おかにゃん=猫又おかゆに付いていて青エールを捨てる時のみ）。
+        // canReplace 未定義なら常に提示（hBP03-106 等の無条件置換と後方互換）。
+        if (rep.canReplace && !rep.canReplace(cheer, holomem, this.engine)) continue;
         const use = yield {
           kind: 'confirm', player: this.playerIdx,
           title: rep.title || `${cheer.name}のかわりに${att.name}をアーカイブする？`,

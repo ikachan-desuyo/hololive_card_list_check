@@ -16,6 +16,9 @@
  *     アーツ修正は「選んだホロメンのエール1枚につき」なので amount を動的関数
  *     (h)=>h.cheers.length*20 にして付与する（送ったエールも数に含まれる）。
  */
+// #FLOW GLOW はタグが 'FLOW' と 'GLOW' に分割格納されるため両方を確認する
+const isFlowGlow = (top) => !!top && (top.tags || []).includes('FLOW') && (top.tags || []).includes('GLOW');
+
 export default {
   number: 'hSD10-001',
   oshiSkill: {
@@ -25,7 +28,7 @@ export default {
       // このターンにBloomしたホロメンがいる かつ #FLOW GLOW ホロメンが自分のステージにいる
       const bloomedThisTurn = engine._stageHolomems(p).some((h) => h.bloomedTurn === engine.state.turn);
       if (!bloomedThisTurn) return false;
-      const hasFlowGlow = engine._stageHolomems(p).some((h) => (h.stack[0].tags || []).includes('FLOW GLOW'));
+      const hasFlowGlow = engine._stageHolomems(p).some((h) => isFlowGlow(h.stack[0]));
       return hasFlowGlow;
     },
     *run(ctx) {
@@ -34,7 +37,7 @@ export default {
       if (!bloomedThisTurn) return;
       const entry = yield ctx.chooseHolomem({
         side: 'self',
-        filter: (e) => ctx.hasTag(e.top, 'FLOW GLOW'),
+        filter: (e) => isFlowGlow(e.top),
         title: 'このターン アーツ+30する #FLOW GLOW ホロメンを選択',
       });
       if (!entry) return;
@@ -52,7 +55,7 @@ export default {
       const p = engine.state.players[ownerIdx];
       // エールを送る先（自分のホロメン）がいて、#FLOW GLOW ホロメンもいる必要がある
       if (engine._stageHolomems(p).length === 0) return false;
-      return engine._stageHolomems(p).some((h) => (h.stack[0].tags || []).includes('FLOW GLOW'));
+      return engine._stageHolomems(p).some((h) => isFlowGlow(h.stack[0]));
     },
     *run(ctx) {
       // エールデッキの上から1枚を自分のホロメンに送る
@@ -65,7 +68,7 @@ export default {
       // その後、#FLOW GLOW ホロメン1人を選ぶ
       const entry = yield ctx.chooseHolomem({
         side: 'self',
-        filter: (e) => ctx.hasTag(e.top, 'FLOW GLOW'),
+        filter: (e) => isFlowGlow(e.top),
         title: 'エール1枚につきアーツ+20する #FLOW GLOW ホロメンを選択',
       });
       if (!entry) return;

@@ -21,4 +21,13 @@ export default {
   attached: {
     artsPlus() { return 10; },
   },
+  triggers: {
+    // ◆1st以上の〈音乃瀬奏〉に付いていたら: ホストが相手をダウンさせた時、自分のデッキを1枚引く
+    * onOpponentDown(ctx) {
+      const top = ctx.sourceHolomem?.stack[0];
+      if (!top || top.name !== '音乃瀬奏') return;
+      if (top.bloomLevel !== '1st' && top.bloomLevel !== '2nd') return;
+      ctx.draw(1);
+    },
+  },
 };
