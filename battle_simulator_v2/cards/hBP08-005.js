@@ -19,6 +19,22 @@
 export default {
   number: 'hBP08-005',
 
+  // 推しステージスキル「もう金曜だねルイ姉」:
+  //   自分のターンが終了する時、センターが〈鷹嶺ルイ〉で自分のコラボがいるなら、手札が4枚になるまで引く（常時・強制）。
+  oshiStageSkill: {
+    name: 'もう金曜だねルイ姉',
+    * onTurnEnd(ctx) {
+      const p = ctx.player;
+      if (!p.center || p.center.stack[0].name !== '鷹嶺ルイ') return;
+      if (!p.collab) return;
+      const need = 4 - p.hand.length;
+      if (need > 0) {
+        ctx.draw(need);
+        ctx.log(`もう金曜だねルイ姉: 手札が4枚になるまで${need}枚引いた`);
+      }
+    },
+  },
+
   oshiSkill: {
     name: 'ホイサホイサ',
     canUse(engine, ownerIdx) {

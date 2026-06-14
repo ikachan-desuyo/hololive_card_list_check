@@ -123,6 +123,9 @@ export function normalizeCard(raw) {
       card.keywords.push({ subtype: 'エクストラ', name: '', text });
       // デッキ構築の同名上限を無視できる印（デッキビルダー等が参照可能）
       if (text.includes('デッキに何枚でも入れられる')) card.unlimitedInDeck = true;
+    } else if (skill.type === '推しステージスキル') {
+      // 推しホロメンの常時能力（永続）。テキストを保持し、効果はカード定義の oshiStageSkill フックで実装する。
+      card.oshiStageText = fwColon(skill.text || skill.name || '');
     }
   }
 

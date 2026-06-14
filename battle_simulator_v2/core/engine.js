@@ -206,6 +206,17 @@ export class Engine {
   }
 
   /**
+   * 推しホロメンの「推しステージスキル」定義（常時能力）。
+   * カード定義の oshiStageSkill フック（artsPlus / artsCostReduce / blocksReset /
+   * cheerColorAlias / onTurnEnd / onArtsUse 等）をエンジン各所が参照する。
+   * その推しが場（推し領域）にいる間つねに有効。
+   */
+  _oshiStage(ownerIdx) {
+    const oshi = this.state.players[ownerIdx]?.oshi;
+    return oshi ? this.registry.get(oshi.number)?.oshiStageSkill || null : null;
+  }
+
+  /**
    * 推しスキルの実効ホロパワーコスト（消費枚数）。
    * 自ステージのホロメン/装着カードのギフト等がコストを書き換える場合に反映する
    * （カード定義 `oshiSkillCostMod(skill, holomem, zone, engine, ownerIdx)` が必要枚数のデルタを返す。
@@ -521,8 +532,11 @@ export class Engine {
     this.log(`【${STEP_NAMES.reset}】`);
     this._pause(() => {
       // 7.2.2: 全てアクティブに（ただし「次のリセットでアクティブにならない」フラグ付きは据え置き、フラグを消費）
+      const oshiStage = this._oshiStage(s.turnPlayer);
       for (const h of this._stageHolomems(p)) {
         if (h.skipNextReset) { h.skipNextReset = false; continue; } // お休みのまま、次回からは通常通り
+        // 推しステージスキルでリセット非アクティブ指定（例 セシリア: 全〈セシリア〉はアクティブにならない）
+        if (oshiStage?.blocksReset?.(h, this, s.turnPlayer)) continue;
         h.rested = false;
       }
       // 7.2.3: コラボ → バックへ移動してお休み
@@ -852,8 +866,8 @@ export class Engine {
     const pushArtActions = (h, zone, art, ai, isReArts) => {
       const card = topCard(h);
       const cost = this._effectiveArtCost(h, art.cost, s.turnPlayer);
-      // アーツ使用時のみ、装着カードの「擬似エール供給」（◆〈ときのそら〉に付いていたら白エール扱い 等）を支払いプールに加味
-      if (!this._canPayCheers(this._artCheerPool(h), cost)) return;
+      // アーツ使用時のみ、装着カードの「擬似エール供給」＋推しステージのエール色エイリアスを支払いプールに加味
+      if (!this._canPayArtCost(h, cost, s.turnPlayer)) return;
       const artDef = this.registry.getArt(card.number, art.name);
       // カード定義によるアーツ使用条件（「アーカイブにサポート4枚以上なければ使えない」等）
       if (artDef?.canUse) {
@@ -926,16 +940,29 @@ export class Engine {
     const p = s.players[s.turnPlayer];
     s.step = 'end';
     this.log(`【${STEP_NAMES.end}】`);
-    // 7.7.3: 「ターンの終わりに」誘発（遅延効果 → ターン終了時の起動型推しスキル）→
-    // 7.7.4: 「ターンの終わりまで」効果の消滅 → 7.7.5: センター補充
-    this._runEndOfTurnEffects(() => {
-      this._offerEndOfTurnOshiSkill(() => {
-        this.effects.expireTurnModifiers();
-        this._queueCenterRefill(p, () => {
-          this._startTurn(1 - s.turnPlayer);
+    // 7.7.3: 「ターンの終わりに」誘発（推しステージスキルの常時ターン終了効果 → 遅延効果 →
+    //   ターン終了時の起動型推しスキル）→ 7.7.4: 効果の消滅 → 7.7.5: センター補充
+    this._runOshiStageTurnEnd(() => {
+      this._runEndOfTurnEffects(() => {
+        this._offerEndOfTurnOshiSkill(() => {
+          this.effects.expireTurnModifiers();
+          this._queueCenterRefill(p, () => {
+            this._startTurn(1 - s.turnPlayer);
+          });
         });
       });
     });
+  }
+
+  /**
+   * 推しステージスキルの「自分のターンが終了する時」常時効果（強制）を実行する。
+   * 例: hBP08-005 鷹嶺ルイ「もう金曜だねルイ姉」（条件成立なら手札4枚までドロー）。
+   */
+  _runOshiStageTurnEnd(done) {
+    const idx = this.state.turnPlayer;
+    const def = this._oshiStage(idx);
+    if (!def?.onTurnEnd) { done(); return; }
+    this._runEffect({ run: def.onTurnEnd }, { playerIdx: idx, sourceCard: this.state.players[idx].oshi }, done);
   }
 
   /**
@@ -1489,6 +1516,10 @@ export class Engine {
           const at = this.registry.get(ally.stack[0].number)?.triggers?.onAllyArtsUse;
           if (at) runners.push({ run: at, srcCard: ally.stack[0], srcH: ally, attackInfo });
         }
+        // 推しステージスキルの「自分の〈X〉がアーツを使った時」（わため: デッキ上1枚をホロパワーに）。
+        // ctx.sourceHolomem = アーツ使用者 h、ctx.attackInfo に使用情報。発火可否はフック側で名前判定する。
+        const oshiStageArts = this._oshiStage(s.turnPlayer);
+        if (oshiStageArts?.onArtsUse) runners.push({ run: oshiStageArts.onArtsUse, srcCard: p.oshi, srcH: h, attackInfo });
         // 「このアーツで（相手に）ダメージを与えた時」（実際に与えた合計ダメージ量を渡す。ライフスティール等）
         if (artDef?.onDamageDealt && totalDealt > 0) {
           const dealt = totalDealt;
@@ -2031,6 +2062,33 @@ export class Engine {
       pool.splice(i, 1);
     }
     return pool.length >= anyCount;
+  }
+
+  /**
+   * アーツのコストを支払えるか。推しステージスキルのエール色エイリアス
+   * （例 FUWAMOCO: 〈フワワ〉〈モココ〉の赤エールを青としても扱う）を反映する。
+   * 各エールは「使える色の集合」を持ち、指定色を貪欲に割り当て→残りで無色を満たす。
+   */
+  _canPayArtCost(h, cost, ownerIdx) {
+    const oshiStage = this._oshiStage(ownerIdx);
+    const sets = this._artCheerPool(h).map((cheer) => {
+      const colors = new Set([cheer.color]);
+      if (oshiStage?.cheerColorAlias) {
+        for (const c of oshiStage.cheerColorAlias(h, cheer, this, ownerIdx) || []) colors.add(c);
+      }
+      return colors;
+    });
+    const specific = cost.filter((c) => c !== COLORLESS);
+    const anyCount = cost.length - specific.length;
+    const used = new Array(sets.length).fill(false);
+    for (const color of specific) {
+      let ok = false;
+      for (let i = 0; i < sets.length; i++) {
+        if (!used[i] && sets[i].has(color)) { used[i] = true; ok = true; break; }
+      }
+      if (!ok) return false;
+    }
+    return used.filter((u) => !u).length >= anyCount;
   }
 
 }

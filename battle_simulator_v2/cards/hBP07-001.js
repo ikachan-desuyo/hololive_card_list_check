@@ -9,6 +9,20 @@
  */
 export default {
   number: 'hBP07-001',
+
+  // 推しステージスキル「ドドドライブ」:
+  //   自分の〈角巻わため〉がアーツを使った時、自分のデッキの上から1枚をホロパワーにする（常時）。
+  oshiStageSkill: {
+    name: 'ドドドライブ',
+    * onArtsUse(ctx) {
+      // ctx.sourceHolomem = アーツ使用者
+      if (ctx.sourceHolomem?.stack[0]?.name !== '角巻わため') return;
+      if (ctx.player.deck.length === 0) return;
+      ctx.player.holoPower.push(ctx.player.deck.shift());
+      ctx.log(`ドドドライブ: デッキの上から1枚をホロパワーに（ホロパワー${ctx.player.holoPower.length}枚）`);
+    },
+  },
+
   oshiSkill: {
     name: '角ドリルしたろか？',
     *run(ctx) {

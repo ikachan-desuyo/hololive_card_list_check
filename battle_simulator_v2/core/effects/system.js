@@ -72,6 +72,9 @@ export class EffectSystem {
     }
     // 常時アウラ（味方の別ホロメンが付与するアーツ+N）
     total += this._auraSum(ownerIdx, (def, src) => def.auraArtsPlus?.(src, holomem, this.engine));
+    // 推しステージスキルの常時アーツ+N（例 AZKi: ホロパワー1枚につきセンターAZKi+20）
+    const oshiStage = this.engine._oshiStage(ownerIdx);
+    if (oshiStage?.artsPlus) total += oshiStage.artsPlus(holomem, this.engine, ownerIdx) || 0;
     return total;
   }
 
@@ -174,6 +177,9 @@ export class EffectSystem {
       if (mod.match && !mod.match(targetHolomem)) continue;
       add(mod.color, mod.amount);
     }
+    // 推しステージスキルの常時コスト軽減（例 Ina: 条件成立で〈一伊那尓栖〉のアーツはエール不要）
+    const oshiStage = this.engine._oshiStage(ownerIdx);
+    for (const r of oshiStage?.artsCostReduce?.(targetHolomem, this.engine, ownerIdx) || []) add(r.color, r.amount);
     // 装着カード（ツール等）による必要エール軽減（「◆Buzzに付いていたら必要無色-1」等）
     for (const att of targetHolomem.attachments) {
       const adef = this.registry.get(att.number);
