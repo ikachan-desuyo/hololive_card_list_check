@@ -11,12 +11,9 @@
  *   - HP+30（付け先がDebutまたはSpotホロメンの時のみ）を attached.hpPlus で実装。
  *     付いているホロメンの現在の最上段カード stack[0] の bloomLevel で条件判定する。
  *
- * 【未実装】「相手から特殊ダメージを受けない」
- *   被ダメージ割り込み（特定ダメージを完全に受けない＝無効化）の常時アウラは、
- *   規約の保留項目（受けるダメージ-N/受けない/HPが減らない）に該当するため未実装。
- *   damageDelta は -N の軽減しか表現できず、「受けない（全カット）」を安全に表現する
- *   フックがエンジンに存在しない。フックが追加されたら、ここに同条件（Debut/Spot限定）で
- *   特殊ダメージ無効を実装すること。
+ * 「相手から特殊ダメージを受けない」
+ *   → attached.damageDelta で実装。付け先がDebut/Spotで、相手のターン（=相手から）の特殊ダメージ(kind==='special')
+ *     のときに -100000 を返して実質0にする（damageReceivedDelta は max(0, dmg+delta)）。
  */
 export default {
   number: 'hBP03-095',
@@ -26,6 +23,15 @@ export default {
       const top = holomem.stack[0];
       const lv = top?.bloomLevel;
       return (lv === 'Debut' || lv === 'Spot') ? 30 : 0;
+    },
+    // ◆Debut/Spot限定: 相手から特殊ダメージを受けない（相手ターンの特殊ダメージを0に）
+    damageDelta(holomem, zone, engine, kind) {
+      const lv = holomem.stack[0]?.bloomLevel;
+      if (lv !== 'Debut' && lv !== 'Spot') return 0;
+      if (kind !== 'special') return 0;
+      const ownerIdx = engine.state.players.findIndex((p) => engine._stageHolomems(p).includes(holomem));
+      if (ownerIdx < 0 || engine.state.turnPlayer === ownerIdx) return 0; // 相手のターン=相手から
+      return -100000;
     },
   },
 };

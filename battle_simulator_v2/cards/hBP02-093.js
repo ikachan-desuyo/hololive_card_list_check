@@ -6,9 +6,8 @@
  *
  * ◆〈白上フブキ〉に付いていたら能力追加:
  *   [バックポジション限定]このマスコットが付いているホロメンは相手からダメージを受けない。
- *   → 【未実装】被ダメージ割り込み（ダメージを受けない）機構がエンジンに存在しないため未対応。
- *     付け先が〈白上フブキ〉かつバックポジションの間、相手から受けるダメージを 0 にする
- *     ダメージ無効化フックが必要（damageDelta では「-N」しか表現できず「受けない」を表せない）。
+ *   → attached.damageDelta で実装。付け先が〈白上フブキ〉かつバックにいて、相手のターン（=相手から）の
+ *     被弾時に -100000 を返して実質「受けない（0）」にする（damageReceivedDelta は max(0, dmg+delta)）。
  *
  * マスコットは、自分のホロメン1人につき1枚だけ付けられる（マスコット共通制限。エンジンが既定で処理）。
  */
@@ -17,6 +16,14 @@ export default {
   attached: {
     hpPlus() {
       return 20;
+    },
+    // ◆〈白上フブキ〉に付いていたら: [バック限定]相手からダメージを受けない（相手ターンの被弾を0に）
+    damageDelta(holomem, zone, engine) {
+      if (holomem.stack[0].name !== '白上フブキ') return 0;
+      if (zone !== 'back') return 0;
+      const ownerIdx = engine.state.players.findIndex((p) => engine._stageHolomems(p).includes(holomem));
+      if (ownerIdx < 0 || engine.state.turnPlayer === ownerIdx) return 0; // 相手のターン=相手から
+      return -100000;
     },
   },
 };

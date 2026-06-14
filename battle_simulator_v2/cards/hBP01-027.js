@@ -4,11 +4,15 @@
  * アーツ「アクセスコード：ID」(70+):
  *   自分のセンターホロメンが#IDを持つ時、このアーツ+50。
  *
- * ギフト/キーワード V.7（未実装・保留）:
+ * ギフト/キーワード V.7:
  *   [ターンに1回][コラボポジション限定]自分のホロメンが相手からダメージを受ける時、
  *   サイコロを1回振れる：奇数の時、そのダメージを受けない。
- *   → 被ダメージ割り込み（受けるダメージを受けない）機構が未実装のため未対応。
+ *   → onDamageReceivedReact（被ダメージ割り込み・任意）で実装。reactor=このベスティアがコラボにいて、
+ *     [ターンに1回]振るのを選んだら、奇数で受けるダメージを0にする。相手ターンの被弾のみ engine が提示
+ *     （アーツ／特殊どちらの経路でも _collectDamageResponders 経由で提示される）。
  */
+import { rollDie } from '../core/rng.js';
+
 export default {
   number: 'hBP01-027',
   arts: {
@@ -20,5 +24,24 @@ export default {
       },
     },
   },
-  // TODO(効果未実装): ギフト V.7 の被ダメージ無効化（奇数で受けない）は割り込み機構未対応のため保留。
+  // ギフト V.7: [ターンに1回][コラボ限定]自分のホロメンが相手から被弾する時、サイコロを振り奇数なら受けない
+  onDamageReceivedReact: {
+    title: 'V.7: サイコロを振って奇数ならそのダメージを受けない？',
+    yesLabel: 'サイコロを振る',
+    canUse(engine, info) {
+      if (info.reactor?.stack[0].name !== 'ベスティア・ゼータ') return false; // 発動はこのベスティア
+      if (engine._zoneOf(info.reactor) !== 'collab') return false;            // [コラボポジション限定]
+      if (info.dmg <= 0) return false;
+      // [ターンに1回]
+      return !engine.state.modifiers.some(
+        (m) => m.kind === 'oncePerTurnUsed' && m.key === 'hBP01-027:v7' && m.ownerIdx === info.defIdx);
+    },
+    apply(engine, info) {
+      engine.state.modifiers.push({ duration: 'turn', kind: 'oncePerTurnUsed', key: 'hBP01-027:v7', ownerIdx: info.defIdx });
+      const v = rollDie(engine.rng);
+      const negated = v % 2 === 1;
+      engine.log(`V.7: サイコロ ${v} → ${negated ? 'そのダメージを受けない' : 'ダメージはそのまま'}`);
+      return negated ? 0 : info.dmg;
+    },
+  },
 };

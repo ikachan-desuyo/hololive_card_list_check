@@ -3,12 +3,9 @@
  *
  * [サポート効果] [ターンに1回]このファンが付いているホロメンにエールが付いた時、
  *   このターンの間、このホロメンのアーツ+10。
- *   → 「（このホロメンに）エールが付いた時」に誘発する効果。
- *      エンジンに「エールが付いた時」(onCheerAttached) のトリガーディスパッチが
- *      存在しないため【保留】。実装するには context.js の attachCheer / engine の
- *      attachCheer 解決時に、付け先ホロメンの装着カードの onCheerAttached を走査して
- *      誘発する仕組みが必要（誘発時に ctx.addTurnModifier({kind:'artsPlus', amount:10, ...}) を
- *      ターンに1回だけ積む）。
+ *   → attached.onCheerAttached で実装済み。context.js の attachCheer がエール付与時に
+ *      付け先ホロメンの装着カードの onCheerAttached を走査して誘発する。誘発時に
+ *      ターン修正 kind:'artsPlus' +10 を積む（ターンに1回はホロメン単位で制御）。
  *
  * 付け先制限のみ実装:
  *   このファンは、自分の〈アユンダ・リス〉だけに付けられ、1人につき何枚でも付けられる。

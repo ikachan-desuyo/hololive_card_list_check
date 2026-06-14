@@ -5,13 +5,25 @@
  *   相手のセンターホロメンとバックホロメン1人に特殊ダメージ20を与える。
  *   → arts.run でコスト（青エール1枚アーカイブ）を支払い、特殊ダメージを与える。
  *
- * ※キーワード/ギフト「毒の愛」(ギフト・特殊ダメージ+20の常時アウラ)は未実装。
+ * キーワード/ギフト「毒の愛」:
  *   [センターポジション限定]自分のステージの〈猫又おかゆ〉全員が相手のセンターホロメンに
- *   与える特殊ダメージ+20、という「他ホロメンを恒常強化する常時アウラ」機構が未対応のため
- *   （hBP05-045 と同様。CARD_EFFECT_STATUS.md §8）。
+ *   与える特殊ダメージ+20。
+ *   → auraSpecialDmgPlus（常時アウラ）で実装。このおかゆがセンターにいる間、〈猫又おかゆ〉が
+ *     相手のセンターに与える特殊ダメージ+20（system.js specialDamageBonus が集計）。
  */
 export default {
   number: 'hBP02-041',
+  // キーワード「毒の愛」: [センター限定]〈猫又おかゆ〉が相手センターに与える特殊ダメージ+20
+  auraSpecialDmgPlus(src, sourceHolomem, targetEntry, engine) {
+    if (engine._zoneOf(src) !== 'center') return 0;               // [センター限定]（キーワード保持者）
+    if (sourceHolomem.stack[0].name !== '猫又おかゆ') return 0;     // 〈猫又おかゆ〉が与える特殊
+    const tgt = targetEntry?.holomem;
+    if (!tgt || engine._zoneOf(tgt) !== 'center') return 0;        // 相手のセンターに
+    const srcOwner = engine.state.players.findIndex((p) => engine._stageHolomems(p).includes(src));
+    const tgtOwner = engine.state.players.findIndex((p) => engine._stageHolomems(p).includes(tgt));
+    if (srcOwner < 0 || tgtOwner < 0 || srcOwner === tgtOwner) return 0; // 相手のセンター（自分のではない）
+    return 20;
+  },
   arts: {
     'ぽいずん猫': {
       *run(ctx) {

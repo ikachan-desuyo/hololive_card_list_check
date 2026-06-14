@@ -1,12 +1,11 @@
 /**
  * アーニャ・メルフィッサ (hBP06-082) 黄・2nd・HP200（#ID #ID2期生 #語学）
  *
- * [ギフト]「眠らない街」（未実装・保留）:
+ * [ギフト]「眠らない街」（auraDamageDelta で実装）:
  *   [コラボポジション限定]自分の推しホロメンが〈アーニャ・メルフィッサ〉なら、
  *   自分の〈古代武器〉が付いている[センターホロメンとコラボホロメン]が受けるアーツダメージ-30。
- *   → 別ホロメンへの「アーツダメージ限定」被ダメージ軽減オーラ。
- *     現エンジンの被ダメージ軽減(damageReceivedDelta)は装着カード起点かつアーツ/特殊の区別が無いため、
- *     この常時アウラ（被ダメージ割り込み）は規約上の保留機構に該当する。未実装。
+ *   → auraDamageDelta（kind==='arts'限定の常時アウラ）で実装。このアーニャがコラボにいて推しがアーニャの時、
+ *     〈古代武器〉付きのセンター/コラボが受けるアーツダメージ-30（damageReceivedDelta が集計）。
  *
  * [アーツ]「奇妙な来客」(70 / 特攻: 青+50):
  *   このターンに自分の推しスキル「神秘の儀式」を使っていたなら、
@@ -19,6 +18,17 @@
  */
 export default {
   number: 'hBP06-082',
+  // ギフト「眠らない街」: [コラボ限定]推しが〈アーニャ・メルフィッサ〉なら、〈古代武器〉付きの前衛が受けるアーツダメージ-30
+  auraDamageDelta(src, target, zone, engine, kind) {
+    if (kind !== 'arts') return 0;                              // アーツダメージ-30
+    if (engine._zoneOf(src) !== 'collab') return 0;            // [コラボ限定]（このアーニャ自身）
+    const ownerIdx = engine.state.players.findIndex((p) => engine._stageHolomems(p).includes(src));
+    if (ownerIdx < 0) return 0;
+    if (engine.state.players[ownerIdx].oshi?.name !== 'アーニャ・メルフィッサ') return 0; // 推しがアーニャ
+    if (zone !== 'center' && zone !== 'collab') return 0;       // センター/コラボの
+    if (!target.attachments.some((a) => a.name === '古代武器')) return 0; // 〈古代武器〉が付いている
+    return -30;
+  },
   arts: {
     '奇妙な来客': {
       *run(ctx) {
