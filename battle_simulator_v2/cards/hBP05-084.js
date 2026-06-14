@@ -14,14 +14,13 @@
  *    付け先が「2nd の〈角巻わため〉」のときは追加判定を行い、自分のステージに〈わためいと〉
  *    （＝いずれかの自分ホロメンに付いたファン）が1枚でもあれば さらに +10（合計+20）。
  *    「2nd以上」= このゲームの最大ブルームレベルが 2nd のため bloomLevel === '2nd' で判定。
- *
- * 保留:
  *  - 「このツールが付いているホロメンがアーツを使った時、自分のアーカイブのエール1枚を
- *     自分の〈角巻わため〉に送れる」部分。
- *     エンジンの onArtsUse トリガーはアーツを使ったホロメン自身(topCard)のカードしか
- *     発火させず、装着カード（ツール）の triggers.onArtsUse を拾う経路が現状ない
- *     （engine.js の afterAllDamage 内 onArtsUse 走査が装着を含まない）ため未実装。
- *     装着カードのアーツ使用時トリガーをエンジンがサポートしたら triggers.onArtsUse で実装可。
+ *     自分の〈角巻わため〉に送れる」部分は triggers.onArtsUse で実装。
+ *     engine.js の afterAllDamage が、アーツを使ったホロメンの装着カードの triggers.onArtsUse も
+ *     走査して発火するようになった（ctx.sourceHolomem=ホスト, ctx.sourceCard=このツール。hBP01-119 参照）。
+ *     ◆能力なので付け先が 2nd の〈角巻わため〉のときのみ発動。送り先は自分の〈角巻わため〉に限定。
+ *     アーカイブのエール1枚を chooseCard（任意・optional）で選び、送り先を chooseHolomem で選んで
+ *     removeFromArchive → attachCheer する（hBP02-021 アーツと同じ「アーカイブのエールを送る」処理）。
  */
 export default {
   number: 'hBP05-084',
@@ -42,6 +41,37 @@ export default {
         }
       }
       return plus;
+    },
+  },
+  triggers: {
+    // ◆2nd以上の〈角巻わため〉に付いていたら: ホストがアーツを使った時、
+    //   自分のアーカイブのエール1枚を自分の〈角巻わため〉に送れる
+    *onArtsUse(ctx) {
+      const host = ctx.sourceHolomem; // このツールが付いているホロメン
+      const top = host?.stack[0];
+      if (!top || top.name !== '角巻わため' || top.bloomLevel !== '2nd') return;
+      // 送れるエールが無ければ何もしない
+      const cheers = ctx.player.archive.filter((c) => c.kind === 'cheer');
+      if (cheers.length === 0) return;
+      // 送り先候補: 自分のステージの〈角巻わため〉
+      const watameTargets = ctx.holomems('self', (e) => e.holomem.stack[0].name === '角巻わため');
+      if (watameTargets.length === 0) return;
+      const picked = yield ctx.chooseCard({
+        cards: cheers,
+        title: 'アーカイブから〈角巻わため〉に送るエールを選択（任意）',
+        optional: true,
+        skipLabel: '送らない',
+      });
+      if (!picked) return;
+      const target = yield ctx.chooseHolomem({
+        side: 'self',
+        filter: (e) => e.holomem.stack[0].name === '角巻わため',
+        title: 'エールを送る〈角巻わため〉を選択',
+      });
+      if (target) {
+        ctx.removeFromArchive(picked);
+        ctx.attachCheer(picked, target.holomem);
+      }
     },
   },
 };

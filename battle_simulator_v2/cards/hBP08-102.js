@@ -12,13 +12,14 @@
  *   - Buzz付与時の追加能力「相手をダウンさせた時にデッキを2枚引く（ターンに1回）」は
  *     triggers.onOpponentDown として記述し、付け先がBuzzホロメンの時のみ発火・ターン1回制限を入れている。
  *
- * 保留:
- *   - 現状エンジンの onOpponentDown ディスパッチは「アーツを使ったホロメンのトップカード」
- *     （topCard(h)）の triggers.onOpponentDown のみを発火し、装着カード（ツール）の
- *     triggers.onOpponentDown は走査していない（engine.js _resolvePerformance 内 line~1224。
- *     hBP03-102 の onCollab 未配線と同種の制限）。
- *     そのため本ツールの「2枚引く」は現時点では実際には発火しない。
- *     装着カードの onOpponentDown 通知が配線されれば、下記トリガーがそのまま機能する。
+ * 実装済み（旧保留解消）:
+ *   - 以前はエンジンの onOpponentDown ディスパッチが「アーツを使ったホロメンのトップカード」
+ *     （topCard(h)）の triggers.onOpponentDown しか発火せず、装着カード（ツール）の
+ *     triggers.onOpponentDown は走査していなかったため保留していた。
+ *     現在は engine.js _resolvePerformance がホストの h.attachments を走査して
+ *     装着カードの onOpponentDown も発火する（ctx.sourceHolomem=ホスト, ctx.sourceCard=このツール。
+ *     hBP02-096 と同方式の配線）。これにより下記トリガーがそのまま機能する。
+ *   - ホスト判定は ctx.sourceHolomem.stack[0].buzz（cards.js が Buzzホロメンに付与する buzz フラグ）で行う。
  */
 export default {
   number: 'hBP08-102',

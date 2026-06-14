@@ -37,6 +37,8 @@ export class EffectContext {
     this.lifeDecreasedThisPerf = opts.lifeDecreasedThisPerf || false;
     // 攻撃時誘発の推しスキル用: { sourceHolomem, art, artName, dealtList:[{target,zone,dealt}], downed }
     this.attackInfo = opts.attackInfo || null;
+    // onOshiSkillUsed 用: 使った推しスキルの情報 { text, sp }
+    this.oshiSkillInfo = opts.oshiSkillInfo || null;
   }
 
   get player() { return this.engine.state.players[this.playerIdx]; }

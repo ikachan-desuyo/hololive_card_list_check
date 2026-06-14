@@ -10,10 +10,13 @@
  *   → 保留: ① の「このターンに〈モココ・アビスガード〉がアーツを使っていたか」は、エンジンが
  *     ホロメン個別の当ターンのアーツ使用履歴を保持していないため判定できず、安全側で +40 を付けない。
  *
- * ギフト「モゴジャ～～ン！！！」（未実装・保留）:
+ * ギフト「モゴジャ～～ン！！！」:
  *   [センターポジション限定]自分の推しスキル「モコちゃん！」を使った時、
  *   自分のエールデッキの上から1枚を自分の#Adventを持つホロメンに送る。
- *   → 保留: 「推しスキルを使った時」に誘発するギフトのトリガーフックが現状の効果システムに存在しないため未実装。
+ *   → triggers.onOshiSkillUsed で実装（oshiSkillInfo.text に「モコちゃん！」を含み、このホロメンがセンターの時、
+ *     エールデッキ上から1枚を#Adventホロメンへ送る）。
+ * 保留（①のみ）: アーツ+40の「このターンに〈モココ〉がアーツを使ったか」はホロメン個別のアーツ使用履歴を
+ *   エンジンが持たないため未加算（中央のターン内アーツ履歴が必要）。
  */
 export default {
   number: 'hBP05-050',
@@ -28,6 +31,21 @@ export default {
         return usedMoko ? 30 : 0;
         // ① 〈モココ・アビスガード〉の当ターンのアーツ使用は判定不能のため未加算（保留）
       },
+    },
+  },
+  triggers: {
+    // ギフト「モゴジャ～～ン！！！」: 推しスキル「モコちゃん！」を使った時、[センター限定]エールデッキ上1枚を#Adventへ
+    *onOshiSkillUsed(ctx) {
+      const info = ctx.oshiSkillInfo;
+      if (!info || !/モコちゃん！/.test(info.text || '')) return;
+      if (ctx.sourceHolomemPos()?.zone !== 'center') return; // [センターポジション限定]
+      const targets = ctx.holomems('self', (e) => (e.top.tags || []).includes('Advent'));
+      if (targets.length === 0 || ctx.player.cheerDeck.length === 0) return;
+      const entry = yield ctx.chooseHolomem({
+        side: 'self', filter: (e) => (e.top.tags || []).includes('Advent'),
+        title: 'エールデッキの上から1枚を送る#Adventホロメンを選択',
+      });
+      if (entry) ctx.sendCheerFromCheerDeckTop(entry.holomem);
     },
   },
 };

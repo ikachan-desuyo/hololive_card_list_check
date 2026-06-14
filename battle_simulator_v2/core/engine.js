@@ -750,6 +750,15 @@ export class Engine {
           if (b && b.damage > 0) usableTargets.push({ zone: 'back', index: bi });
         });
       }
+      // 対象拡張: ターン修正 kind:'artTargetSecondBack' を持つホロメンは相手の2ndバックも狙える (hBP08-018)
+      if (this.effects.hasArtTargetMod('artTargetSecondBack', h, s.turnPlayer)) {
+        if (usableTargets === targets) usableTargets = [...targets];
+        opp.back.forEach((b, bi) => {
+          if (b && b.stack[0].bloomLevel === '2nd' && !usableTargets.some((t) => t.zone === 'back' && t.index === bi)) {
+            usableTargets.push({ zone: 'back', index: bi });
+          }
+        });
+      }
       // カード定義による対象制限（「このアーツは相手のセンターホロメンしか対象にできない」等）
       const allowedTargets = artDef?.targetZones
         ? usableTargets.filter((t) => artDef.targetZones.includes(t.zone))
@@ -993,12 +1002,15 @@ export class Engine {
         this.log(`${p.name}: ${skill.sp ? 'SP' : ''}推しスキル発動（ホロパワー-${skill.cost}）`);
         const def = this.registry.get(p.oshi.number);
         const skillDef = skill.sp ? def?.spOshiSkill : def?.oshiSkill;
+        // 推しスキル解決後に「推しスキルを使った時」の味方ホロメンギフトを誘発（hBP05-038/050 等）
+        const afterSkill = () => this._dispatchOshiSkillUsed(s.turnPlayer, skill, finish);
         if (skillDef) {
-          this._runEffect(skillDef, { playerIdx: s.turnPlayer, sourceCard: p.oshi }, finish);
+          this._runEffect(skillDef, { playerIdx: s.turnPlayer, sourceCard: p.oshi }, afterSkill);
           return;
         }
         this.log(`TODO(効果未実装) 推しスキル: ${skill.text}`);
-        break;
+        afterSkill();
+        return;
       }
       case 'support': {
         const card = p.hand.splice(action.handIndex, 1)[0];
@@ -1432,6 +1444,31 @@ export class Engine {
     }
 
     runDownTrigger();
+  }
+
+  /**
+   * 「（自分が）推しスキルを使った時」の味方ホロメンギフトを誘発する。
+   * ownerIdx のステージ上の各ホロメンの triggers.onOshiSkillUsed を順に実行し、完了後 after()。
+   * ctx.oshiSkillInfo = { text, sp }（使った推しスキルの本文・SPか）。
+   */
+  _dispatchOshiSkillUsed(ownerIdx, skill, after) {
+    const p = this.state.players[ownerIdx];
+    const runners = [];
+    for (const h of this._stageHolomems(p)) {
+      const trig = this.registry.get(h.stack[0].number)?.triggers?.onOshiSkillUsed;
+      if (trig) runners.push({ run: trig, srcH: h });
+    }
+    if (runners.length === 0) { after(); return; }
+    const info = { text: skill.text || '', sp: !!skill.sp };
+    const runNext = (i) => {
+      if (i >= runners.length) { after(); return; }
+      this._runEffect(
+        { run: runners[i].run },
+        { playerIdx: ownerIdx, sourceCard: runners[i].srcH.stack[0], sourceHolomem: runners[i].srcH, oshiSkillInfo: info },
+        () => runNext(i + 1),
+      );
+    };
+    runNext(0);
   }
 
   /**

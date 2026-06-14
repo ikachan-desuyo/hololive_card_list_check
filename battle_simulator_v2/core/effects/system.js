@@ -187,9 +187,13 @@ export class EffectSystem {
    * ターン修正 kind:'artTargetDamagedBack'（match でホロメンを限定）で表現する (hBP07-086)。
    */
   artCanTargetDamagedBack(holomem, ownerIdx) {
+    return this.hasArtTargetMod('artTargetDamagedBack', holomem, ownerIdx);
+  }
+
+  /** 指定 kind のアーツ対象拡張ターン修正を、このホロメンが持っているか（match でホロメン限定可） */
+  hasArtTargetMod(kind, holomem, ownerIdx) {
     return this.engine.state.modifiers.some((m) =>
-      m.kind === 'artTargetDamagedBack' && m.ownerIdx === ownerIdx &&
-      (!m.match || m.match(holomem)));
+      m.kind === kind && m.ownerIdx === ownerIdx && (!m.match || m.match(holomem)));
   }
 
   /**

@@ -49,7 +49,9 @@
  *       *onAttach(ctx) {...},                            // このカードを付けた時（supportAttach / attachSupportWithTrigger で発火）
  *       *onOpponentDown(ctx) {...},                      // このホロメンが相手をダウンさせた時（アーツ解決時に発火。選択可）
  *       *onOpponentPerformanceEnd(ctx) {...},            // 相手のパフォーマンスステップ終了時（防御側で発火。ctx.lifeDecreasedThisPerf でそのステップ中のライフ減少を判定）
+ *       *onOshiSkillUsed(ctx) {...},                      // 自分が推しスキルを使った時（自ステージのホロメンに発火。ctx.oshiSkillInfo={text,sp} で種別判定）
  *     },                                                 //   ※ctx.sourceCard=自分, ctx.sourceHolomem=付いた/ダウンした/ダウンさせたホロメン
+ *     // ※アーツ対象拡張のターン修正: kind:'artTargetDamagedBack'（HP減バック）/ 'artTargetSecondBack'（相手2ndバック）。ctx.addTurnModifier({kind,ownerIdx,match}) で付与
  *     specialBloom(h, handCard, engine, ownerIdx) { return bool; }, // 特殊Bloom: true でメインのBloom候補に追加（レベル遷移条件のみ迂回。同名/HP/ターン制限は通常通り）
  *     onDamageReceivedReact: {                          // 「ダメージを受ける時に使える」リアクティブ割り込み（推しスキル以外。ホロメンギフト/装着ファン）
  *       title, yesLabel,                                //   防御側に決定ポイントを提示。アーツ/特殊どちらのダメージ経路でも発火する

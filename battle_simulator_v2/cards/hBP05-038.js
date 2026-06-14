@@ -5,10 +5,9 @@
  *   [コラボポジション限定]自分のSP推しスキル「BAU BAU!」を使った時、このターンの間、
  *   このホロメンのアーツ+70。自分のステージに2ndホロメンがいるなら、さらに、
  *   このターンの間、このホロメンのアーツ+50。
- *   → 保留: 「自分の特定名のSP推しスキルを使った時」に味方ホロメンのギフトを誘発する
- *     フックがエンジンに存在しないため未実装。SP推しスキル「BAU BAU!」(別の推しカード)
- *     使用時に、コラボ位置のこのホロメンへ artsPlus +70（＋2ndホロメンがいれば+50）の
- *     ターン修正を付与する処理は、その推しスキル側もしくは専用フック追加が必要。
+ *   → triggers.onOshiSkillUsed で実装。自分が推しスキルを使った時（ctx.oshiSkillInfo.sp かつ
+ *     text に「BAU BAU!」を含む）、このホロメンがコラボ位置なら artsPlus +70、
+ *     さらに自分のステージに2ndホロメンがいれば +50 のターン修正を付与する。
  *
  * アーツ「ノーーーーーーエ！」(30):
  *   このアーツは、自分のセンターホロメンが〈フワワ・アビスガード〉なら、
@@ -38,5 +37,26 @@ export default {
       return [{ color: '無色', amount: 1 }];
     }
     return [];
+  },
+
+  triggers: {
+    // ギフト「モココェ」: SP推しスキル「BAU BAU!」を使った時、コラボ位置ならアーツ+70（+2ndがいれば更に+50）
+    *onOshiSkillUsed(ctx) {
+      const info = ctx.oshiSkillInfo;
+      if (!info || !info.sp || !/BAU BAU[!！]/.test(info.text || '')) return;
+      const self = ctx.sourceHolomem;
+      if (ctx.sourceHolomemPos()?.zone !== 'collab') return; // [コラボポジション限定]
+      ctx.addTurnModifier({
+        kind: 'artsPlus', ownerIdx: ctx.playerIdx, amount: 70,
+        match: (hm) => hm === self, description: 'モココェ: BAU BAU!使用でアーツ+70',
+      });
+      const has2nd = ctx.holomems('self', (e) => e.top.bloomLevel === '2nd').length > 0;
+      if (has2nd) {
+        ctx.addTurnModifier({
+          kind: 'artsPlus', ownerIdx: ctx.playerIdx, amount: 50,
+          match: (hm) => hm === self, description: 'モココェ: 2ndがいるのでさらにアーツ+50',
+        });
+      }
+    },
   },
 };

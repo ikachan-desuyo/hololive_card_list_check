@@ -10,30 +10,36 @@
  *   相手のDebut以外のホロメン1人に特殊ダメージ100を与える。
  *
  * --- 共通ヘルパー ---
- * 「相手のセンターのバトンタッチに必要な無色の数」を、相手センターのトップカードの
- * batonTouch 配列内の無色エールの数で判定する。
+ * 「相手のセンターのバトンタッチに必要な無色の数」を、相手センターの【実効】バトンタッチコスト
+ * （engine._effectiveBatonCost）内の無色エールの数で判定する。
  *
- * 【保留】カードDB（card_data.json）の baton_touch は常に文字列 "無色" 1個ぶんとしてしか
- *   格納されておらず（core/cards.js: batonTouch = ['無色']）、必要無色の「数」を表現できない。
- *   そのため現状この条件は実質的に成立しない（必要無色は常に1扱い）。
- *   データモデルが拡張されれば下記ヘルパーがそのまま正しく機能するよう、
- *   無色エールの個数を数える形で実装しておく。
+ * 補足: カードDBの baton_touch は常に "無色" 1個（core/cards.js: batonTouch=['無色']）で、
+ *   素のコストだけでは5に届かない。だが現行エンジンにはバトンタッチ必要エール修正
+ *   （ターン修正 kind:'batonCostReduce' / 装着カードの batonCostReduceAttached、負 amount=必要増）
+ *   が存在し、_applyCostReduction が無色を追加する（engine.js）。例: hBP08-004 推しスキルで
+ *   相手センターのバトンタッチ必要無色+3。これらが積めば実効コストが5無色以上になり得るため、
+ *   素のトップカードではなく実効コストを数える。これにより本条件は実際の対戦で成立し得る。
  *
  * 【保留】ギフト（相手センターのアーツ必要無色+2）は常時効果だが、
  *   アーツ必要エール修正のオーラ機構（artsCostReduceAura）は「対象ホロメンの持ち主自身の
- *   ステージ上のカード」しか走査しない（system.js artsCostReduction）。
+ *   ステージ上のカード」しか走査しない（system.js artsCostReduction: players[ownerIdx] のみ）。
  *   本カードは自分のステージに居て相手のコストを増やすため、現行の機構では表現できない。
- *   クロスサイドのアーツコスト修正プリミティブが無いため、ギフトは未実装（保留）とする。
+ *   ターン修正 kind:'artCostReduce' は一時的（duration:'turn'/untilTurn）で、
+ *   「相手センターのバトンタッチ必要無色が5つ以上なら」という動的条件で毎回再評価する常時効果には
+ *   合わず、再評価のためのフックも無い。クロスサイドの常時アーツコスト修正オーラが無いため、
+ *   ギフトは未実装（保留）を維持する。
  */
 
 import { COLORLESS } from '../core/constants.js';
 
-/** 相手のセンターホロメンのバトンタッチに必要な無色の数（≧5 を満たすかの判定用） */
+/** 相手のセンターホロメンのバトンタッチに【実効で】必要な無色の数（≧5 を満たすかの判定用） */
 function oppCenterBatonColorless(ctx) {
-  const center = ctx.holomems('opp', (e) => e.pos.zone === 'center')[0];
-  if (!center) return 0;
-  const baton = center.top.batonTouch || [];
-  return baton.filter((c) => c === COLORLESS).length;
+  const entry = ctx.holomems('opp', (e) => e.pos.zone === 'center')[0];
+  if (!entry) return 0;
+  const oppIdx = 1 - ctx.playerIdx;
+  // 素のバトンタッチコストに、必要エール修正（batonCostReduce 等。負 amount=必要増）を適用した実効コスト
+  const cost = ctx.engine._effectiveBatonCost(entry.holomem, entry.top.batonTouch || [], oppIdx);
+  return cost.filter((c) => c === COLORLESS).length;
 }
 
 export default {
