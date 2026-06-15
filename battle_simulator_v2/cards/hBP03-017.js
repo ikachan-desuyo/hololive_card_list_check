@@ -13,12 +13,11 @@ export default {
     name: 'プリペア',
     oncePerTurn: false, // ターン制限の記載なし
     canUse(ctx) {
-      // 自分の推しホロメンが〈獅白ぼたん〉の時のみ
+      // 自分の推しホロメンが〈獅白ぼたん〉の時のみ（使用条件）
       if (ctx.player.oshi?.name !== '獅白ぼたん') return false;
-      // コスト: エールデッキの上から1枚をアーカイブできること
-      if (ctx.player.cheerDeck.length < 1) return false;
-      // HPが減っている自分のホロメンがいる時に意味がある
-      return ctx.holomems('self', (e) => e.holomem.damage > 0).length > 0;
+      // コスト: エールデッキの上から1枚をアーカイブできること（このコスト支払い自体が状態変化）。
+      // → HPが減ったホロメンが居なくても起動可能（Q309: エールアーカイブ目的でも使える）。
+      return ctx.player.cheerDeck.length >= 1;
     },
     *run(ctx) {
       // コスト: エールデッキの上から1枚をアーカイブ

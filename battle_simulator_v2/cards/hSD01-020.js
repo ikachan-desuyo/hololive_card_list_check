@@ -16,6 +16,10 @@ export default {
     },
   },
   support: {
+    // アーカイブにエールが無い時は（サイコロも振れず）何も起きないので使用不可 (Q554)
+    canUse(ctx) {
+      return ctx.player.archive.some((c) => c.kind === 'cheer') && ctx.holomems('self').length > 0;
+    },
     *run(ctx) {
       const value = (yield* ctx.rollDice());
       if (value < 3) return;

@@ -886,6 +886,26 @@ export async function runTests() {
     assert(def.oshiSkill.aiSkip(e, 0) === false, 'パソコンがあるのに aiSkip=true になっている');
   });
 
+  await testAsync('hBP03-087 コールアンドレスポンス: ホロメン1人/エール無しでは使えない（一般ルールQ348/Q344）', async () => {
+    const e = await setupMainStep(deckMap, 115);
+    await e.registry.preload(['hBP03-087'], lib);
+    const p0 = e.state.players[0];
+    const def = e.registry.get('hBP03-087');
+    const withCheer = e._createHolomem(fakeHolomen({ name: 'A' }), 1);
+    withCheer.cheers.push({ name: '青エール', kind: 'cheer', color: '青' });
+    const other = e._createHolomem(fakeHolomen({ name: 'B' }), 1);
+    const ctx = e._effectContext(0, {});
+    // ① ホロメン1人だけ（エール付き）→ 付け替え先が無いので使用不可
+    p0.center = withCheer; p0.collab = null; p0.back = [];
+    assert(!def.support.canUse(ctx), 'ホロメン1人だけなのに使用可になっている（Q344違反）');
+    // ② 2人＋一方にエール → 使用可
+    p0.back = [other];
+    assert(def.support.canUse(ctx), '2人＋エール付きなのに使用不可');
+    // ③ 2人だがエール無し → 何も起きないので使用不可
+    withCheer.cheers.length = 0;
+    assert(!def.support.canUse(ctx), 'エールが無いのに使用可になっている');
+  });
+
   await testAsync('相手の手札ステップで自分の手札が増えない', async () => {
     const e = await setupMainStep(deckMap, 21); // P1(先攻)のメインステップ
     // P1のターンを終わらせてP2のターンへ
