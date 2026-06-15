@@ -52,9 +52,10 @@ export default {
   // SP推しスキル: アーカイブの#食べ物イベント1～4枚を手札に戻し、その後#料理ホロメン全員のアーツ+40
   spOshiSkill: {
     name: 'ちょこっとクッキング',
-    canUse(engine, ownerIdx) {
-      const p = engine.state.players[ownerIdx];
-      return p.archive.some(isFoodEvent);
+    // アーカイブに#食べ物イベントが無くても宣言できる（Q442: 使用可。#料理がいれば+40は適用される＝Q443）。
+    // AIは空振り回避のため現状どおり「アーカイブに#食べ物が無ければ選ばない」（挙動維持）。
+    aiSkip(engine, ownerIdx) {
+      return !engine.state.players[ownerIdx].archive.some(isFoodEvent);
     },
     *run(ctx) {
       // アーカイブの#食べ物イベント1～4枚を手札に戻す
