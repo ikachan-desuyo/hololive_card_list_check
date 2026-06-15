@@ -761,8 +761,11 @@ export class EffectContext {
    * バトンタッチ等のシステムコストは opts.ability=false で呼び、置換を提示しない。
    */
   *archiveCheer(holomem, cheer, opts = {}) {
-    // 能力によるアーカイブ時のみ、自分のホロメンに付いた置換カードを提示
-    if (opts.ability !== false && this.engine._stageHolomems(this.player).includes(holomem)) {
+    // 能力によるアーカイブ時のみ、自分のホロメンに付いた置換カードを提示。
+    // ただし「このカードが付いているホロメン自身の能力」での捨て札限定 (Q357)。
+    // 他のホロメンの能力（例: フブラがぼたんのエールをアーカイブ）では身代わりにできない → sourceHolomem===holomem を要求。
+    if (opts.ability !== false && this.sourceHolomem === holomem
+        && this.engine._stageHolomems(this.player).includes(holomem)) {
       for (const att of [...holomem.attachments]) {
         const rep = this.engine.registry.get(att.number)?.cheerArchiveReplace;
         if (!rep) continue;

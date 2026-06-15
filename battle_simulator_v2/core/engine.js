@@ -1659,15 +1659,21 @@ export class Engine {
           // (kind='arts')
           const recv = redirectTo || t;
           const recvCard = topCard(recv);
-          if (redirectTo) this.log(`ダメージの受け手を変更: ${tCard.name} → ${recvCard.name}`);
+          if (redirectTo) {
+            this.log(`ダメージの受け手を変更: ${tCard.name} → ${recvCard.name}`);
+            // 差し替え先ホロメンの「受けるダメージ」修正（やめなー等の軽減/無効）を適用する (Q565)
+            finalDmg = this._applyDamageReceived(recv, finalDmg, 'arts', h, { ignoreReduction: noReduce });
+          }
           recv.damage += finalDmg;
           totalDealt += finalDmg;
           if (finalDmg > 0) dealtList.push({ target: recv, zone: this._zoneOf(recv), dealt: finalDmg });
           this.log(
             `「${art.name}」→ ${recvCard.name} に ${finalDmg}ダメージ（累計${recv.damage}/${this.effectiveHp(recv)}）`
           );
-          if (finalDmg > 0) this._dispatchDamageReceivedForced(recv); // 強制被ダメージトリガー (hBP07-108)
-          if (recv.damage >= this.effectiveHp(recv)) downed.push(recv);
+          // 致死判定はダメージ時点で確定する。被ダメ後の回復（緑の地母神 hBP07-029）では致死ダウンを覆せない (Q593)
+          const wasLethal = recv.damage >= this.effectiveHp(recv);
+          if (finalDmg > 0) this._dispatchDamageReceivedForced(recv); // 強制被ダメージトリガー (hBP07-108 / 緑の地母神の回復)
+          if (wasLethal) downed.push(recv);
           after2();
         }, 'arts', { noReduce }); // 「軽減されない」アーツは被ダメ割り込みの軽減型も無効化する (Q539)
       };
