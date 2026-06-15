@@ -254,11 +254,45 @@ export class EffectContext {
    * 1個ずつの rollDice をそのまま n 回呼ぶので、ファン割り込み・回数カウント(abilityDiceRoll)も従来どおり働く。
    */
   *rollDiceMany(n) {
-    const results = [];
+    let results = [];
     const prev = this._diceBatchSize;
     this._diceBatchSize = n;
     try {
       for (let i = 0; i < n; i++) results.push(yield* this.rollDice());
+      // 多個振り(n>1)のときだけ、「結果をすべて無くして振り直す」型の割り込み（野うさぎ同盟 hBP01-123 等）を
+      // バッチ単位で提示する。使ったらファンをアーカイブし、n個まとめて振り直す（Q229）。
+      // ※1個振り(n<=1)では _offerDiceReact 側で従来どおり処理されるため、ここでは出さない（挙動不変）。
+      if (n > 1) {
+        const eng = this.engine;
+        let rerolled = true;
+        while (rerolled) {
+          rerolled = false;
+          for (const h of eng._stageHolomems(this.player)) {
+            for (const att of [...h.attachments]) {
+              const r = eng.registry.get(att.number)?.onDiceRollReact;
+              if (!r || !r.batchReroll) continue;
+              const info = { ownerIdx: this.playerIdx, roller: this.sourceHolomem, rollerCard: this.sourceCard, values: results, fanCard: att, fanHolomem: h };
+              if (r.canUse && !r.canUse(eng, info)) continue;
+              const use = yield {
+                kind: 'confirm', player: this.playerIdx, title: r.title,
+                buildOptions: () => [
+                  { id: 'yes', label: r.yesLabel || '使う', value: true },
+                  { id: 'no', label: '使わない', value: false },
+                ],
+              };
+              if (!use) continue;
+              const ai = h.attachments.indexOf(att);
+              if (ai !== -1) { h.attachments.splice(ai, 1); this.player.archive.push(att); }
+              this.log(`${att.name}: サイコロの結果をすべて無くして振り直す`);
+              results = [];
+              for (let i = 0; i < n; i++) results.push(yield* this.rollDice());
+              rerolled = true;
+              break;
+            }
+            if (rerolled) break;
+          }
+        }
+      }
     } finally {
       this._diceBatchSize = prev; // 入れ子・例外時も元に戻す
     }
@@ -290,6 +324,9 @@ export class EffectContext {
       for (const att of [...h.attachments]) { // apply で外れても走査が崩れないようスナップショット
         const r = eng.registry.get(att.number)?.onDiceRollReact;
         if (!r) continue;
+        // 「結果をすべて無くして振り直す」型(batchReroll)は、多個振りバッチ中はバッチ単位で処理する（rollDiceMany）。
+        // 単発ロール（バッチでない／1個振り）では従来どおりここで1個を振り直す（挙動不変。Q229）。
+        if (r.batchReroll && this._diceBatchSize > 1) continue;
         // roller=振っているホロメン（推しスキルの場合は null）/ rollerCard=振っている能力の発生源カード（推し含む）
         const info = { ownerIdx: this.playerIdx, roller: this.sourceHolomem, rollerCard: this.sourceCard, value, fanCard: att, fanHolomem: h };
         if (r.canUse && !r.canUse(eng, info)) continue;

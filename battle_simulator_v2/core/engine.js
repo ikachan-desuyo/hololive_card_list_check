@@ -1270,6 +1270,44 @@ export class Engine {
     }
   }
 
+  /**
+   * 同時に誘発した複数の自動能力（同一プレイヤー所有）を解決する。
+   * 2件以上ある時は、所有プレイヤーが解決順を選ぶ (10.6.3 / Q257/Q259/Q587 等)。
+   * 0・1件のときは順次実行と完全に同一の挙動（決定ポイントを出さない＝既存挙動不変）。
+   * runners: [{ run, opts, label }]。run は generator、opts は _runEffect の ctxOpts。
+   */
+  _runOrderedTriggers(runners, ownerIdx, after) {
+    if (!runners || runners.length <= 1) {
+      const run = (i) => {
+        if (i >= (runners ? runners.length : 0)) { after(); return; }
+        this._runEffect({ run: runners[i].run }, runners[i].opts, () => run(i + 1));
+      };
+      run(0);
+      return;
+    }
+    const remaining = runners.slice();
+    const step = () => {
+      if (remaining.length === 0) { after(); return; }
+      if (remaining.length === 1) {
+        const r = remaining.shift();
+        this._runEffect({ run: r.run }, r.opts, step);
+        return;
+      }
+      this.state.pending = {
+        type: 'effectChoice',
+        player: ownerIdx,
+        request: { kind: 'chooseOption', title: '同時に誘発した能力の解決順を選択（先に解決するものを選ぶ）' },
+        options: remaining.map((r, i) => ({ id: `order_${i}`, label: r.label || `能力${i + 1}`, value: i })),
+        resume: (idx) => {
+          const r = remaining.splice(idx, 1)[0];
+          this._runEffect({ run: r.run }, r.opts, step);
+        },
+      };
+      this.onChange();
+    };
+    step();
+  }
+
   _executeMainAction(action) {
     const s = this.state;
     const p = s.players[s.turnPlayer];
@@ -1293,15 +1331,13 @@ export class Engine {
         }
         if (enterRunners.length > 0) {
           const enteredInfo = { holomem: placed, card };
-          const runEnter = (i) => {
-            if (i >= enterRunners.length) { finish(); return; }
-            this._runEffect(
-              { run: enterRunners[i].run },
-              { playerIdx: s.turnPlayer, sourceCard: topCard(enterRunners[i].srcH), sourceHolomem: enterRunners[i].srcH, enteredInfo },
-              () => runEnter(i + 1),
-            );
-          };
-          runEnter(0);
+          // 複数ホロメンの onEnter が同時誘発なら解決順をプレイヤーが選ぶ
+          const ordered = enterRunners.map((r) => ({
+            run: r.run,
+            label: topCard(r.srcH).name,
+            opts: { playerIdx: s.turnPlayer, sourceCard: topCard(r.srcH), sourceHolomem: r.srcH, enteredInfo },
+          }));
+          this._runOrderedTriggers(ordered, s.turnPlayer, finish);
           return;
         }
         break;
@@ -1327,15 +1363,13 @@ export class Engine {
           if (atrig) runners.push({ run: atrig, src: att });
         }
         if (runners.length > 0) {
-          const runNext = (i) => {
-            if (i >= runners.length) { finish(); return; }
-            this._runEffect(
-              { run: runners[i].run },
-              { playerIdx: s.turnPlayer, sourceCard: runners[i].src, sourceHolomem: h },
-              () => runNext(i + 1),
-            );
-          };
-          runNext(0);
+          // 同時誘発（ブルームエフェクト＋装着の onBloom 等）が2件以上なら解決順をプレイヤーが選ぶ (Q257/Q259)
+          const ordered = runners.map((r) => ({
+            run: r.run,
+            label: r.src.name || 'ブルームエフェクト',
+            opts: { playerIdx: s.turnPlayer, sourceCard: r.src, sourceHolomem: h },
+          }));
+          this._runOrderedTriggers(ordered, s.turnPlayer, finish);
           return;
         }
         break;
@@ -1372,15 +1406,13 @@ export class Engine {
           if (atrig) runners.push({ run: atrig, srcCard: att, srcH: h });
         }
         if (runners.length > 0) {
-          const runNext = (i) => {
-            if (i >= runners.length) { finish(); return; }
-            this._runEffect(
-              { run: runners[i].run },
-              { playerIdx: s.turnPlayer, sourceCard: runners[i].srcCard, sourceHolomem: runners[i].srcH },
-              () => runNext(i + 1),
-            );
-          };
-          runNext(0);
+          // コラボエフェクト＋傍観 onCollab が2件以上同時誘発なら解決順をプレイヤーが選ぶ (Q587 等)
+          const ordered = runners.map((r) => ({
+            run: r.run,
+            label: r.srcCard.name || 'コラボエフェクト',
+            opts: { playerIdx: s.turnPlayer, sourceCard: r.srcCard, sourceHolomem: r.srcH },
+          }));
+          this._runOrderedTriggers(ordered, s.turnPlayer, finish);
           return;
         }
         break;
@@ -1473,15 +1505,13 @@ export class Engine {
         const hostTrig = this.registry.get(topCard(h).number)?.triggers?.onAttached;
         if (hostTrig) attachRunners.push(hostTrig);
         if (attachRunners.length > 0) {
-          const runAttach = (i) => {
-            if (i >= attachRunners.length) { finish(); return; }
-            this._runEffect(
-              { run: attachRunners[i] },
-              { playerIdx: s.turnPlayer, sourceCard: card, sourceHolomem: h },
-              () => runAttach(i + 1),
-            );
-          };
-          runAttach(0);
+          // 付けたカードの onAttach と付け先の onAttached が同時誘発なら解決順をプレイヤーが選ぶ
+          const ordered = attachRunners.map((trig) => ({
+            run: trig,
+            label: card.name,
+            opts: { playerIdx: s.turnPlayer, sourceCard: card, sourceHolomem: h },
+          }));
+          this._runOrderedTriggers(ordered, s.turnPlayer, finish);
           return;
         }
         break;
@@ -1911,13 +1941,16 @@ export class Engine {
     // 「相手のターンで～」等の条件は各カードの run() 内で ctx.state.turnPlayer を見て判定する。
     const runDownTrigger = () => {
       const downedInfo = { holomem: h, card, ownerIdx, zone: pos.zone };
-      const runners = [];
       // 1) ダウンしたホロメン自身＋付いている装着カード（ファン等）の onDown。sourceHolomem はダウンしたホロメン。
+      //    同一所有者の能力が複数同時誘発するので、2件以上なら所有者が解決順を選ぶ (Q474 複数装備)。
+      const ownRunners = [];
       for (const c of [card, ...h.attachments]) {
         const trig = this.registry.get(c.number)?.triggers?.onDown;
-        if (trig) runners.push({ run: trig, opts: { playerIdx: ownerIdx, sourceCard: c, sourceHolomem: h } });
+        if (trig) ownRunners.push({ run: trig, label: c.name, opts: { playerIdx: ownerIdx, sourceCard: c, sourceHolomem: h } });
       }
       // 2) 場の全ホロメン（両者）＋装着の onAnyDown（ダウンしたホロメン自身は除く）。downedInfo を渡す。
+      //    両プレイヤーにまたがるため順序は従来どおり逐次（cross-player の順序制御は別課題）。
+      const anyRunners = [];
       for (let pi = 0; pi < 2; pi++) {
         const pl = this.state.players[pi];
         for (const wpos of this._stagePositions(pl)) {
@@ -1925,15 +1958,16 @@ export class Engine {
           if (wh === h) continue;
           for (const c of [topCard(wh), ...wh.attachments]) {
             const atrig = this.registry.get(c.number)?.triggers?.onAnyDown;
-            if (atrig) runners.push({ run: atrig, opts: { playerIdx: pi, sourceCard: c, sourceHolomem: wh, downedInfo } });
+            if (atrig) anyRunners.push({ run: atrig, opts: { playerIdx: pi, sourceCard: c, sourceHolomem: wh, downedInfo } });
           }
         }
       }
-      const runNext = (i) => {
-        if (i >= runners.length) { finish(); return; }
-        this._runEffect({ run: runners[i].run }, runners[i].opts, () => runNext(i + 1));
+      const runAny = (i) => {
+        if (i >= anyRunners.length) { finish(); return; }
+        this._runEffect({ run: anyRunners[i].run }, anyRunners[i].opts, () => runAny(i + 1));
       };
-      runNext(0);
+      // 自身の onDown 群（所有者が順序選択）→ その後 onAnyDown 群を逐次（全体の順序は従来と同じ）
+      this._runOrderedTriggers(ownRunners, ownerIdx, () => runAny(0));
     };
 
     // 「（ホロメンが）ダウンした時に使える」推しスキル (11.3.1.1 / 12.1.5.2)

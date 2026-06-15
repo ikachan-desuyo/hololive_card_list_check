@@ -765,6 +765,52 @@ export async function runTests() {
     assert(s.pending.options.some((a) => a.kind === 'art' && a.zone === 'collab'), '再アーツ放棄後にコラボのアーツが解禁されていない');
   });
 
+  await testAsync('hBP01-123 野うさぎ同盟: 多個振りは「すべて振り直す」をバッチ単位で1回提示（Q229）', async () => {
+    const e = await setupMainStep(deckMap, 110);
+    await e.registry.preload(['hBP01-123'], lib);
+    const p0 = e.state.players[0];
+    const peko = e._createHolomem(fakeHolomen({ name: '兎田ぺこら' }), 1);
+    const fan = lib.getByNumber('hBP01-123');
+    peko.attachments.push(fan);
+    p0.center = peko;
+    const ctx = e._effectContext(0, { sourceHolomem: peko });
+    let confirmCount = 0;
+    const gen = ctx.rollDiceMany(3);
+    let r = gen.next();
+    while (!r.done) {
+      const opts = r.value.buildOptions();
+      confirmCount++;
+      // 1回目（バッチ振り直し）に yes、以降は no
+      const val = confirmCount === 1 ? opts.find((o) => o.value === true).value : opts.find((o) => o.value === false).value;
+      r = gen.next(val);
+    }
+    assertEq(r.value.length, 3, '3個の出目が返っていない');
+    assertEq(confirmCount, 1, '野うさぎの提示がバッチ単位で1回でない（per-dieで複数回出ている）');
+    assert(!peko.attachments.includes(fan), '野うさぎがアーカイブされていない');
+    assert(p0.archive.includes(fan), '野うさぎがアーカイブに置かれていない');
+  });
+
+  await testAsync('A3 同時誘発の順序選択: 2件以上で解決順を選べる／1件以下は決定ポイント無し', async () => {
+    const e = await setupMainStep(deckMap, 111);
+    const order = [];
+    const mk = (tag) => ({ run: function* () { order.push(tag); }, opts: { playerIdx: 0 }, label: tag });
+    e.state.pending = null;
+    // 1件: 決定ポイント無しで即実行（既存挙動と同一）
+    let done1 = false;
+    e._runOrderedTriggers([mk('X')], 0, () => { done1 = true; });
+    assert(done1, '1件のトリガーが実行されていない');
+    assertEq(order.join(','), 'X', '1件の実行結果が不正');
+    assert(!e.state.pending, '1件以下なのに順序選択の決定ポイントを出している（既存挙動が変わっている）');
+    // 2件: 順序選択の決定ポイントが出る。B→A の順で選ぶ
+    order.length = 0;
+    let done2 = false;
+    e._runOrderedTriggers([mk('A'), mk('B')], 0, () => { done2 = true; });
+    assert(e.state.pending && e.state.pending.options.length === 2, '2件同時誘発で順序選択が出ていない');
+    e.apply(e.state.pending.options.find((o) => o.label === 'B').id);
+    assert(done2, '順序選択の解決が完了していない');
+    assertEq(order.join(','), 'B,A', '選んだ順（B→A）で解決されていない');
+  });
+
   await testAsync('相手の手札ステップで自分の手札が増えない', async () => {
     const e = await setupMainStep(deckMap, 21); // P1(先攻)のメインステップ
     // P1のターンを終わらせてP2のターンへ
