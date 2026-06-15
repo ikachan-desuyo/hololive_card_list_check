@@ -868,6 +868,24 @@ export async function runTests() {
     assert(!targets.includes(plain), '非Buzzの普通ホロメンが対象になってしまっている');
   });
 
+  await testAsync('hBP03-001 推しスキル: 対象不在でも宣言可（Q296）＋AIは空振りを避ける(aiSkip)', async () => {
+    const e = await setupMainStep(deckMap, 114);
+    await e.registry.preload(['hBP03-001'], lib);
+    e.state.turn = 3; e.state.turnPlayer = 0;
+    const p0 = e.state.players[0];
+    p0.oshi = lib.getByNumber('hBP03-001');
+    p0.holoPower = [fakeHolomen(), fakeHolomen()];
+    p0.usedOshiSkillThisTurn = 0;
+    p0.deck = [fakeHolomen(), fakeHolomen()]; // デッキにパソコン無し
+    e._queueMainPending();
+    const skillAct = e.actions().find((a) => a.kind === 'oshiSkill');
+    assert(skillAct, '対象（パソコン）不在でも推しスキルが宣言できない（Q296違反）');
+    const def = e.registry.get('hBP03-001');
+    assert(def.oshiSkill.aiSkip(e, 0) === true, 'パソコン不在で aiSkip=true でない（AIが無駄撃ちしうる）');
+    p0.deck.push({ number: 'x', name: 'ゲーミングパソコン', kind: 'support', supportType: 'アイテム' });
+    assert(def.oshiSkill.aiSkip(e, 0) === false, 'パソコンがあるのに aiSkip=true になっている');
+  });
+
   await testAsync('相手の手札ステップで自分の手札が増えない', async () => {
     const e = await setupMainStep(deckMap, 21); // P1(先攻)のメインステップ
     // P1のターンを終わらせてP2のターンへ

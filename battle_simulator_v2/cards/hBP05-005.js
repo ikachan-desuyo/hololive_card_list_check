@@ -25,9 +25,9 @@ export default {
   // 推しスキル: デッキから#食べ物イベント1枚を公開し手札に加え、デッキをシャッフル
   oshiSkill: {
     name: 'ちょこまみれになっちゃえっ！',
-    canUse(engine, ownerIdx) {
-      const p = engine.state.players[ownerIdx];
-      return p.deck.some(isFoodEvent);
+    // デッキに#食べ物イベントが無くても宣言できる（Q441: 使用可・シャッフルのみで終了）。AIは空振りを避ける。
+    aiSkip(engine, ownerIdx) {
+      return !engine.state.players[ownerIdx].deck.some(isFoodEvent);
     },
     *run(ctx) {
       const events = ctx.deckCards(isFoodEvent);
