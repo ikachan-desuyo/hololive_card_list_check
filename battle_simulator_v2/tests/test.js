@@ -906,6 +906,35 @@ export async function runTests() {
     assert(!def.support.canUse(ctx), 'エールが無いのに使用可になっている');
   });
 
+  await testAsync('hBP07-051 TAKE YOUR TIME: 付け替え先は#Promise≠自分≠元の所有者（no-op付け替えを作らない）', async () => {
+    const e = await setupMainStep(deckMap, 116);
+    await e.registry.preload(['hBP07-051'], lib);
+    const p0 = e.state.players[0];
+    const kronii = e._createHolomem(fakeHolomen({ name: 'オーロ・クロニー', tags: ['EN', 'Promise'] }), 1);
+    const promiseY = e._createHolomem(fakeHolomen({ name: 'Y', tags: ['Promise'] }), 1);
+    const nonPromiseZ = e._createHolomem(fakeHolomen({ name: 'Z', tags: [] }), 1);
+    kronii.cheers.push({ name: 'クロのエール', kind: 'cheer', color: '青' });
+    promiseY.cheers.push({ name: 'Yのエール', kind: 'cheer', color: '青' });
+    p0.collab = kronii; p0.center = promiseY; p0.back = [nonPromiseZ];
+    const def = e.registry.get('hBP07-051');
+    const gen = def.collabEffect.run(e._effectContext(0, { sourceHolomem: kronii, sourceCard: kronii.stack[0] }));
+    let r = gen.next();          // confirm
+    assertEq(r.value.kind, 'confirm', 'confirm が出ていない');
+    r = gen.next(true);          // → chooseCard（付け替え可能なエール）
+    assertEq(r.value.kind, 'chooseCard', 'エール選択が出ていない');
+    const cheerNames = r.value.buildOptions().filter((o) => o.value).map((o) => o.value.name);
+    // クロニーのエールは送り先Y(≠自分・≠所有者クロニー・Promise)があるので候補。
+    // Yのエールは送り先が無い（他のPromiseはクロニー=自分のみ）ので候補外。
+    assert(cheerNames.includes('クロのエール'), 'クロニーのエールが付け替え候補に無い');
+    assert(!cheerNames.includes('Yのエール'), 'Yのエールが候補になっている（送り先が無いのに）');
+    // クロニーのエールを選ぶ → 付け替え先候補は Y のみ（自分・非Promise・所有者を除く）
+    const pick = r.value.buildOptions().find((o) => o.value && o.value.name === 'クロのエール');
+    r = gen.next(pick.value);
+    assertEq(r.value.kind, 'chooseHolomem', '付け替え先選択が出ていない');
+    const destNames = r.value.buildOptions().filter((o) => o.value).map((o) => o.value.top.name);
+    assertEq(destNames.join(','), 'Y', '付け替え先が Y のみになっていない（自分/非Promise/元の所有者が混入）');
+  });
+
   await testAsync('相手の手札ステップで自分の手札が増えない', async () => {
     const e = await setupMainStep(deckMap, 21); // P1(先攻)のメインステップ
     // P1のターンを終わらせてP2のターンへ
