@@ -837,6 +837,37 @@ export async function runTests() {
     assert(!e._isTreatedAllColors(oppCenter), 'センター限定なのにバックの一伊那尓栖で全色扱いになっている');
   });
 
+  await testAsync('hBP06-003「迷ったらまず実行！」: 対象はBuzzホロメン(名前不問)＋Buzzから化けた風真いろは（Q501/Q502）', async () => {
+    const e = await setupMainStep(deckMap, 113);
+    await e.registry.preload(['hBP06-003'], lib);
+    e.state.turn = 3; e.state.turnPlayer = 0;
+    const p0 = e.state.players[0];
+    p0.oshi = { number: 'hBP06-003', name: '風真いろは' };
+    p0.holoPower = [fakeHolomen(), fakeHolomen()];
+    p0.usedOshiSkillThisTurn = 0;
+    // エールデッキに1枚
+    p0.cheerDeck = [{ id: 'cheer', number: 'c', name: '緑エール', kind: 'cheer', color: '緑' }];
+    // ① Buzzホロメン（風真いろは以外）→ 対象になる
+    const buzzOther = e._createHolomem(fakeHolomen({ name: '別Buzz', buzz: true }), 1);
+    // ② 非Buzzの〈風真いろは〉が Buzzの〈風真いろは〉の上 → 対象になる（土台をBuzzにして上に非Buzzを重ねる）
+    const irohaOverBuzz = e._createHolomem(fakeHolomen({ name: '風真いろは', buzz: true }), 1);
+    irohaOverBuzz.stack.unshift({ name: '風真いろは', buzz: false }); // top=非Buzz風真いろは, 真下=Buzz
+    // ③ 非Buzzの普通ホロメン → 対象外
+    const plain = e._createHolomem(fakeHolomen({ name: '普通', buzz: false }), 1);
+    p0.center = buzzOther; p0.collab = irohaOverBuzz; p0.back = [plain];
+
+    const def = e.registry.get('hBP06-003');
+    assert(def.oshiSkill.canUse(e, 0), '推しスキルが使えない（対象がいるのに）');
+    // run を1ステップ進めて chooseHolomem の候補（buildOptions）を取り出す
+    const gen = def.oshiSkill.run(e._effectContext(0, { sourceCard: p0.oshi }));
+    const req = gen.next().value;
+    assert(req && req.kind === 'chooseHolomem', '対象選択が出ていない');
+    const targets = req.buildOptions().filter((o) => o.value).map((o) => o.value.holomem);
+    assert(targets.includes(buzzOther), 'Buzzホロメン(風真いろは以外)が対象になっていない（Q502違反）');
+    assert(targets.includes(irohaOverBuzz), 'Buzzから化けた〈風真いろは〉が対象になっていない');
+    assert(!targets.includes(plain), '非Buzzの普通ホロメンが対象になってしまっている');
+  });
+
   await testAsync('相手の手札ステップで自分の手札が増えない', async () => {
     const e = await setupMainStep(deckMap, 21); // P1(先攻)のメインステップ
     // P1のターンを終わらせてP2のターンへ
