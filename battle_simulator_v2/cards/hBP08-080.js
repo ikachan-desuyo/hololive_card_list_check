@@ -40,8 +40,14 @@ export default {
         skipLabel: '出さない／見つからなかったことにする',
       });
       if (picked) {
-        ctx.removeFromDeck(picked);
-        ctx.putToBack(picked); // ステージ（バック）に出す
+        // ステージ満杯時は出せない。先にデッキから抜くとカードが消失する（保存則違反）ため、
+        // 出せる時だけデッキから抜いて出す。出せなければデッキに残す（直後のシャッフルで戻る）。
+        if (ctx.engine._stageCount(ctx.player) < 6) {
+          ctx.removeFromDeck(picked);
+          ctx.putToBack(picked); // ステージ（バック）に出す
+        } else {
+          ctx.log('ステージが満杯のため #ReGLOSS Debutホロメンを出せない');
+        }
       }
       // そしてデッキをシャッフルする
       ctx.shuffleDeck();

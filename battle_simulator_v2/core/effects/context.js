@@ -37,6 +37,8 @@ export class EffectContext {
     this.downedHolomem = opts.downedHolomem || null;
     // onEnter 用: ステージに出たホロメンの情報 { holomem, card }
     this.enteredInfo = opts.enteredInfo || null;
+    // 傍観 onCollab 用: コラボしたホロメンの情報 { holomem, card }（hBP08-051「愛のエゴサ」）
+    this.collabInfo = opts.collabInfo || null;
     // onSpecialDamageDealt 用: 与えた特殊ダメージの情報 { source, target, amount }
     this.specialDealt = opts.specialDealt || null;
     // onReturnedToDeck 用: デッキに戻ったホロメンの情報 { cards }

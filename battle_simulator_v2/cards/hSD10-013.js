@@ -42,7 +42,11 @@ export default {
       if (!picked) { ctx.shuffleDeck(); return; }
       ctx.removeFromDeck(picked);
       ctx.flashReveal(picked);
-      ctx.putToBack(picked); // ステージ（バック）に出す（上限なら出ない）
+      if (!ctx.putToBack(picked)) {
+        // ステージ満杯などで出せない時はデッキに戻す（どの領域にも属さない瞬間を作らない＝保存則）
+        ctx.player.deck.push(picked);
+        ctx.log('ステージが満杯のため出せなかった');
+      }
       ctx.shuffleDeck();
       // その後、このふぐ太郎をデッキの下に戻す
       const i = host.attachments.indexOf(ctx.sourceCard);

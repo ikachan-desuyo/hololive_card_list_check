@@ -811,6 +811,32 @@ export async function runTests() {
     assertEq(order.join(','), 'B,A', '選んだ順（B→A）で解決されていない');
   });
 
+  await testAsync('hBP08-110 Takodachi: 一伊那尓栖センター時に相手センター/コラボを全色扱い（Q685-689）', async () => {
+    const e = await setupMainStep(deckMap, 112);
+    await e.registry.preload(['hBP08-110'], lib);
+    const p0 = e.state.players[0]; const p1 = e.state.players[1];
+    const ina = e._createHolomem(fakeHolomen({ name: '一伊那尓栖', color: '緑' }), 1);
+    const tako = lib.getByNumber('hBP08-110');
+    ina.attachments.push(tako);
+    p0.center = ina; p0.collab = null; p0.back = [];
+    const oppCenter = e._createHolomem(fakeHolomen({ name: '相手センター', color: '青' }), 1);
+    const oppBack = e._createHolomem(fakeHolomen({ name: '相手バック', color: '青' }), 1);
+    p1.center = oppCenter; p1.collab = null; p1.back = [oppBack];
+    // 付け先制限（一伊那尓栖のみ）
+    assert(e._canAttachSupport(ina, tako), 'Takodachiが一伊那尓栖に付けられない');
+    assert(!e._canAttachSupport(e._createHolomem(fakeHolomen({ name: '別' }), 1), tako), 'Takodachiが一伊那尓栖以外に付けられてしまう');
+    // アーツ+10
+    assertEq(e.effects.artsBonus(ina, 0), 10, 'Takodachiのアーツ+10が乗っていない');
+    // 全色扱い: 相手センターは全色扱い（緑を持つと判定）。バックは対象外。無色は含まない(Q685)
+    assert(e._isTreatedAllColors(oppCenter), '相手センターが全色扱いになっていない');
+    assert(e._hasColor(oppCenter, '緑'), '全色扱いの相手センターが緑を持つと判定されない');
+    assert(!e._isTreatedAllColors(oppBack), '相手バックまで全色扱いになっている（対象はセンター/コラボのみ）');
+    assert(!e._hasColor(oppCenter, '無色'), '全色扱いが無色まで含んでしまっている（Q685違反）');
+    // [センター限定]: 一伊那尓栖がバックなら無効
+    p0.center = null; p0.back = [ina];
+    assert(!e._isTreatedAllColors(oppCenter), 'センター限定なのにバックの一伊那尓栖で全色扱いになっている');
+  });
+
   await testAsync('相手の手札ステップで自分の手札が増えない', async () => {
     const e = await setupMainStep(deckMap, 21); // P1(先攻)のメインステップ
     // P1のターンを終わらせてP2のターンへ

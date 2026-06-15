@@ -199,11 +199,21 @@ export class Engine {
    * (hBP08-006/068/073/074)
    */
   _isTreatedAllColors(holomem) {
-    return this.state.modifiers.some(
+    if (this.state.modifiers.some(
       (m) =>
         (m.kind === 'treatedAllColors' || m.kind === 'colorOverrideAll') &&
-        (!m.match || m.match(holomem)),
-    );
+        (!m.match || m.match(holomem)))) return true;
+    // 継続アウラ（装着ファン等が相手ホロメンを全色扱いにする。Takodachi hBP08-110）。
+    // どのカードも auraTreatedAllColors を持たない間はこのループは false を返すだけ（既存挙動不変）。
+    for (const pl of this.state.players) {
+      for (const src of this._stageHolomems(pl)) {
+        for (const c of [src.stack[0], ...src.attachments]) {
+          const fn = this.registry.get(c.number)?.auraTreatedAllColors;
+          if (fn && fn(src, holomem, this)) return true;
+        }
+      }
+    }
+    return false;
   }
 
   /**
@@ -1407,10 +1417,11 @@ export class Engine {
         }
         if (runners.length > 0) {
           // コラボエフェクト＋傍観 onCollab が2件以上同時誘発なら解決順をプレイヤーが選ぶ (Q587 等)
+          const collabInfo = { holomem: h, card: topCard(h) }; // コラボしたホロメン（傍観 onCollab が参照。hBP08-051）
           const ordered = runners.map((r) => ({
             run: r.run,
             label: r.srcCard.name || 'コラボエフェクト',
-            opts: { playerIdx: s.turnPlayer, sourceCard: r.srcCard, sourceHolomem: r.srcH },
+            opts: { playerIdx: s.turnPlayer, sourceCard: r.srcCard, sourceHolomem: r.srcH, collabInfo },
           }));
           this._runOrderedTriggers(ordered, s.turnPlayer, finish);
           return;
