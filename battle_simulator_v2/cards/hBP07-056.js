@@ -5,8 +5,9 @@
  *   [センター限定]自分のパフォーマンスステップ開始時、このホロメン以外の自分の〈オーロ・クロニー〉1人を、
  *   このホロメンに重なっているホロメンを使ってBloomできる。
  *   → triggers.onPerformanceStepStart で実装。自分のパフォーマンス開始時、センターのこのオーロの
- *      重なっているホロメン（stack[1..]）1枚を取り出し、別の〈オーロ・クロニー〉にBloomさせる
- *      （Bloom条件は canReBloom で判定。ブルームエフェクトも誘発）。
+ *      重なっているホロメン（stack[1..]）1枚を取り出し、別の〈オーロ・クロニー〉にBloomさせる。
+ *      通常Bloomなので _canBloomIgnoreName で判定する（このターンに出た/Bloomしたホロメンは対象外）。
+ *      ブルームエフェクトも誘発する。
  *
  * [アーツ] You're not ready for me. (80+) icons: 青青無無 / 特攻: 赤+50
  *   このホロメンのエール1枚を自分の他の#Promiseを持つホロメンに付け替えられる。
@@ -26,8 +27,10 @@ export default {
       if (self.stack[0].name !== 'オーロ・クロニー') return;
       const bloomCards = self.stack.slice(1).filter((c) => c.kind === 'holomen'); // 重なっているホロメン
       if (bloomCards.length === 0) return;
+      // 通常Bloomの制限を満たすこと（このターンに出た／このターンBloomしたホロメンはBloom不可。_canBloomIgnoreName）。
+      // ※これは「もう1回Bloom（再Bloom）」ではないので canReBloom（このターン制限を無視）は使わない。
       const matches = (e) => e.holomem !== self && e.top.name === 'オーロ・クロニー'
-        && bloomCards.some((c) => ctx.canReBloom(e.holomem, c));
+        && bloomCards.some((c) => ctx.engine._canBloomIgnoreName(e.holomem, c));
       const valid = ctx.holomems('self', matches);
       if (valid.length === 0) return;
       const entry = valid.length === 1
@@ -35,7 +38,7 @@ export default {
         : yield ctx.chooseHolomem({ side: 'self', filter: matches, title: 'Bloomさせる別の〈オーロ・クロニー〉を選択', optional: true });
       if (!entry) return;
       const target = entry.holomem;
-      const usable = bloomCards.filter((c) => ctx.canReBloom(target, c));
+      const usable = bloomCards.filter((c) => ctx.engine._canBloomIgnoreName(target, c));
       const card = usable.length === 1
         ? usable[0]
         : yield ctx.chooseCard({ cards: usable, title: '重なっているホロメンから使うカードを選択', optional: true });

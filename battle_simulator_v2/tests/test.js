@@ -935,6 +935,46 @@ export async function runTests() {
     assertEq(destNames.join(','), 'Y', '付け替え先が Y のみになっていない（自分/非Promise/元の所有者が混入）');
   });
 
+  await testAsync('hBP07-100 フロンティアスピリット: 何も起きない時は使えない（一般ルールQ348）', async () => {
+    const e = await setupMainStep(deckMap, 117);
+    await e.registry.preload(['hBP07-100'], lib);
+    const p0 = e.state.players[0];
+    const def = e.registry.get('hBP07-100');
+    p0.center = e._createHolomem(fakeHolomen({ name: 'AZKi' }), 1); // ステージにAZKi
+    p0.collab = null; p0.back = [];
+    const mkFS = () => ({ number: 'hBP07-100', name: 'フロンティアスピリット', kind: 'support', supportType: 'イベント' });
+    const ctx = e._effectContext(0, {});
+    // ① アーカイブにFS1枚・エール0枚・AZKi無し → 何も起きないので使用不可（ユーザー報告のケース）
+    p0.archive = [mkFS()];
+    assert(!def.support.canUse(ctx), 'FS1枚・エール0枚・アーカイブAZKi無しなのに使用可になっている');
+    // ② エールを足す（FS＋エール＋ステージAZKi）→ エールを送れるので使用可
+    p0.archive = [mkFS(), { number: 'c', name: '青エール', kind: 'cheer', color: '青' }];
+    assert(def.support.canUse(ctx), 'FS＋エール＋ステージAZKiで使用可にならない');
+    // ③ アーカイブに〈AZKi〉がいれば（手札に戻せるので）使用可
+    p0.archive = [{ number: 'azki', name: 'AZKi', kind: 'holomen', bloomLevel: 'Debut' }];
+    assert(def.support.canUse(ctx), 'アーカイブに〈AZKi〉がいるのに使用可にならない');
+  });
+
+  await testAsync('hBP07-056 時界を統べし者: このターン出た〈オーロ・クロニー〉はBloomできない', async () => {
+    const e = await setupMainStep(deckMap, 118);
+    await e.registry.preload(['hBP07-056'], lib);
+    const s = e.state; s.turnPlayer = 0;
+    const p0 = s.players[0];
+    const center = e._createHolomem(fakeHolomen({ name: 'オーロ・クロニー', bloomLevel: '2nd', hp: 200 }), s.turn);
+    center.stack.push({ name: 'オーロ・クロニー', bloomLevel: '1st', hp: 150, kind: 'holomen' }); // 真下に1st（Bloom素材）
+    const target = e._createHolomem(fakeHolomen({ name: 'オーロ・クロニー', bloomLevel: 'Debut', hp: 130 }), s.turn); // このターン出た
+    p0.center = center; p0.collab = null; p0.back = [target];
+    const def = e.registry.get('hBP07-056');
+    const drive = (gen) => { let r = gen.next(); while (!r.done) r = gen.next(null); };
+    // このターン出たtarget → Bloomされない
+    drive(def.triggers.onPerformanceStepStart(e._effectContext(0, { sourceHolomem: center, sourceCard: center.stack[0] })));
+    assertEq(target.stack[0].bloomLevel, 'Debut', 'このターン出たホロメンがBloomされてしまった（出たばかりは不可）');
+    // 前ターンに出ていれば Bloomできる
+    target.placedTurn = s.turn - 1;
+    drive(def.triggers.onPerformanceStepStart(e._effectContext(0, { sourceHolomem: center, sourceCard: center.stack[0] })));
+    assertEq(target.stack[0].bloomLevel, '1st', '前ターンに出たホロメンがBloomされていない');
+  });
+
   await testAsync('相手の手札ステップで自分の手札が増えない', async () => {
     const e = await setupMainStep(deckMap, 21); // P1(先攻)のメインステップ
     // P1のターンを終わらせてP2のターンへ
