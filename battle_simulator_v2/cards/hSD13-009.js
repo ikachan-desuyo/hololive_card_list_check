@@ -21,7 +21,7 @@ export default {
         });
         if (picked) {
           ctx.removeFromDeck(picked);
-          ctx.putToBack(picked); // 公開してステージ（バック）に出す
+          yield* ctx.putToBackWithTrigger(picked); // 公開してステージに出し、出た時の onEnter も誘発
         }
       }
       ctx.shuffleDeck();

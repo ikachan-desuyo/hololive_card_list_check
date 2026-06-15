@@ -45,16 +45,20 @@ export default {
         if (ctx.player.oshi?.name !== '百鬼あやめ') return;
         const maxArchive = Math.min(3, ctx.player.cheerDeck.length);
         if (maxArchive <= 0) return;
-        // 1～3枚を「上から」アーカイブ（任意）。何枚アーカイブするかを順に確認する。
+        // 1～3枚を「上から」アーカイブ（任意・「できる」なので0枚も可）。
+        // エールデッキの上の中身は見られないため、枚数を先に宣言してからまとめてアーカイブする。
+        // （1枚ずつ結果を見て続行/停止できる段階的処理は不可。Q523）
+        const declared = yield {
+          kind: 'choose', player: ctx.playerIdx, title: 'エールデッキの上から何枚アーカイブしますか？（このアーツ+40/枚）',
+          buildOptions: () => {
+            const opts = [{ id: 'n_0', label: 'アーカイブしない', value: 0 }];
+            for (let n = 1; n <= maxArchive; n++) opts.push({ id: `n_${n}`, label: `${n}枚`, value: n });
+            return opts;
+          },
+        };
         let archived = 0;
-        while (archived < maxArchive) {
-          const ok = yield ctx.confirm(
-            `エールデッキの上から1枚をアーカイブしてこのアーツ+40しますか？`
-            + `（現在 ${archived} 枚／最大 ${maxArchive} 枚, 累計+${archived * 40}）`,
-          );
-          if (!ok) break;
+        for (let i = 0; i < declared && ctx.player.cheerDeck.length > 0; i++) {
           const cheer = ctx.player.cheerDeck.shift();
-          if (!cheer) break;
           ctx.player.archive.push(cheer);
           ctx.log(`エールデッキの上から ${cheer.name} をアーカイブ`);
           archived++;

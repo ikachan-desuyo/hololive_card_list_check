@@ -39,8 +39,8 @@ export default {
     name: 'ホイサホイサ',
     canUse(engine, ownerIdx) {
       const p = engine.state.players[ownerIdx];
-      // 「自分の手札2枚をアーカイブする」を行える＝手札が2枚以上
-      return p.hand.length >= 2;
+      // Q642: 手札1枚でも使用可（2枚未満なら特殊ダメージは発生しないが使用自体は可能）
+      return p.hand.length >= 1;
     },
     *run(ctx) {
       // 自分の手札2枚をアーカイブする

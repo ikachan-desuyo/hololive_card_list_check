@@ -43,7 +43,7 @@ export default {
       return engine.state.turnPlayer !== ownerIdx &&        // 相手のターン
         !p.usedSpOshiSkillThisGame &&                        // ゲームに1回
         p.holoPower.length >= 2 &&                           // [ホロパワー：-2]
-        downedHolomem.stack[0].color === '赤';               // 赤ホロメン
+        engine._hasColor(downedHolomem, '赤');               // 赤ホロメン
     },
     *run(ctx) {
       const downed = ctx.downedHolomem;

@@ -14,11 +14,11 @@ export default {
     *onDown(ctx) {
       if (ctx.state.turnPlayer === ctx.playerIdx) return; // 相手のターンのみ
       if (ctx.player.cheerDeck.length === 0) return;
-      // ダウンするこのホロメン自身を除いた〈大空スバル〉に送る
-      const subarus = ctx.holomems('self', (e) => e.holomem !== ctx.sourceHolomem && e.top.name === '大空スバル');
+      // 〈大空スバル〉に送る（ダウンした自身にも送れる。Q537）
+      const subarus = ctx.holomems('self', (e) => e.top.name === '大空スバル');
       if (subarus.length === 0) return;
       const entry = yield ctx.chooseHolomem({
-        side: 'self', filter: (e) => e.holomem !== ctx.sourceHolomem && e.top.name === '大空スバル',
+        side: 'self', filter: (e) => e.top.name === '大空スバル',
         title: 'エールデッキの上から1枚を送る〈大空スバル〉を選択', optional: true,
       });
       if (entry) ctx.sendCheerFromCheerDeckTop(entry.holomem);

@@ -63,7 +63,7 @@ export default {
         if (!picked) break;
         ctx.removeFromDeck(picked);
         ctx.log(`${ctx.player.name}: ${picked.name}〔2nd〕を公開`);
-        if (!ctx.putToBack(picked)) break;
+        if (!(yield* ctx.putToBackWithTrigger(picked))) break; // 出た時の onEnter も誘発
         placed += 1;
       }
 

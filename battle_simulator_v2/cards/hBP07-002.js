@@ -9,7 +9,8 @@
  * SP推しスキル「不可能なんてないんだから！」[ホロパワー：-2][ゲームに1回]:
  *   自分のアーカイブの[マスコットとファン]を好きな枚数選び、自分の#ID3期生を持つホロメン1人に付ける。
  *   3枚以上付けたなら、このターンの間、そのホロメンのアーツ+100。
- *   → 付け先のマスコット枚数制限（1人1枚）は無視して「好きな枚数」付ける効果のため attachSupport を直接使う。
+ *   → 「好きな枚数」付けられるが装着上限（マスコットは1人1枚）は外れない（Q581）。
+ *     付け先候補は ctx.engine._canAttachSupport で都度フィルタする。
  */
 export default {
   number: 'hBP07-002',
@@ -63,11 +64,15 @@ export default {
       });
       if (!target) return;
 
-      // アーカイブのマスコット/ファンを好きな枚数選んで付ける
+      // アーカイブのマスコット/ファンを好きな枚数選んで付ける。
+      // 「好きな枚数」でも装着上限（マスコットは1人1枚）は外れない（Q581）。
+      // 付け先に既にマスコットがある場合、追加のマスコットは候補から除外する。
       let attachedCount = 0;
       while (true) {
         const parts = ctx.player.archive.filter((c) =>
-          c.kind === 'support' && (c.supportType === 'マスコット' || c.supportType === 'ファン'));
+          c.kind === 'support'
+          && (c.supportType === 'マスコット' || c.supportType === 'ファン')
+          && ctx.engine._canAttachSupport(target.holomem, c));
         if (parts.length === 0) break;
         const picked = yield ctx.chooseCard({
           cards: parts,

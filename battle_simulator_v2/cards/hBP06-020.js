@@ -32,16 +32,19 @@ export default {
       *run(ctx) {
         const max = Math.min(3, ctx.player.deck.length);
         if (max === 0) return;
-        // 1～3枚をアーカイブ（枚数を選ぶ: 1枚ずつ「まだ削るか」）
-        let count = 0;
-        for (let i = 0; i < max; i++) {
-          const more = i === 0
-            ? true
-            : yield ctx.confirm(`さらにデッキの上をアーカイブしますか？（現在${count}枚）`, 'する', 'やめる');
-          if (!more) break;
-          if (ctx.player.deck.length === 0) break;
+        // 1～3枚をアーカイブ（枚数を先に宣言してからまとめてアーカイブ。
+        // デッキの上の中身は見られないため、途中で結果を見て止める段階的処理にはしない。Q516）
+        const count = yield {
+          kind: 'choose', player: ctx.playerIdx, title: 'デッキの上から何枚アーカイブしますか？',
+          buildOptions: () => {
+            const opts = [];
+            for (let n = 1; n <= max; n++) opts.push({ id: `n_${n}`, label: `${n}枚`, value: n });
+            return opts;
+          },
+        };
+        if (!count) return;
+        for (let i = 0; i < count && ctx.player.deck.length > 0; i++) {
           ctx.player.archive.push(ctx.player.deck.shift());
-          count++;
         }
         if (count > 0) {
           ctx.recordDeckArchive(count);

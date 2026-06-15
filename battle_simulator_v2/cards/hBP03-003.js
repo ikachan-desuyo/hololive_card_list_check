@@ -48,7 +48,7 @@ export default {
     // センターホロメンの色が赤の時のみ使える
     canUse(engine, ownerIdx) {
       const p = engine.state.players[ownerIdx];
-      return !!p.center && p.center.stack[0].color === '赤';
+      return !!p.center && engine._hasColor(p.center, '赤');
     },
     *run(ctx) {
       // 手札を好きな枚数選んでデッキの下に戻す（「好きな枚数」=0枚も可）

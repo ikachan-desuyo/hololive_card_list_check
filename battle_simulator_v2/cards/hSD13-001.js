@@ -68,9 +68,9 @@ export default {
       });
       if (!picked) return;
       ctx.removeFromArchive(picked);
-      if (!ctx.putToBack(picked)) return; // 上限などで出せなければ終了
-      // 出したホロメン（バック末尾に追加された）を取得
-      const target = ctx.player.back[ctx.player.back.length - 1];
+      // バックに出し、「ステージに出た時」の onEnter（セシリア「正義の旋律」等）も誘発する
+      const target = yield* ctx.putToBackWithTrigger(picked);
+      if (!target) return; // 上限などで出せなければ終了
 
       // その後、アーカイブのエール1～5枚をそのホロメンに送る（最低1枚・最大5枚）
       for (let i = 0; i < 5; i++) {

@@ -8,14 +8,17 @@ export default {
   number: 'hBP06-096',
   support: {
     canUse(ctx) {
-      return ctx.holomems('self', (e) => e.top.name === '角巻わため').length > 0 &&
-        ctx.holomems('self', (e) => e.top.name === '大空スバル').length > 0;
+      return ctx.holomems('self', (e) => ctx.nameIs(e.top, '角巻わため')).length > 0 &&
+        ctx.holomems('self', (e) => ctx.nameIs(e.top, '大空スバル')).length > 0;
     },
     *run(ctx) {
       const chosen = [];
       for (const name of ['角巻わため', '大空スバル']) {
         const entry = yield ctx.chooseHolomem({
-          side: 'self', filter: (e) => e.top.name === name, title: `〈${name}〉を選択`,
+          // ラムダック等〈角巻わため〉〈大空スバル〉両名のカードを拾い、
+          // かつ既に選んだホロメンは除外して同一ホロメンの2枠重複選択を防ぐ。
+          side: 'self', filter: (e) => ctx.nameIs(e.top, name) && !chosen.includes(e.holomem),
+          title: `〈${name}〉を選択`,
         });
         if (!entry) continue;
         chosen.push(entry.holomem);

@@ -16,7 +16,7 @@ export default {
   arts: {
     'SorAZ グラビティ': {
       *run(ctx) {
-        const hasSora = ctx.holomems('self', (e) => e.top.name === 'ときのそら').length > 0;
+        const hasSora = ctx.holomems('self', (e) => ctx.nameIs(e.top, 'ときのそら')).length > 0;
         if (!hasSora) return;
         if (ctx.player.cheerDeck.length === 0) return;
         const target = yield ctx.chooseHolomem({

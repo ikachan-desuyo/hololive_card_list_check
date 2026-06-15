@@ -24,11 +24,15 @@ export default {
       if (!picked) return;
       ctx.removeFromArchive(picked);
       ctx.player.deck.push(picked); // デッキの下に戻す
-      // このホロメンをアーカイブするかわりに手札に戻す（スタックを手札へ。finish はアーカイブしない）
-      const cards = [...downed.stack];
-      downed.stack.length = 0;
-      for (const c of cards) ctx.addToHand(c);
-      ctx.log('夏色まつり「一緒にゲームしよ」: アーカイブするかわりに手札に戻した');
+      // Q604: 手札に戻すのは「このカード」（＝スタック最上段の hBP07-084）1枚のみ。
+      // 残りのスタック・エール・装着は、ダウン処理の finish() で通常どおりアーカイブされる。
+      const self = ctx.sourceCard; // ダウンしたホロメンの最上段（このカード）
+      const idx = downed.stack.indexOf(self);
+      if (idx !== -1) {
+        downed.stack.splice(idx, 1);
+        ctx.addToHand(self);
+        ctx.log('夏色まつり「一緒にゲームしよ」: このカード1枚を手札に戻した（残りはアーカイブ）');
+      }
     },
   },
   arts: {

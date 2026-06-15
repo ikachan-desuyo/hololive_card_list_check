@@ -644,6 +644,22 @@ export class EffectContext {
     return true;
   }
 
+  /**
+   * ホロメンをバックに出し、「ステージに出た時」の onEnter トリガー（hSD13-014「正義の旋律」等）を誘発する。
+   * ジェネレータ（`const placed = yield* ctx.putToBackWithTrigger(card)`）。出せなければ null、出せたら出したホロメンを返す。
+   * デッキ/アーカイブからの展開（手札の place 以外）でも onEnter を発火させたい時に使う (Q575)。
+   */
+  *putToBackWithTrigger(card) {
+    if (!this.putToBack(card)) return null;
+    const placed = this.player.back[this.player.back.length - 1];
+    const enteredInfo = { holomem: placed, card };
+    for (const wh of this.engine._stageHolomems(this.player)) {
+      const et = this.engine.registry.get(wh.stack[0].number)?.triggers?.onEnter;
+      if (et) yield* et(new EffectContext(this.engine, this.playerIdx, { sourceHolomem: wh, sourceCard: wh.stack[0], enteredInfo }));
+    }
+    return placed;
+  }
+
   /** エールをホロメンに付ける（送る 5.21） */
   attachCheer(cheer, holomem) {
     holomem.cheers.push(cheer);

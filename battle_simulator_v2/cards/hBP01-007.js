@@ -17,7 +17,7 @@ export default {
       title: '推しスキル「ほうき星」: ダメージを受けた相手バックへ特殊ダメージ50？（ホロパワー-2）',
       canUse(engine, idx, info) {
         const sh = info.sourceHolomem;
-        if (!sh || sh.stack[0].color !== '青') return false;        // 自分の青ホロメンが与えた
+        if (!sh || !engine._hasColor(sh, '青')) return false;        // 自分の青ホロメンが与えた
         return (info.dealtList || []).some((d) => d.zone === 'back'); // 相手バックにダメージ
       },
       *run(ctx) {
@@ -36,7 +36,7 @@ export default {
       title: 'SP推しスキル「シューティングスター」: 与えたダメージと同じ数値を相手バックへ特殊ダメージ？（ホロパワー-2）',
       canUse(engine, idx, info) {
         const sh = info.sourceHolomem;
-        if (!sh || sh.stack[0].color !== '青') return false;          // 自分の青ホロメンが与えた
+        if (!sh || !engine._hasColor(sh, '青')) return false;          // 自分の青ホロメンが与えた
         if (!(info.dealtList || []).some((d) => d.zone === 'center' || d.zone === 'collab')) return false;
         return engine.state.players[1 - idx].back.length > 0;          // 相手にバックがいる
       },

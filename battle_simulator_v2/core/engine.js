@@ -207,6 +207,25 @@ export class Engine {
   }
 
   /**
+   * 名前一致（〈名称〉参照）。エクストラ「〈X〉〈Y〉としても扱う」(nameAliases) の別名にも一致する。
+   * canUse(engine,...) など ctx を持たない経路から使う（ctx.nameIs と同義）。
+   */
+  _nameIs(card, name) {
+    return !!card && (card.name === name || (card.nameAliases || []).includes(name));
+  }
+
+  /**
+   * ホロメンが指定色を「持つ」か。多色カード（'白緑'等の合成色文字列）は構成色すべてを持つ (2.4.3)。
+   * 「すべての色を持つホロメンとして扱う」継続効果 (_isTreatedAllColors) も一致する。
+   * ただし無色は「色」として数えない (2.4.2.2 / Q685) ため、all-colors では無色要求に一致させない。
+   */
+  _hasColor(holomem, color) {
+    const c = topCard(holomem).color || '';
+    if (color === '無色') return c.includes('無色');
+    return this._isTreatedAllColors(holomem) || c.includes(color);
+  }
+
+  /**
    * 推しホロメンの「推しステージスキル」定義（常時能力）。
    * カード定義の oshiStageSkill フック（artsPlus / artsCostReduce / blocksReset /
    * cheerColorAlias / onTurnEnd / onArtsUse 等）をエンジン各所が参照する。
@@ -1615,7 +1634,7 @@ export class Engine {
         // 「すべての色を持つホロメンとして扱う」継続効果が乗っている対象は、どの特攻色とも一致する
         const allColors = this._isTreatedAllColors(t);
         for (const tk of art.tokkou || []) {
-          if (allColors || tCard.color === tk.color) {
+          if (allColors || (tCard.color || '').includes(tk.color)) { // 多色（'白緑'等）は構成色すべてに一致 (2.4.3)
             dmg += tk.value;
             this.log(`特攻発動！ ${tk.color}+${tk.value}${allColors ? '（全色扱い）' : ''}`);
           }
@@ -1624,7 +1643,7 @@ export class Engine {
         for (const m of this.state.modifiers) {
           if (m.kind !== 'tokkouPlus' || m.ownerIdx !== s.turnPlayer) continue;
           if (m.match && !m.match(h)) continue;
-          if (allColors || tCard.color === m.color) {
+          if (allColors || (tCard.color || '').includes(m.color)) {
             dmg += m.amount;
             this.log(`特攻（継続効果）！ ${m.color}+${m.amount}${allColors ? '（全色扱い）' : ''}`);
           }
@@ -1650,7 +1669,7 @@ export class Engine {
           if (finalDmg > 0) this._dispatchDamageReceivedForced(recv); // 強制被ダメージトリガー (hBP07-108)
           if (recv.damage >= this.effectiveHp(recv)) downed.push(recv);
           after2();
-        });
+        }, 'arts', { noReduce }); // 「軽減されない」アーツは被ダメ割り込みの軽減型も無効化する (Q539)
       };
 
       // 全対象に逐次適用（割り込みが挟まるためチェーン）→ 完了後にアーツ後トリガー群
@@ -2063,7 +2082,7 @@ export class Engine {
    * アーツダメージ適用の直前に呼ぶ。使える割り込みを順に防御側へ決定ポイントとして提示し、最終ダメージで after を呼ぶ。
    * 無ければそのまま after(dmg)。特殊ダメージの割り込みは _offerDamageInterruptsGen（generator版）を使う。
    */
-  _offerDamageOshiSkill(targetHolomem, dmg, after, kind = 'arts') {
+  _offerDamageOshiSkill(targetHolomem, dmg, after, kind = 'arts', opts = {}) {
     const s = this.state;
     const defIdx = s.players.findIndex((p) => this._stageHolomems(p).includes(targetHolomem));
     // 攻撃はターンプレイヤー→相手。防御側はターンプレイヤーでない側のみ（自分のアーツの自爆等は対象外）
@@ -2075,6 +2094,9 @@ export class Engine {
       if (i >= responders.length) { after(curDmg); return; }
       const r = responders[i].build(curDmg);
       if (!r) { run(i + 1, curDmg); return; }
+      // 「このアーツダメージは軽減されない」(opts.noReduce) の時、ダメージ軽減型の割り込み（apply のみ）は無効化＝提示しない。
+      // 受け手差し替え(redirect)や副作用(run)はダメージ量を変えないので提示する。
+      if (opts.noReduce && r.apply && !r.run && !r.redirect) { run(i + 1, curDmg); return; }
       this.state.pending = {
         type: 'effectChoice',
         player: defIdx,

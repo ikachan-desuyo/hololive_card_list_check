@@ -53,7 +53,7 @@ export default {
       title: 'SP推しスキル「フブキングダム」: マスコット2枚につきサイコロを振り、奇数が出たら相手のライフ-1？（ホロパワー-2 / ゲームに1回）',
       canUse(engine, idx, info) {
         const sh = info.sourceHolomem;
-        if (!sh || sh.stack[0].color !== '白') return false;   // 自分の白ホロメンが
+        if (!sh || !engine._hasColor(sh, '白')) return false;   // 自分の白ホロメンが
         if (!(info.downed || []).length) return false;          // 相手のホロメンをダウンさせた時
         // マスコット2枚につき1回振れる＝マスコットが2枚以上ないと振れない（空振り回避）
         const me = engine.state.players[idx];
