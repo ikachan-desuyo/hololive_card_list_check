@@ -45,17 +45,17 @@ export default {
     *run(ctx) {
       const looked = ctx.lookTopDeck(7);
 
-      // 〈尾丸ポルカ〉1枚（複数あれば選択、なければ加えない）
+      // Q437/Q438: 加えるかどうかは任意（片方だけ／どちらも加えない、も可）
+      // 〈尾丸ポルカ〉1枚（複数あれば選択、加えないことも選べる）
       const polkas = looked.filter((c) => c.name === '尾丸ポルカ');
       if (polkas.length > 0) {
-        let polka = polkas[0];
-        if (polkas.length > 1) {
-          polka = yield ctx.chooseCard({
-            cards: polkas,
-            title: '手札に加える〈尾丸ポルカ〉を選択',
-            displayCards: looked,
-          });
-        }
+        const polka = yield ctx.chooseCard({
+          cards: polkas,
+          title: '手札に加える〈尾丸ポルカ〉を選択（任意）',
+          displayCards: looked,
+          optional: true,
+          skipLabel: '加えない',
+        });
         if (polka) {
           const i = looked.indexOf(polka);
           if (i !== -1) looked.splice(i, 1);
@@ -64,17 +64,16 @@ export default {
         }
       }
 
-      // スタッフ1枚（複数あれば選択、なければ加えない）
+      // スタッフ1枚（複数あれば選択、加えないことも選べる）
       const staffs = looked.filter(isStaff);
       if (staffs.length > 0) {
-        let staff = staffs[0];
-        if (staffs.length > 1) {
-          staff = yield ctx.chooseCard({
-            cards: staffs,
-            title: '手札に加えるスタッフを選択',
-            displayCards: looked,
-          });
-        }
+        const staff = yield ctx.chooseCard({
+          cards: staffs,
+          title: '手札に加えるスタッフを選択（任意）',
+          displayCards: looked,
+          optional: true,
+          skipLabel: '加えない',
+        });
         if (staff) {
           const i = looked.indexOf(staff);
           if (i !== -1) looked.splice(i, 1);

@@ -10,7 +10,10 @@ export default {
   number: 'hBP03-088',
   support: {
     canUse(ctx) {
-      return ctx.player.life.length < ctx.opponent.life.length;
+      // 自分のライフが相手より少ない時のみ
+      if (ctx.player.life.length >= ctx.opponent.life.length) return false;
+      // 移動対象が無い（相手コラボが埋まっている／相手バックにホロメンがいない）なら何も起きないので使用不可 (Q348)
+      return !ctx.opponent.collab && ctx.holomems('opp', (e) => e.pos.zone === 'back').length > 0;
     },
     *run(ctx) {
       if (ctx.opponent.collab) return; // 相手のコラボがいる時は何もしない

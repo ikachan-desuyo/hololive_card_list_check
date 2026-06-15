@@ -19,9 +19,11 @@ export default {
   number: 'hBP03-001',
   oshiSkill: {
     name: 'パソコンならわかるのら',
-    canUse(engine, ownerIdx) {
+    // 対象（パソコン）がデッキに無くても宣言できる（Q296: 使用可・解決時に何もしない）。
+    // コスト/[ターン1回]はエンジンが処理。AIは空振り（パソコン不在）を避ける。
+    aiSkip(engine, ownerIdx) {
       const p = engine.state.players[ownerIdx];
-      return p.deck.some((c) =>
+      return !p.deck.some((c) =>
         c.kind === 'support' && c.supportType === 'アイテム' && (c.name || '').includes('パソコン'));
     },
     *run(ctx) {
@@ -44,10 +46,12 @@ export default {
     name: 'ルーナイト集合',
     canUse(engine, ownerIdx) {
       const p = engine.state.players[ownerIdx];
-      // センターホロメンが〈姫森ルーナ〉であること
-      if (!p.center || p.center.stack[0].name !== '姫森ルーナ') return false;
-      // デッキに〈ルーナイト〉があること
-      return p.deck.some((c) => c.name === 'ルーナイト');
+      // 「自分のセンターホロメンが〈姫森ルーナ〉の時に使える」= 使用条件（残す）
+      return !!p.center && p.center.stack[0].name === '姫森ルーナ';
+    },
+    // デッキに〈ルーナイト〉が無くても使用可（Q297）。AIは空振りを避ける。
+    aiSkip(engine, ownerIdx) {
+      return !engine.state.players[ownerIdx].deck.some((c) => c.name === 'ルーナイト');
     },
     *run(ctx) {
       // 〈ルーナイト〉は〈姫森ルーナ〉だけに付けられる。付け先候補がなければ何もしない。

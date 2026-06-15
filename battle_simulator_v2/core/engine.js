@@ -14,7 +14,7 @@
 
 import { COLORLESS, STAGE_LIMIT, MULLIGAN_LIMIT, INITIAL_HAND, STEP_NAMES, LOSS_REASONS } from './constants.js';
 import { CardKind } from './cards.js';
-import { createRng, shuffle } from './rng.js';
+import { createRng, shuffle, rollDie } from './rng.js';
 import { EffectContext } from './effects/context.js';
 import { EffectSystem } from './effects/system.js';
 import { EffectRegistry } from './effects/registry.js';
@@ -199,11 +199,57 @@ export class Engine {
    * (hBP08-006/068/073/074)
    */
   _isTreatedAllColors(holomem) {
-    return this.state.modifiers.some(
+    if (this.state.modifiers.some(
       (m) =>
         (m.kind === 'treatedAllColors' || m.kind === 'colorOverrideAll') &&
-        (!m.match || m.match(holomem)),
-    );
+        (!m.match || m.match(holomem)))) return true;
+    // 継続アウラ（装着ファン等が相手ホロメンを全色扱いにする。Takodachi hBP08-110）。
+    // どのカードも auraTreatedAllColors を持たない間はこのループは false を返すだけ（既存挙動不変）。
+    for (const pl of this.state.players) {
+      for (const src of this._stageHolomems(pl)) {
+        for (const c of [src.stack[0], ...src.attachments]) {
+          const fn = this.registry.get(c.number)?.auraTreatedAllColors;
+          if (fn && fn(src, holomem, this)) return true;
+        }
+      }
+    }
+    return false;
+  }
+
+  /**
+   * 名前一致（〈名称〉参照）。エクストラ「〈X〉〈Y〉としても扱う」(nameAliases) の別名にも一致する。
+   * canUse(engine,...) など ctx を持たない経路から使う（ctx.nameIs と同義）。
+   */
+  _nameIs(card, name) {
+    return !!card && (card.name === name || (card.nameAliases || []).includes(name));
+  }
+
+  /**
+   * サイコロを1個振る（出目を返す）。「目をNとして扱う」継続効果 (diceFixed) を ownerIdx に対して適用する。
+   * 「左手に地図」等で宣言された出目は、ctx.rollDice 以外の経路（V.7 等のリアクティブ割り込み）でも反映される (Q221)。
+   * ※ファンの振り直し割り込み(onDiceRollReact)や diceDouble は含まない（それらは ctx.rollDice 側で扱う）。
+   */
+  _rollDieFor(ownerIdx, batchSize = undefined) {
+    let value = rollDie(this.rng);
+    const fixed = this.state.modifiers.find(
+      (m) => m.kind === 'diceFixed' && m.ownerIdx === ownerIdx && !m.used
+        && (m.batchOf == null || m.batchOf === batchSize));
+    if (fixed) {
+      value = fixed.value;
+      if (fixed.once) fixed.used = true;
+    }
+    return value;
+  }
+
+  /**
+   * ホロメンが指定色を「持つ」か。多色カード（'白緑'等の合成色文字列）は構成色すべてを持つ (2.4.3)。
+   * 「すべての色を持つホロメンとして扱う」継続効果 (_isTreatedAllColors) も一致する。
+   * ただし無色は「色」として数えない (2.4.2.2 / Q685) ため、all-colors では無色要求に一致させない。
+   */
+  _hasColor(holomem, color) {
+    const c = topCard(holomem).color || '';
+    if (color === '無色') return c.includes('無色');
+    return this._isTreatedAllColors(holomem) || c.includes(color);
   }
 
   /**
@@ -861,6 +907,7 @@ export class Engine {
     }
     s.step = 'performance';
     s.perfUsed = { center: false, collab: false };
+    s.reArtsPending = null; // 再アーツ「もう1回」の保留状態（Q590: 1回目直後は他アーツを挟ませない）
     // 「相手のパフォーマンスステップに自分のライフが減っていたら」判定用に開始時ライフを記録
     s.lifeAtPerfStart = [s.players[0].life.length, s.players[1].life.length];
     this.log(`【${STEP_NAMES.performance}】`);
@@ -1025,6 +1072,14 @@ export class Engine {
           if (art) pushArtActions(h, zone, art, h.lastArtUsedIndex, true);
         }
       }
+    }
+
+    // Q590: 再アーツ「もう1回」の保留中は、再アーツを使う/使わないを決めるまで他のアーツを挟めない。
+    //   該当ホロメンの再アーツ（reArts:true）のみ提示し、「もう1回使わない」で放棄できる。
+    if (s.reArtsPending) {
+      const reActions = actions.filter((a) => a.kind === 'art' && a.reArts && a.zone === s.reArtsPending.zone);
+      reActions.push({ id: 'declineReArts', label: '同じアーツをもう1回使わない', kind: 'declineReArts' });
+      return reActions;
     }
 
     actions.push({ id: 'pass', label: 'エンドステップへ', kind: 'pass' });
@@ -1225,6 +1280,44 @@ export class Engine {
     }
   }
 
+  /**
+   * 同時に誘発した複数の自動能力（同一プレイヤー所有）を解決する。
+   * 2件以上ある時は、所有プレイヤーが解決順を選ぶ (10.6.3 / Q257/Q259/Q587 等)。
+   * 0・1件のときは順次実行と完全に同一の挙動（決定ポイントを出さない＝既存挙動不変）。
+   * runners: [{ run, opts, label }]。run は generator、opts は _runEffect の ctxOpts。
+   */
+  _runOrderedTriggers(runners, ownerIdx, after) {
+    if (!runners || runners.length <= 1) {
+      const run = (i) => {
+        if (i >= (runners ? runners.length : 0)) { after(); return; }
+        this._runEffect({ run: runners[i].run }, runners[i].opts, () => run(i + 1));
+      };
+      run(0);
+      return;
+    }
+    const remaining = runners.slice();
+    const step = () => {
+      if (remaining.length === 0) { after(); return; }
+      if (remaining.length === 1) {
+        const r = remaining.shift();
+        this._runEffect({ run: r.run }, r.opts, step);
+        return;
+      }
+      this.state.pending = {
+        type: 'effectChoice',
+        player: ownerIdx,
+        request: { kind: 'chooseOption', title: '同時に誘発した能力の解決順を選択（先に解決するものを選ぶ）' },
+        options: remaining.map((r, i) => ({ id: `order_${i}`, label: r.label || `能力${i + 1}`, value: i })),
+        resume: (idx) => {
+          const r = remaining.splice(idx, 1)[0];
+          this._runEffect({ run: r.run }, r.opts, step);
+        },
+      };
+      this.onChange();
+    };
+    step();
+  }
+
   _executeMainAction(action) {
     const s = this.state;
     const p = s.players[s.turnPlayer];
@@ -1248,15 +1341,13 @@ export class Engine {
         }
         if (enterRunners.length > 0) {
           const enteredInfo = { holomem: placed, card };
-          const runEnter = (i) => {
-            if (i >= enterRunners.length) { finish(); return; }
-            this._runEffect(
-              { run: enterRunners[i].run },
-              { playerIdx: s.turnPlayer, sourceCard: topCard(enterRunners[i].srcH), sourceHolomem: enterRunners[i].srcH, enteredInfo },
-              () => runEnter(i + 1),
-            );
-          };
-          runEnter(0);
+          // 複数ホロメンの onEnter が同時誘発なら解決順をプレイヤーが選ぶ
+          const ordered = enterRunners.map((r) => ({
+            run: r.run,
+            label: topCard(r.srcH).name,
+            opts: { playerIdx: s.turnPlayer, sourceCard: topCard(r.srcH), sourceHolomem: r.srcH, enteredInfo },
+          }));
+          this._runOrderedTriggers(ordered, s.turnPlayer, finish);
           return;
         }
         break;
@@ -1282,15 +1373,13 @@ export class Engine {
           if (atrig) runners.push({ run: atrig, src: att });
         }
         if (runners.length > 0) {
-          const runNext = (i) => {
-            if (i >= runners.length) { finish(); return; }
-            this._runEffect(
-              { run: runners[i].run },
-              { playerIdx: s.turnPlayer, sourceCard: runners[i].src, sourceHolomem: h },
-              () => runNext(i + 1),
-            );
-          };
-          runNext(0);
+          // 同時誘発（ブルームエフェクト＋装着の onBloom 等）が2件以上なら解決順をプレイヤーが選ぶ (Q257/Q259)
+          const ordered = runners.map((r) => ({
+            run: r.run,
+            label: r.src.name || 'ブルームエフェクト',
+            opts: { playerIdx: s.turnPlayer, sourceCard: r.src, sourceHolomem: h },
+          }));
+          this._runOrderedTriggers(ordered, s.turnPlayer, finish);
           return;
         }
         break;
@@ -1327,15 +1416,14 @@ export class Engine {
           if (atrig) runners.push({ run: atrig, srcCard: att, srcH: h });
         }
         if (runners.length > 0) {
-          const runNext = (i) => {
-            if (i >= runners.length) { finish(); return; }
-            this._runEffect(
-              { run: runners[i].run },
-              { playerIdx: s.turnPlayer, sourceCard: runners[i].srcCard, sourceHolomem: runners[i].srcH },
-              () => runNext(i + 1),
-            );
-          };
-          runNext(0);
+          // コラボエフェクト＋傍観 onCollab が2件以上同時誘発なら解決順をプレイヤーが選ぶ (Q587 等)
+          const collabInfo = { holomem: h, card: topCard(h) }; // コラボしたホロメン（傍観 onCollab が参照。hBP08-051）
+          const ordered = runners.map((r) => ({
+            run: r.run,
+            label: r.srcCard.name || 'コラボエフェクト',
+            opts: { playerIdx: s.turnPlayer, sourceCard: r.srcCard, sourceHolomem: r.srcH, collabInfo },
+          }));
+          this._runOrderedTriggers(ordered, s.turnPlayer, finish);
           return;
         }
         break;
@@ -1428,15 +1516,13 @@ export class Engine {
         const hostTrig = this.registry.get(topCard(h).number)?.triggers?.onAttached;
         if (hostTrig) attachRunners.push(hostTrig);
         if (attachRunners.length > 0) {
-          const runAttach = (i) => {
-            if (i >= attachRunners.length) { finish(); return; }
-            this._runEffect(
-              { run: attachRunners[i] },
-              { playerIdx: s.turnPlayer, sourceCard: card, sourceHolomem: h },
-              () => runAttach(i + 1),
-            );
-          };
-          runAttach(0);
+          // 付けたカードの onAttach と付け先の onAttached が同時誘発なら解決順をプレイヤーが選ぶ
+          const ordered = attachRunners.map((trig) => ({
+            run: trig,
+            label: card.name,
+            opts: { playerIdx: s.turnPlayer, sourceCard: card, sourceHolomem: h },
+          }));
+          this._runOrderedTriggers(ordered, s.turnPlayer, finish);
           return;
         }
         break;
@@ -1509,6 +1595,18 @@ export class Engine {
 
   _executePerformanceAction(action) {
     const s = this.state;
+    // Q590: 再アーツ「もう1回」を放棄する。対応する reArts 修正を使用済みにして通常のパフォーマンスに戻る。
+    if (action.kind === 'declineReArts') {
+      const h = s.reArtsPending ? s.players[s.turnPlayer][s.reArtsPending.zone] : null;
+      if (h) {
+        const reMod = s.modifiers.find(
+          (m) => m.kind === 'reArts' && !m.used && m.ownerIdx === s.turnPlayer && m.match?.(h));
+        if (reMod) reMod.used = true;
+      }
+      s.reArtsPending = null;
+      this._queuePerformancePending();
+      return;
+    }
     if (action.kind === 'pass') {
       // パフォーマンスステップ終了時：防御側（非ターンプレイヤー）の onOpponentPerformanceEnd を実行
       const defIdx = 1 - s.turnPlayer;
@@ -1554,6 +1652,12 @@ export class Engine {
       const reMod = s.modifiers.find(
         (m) => m.kind === 'reArts' && !m.used && m.ownerIdx === s.turnPlayer && m.match?.(h));
       if (reMod) reMod.used = true;
+      s.reArtsPending = null; // 再アーツを使い切った（Q590）
+    } else {
+      // 1回目のアーツ。「もう1回」修正を持つなら、再アーツの可否を決めるまで保留（他アーツを挟ませない Q590）
+      const reMod = s.modifiers.find(
+        (m) => m.kind === 'reArts' && !m.used && m.ownerIdx === s.turnPlayer && m.match?.(h));
+      s.reArtsPending = reMod ? { zone: action.zone } : null;
     }
     this.log(`${card.name} のアーツ「${art.name}」！${action.reArts ? '（再アーツ）' : ''}`);
 
@@ -1615,7 +1719,7 @@ export class Engine {
         // 「すべての色を持つホロメンとして扱う」継続効果が乗っている対象は、どの特攻色とも一致する
         const allColors = this._isTreatedAllColors(t);
         for (const tk of art.tokkou || []) {
-          if (allColors || tCard.color === tk.color) {
+          if (allColors || (tCard.color || '').includes(tk.color)) { // 多色（'白緑'等）は構成色すべてに一致 (2.4.3)
             dmg += tk.value;
             this.log(`特攻発動！ ${tk.color}+${tk.value}${allColors ? '（全色扱い）' : ''}`);
           }
@@ -1624,7 +1728,7 @@ export class Engine {
         for (const m of this.state.modifiers) {
           if (m.kind !== 'tokkouPlus' || m.ownerIdx !== s.turnPlayer) continue;
           if (m.match && !m.match(h)) continue;
-          if (allColors || tCard.color === m.color) {
+          if (allColors || (tCard.color || '').includes(m.color)) {
             dmg += m.amount;
             this.log(`特攻（継続効果）！ ${m.color}+${m.amount}${allColors ? '（全色扱い）' : ''}`);
           }
@@ -1640,17 +1744,23 @@ export class Engine {
           // (kind='arts')
           const recv = redirectTo || t;
           const recvCard = topCard(recv);
-          if (redirectTo) this.log(`ダメージの受け手を変更: ${tCard.name} → ${recvCard.name}`);
+          if (redirectTo) {
+            this.log(`ダメージの受け手を変更: ${tCard.name} → ${recvCard.name}`);
+            // 差し替え先ホロメンの「受けるダメージ」修正（やめなー等の軽減/無効）を適用する (Q565)
+            finalDmg = this._applyDamageReceived(recv, finalDmg, 'arts', h, { ignoreReduction: noReduce });
+          }
           recv.damage += finalDmg;
           totalDealt += finalDmg;
           if (finalDmg > 0) dealtList.push({ target: recv, zone: this._zoneOf(recv), dealt: finalDmg });
           this.log(
             `「${art.name}」→ ${recvCard.name} に ${finalDmg}ダメージ（累計${recv.damage}/${this.effectiveHp(recv)}）`
           );
-          if (finalDmg > 0) this._dispatchDamageReceivedForced(recv); // 強制被ダメージトリガー (hBP07-108)
-          if (recv.damage >= this.effectiveHp(recv)) downed.push(recv);
+          // 致死判定はダメージ時点で確定する。被ダメ後の回復（緑の地母神 hBP07-029）では致死ダウンを覆せない (Q593)
+          const wasLethal = recv.damage >= this.effectiveHp(recv);
+          if (finalDmg > 0) this._dispatchDamageReceivedForced(recv); // 強制被ダメージトリガー (hBP07-108 / 緑の地母神の回復)
+          if (wasLethal) downed.push(recv);
           after2();
-        });
+        }, 'arts', { noReduce }); // 「軽減されない」アーツは被ダメ割り込みの軽減型も無効化する (Q539)
       };
 
       // 全対象に逐次適用（割り込みが挟まるためチェーン）→ 完了後にアーツ後トリガー群
@@ -1842,13 +1952,16 @@ export class Engine {
     // 「相手のターンで～」等の条件は各カードの run() 内で ctx.state.turnPlayer を見て判定する。
     const runDownTrigger = () => {
       const downedInfo = { holomem: h, card, ownerIdx, zone: pos.zone };
-      const runners = [];
       // 1) ダウンしたホロメン自身＋付いている装着カード（ファン等）の onDown。sourceHolomem はダウンしたホロメン。
+      //    同一所有者の能力が複数同時誘発するので、2件以上なら所有者が解決順を選ぶ (Q474 複数装備)。
+      const ownRunners = [];
       for (const c of [card, ...h.attachments]) {
         const trig = this.registry.get(c.number)?.triggers?.onDown;
-        if (trig) runners.push({ run: trig, opts: { playerIdx: ownerIdx, sourceCard: c, sourceHolomem: h } });
+        if (trig) ownRunners.push({ run: trig, label: c.name, opts: { playerIdx: ownerIdx, sourceCard: c, sourceHolomem: h } });
       }
       // 2) 場の全ホロメン（両者）＋装着の onAnyDown（ダウンしたホロメン自身は除く）。downedInfo を渡す。
+      //    両プレイヤーにまたがるため順序は従来どおり逐次（cross-player の順序制御は別課題）。
+      const anyRunners = [];
       for (let pi = 0; pi < 2; pi++) {
         const pl = this.state.players[pi];
         for (const wpos of this._stagePositions(pl)) {
@@ -1856,15 +1969,16 @@ export class Engine {
           if (wh === h) continue;
           for (const c of [topCard(wh), ...wh.attachments]) {
             const atrig = this.registry.get(c.number)?.triggers?.onAnyDown;
-            if (atrig) runners.push({ run: atrig, opts: { playerIdx: pi, sourceCard: c, sourceHolomem: wh, downedInfo } });
+            if (atrig) anyRunners.push({ run: atrig, opts: { playerIdx: pi, sourceCard: c, sourceHolomem: wh, downedInfo } });
           }
         }
       }
-      const runNext = (i) => {
-        if (i >= runners.length) { finish(); return; }
-        this._runEffect({ run: runners[i].run }, runners[i].opts, () => runNext(i + 1));
+      const runAny = (i) => {
+        if (i >= anyRunners.length) { finish(); return; }
+        this._runEffect({ run: anyRunners[i].run }, anyRunners[i].opts, () => runAny(i + 1));
       };
-      runNext(0);
+      // 自身の onDown 群（所有者が順序選択）→ その後 onAnyDown 群を逐次（全体の順序は従来と同じ）
+      this._runOrderedTriggers(ownRunners, ownerIdx, () => runAny(0));
     };
 
     // 「（ホロメンが）ダウンした時に使える」推しスキル (11.3.1.1 / 12.1.5.2)
@@ -2063,7 +2177,7 @@ export class Engine {
    * アーツダメージ適用の直前に呼ぶ。使える割り込みを順に防御側へ決定ポイントとして提示し、最終ダメージで after を呼ぶ。
    * 無ければそのまま after(dmg)。特殊ダメージの割り込みは _offerDamageInterruptsGen（generator版）を使う。
    */
-  _offerDamageOshiSkill(targetHolomem, dmg, after, kind = 'arts') {
+  _offerDamageOshiSkill(targetHolomem, dmg, after, kind = 'arts', opts = {}) {
     const s = this.state;
     const defIdx = s.players.findIndex((p) => this._stageHolomems(p).includes(targetHolomem));
     // 攻撃はターンプレイヤー→相手。防御側はターンプレイヤーでない側のみ（自分のアーツの自爆等は対象外）
@@ -2075,6 +2189,9 @@ export class Engine {
       if (i >= responders.length) { after(curDmg); return; }
       const r = responders[i].build(curDmg);
       if (!r) { run(i + 1, curDmg); return; }
+      // 「このアーツダメージは軽減されない」(opts.noReduce) の時、ダメージ軽減型の割り込み（apply のみ）は無効化＝提示しない。
+      // 受け手差し替え(redirect)や副作用(run)はダメージ量を変えないので提示する。
+      if (opts.noReduce && r.apply && !r.run && !r.redirect) { run(i + 1, curDmg); return; }
       this.state.pending = {
         type: 'effectChoice',
         player: defIdx,

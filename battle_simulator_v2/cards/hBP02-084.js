@@ -7,6 +7,10 @@
 export default {
   number: 'hBP02-084',
   support: {
+    // デッキが0枚の時は（引けず・サイコロも振れず）何も起きないので使用不可 (Q551。デッキ2枚はQ550でOK)
+    canUse(ctx) {
+      return ctx.player.deck.length > 0;
+    },
     *run(ctx) {
       ctx.draw(2);
       const dice = (yield* ctx.rollDice());

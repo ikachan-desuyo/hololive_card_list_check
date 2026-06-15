@@ -58,7 +58,7 @@ export default {
     canUse(engine, ownerIdx) {
       const p = engine.state.players[ownerIdx];
       // 自分のセンターホロメンの色が緑
-      if (!p.center || p.center.stack[0].color !== '緑') return false;
+      if (!p.center || !engine._hasColor(p.center, '緑')) return false;
       // 相手のDebut以外のセンターホロメンが存在すること
       const opp = engine.state.players[1 - ownerIdx];
       if (!opp.center) return false;

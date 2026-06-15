@@ -10,7 +10,7 @@ export default {
   arts: {
     'SorAZ シンパシー': {
       dmgBonus(ctx) {
-        const hasAZKi = ctx.holomems('self', (e) => e.top?.name === 'AZKi').length > 0;
+        const hasAZKi = ctx.holomems('self', (e) => e.top && ctx.nameIs(e.top, 'AZKi')).length > 0;
         return hasAZKi ? 50 : 0;
       },
     },

@@ -19,10 +19,9 @@ export default {
   number: 'hBP03-003',
 
   oshiSkill: {
-    // アーカイブに〈35P〉が1枚もない時は空振りになるので使えない
-    canUse(engine, ownerIdx) {
-      const p = engine.state.players[ownerIdx];
-      return p.archive.some(is35P);
+    // アーカイブに〈35P〉が無くても宣言できる（Q300: 使用可・解決時に何もしない）。AIは空振りを避ける。
+    aiSkip(engine, ownerIdx) {
+      return !engine.state.players[ownerIdx].archive.some(is35P);
     },
     *run(ctx) {
       // 「振れる」=任意
@@ -48,7 +47,7 @@ export default {
     // センターホロメンの色が赤の時のみ使える
     canUse(engine, ownerIdx) {
       const p = engine.state.players[ownerIdx];
-      return !!p.center && p.center.stack[0].color === '赤';
+      return !!p.center && engine._hasColor(p.center, '赤');
     },
     *run(ctx) {
       // 手札を好きな枚数選んでデッキの下に戻す（「好きな枚数」=0枚も可）

@@ -34,12 +34,11 @@ export default {
     cost: 1,
     title: '推しスキル「IOFORIA~!」: エール1枚を他の#ID1期生に付け替えますか？',
     canUse(engine, defIdx, target) {
-      if (engine.state.turnPlayer === defIdx) return false; // 相手のターン限定
-      if (!(target.stack[0].tags || []).includes(ID1KISEI)) return false; // 対象が#ID1期生
-      if (target.cheers.length === 0) return false; // 付け替えるエールが必要
-      // 付け替え先（他の#ID1期生）がいること
-      return engine._stageHolomems(engine.state.players[defIdx])
-        .some((h) => h !== target && (h.stack[0].tags || []).includes(ID1KISEI));
+      if (engine.state.turnPlayer === defIdx) return false; // 相手のターン限定（使用条件）
+      if (!(target.stack[0].tags || []).includes(ID1KISEI)) return false; // 対象が#ID1期生（使用条件）
+      // 付け替えるエールや付け替え先が無くても使用可（ホロパワー支払い＝状態変化。Q431: 何もせず解決）。
+      // → 在庫チェックは外す（割り込みが提示され、無ければ run が何もしない）。
+      return true;
     },
     * run(ctx, { target }) {
       if (target.cheers.length === 0) return;

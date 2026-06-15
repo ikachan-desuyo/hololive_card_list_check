@@ -20,7 +20,7 @@ export default {
       const pool = [...looked];
       while (true) {
         const candidates = pool.filter(
-          (c) => c.kind === 'holomen' && NAMES.includes(c.name));
+          (c) => c.kind === 'holomen' && NAMES.some((n) => ctx.nameIs(c, n)));
         if (candidates.length === 0) break;
         const picked = yield ctx.chooseCard({
           cards: candidates,

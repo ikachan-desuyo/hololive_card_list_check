@@ -37,19 +37,15 @@ export default {
       if (archived === 0) return;
       ctx.log(`手札${archived}枚をアーカイブした`);
 
-      // アーカイブした枚数だけ、アーカイブの〈ろぼさー〉を手札に戻す
+      // Q530: アーカイブした枚数だけ、アーカイブの〈ろぼさー〉を手札に戻す（強制。候補があれば必ず戻す）
       for (let i = 0; i < archived; i++) {
         const cand = ctx.player.archive.filter((c) => c.name === 'ろぼさー');
         if (cand.length === 0) break;
-        const picked = yield ctx.chooseCard({
-          cards: cand,
-          title: `手札に戻す〈ろぼさー〉を選択（${i + 1}/${archived}）`,
-          optional: true,
-          skipLabel: 'ここまでにする',
-        });
-        if (!picked) break;
+        // 同名カードで機能差が無いため先頭を強制回収
+        const picked = cand[0];
         ctx.removeFromArchive(picked);
         ctx.addToHand(picked);
+        ctx.log(`いたずらしちゃうぞ～！: アーカイブの〈ろぼさー〉を手札に戻した（${i + 1}/${archived}）`);
       }
     },
   },

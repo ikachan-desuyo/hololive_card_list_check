@@ -25,9 +25,13 @@ export default {
       }
       // 送られたホロメンと同名の1stホロメンをアーカイブから手札へ
       const name = dest.holomem.stack[0].name;
+      // Q462: アーカイブの同名1stホロメン1枚を手札に戻す（強制。候補があれば必ず戻す）
       const cand = ctx.player.archive.filter((c) => c.kind === 'holomen' && c.bloomLevel === '1st' && c.name === name);
       if (cand.length === 0) return;
-      const back = yield ctx.chooseCard({ cards: cand, title: `手札に戻す〈${name}〉の1stホロメンを選択（任意）`, optional: true, skipLabel: '戻さない' });
+      // 候補が複数（別バージョン等）あればどれを戻すか選ぶ。戻すこと自体は強制（optionalにしない）。
+      const back = cand.length === 1
+        ? cand[0]
+        : yield ctx.chooseCard({ cards: cand, title: `手札に戻す〈${name}〉の1stホロメンを選択` });
       if (back) { ctx.removeFromArchive(back); ctx.addToHand(back, { reveal: false }); }
     },
   },

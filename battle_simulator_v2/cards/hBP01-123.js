@@ -14,6 +14,9 @@ export default {
     unlimited: true,
   },
   onDiceRollReact: {
+    // 「そのサイコロの結果をすべて無くし、はじめから振り直す」。多個振り(rollDiceMany)では
+    // バッチ単位で全て振り直す（engine が処理）。1個振りでは下の apply で1個を振り直す。
+    batchReroll: true,
     title: '野うさぎ同盟をアーカイブして、サイコロを振り直す？',
     yesLabel: 'アーカイブする（振り直し）',
     canUse(engine, info) {

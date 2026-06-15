@@ -10,6 +10,11 @@ export default {
   bloomEffect: {
     name: '新たな運命',
     *run(ctx) {
+      // Q54「DebutからBloomした時」: Bloom元（stack[1]）がDebutの場合のみ発動
+      if (ctx.sourceHolomem?.stack[1]?.bloomLevel !== 'Debut') {
+        ctx.log('発動条件を満たしていない（Debutからのブルームではない）');
+        return;
+      }
       const cand = ctx.deckCards((c) =>
         c.kind === 'holomen' &&
         !c.buzz &&

@@ -11,7 +11,9 @@
  *     好きな順でデッキの下に戻す（通常の「ステージ外移動は最上段のみ」(4.4.7)を上書きする明示効果）。
  *   - stack のカードはホロメンカードのみ。付いているエール / サポート（装着）は
  *     テキストに「デッキに戻す」記載が無く、ホロメンがステージを離れることで宙に浮くため
- *     アーカイブする（11.3.1.2 / 4.4.7 と同じ扱い）。
+ *     アーカイブする（11.3.1.2 / 4.4.7 と同じ扱い）。これは returnHolomemToDeck が行う。
+ *   - 「能力でデッキに戻った時」の誘発（推しステージスキル等）を発火させるため、
+ *     直接デッキへ戻さず ctx.returnHolomemToDeck 経由で戻す（Q584）。
  *   - 無色-1 はターン修正 artCostReduce(color:'無色') を〈赤井はあと〉全員に適用（毎回評価の match）。
  *   - 使用条件: バックに〈赤井はあと〉が1人以上いること。
  */
@@ -29,18 +31,16 @@ export default {
       });
       if (target) {
         const h = target.holomem;
-        // 重なっているホロメンカードすべて（stack）を好きな順でデッキの下に戻す
-        const stackCards = [...h.stack];
-        const ordered = yield* ctx.orderCardsFlow(stackCards, 'デッキの下に戻す順番');
-        // 付いていたエール・装着カードはアーカイブ（テキストに戻す記載が無く宙に浮くため）
-        if (h.cheers.length > 0 || h.attachments.length > 0) {
-          ctx.player.archive.push(...h.cheers, ...h.attachments);
-          ctx.log(`${stackCards[0].name} に付いていたエール/サポートをアーカイブ`);
-        }
-        // ステージから取り除いてからデッキの下へ
-        ctx.engine._removeHolomem(ctx.player, target.pos);
-        ctx.deckToBottom(ordered);
-        ctx.log(`${stackCards[0].name}（重なり${stackCards.length}枚）をデッキの下に戻した`);
+        const topName = h.stack[0].name;
+        const stackLen = h.stack.length;
+        // 重なっているホロメンカードすべて（stack）を好きな順でデッキの下に戻す。
+        // 順番を先に決めてから stack を並べ替え、能力によるデッキ戻し（推しステージスキル等の
+        // 「能力でデッキに戻った時」誘発：はあちゃまなう等）を発火させる returnHolomemToDeck 経由で戻す。Q584
+        const ordered = yield* ctx.orderCardsFlow([...h.stack], 'デッキの下に戻す順番');
+        h.stack = ordered; // returnHolomemToDeck は stack の順でデッキ下に積むため、宣言順を反映
+        // 付いていたエール・装着カードのアーカイブもエンジン側（returnHolomemToDeck）で行われる。
+        yield* ctx.returnHolomemToDeck(h, { bottom: true });
+        ctx.log(`${topName}（重なり${stackLen}枚）をデッキの下に戻した`);
       }
       // このターンの間、自分の〈赤井はあと〉全員のアーツ必要無色-1
       ctx.addTurnModifier({

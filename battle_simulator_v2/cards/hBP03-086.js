@@ -24,6 +24,11 @@ function isExtraUnlimitedDebut(ctx, c) {
 export default {
   number: 'hBP03-086',
   support: {
+    // ステージ満杯（6人）or 対象Debutがデッキに無い時は何も起きないので使用不可（一般ルールQ348）
+    canUse(ctx) {
+      return ctx.engine._stageCount(ctx.player) < 6
+        && ctx.player.deck.some((c) => isExtraUnlimitedDebut(ctx, c));
+    },
     *run(ctx) {
       // 1枚目（候補があれば必須。ステージに空きがあること）
       if (ctx.engine._stageCount(ctx.player) >= 6) {

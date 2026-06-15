@@ -37,6 +37,8 @@ export class EffectContext {
     this.downedHolomem = opts.downedHolomem || null;
     // onEnter 用: ステージに出たホロメンの情報 { holomem, card }
     this.enteredInfo = opts.enteredInfo || null;
+    // 傍観 onCollab 用: コラボしたホロメンの情報 { holomem, card }（hBP08-051「愛のエゴサ」）
+    this.collabInfo = opts.collabInfo || null;
     // onSpecialDamageDealt 用: 与えた特殊ダメージの情報 { source, target, amount }
     this.specialDealt = opts.specialDealt || null;
     // onReturnedToDeck 用: デッキに戻ったホロメンの情報 { cards }
@@ -231,19 +233,10 @@ export class EffectContext {
     this.engine.state.modifiers.push({
       duration: 'turn', kind: 'abilityDiceRoll', ownerIdx: this.playerIdx,
     });
-    let value = rollDie(this.engine.rng);
-    // diceFixed: 「目をNとして扱う」。m.batchOf があれば「1度にちょうど batchOf 個振る時」限定
-    // （hBP04-005「1度に3回振る時」）。rollDiceMany(n) が this._diceBatchSize=n を立てている間だけ一致する。
-    const fixed = this.engine.state.modifiers.find(
-      (m) => m.kind === 'diceFixed' && m.ownerIdx === this.playerIdx && !m.used
-        && (m.batchOf == null || m.batchOf === this._diceBatchSize));
-    if (fixed) {
-      this.log(`🎲 サイコロ: ${value} → ${fixed.value} として扱う（${fixed.description || '効果'}）`);
-      value = fixed.value;
-      if (fixed.once) fixed.used = true; // 「次に出る目」だけ＝一発消費（hSD01-002）
-    } else {
-      this.log(`🎲 サイコロ: ${value}`);
-    }
+    // diceFixed（「目をNとして扱う」＝左手に地図等の宣言。batchOf があれば「1度にちょうど N 個振る時」限定）は
+    // engine._rollDieFor が適用する。これにより V.7 等の直叩き経路とも共通の宣言値処理になる (Q221)。
+    let value = this.engine._rollDieFor(this.playerIdx, this._diceBatchSize);
+    this.log(`🎲 サイコロ: ${value}`);
     // 「目を倍として扱う」継続効果 (kind:'diceDouble')。発生源カード（推し含む）が match に合致したら倍化する (hBP08-045)
     const rollerCard = this.sourceCard || (this.sourceHolomem && this.sourceHolomem.stack[0]) || null;
     const dbl = this.engine.state.modifiers.find(
@@ -263,11 +256,45 @@ export class EffectContext {
    * 1個ずつの rollDice をそのまま n 回呼ぶので、ファン割り込み・回数カウント(abilityDiceRoll)も従来どおり働く。
    */
   *rollDiceMany(n) {
-    const results = [];
+    let results = [];
     const prev = this._diceBatchSize;
     this._diceBatchSize = n;
     try {
       for (let i = 0; i < n; i++) results.push(yield* this.rollDice());
+      // 多個振り(n>1)のときだけ、「結果をすべて無くして振り直す」型の割り込み（野うさぎ同盟 hBP01-123 等）を
+      // バッチ単位で提示する。使ったらファンをアーカイブし、n個まとめて振り直す（Q229）。
+      // ※1個振り(n<=1)では _offerDiceReact 側で従来どおり処理されるため、ここでは出さない（挙動不変）。
+      if (n > 1) {
+        const eng = this.engine;
+        let rerolled = true;
+        while (rerolled) {
+          rerolled = false;
+          for (const h of eng._stageHolomems(this.player)) {
+            for (const att of [...h.attachments]) {
+              const r = eng.registry.get(att.number)?.onDiceRollReact;
+              if (!r || !r.batchReroll) continue;
+              const info = { ownerIdx: this.playerIdx, roller: this.sourceHolomem, rollerCard: this.sourceCard, values: results, fanCard: att, fanHolomem: h };
+              if (r.canUse && !r.canUse(eng, info)) continue;
+              const use = yield {
+                kind: 'confirm', player: this.playerIdx, title: r.title,
+                buildOptions: () => [
+                  { id: 'yes', label: r.yesLabel || '使う', value: true },
+                  { id: 'no', label: '使わない', value: false },
+                ],
+              };
+              if (!use) continue;
+              const ai = h.attachments.indexOf(att);
+              if (ai !== -1) { h.attachments.splice(ai, 1); this.player.archive.push(att); }
+              this.log(`${att.name}: サイコロの結果をすべて無くして振り直す`);
+              results = [];
+              for (let i = 0; i < n; i++) results.push(yield* this.rollDice());
+              rerolled = true;
+              break;
+            }
+            if (rerolled) break;
+          }
+        }
+      }
     } finally {
       this._diceBatchSize = prev; // 入れ子・例外時も元に戻す
     }
@@ -299,6 +326,9 @@ export class EffectContext {
       for (const att of [...h.attachments]) { // apply で外れても走査が崩れないようスナップショット
         const r = eng.registry.get(att.number)?.onDiceRollReact;
         if (!r) continue;
+        // 「結果をすべて無くして振り直す」型(batchReroll)は、多個振りバッチ中はバッチ単位で処理する（rollDiceMany）。
+        // 単発ロール（バッチでない／1個振り）では従来どおりここで1個を振り直す（挙動不変。Q229）。
+        if (r.batchReroll && this._diceBatchSize > 1) continue;
         // roller=振っているホロメン（推しスキルの場合は null）/ rollerCard=振っている能力の発生源カード（推し含む）
         const info = { ownerIdx: this.playerIdx, roller: this.sourceHolomem, rollerCard: this.sourceCard, value, fanCard: att, fanHolomem: h };
         if (r.canUse && !r.canUse(eng, info)) continue;
@@ -644,6 +674,22 @@ export class EffectContext {
     return true;
   }
 
+  /**
+   * ホロメンをバックに出し、「ステージに出た時」の onEnter トリガー（hSD13-014「正義の旋律」等）を誘発する。
+   * ジェネレータ（`const placed = yield* ctx.putToBackWithTrigger(card)`）。出せなければ null、出せたら出したホロメンを返す。
+   * デッキ/アーカイブからの展開（手札の place 以外）でも onEnter を発火させたい時に使う (Q575)。
+   */
+  *putToBackWithTrigger(card) {
+    if (!this.putToBack(card)) return null;
+    const placed = this.player.back[this.player.back.length - 1];
+    const enteredInfo = { holomem: placed, card };
+    for (const wh of this.engine._stageHolomems(this.player)) {
+      const et = this.engine.registry.get(wh.stack[0].number)?.triggers?.onEnter;
+      if (et) yield* et(new EffectContext(this.engine, this.playerIdx, { sourceHolomem: wh, sourceCard: wh.stack[0], enteredInfo }));
+    }
+    return placed;
+  }
+
   /** エールをホロメンに付ける（送る 5.21） */
   attachCheer(cheer, holomem) {
     holomem.cheers.push(cheer);
@@ -745,8 +791,11 @@ export class EffectContext {
    * バトンタッチ等のシステムコストは opts.ability=false で呼び、置換を提示しない。
    */
   *archiveCheer(holomem, cheer, opts = {}) {
-    // 能力によるアーカイブ時のみ、自分のホロメンに付いた置換カードを提示
-    if (opts.ability !== false && this.engine._stageHolomems(this.player).includes(holomem)) {
+    // 能力によるアーカイブ時のみ、自分のホロメンに付いた置換カードを提示。
+    // ただし「このカードが付いているホロメン自身の能力」での捨て札限定 (Q357)。
+    // 他のホロメンの能力（例: フブラがぼたんのエールをアーカイブ）では身代わりにできない → sourceHolomem===holomem を要求。
+    if (opts.ability !== false && this.sourceHolomem === holomem
+        && this.engine._stageHolomems(this.player).includes(holomem)) {
       for (const att of [...holomem.attachments]) {
         const rep = this.engine.registry.get(att.number)?.cheerArchiveReplace;
         if (!rep) continue;
@@ -929,6 +978,17 @@ export class EffectContext {
       if (opts.noLifeOnDown) targetEntry.holomem.noLifeOnDown = true;
       // 「ダウンさせた時」トリガー（雪花ラミィSP推しスキル等）。ダウンしたホロメンを渡す
       this.engine._notifySourceDown(this.sourceHolomem, this.playerIdx, [targetEntry.holomem]);
+      // 発生源ホロメン本体＋装着カードの「（このホロメンが）相手をダウンさせた時」トリガー。
+      // 特殊ダメージ（ブルームエフェクト等）でのダウンも条件を満たす (Q207 hBP01-115)。
+      if (this.sourceHolomem && defIdx !== this.playerIdx) {
+        const downedInfo = { holomem: targetEntry.holomem, downedBySpecial: true };
+        const selfTrig = eng.registry.get(this.sourceHolomem.stack[0].number)?.triggers?.onOpponentDown;
+        if (selfTrig) yield* selfTrig(new EffectContext(eng, this.playerIdx, { sourceHolomem: this.sourceHolomem, sourceCard: this.sourceHolomem.stack[0], downedInfo }));
+        for (const att of this.sourceHolomem.attachments) {
+          const at = eng.registry.get(att.number)?.triggers?.onOpponentDown;
+          if (at) yield* at(new EffectContext(eng, this.playerIdx, { sourceHolomem: this.sourceHolomem, sourceCard: att, downedInfo }));
+        }
+      }
     }
     this.log(
       `${targetEntry.top.name} に特殊ダメージ${total}` +

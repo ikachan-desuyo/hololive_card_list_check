@@ -245,9 +245,16 @@ export class HeuristicAI {
           if (centerRemain <= 40 && backRemain > centerRemain + 30) score = 35;
           break;
         }
-        case 'oshiSkill':
+        case 'oshiSkill': {
+          // ルール上は対象不在でも推しスキルを宣言できる（コスト空振り）。
+          // 効果が無い（skillDef.aiSkip が true）スキルはAIは選ばない＝無駄なコスト消費を避ける。
+          const skill = p.oshi.oshiSkills?.[opt.skillIndex];
+          const odef = engine.registry.get(p.oshi.number);
+          const skillDef = skill?.sp ? odef?.spOshiSkill : odef?.oshiSkill;
+          if (skillDef?.aiSkip && skillDef.aiSkip(engine, engine.state.players.indexOf(p))) break;
           score = 18; // 実装済みスキルのみ提示される前提
           break;
+        }
         default:
           break;
       }

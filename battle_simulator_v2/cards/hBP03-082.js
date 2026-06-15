@@ -11,9 +11,10 @@ export default {
     name: 'ここが私のステージだから！',
     *run(ctx) {
       const dest = ctx.sourceHolomem;
-      // 自分のステージ上でエールが付いているホロメン（付け替え元の候補）
+      // 付け替え元の候補＝エールが付いている「dest（このホロメン）以外の」ホロメン。
+      // 付け替え元にこのホロメン自身は選べない（奏が1人だけなら付け替え不可。Q338）。
       const hasMovable = () =>
-        ctx.holomems('self').some((e) => e.holomem.cheers.length > 0);
+        ctx.holomems('self').some((e) => e.holomem !== dest && e.holomem.cheers.length > 0);
       if (!hasMovable()) return;
 
       // 最大2枚まで、1枚ずつ任意のホロメンから選んで dest に付け替える
@@ -26,7 +27,7 @@ export default {
         // 付け替え元のホロメンを選択（任意。1枚目はキャンセルで実行しない）
         const fromEntry = yield ctx.chooseHolomem({
           side: 'self',
-          filter: (e) => e.holomem.cheers.length > 0,
+          filter: (e) => e.holomem !== dest && e.holomem.cheers.length > 0,
           title: promptTitle,
           optional: true,
         });

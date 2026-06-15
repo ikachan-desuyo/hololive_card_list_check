@@ -740,6 +740,241 @@ export async function runTests() {
     assertEq(art.dmgBonus(ctx), 40, 'デッキから3枚アーカイブで+40になっていない');
   });
 
+  await testAsync('hBP07-008「もういっぺぇ」: 再アーツ保留中はコラボのアーツを挟めない（Q590）', async () => {
+    const e = await setupMainStep(deckMap, 109);
+    await e.registry.preload(['hBP07-008'], lib);
+    const s = e.state; s.turn = 3; s.turnPlayer = 0;
+    const p0 = s.players[0]; const p1 = s.players[1];
+    const watame = e._createHolomem(lib.getByNumber('hBP07-008'), 1);
+    const collab = e._createHolomem(fakeHolomen({ name: 'コラボ', arts: [{ name: 'A', dmg: '30', cost: [], tokkou: [], text: '' }] }), 1);
+    p0.center = watame; p0.collab = collab; p0.back = [];
+    p1.center = e._createHolomem(fakeHolomen({ name: '敵', hp: 200 }), 1); p1.collab = null; p1.back = [];
+    // 再アーツ修正＋「センターわためが1回目アーツを使った直後」を再現
+    s.modifiers.push({ duration: 'turn', kind: 'reArts', ownerIdx: 0, used: false, match: (hm) => hm === watame });
+    s.step = 'performance';
+    s.perfUsed = { center: true, collab: false };
+    watame.lastArtUsedIndex = 0;
+    s.reArtsPending = { zone: 'center' };
+    e._queuePerformancePending();
+    const acts = s.pending.options;
+    assert(acts.some((a) => a.kind === 'declineReArts'), '「もう1回使わない」の選択肢が無い');
+    assert(!acts.some((a) => a.kind === 'art' && a.zone === 'collab'), '再アーツ保留中なのにコラボのアーツが挟める（Q590違反）');
+    // 放棄するとコラボのアーツが解禁される
+    const decline = acts.find((a) => a.kind === 'declineReArts');
+    e.apply(decline.id);
+    assert(s.pending.options.some((a) => a.kind === 'art' && a.zone === 'collab'), '再アーツ放棄後にコラボのアーツが解禁されていない');
+  });
+
+  await testAsync('hBP01-123 野うさぎ同盟: 多個振りは「すべて振り直す」をバッチ単位で1回提示（Q229）', async () => {
+    const e = await setupMainStep(deckMap, 110);
+    await e.registry.preload(['hBP01-123'], lib);
+    const p0 = e.state.players[0];
+    const peko = e._createHolomem(fakeHolomen({ name: '兎田ぺこら' }), 1);
+    const fan = lib.getByNumber('hBP01-123');
+    peko.attachments.push(fan);
+    p0.center = peko;
+    const ctx = e._effectContext(0, { sourceHolomem: peko });
+    let confirmCount = 0;
+    const gen = ctx.rollDiceMany(3);
+    let r = gen.next();
+    while (!r.done) {
+      const opts = r.value.buildOptions();
+      confirmCount++;
+      // 1回目（バッチ振り直し）に yes、以降は no
+      const val = confirmCount === 1 ? opts.find((o) => o.value === true).value : opts.find((o) => o.value === false).value;
+      r = gen.next(val);
+    }
+    assertEq(r.value.length, 3, '3個の出目が返っていない');
+    assertEq(confirmCount, 1, '野うさぎの提示がバッチ単位で1回でない（per-dieで複数回出ている）');
+    assert(!peko.attachments.includes(fan), '野うさぎがアーカイブされていない');
+    assert(p0.archive.includes(fan), '野うさぎがアーカイブに置かれていない');
+  });
+
+  await testAsync('A3 同時誘発の順序選択: 2件以上で解決順を選べる／1件以下は決定ポイント無し', async () => {
+    const e = await setupMainStep(deckMap, 111);
+    const order = [];
+    const mk = (tag) => ({ run: function* () { order.push(tag); }, opts: { playerIdx: 0 }, label: tag });
+    e.state.pending = null;
+    // 1件: 決定ポイント無しで即実行（既存挙動と同一）
+    let done1 = false;
+    e._runOrderedTriggers([mk('X')], 0, () => { done1 = true; });
+    assert(done1, '1件のトリガーが実行されていない');
+    assertEq(order.join(','), 'X', '1件の実行結果が不正');
+    assert(!e.state.pending, '1件以下なのに順序選択の決定ポイントを出している（既存挙動が変わっている）');
+    // 2件: 順序選択の決定ポイントが出る。B→A の順で選ぶ
+    order.length = 0;
+    let done2 = false;
+    e._runOrderedTriggers([mk('A'), mk('B')], 0, () => { done2 = true; });
+    assert(e.state.pending && e.state.pending.options.length === 2, '2件同時誘発で順序選択が出ていない');
+    e.apply(e.state.pending.options.find((o) => o.label === 'B').id);
+    assert(done2, '順序選択の解決が完了していない');
+    assertEq(order.join(','), 'B,A', '選んだ順（B→A）で解決されていない');
+  });
+
+  await testAsync('hBP08-110 Takodachi: 一伊那尓栖センター時に相手センター/コラボを全色扱い（Q685-689）', async () => {
+    const e = await setupMainStep(deckMap, 112);
+    await e.registry.preload(['hBP08-110'], lib);
+    const p0 = e.state.players[0]; const p1 = e.state.players[1];
+    const ina = e._createHolomem(fakeHolomen({ name: '一伊那尓栖', color: '緑' }), 1);
+    const tako = lib.getByNumber('hBP08-110');
+    ina.attachments.push(tako);
+    p0.center = ina; p0.collab = null; p0.back = [];
+    const oppCenter = e._createHolomem(fakeHolomen({ name: '相手センター', color: '青' }), 1);
+    const oppBack = e._createHolomem(fakeHolomen({ name: '相手バック', color: '青' }), 1);
+    p1.center = oppCenter; p1.collab = null; p1.back = [oppBack];
+    // 付け先制限（一伊那尓栖のみ）
+    assert(e._canAttachSupport(ina, tako), 'Takodachiが一伊那尓栖に付けられない');
+    assert(!e._canAttachSupport(e._createHolomem(fakeHolomen({ name: '別' }), 1), tako), 'Takodachiが一伊那尓栖以外に付けられてしまう');
+    // アーツ+10
+    assertEq(e.effects.artsBonus(ina, 0), 10, 'Takodachiのアーツ+10が乗っていない');
+    // 全色扱い: 相手センターは全色扱い（緑を持つと判定）。バックは対象外。無色は含まない(Q685)
+    assert(e._isTreatedAllColors(oppCenter), '相手センターが全色扱いになっていない');
+    assert(e._hasColor(oppCenter, '緑'), '全色扱いの相手センターが緑を持つと判定されない');
+    assert(!e._isTreatedAllColors(oppBack), '相手バックまで全色扱いになっている（対象はセンター/コラボのみ）');
+    assert(!e._hasColor(oppCenter, '無色'), '全色扱いが無色まで含んでしまっている（Q685違反）');
+    // [センター限定]: 一伊那尓栖がバックなら無効
+    p0.center = null; p0.back = [ina];
+    assert(!e._isTreatedAllColors(oppCenter), 'センター限定なのにバックの一伊那尓栖で全色扱いになっている');
+  });
+
+  await testAsync('hBP06-003「迷ったらまず実行！」: 対象はBuzzホロメン(名前不問)＋Buzzから化けた風真いろは（Q501/Q502）', async () => {
+    const e = await setupMainStep(deckMap, 113);
+    await e.registry.preload(['hBP06-003'], lib);
+    e.state.turn = 3; e.state.turnPlayer = 0;
+    const p0 = e.state.players[0];
+    p0.oshi = { number: 'hBP06-003', name: '風真いろは' };
+    p0.holoPower = [fakeHolomen(), fakeHolomen()];
+    p0.usedOshiSkillThisTurn = 0;
+    // エールデッキに1枚
+    p0.cheerDeck = [{ id: 'cheer', number: 'c', name: '緑エール', kind: 'cheer', color: '緑' }];
+    // ① Buzzホロメン（風真いろは以外）→ 対象になる
+    const buzzOther = e._createHolomem(fakeHolomen({ name: '別Buzz', buzz: true }), 1);
+    // ② 非Buzzの〈風真いろは〉が Buzzの〈風真いろは〉の上 → 対象になる（土台をBuzzにして上に非Buzzを重ねる）
+    const irohaOverBuzz = e._createHolomem(fakeHolomen({ name: '風真いろは', buzz: true }), 1);
+    irohaOverBuzz.stack.unshift({ name: '風真いろは', buzz: false }); // top=非Buzz風真いろは, 真下=Buzz
+    // ③ 非Buzzの普通ホロメン → 対象外
+    const plain = e._createHolomem(fakeHolomen({ name: '普通', buzz: false }), 1);
+    p0.center = buzzOther; p0.collab = irohaOverBuzz; p0.back = [plain];
+
+    const def = e.registry.get('hBP06-003');
+    assert(def.oshiSkill.canUse(e, 0), '推しスキルが使えない（対象がいるのに）');
+    // run を1ステップ進めて chooseHolomem の候補（buildOptions）を取り出す
+    const gen = def.oshiSkill.run(e._effectContext(0, { sourceCard: p0.oshi }));
+    const req = gen.next().value;
+    assert(req && req.kind === 'chooseHolomem', '対象選択が出ていない');
+    const targets = req.buildOptions().filter((o) => o.value).map((o) => o.value.holomem);
+    assert(targets.includes(buzzOther), 'Buzzホロメン(風真いろは以外)が対象になっていない（Q502違反）');
+    assert(targets.includes(irohaOverBuzz), 'Buzzから化けた〈風真いろは〉が対象になっていない');
+    assert(!targets.includes(plain), '非Buzzの普通ホロメンが対象になってしまっている');
+  });
+
+  await testAsync('hBP03-001 推しスキル: 対象不在でも宣言可（Q296）＋AIは空振りを避ける(aiSkip)', async () => {
+    const e = await setupMainStep(deckMap, 114);
+    await e.registry.preload(['hBP03-001'], lib);
+    e.state.turn = 3; e.state.turnPlayer = 0;
+    const p0 = e.state.players[0];
+    p0.oshi = lib.getByNumber('hBP03-001');
+    p0.holoPower = [fakeHolomen(), fakeHolomen()];
+    p0.usedOshiSkillThisTurn = 0;
+    p0.deck = [fakeHolomen(), fakeHolomen()]; // デッキにパソコン無し
+    e._queueMainPending();
+    const skillAct = e.actions().find((a) => a.kind === 'oshiSkill');
+    assert(skillAct, '対象（パソコン）不在でも推しスキルが宣言できない（Q296違反）');
+    const def = e.registry.get('hBP03-001');
+    assert(def.oshiSkill.aiSkip(e, 0) === true, 'パソコン不在で aiSkip=true でない（AIが無駄撃ちしうる）');
+    p0.deck.push({ number: 'x', name: 'ゲーミングパソコン', kind: 'support', supportType: 'アイテム' });
+    assert(def.oshiSkill.aiSkip(e, 0) === false, 'パソコンがあるのに aiSkip=true になっている');
+  });
+
+  await testAsync('hBP03-087 コールアンドレスポンス: ホロメン1人/エール無しでは使えない（一般ルールQ348/Q344）', async () => {
+    const e = await setupMainStep(deckMap, 115);
+    await e.registry.preload(['hBP03-087'], lib);
+    const p0 = e.state.players[0];
+    const def = e.registry.get('hBP03-087');
+    const withCheer = e._createHolomem(fakeHolomen({ name: 'A' }), 1);
+    withCheer.cheers.push({ name: '青エール', kind: 'cheer', color: '青' });
+    const other = e._createHolomem(fakeHolomen({ name: 'B' }), 1);
+    const ctx = e._effectContext(0, {});
+    // ① ホロメン1人だけ（エール付き）→ 付け替え先が無いので使用不可
+    p0.center = withCheer; p0.collab = null; p0.back = [];
+    assert(!def.support.canUse(ctx), 'ホロメン1人だけなのに使用可になっている（Q344違反）');
+    // ② 2人＋一方にエール → 使用可
+    p0.back = [other];
+    assert(def.support.canUse(ctx), '2人＋エール付きなのに使用不可');
+    // ③ 2人だがエール無し → 何も起きないので使用不可
+    withCheer.cheers.length = 0;
+    assert(!def.support.canUse(ctx), 'エールが無いのに使用可になっている');
+  });
+
+  await testAsync('hBP07-051 TAKE YOUR TIME: 付け替え先は#Promise≠自分≠元の所有者（no-op付け替えを作らない）', async () => {
+    const e = await setupMainStep(deckMap, 116);
+    await e.registry.preload(['hBP07-051'], lib);
+    const p0 = e.state.players[0];
+    const kronii = e._createHolomem(fakeHolomen({ name: 'オーロ・クロニー', tags: ['EN', 'Promise'] }), 1);
+    const promiseY = e._createHolomem(fakeHolomen({ name: 'Y', tags: ['Promise'] }), 1);
+    const nonPromiseZ = e._createHolomem(fakeHolomen({ name: 'Z', tags: [] }), 1);
+    kronii.cheers.push({ name: 'クロのエール', kind: 'cheer', color: '青' });
+    promiseY.cheers.push({ name: 'Yのエール', kind: 'cheer', color: '青' });
+    p0.collab = kronii; p0.center = promiseY; p0.back = [nonPromiseZ];
+    const def = e.registry.get('hBP07-051');
+    const gen = def.collabEffect.run(e._effectContext(0, { sourceHolomem: kronii, sourceCard: kronii.stack[0] }));
+    let r = gen.next();          // confirm
+    assertEq(r.value.kind, 'confirm', 'confirm が出ていない');
+    r = gen.next(true);          // → chooseCard（付け替え可能なエール）
+    assertEq(r.value.kind, 'chooseCard', 'エール選択が出ていない');
+    const cheerNames = r.value.buildOptions().filter((o) => o.value).map((o) => o.value.name);
+    // クロニーのエールは送り先Y(≠自分・≠所有者クロニー・Promise)があるので候補。
+    // Yのエールは送り先が無い（他のPromiseはクロニー=自分のみ）ので候補外。
+    assert(cheerNames.includes('クロのエール'), 'クロニーのエールが付け替え候補に無い');
+    assert(!cheerNames.includes('Yのエール'), 'Yのエールが候補になっている（送り先が無いのに）');
+    // クロニーのエールを選ぶ → 付け替え先候補は Y のみ（自分・非Promise・所有者を除く）
+    const pick = r.value.buildOptions().find((o) => o.value && o.value.name === 'クロのエール');
+    r = gen.next(pick.value);
+    assertEq(r.value.kind, 'chooseHolomem', '付け替え先選択が出ていない');
+    const destNames = r.value.buildOptions().filter((o) => o.value).map((o) => o.value.top.name);
+    assertEq(destNames.join(','), 'Y', '付け替え先が Y のみになっていない（自分/非Promise/元の所有者が混入）');
+  });
+
+  await testAsync('hBP07-100 フロンティアスピリット: 何も起きない時は使えない（一般ルールQ348）', async () => {
+    const e = await setupMainStep(deckMap, 117);
+    await e.registry.preload(['hBP07-100'], lib);
+    const p0 = e.state.players[0];
+    const def = e.registry.get('hBP07-100');
+    p0.center = e._createHolomem(fakeHolomen({ name: 'AZKi' }), 1); // ステージにAZKi
+    p0.collab = null; p0.back = [];
+    const mkFS = () => ({ number: 'hBP07-100', name: 'フロンティアスピリット', kind: 'support', supportType: 'イベント' });
+    const ctx = e._effectContext(0, {});
+    // ① アーカイブにFS1枚・エール0枚・AZKi無し → 何も起きないので使用不可（ユーザー報告のケース）
+    p0.archive = [mkFS()];
+    assert(!def.support.canUse(ctx), 'FS1枚・エール0枚・アーカイブAZKi無しなのに使用可になっている');
+    // ② エールを足す（FS＋エール＋ステージAZKi）→ エールを送れるので使用可
+    p0.archive = [mkFS(), { number: 'c', name: '青エール', kind: 'cheer', color: '青' }];
+    assert(def.support.canUse(ctx), 'FS＋エール＋ステージAZKiで使用可にならない');
+    // ③ アーカイブに〈AZKi〉がいれば（手札に戻せるので）使用可
+    p0.archive = [{ number: 'azki', name: 'AZKi', kind: 'holomen', bloomLevel: 'Debut' }];
+    assert(def.support.canUse(ctx), 'アーカイブに〈AZKi〉がいるのに使用可にならない');
+  });
+
+  await testAsync('hBP07-056 時界を統べし者: このターン出た〈オーロ・クロニー〉はBloomできない', async () => {
+    const e = await setupMainStep(deckMap, 118);
+    await e.registry.preload(['hBP07-056'], lib);
+    const s = e.state; s.turnPlayer = 0;
+    const p0 = s.players[0];
+    const center = e._createHolomem(fakeHolomen({ name: 'オーロ・クロニー', bloomLevel: '2nd', hp: 200 }), s.turn);
+    center.stack.push({ name: 'オーロ・クロニー', bloomLevel: '1st', hp: 150, kind: 'holomen' }); // 真下に1st（Bloom素材）
+    const target = e._createHolomem(fakeHolomen({ name: 'オーロ・クロニー', bloomLevel: 'Debut', hp: 130 }), s.turn); // このターン出た
+    p0.center = center; p0.collab = null; p0.back = [target];
+    const def = e.registry.get('hBP07-056');
+    const drive = (gen) => { let r = gen.next(); while (!r.done) r = gen.next(null); };
+    // このターン出たtarget → Bloomされない
+    drive(def.triggers.onPerformanceStepStart(e._effectContext(0, { sourceHolomem: center, sourceCard: center.stack[0] })));
+    assertEq(target.stack[0].bloomLevel, 'Debut', 'このターン出たホロメンがBloomされてしまった（出たばかりは不可）');
+    // 前ターンに出ていれば Bloomできる
+    target.placedTurn = s.turn - 1;
+    drive(def.triggers.onPerformanceStepStart(e._effectContext(0, { sourceHolomem: center, sourceCard: center.stack[0] })));
+    assertEq(target.stack[0].bloomLevel, '1st', '前ターンに出たホロメンがBloomされていない');
+  });
+
   await testAsync('相手の手札ステップで自分の手札が増えない', async () => {
     const e = await setupMainStep(deckMap, 21); // P1(先攻)のメインステップ
     // P1のターンを終わらせてP2のターンへ

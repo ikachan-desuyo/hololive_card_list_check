@@ -20,7 +20,17 @@ export default {
   number: 'hBP07-100',
   support: {
     canUse(ctx) {
-      return !ctx.oncePerTurnUsed('hBP07-100:フロンティアスピリット');
+      // #魔法… ではなく「〈フロンティアスピリット〉はターンに1回しか使えない」
+      if (ctx.oncePerTurnUsed('hBP07-100:フロンティアスピリット')) return false;
+      const p = ctx.player;
+      // 効果が何か起きる時だけプレイ可能（一般ルールQ348）:
+      //  ① アーカイブに〈AZKi〉がいて手札に戻せる、または
+      //  ② アーカイブの〈フロンティアスピリット〉≥1 ＋ アーカイブのエール≥1 ＋ ステージに〈AZKi〉（エールを送れる）
+      const canReturnAzki = p.archive.some((c) => c.kind === 'holomen' && c.name === 'AZKi');
+      const canSendCheer = p.archive.some((c) => c.name === 'フロンティアスピリット')
+        && p.archive.some((c) => c.kind === 'cheer')
+        && ctx.holomems('self', (e) => e.top.name === 'AZKi').length > 0;
+      return canReturnAzki || canSendCheer;
     },
     *run(ctx) {
       ctx.markOncePerTurn('hBP07-100:フロンティアスピリット');

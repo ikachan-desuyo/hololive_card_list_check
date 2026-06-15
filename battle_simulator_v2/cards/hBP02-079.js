@@ -8,23 +8,20 @@
  * 実装メモ:
  *   - 特殊ダメージ20 + noLifeOnDown は yield* ctx.dealSpecialDamage(target, 20, {noLifeOnDown:true}) で表現。
  *     （dealSpecialDamage はダウン確定時のみ noLifeOnDown を立てる仕様）
- *   - 「自分の#魔法を持つイベントはターンに1回しか使えない」は、#魔法 イベント全体で共有する
- *     ターン1回キー（MAGIC_EVENT_KEY）で制限する。同キーを使う他の #魔法 イベントとも排他になる。
- *     canUse で既使用なら不可、run の冒頭でマークする。
+ *   - 「自分の#魔法を持つイベントはターンに1回しか使えない」は、このターンに使った
+ *     #魔法イベントの枚数（countSupportThisTurn）で制限する。魔法のタンス(hBP02-083)等
+ *     他の #魔法 イベントと相互排他になる（どちらを先に使っても他方が使えなくなる）。
  */
-const MAGIC_EVENT_KEY = '#魔法イベント:ターン1回';
-
 export default {
   number: 'hBP02-079',
   support: {
     canUse(ctx) {
-      // #魔法 イベントはこのターン未使用であること
-      if (ctx.oncePerTurnUsed(MAGIC_EVENT_KEY)) return false;
+      // #魔法 イベントはこのターン未使用であること（タンス等と共通の数え方で相互排他）
+      if (ctx.countSupportThisTurn((c) => (c.tags || []).includes('魔法') && c.supportType === 'イベント') > 0) return false;
       // 相手のセンター/コラボが対象（最低1人いること）
       return ctx.holomems('opp', (e) => e.pos.zone === 'center' || e.pos.zone === 'collab').length > 0;
     },
     *run(ctx) {
-      ctx.markOncePerTurn(MAGIC_EVENT_KEY);
       const target = yield ctx.chooseHolomem({
         side: 'opp',
         filter: (e) => e.pos.zone === 'center' || e.pos.zone === 'collab',

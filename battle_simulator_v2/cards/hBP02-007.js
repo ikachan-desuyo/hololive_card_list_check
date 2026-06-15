@@ -26,14 +26,12 @@ export default {
 
   oshiSkill: {
     name: 'サンプリング',
-    canUse(engine, ownerIdx) {
+    // 手札0/1枚でも宣言できる（Q237: 使用可・2枚アーカイブできなければ何もせず終了）。
+    // コスト/[ターン1回]はエンジンが処理。AIは空振り（手札2枚未満／アーカイブに#ENホロメン無し）を避ける。
+    aiSkip(engine, ownerIdx) {
       const p = engine.state.players[ownerIdx];
-      // 手札が2枚以上（コストとして2枚アーカイブする）
-      if (p.hand.length < 2) return false;
-      // アーカイブに #EN を持つホロメンが1枚以上
-      return p.archive.some(
-        (c) => c.kind === 'holomen' && (c.tags || []).includes('EN'),
-      );
+      return p.hand.length < 2 || !p.archive.some(
+        (c) => c.kind === 'holomen' && (c.tags || []).includes('EN'));
     },
     *run(ctx) {
       // コスト: 手札2枚をアーカイブ
