@@ -135,6 +135,19 @@ export async function runTests() {
     assertEq(d.cheerDeck[0].name, d.cheerDeck[1].name, 'コピーの内容は同一であるべき');
   });
 
+  test('デッキ構築: 同一カードナンバー4枚制限（エクストラ「何枚でも」は例外）', () => {
+    const oshi = 'hBP04-004_OSR';
+    // 違反: 非エクストラのサポート（ルイ友 hBP08-109）を5枚 → 4枚制限エラー
+    const illegal = { [oshi]: 1, 'hBP04-043_C': 45, 'hBP08-109_C': 5, 'hY04-001_C': 20 };
+    const dBad = lib.buildGameDeck(illegal);
+    assert(dBad.errors.some((e) => e.includes('4枚まで')),
+      `非エクストラ5枚が4枚制限で弾かれていない: ${dBad.errors.join(' / ')}`);
+    // 合法: 非エクストラは4枚以内、残りはエクストラ（雪花ラミィ=デッキに何枚でも）で埋める
+    const legal = { [oshi]: 1, 'hBP04-043_C': 46, 'hBP08-109_C': 4, 'hY04-001_C': 20 };
+    const dOk = lib.buildGameDeck(legal);
+    assertEq(dOk.errors.length, 0, `合法デッキ（エクストラ46枚+通常4枚）でエラー: ${dOk.errors.join(' / ')}`);
+  });
+
   test('デッキ構築: カードID配列・構造化形式も受け付ける（デッキビルダー保存形式の互換）', () => {
     // 配列形式（デッキビルダーが localStorage に保存する形）。以前は Object.entries が添字を拾い
     // 「カードが見つかりません: 0」になっていた回帰を防ぐ。
@@ -464,6 +477,72 @@ export async function runTests() {
     const bonusBack = e.effects.specialDamageBonus(lamy, { pos: { zone: 'back' }, holomem: shion, top: shion.stack[0] }, 0);
     assertEq(bonusCenter, 20, '雪民2枚で相手センターへの特殊ダメージ+20になっていない');
     assertEq(bonusBack, 0, 'センター以外なのに修正が乗っている');
+  });
+
+  await testAsync('hBP08-109 ルイ友: 〈鷹嶺ルイ〉だけに付けられる（コンパイラの付け先制限）', async () => {
+    const e = await setupMainStep(deckMap, 106);
+    await e.registry.preload(['hBP08-109'], lib);
+    const def = e.registry.get('hBP08-109');
+    assert(def, 'ルイ友がコンパイル/登録されていない');
+    assert(def.attachRule, 'ルイ友に付け先ルール(attachRule)が生成されていない');
+    const fanCard = lib.getByNumber('hBP08-109'); // ファン本体（supportType: ファン）
+    const lui = e._createHolomem(fakeHolomen({ name: '鷹嶺ルイ' }), 1);
+    const other = e._createHolomem(fakeHolomen({ name: '別のホロメン' }), 1);
+    assert(e._canAttachSupport(lui, fanCard), 'ルイ友が〈鷹嶺ルイ〉に付けられない');
+    assert(!e._canAttachSupport(other, fanCard), 'ルイ友が〈鷹嶺ルイ〉以外にも付けられてしまう（バグ）');
+  });
+
+  await testAsync('hBP08-109 ルイ友: メインのプレイ候補は〈鷹嶺ルイ〉への付けだけ（シオン等には出せない）', async () => {
+    const e = await setupMainStep(deckMap, 107);
+    await e.registry.preload(['hBP08-109'], lib);
+    e.state.turn = 3;
+    const p0 = e.state.players[0];
+    // 実カードで再現: センター鷹嶺ルイ2nd(hBP08-067) / コラボ紫咲シオン2nd(hBP02-047)
+    p0.center = e._createHolomem(lib.getByNumber('hBP08-067'), 1);
+    p0.collab = e._createHolomem(lib.getByNumber('hBP02-047'), 1);
+    p0.back = [e._createHolomem(fakeHolomen({ name: '別ホロメン' }), 1)];
+    const fan = lib.getByNumber('hBP08-109');
+    p0.hand.push(fan);
+    e._queueMainPending();
+    const acts = e.actions().filter((a) => a.handIndex != null && p0.hand[a.handIndex] === fan);
+    const genericActs = acts.filter((a) => a.kind === 'support');
+    const attachActs = acts.filter((a) => a.kind === 'supportAttach');
+    assertEq(genericActs.length, 0, 'ルイ友が汎用サポート（場のどこにでも出せる）扱いになっている（バグ）');
+    assert(attachActs.length > 0, 'ルイ友の付けアクションが生成されていない');
+    for (const a of attachActs) {
+      const h = e._holomemAt(p0, a.pos);
+      assertEq(h.stack[0].name, '鷹嶺ルイ', `ルイ友が〈${h.stack[0].name}〉に付けられてしまう（鷹嶺ルイ以外）`);
+    }
+  });
+
+  await testAsync('hBP07-100 フロンティアスピリット: エールは〈AZKi〉1人にまとめて送る（複数人に分けられない）', async () => {
+    const e = await setupMainStep(deckMap, 108);
+    await e.registry.preload(['hBP07-100'], lib);
+    e.state.turn = 3;
+    const p0 = e.state.players[0];
+    // ステージに AZKi 2人（分散できてしまうとバグ）
+    const azki1 = e._createHolomem(fakeHolomen({ name: 'AZKi' }), 1);
+    const azki2 = e._createHolomem(fakeHolomen({ name: 'AZKi' }), 1);
+    p0.center = azki1; p0.collab = azki2; p0.back = [];
+    // アーカイブ: フロンティアスピリット2枚 + エール3枚（戻す用のアーカイブAZKiは置かない）
+    const mkFS = () => ({ number: 'hBP07-100', name: 'フロンティアスピリット', kind: 'support', supportType: 'イベント' });
+    const mkCheer = () => ({ number: 'hY-cheer', name: '白エール', kind: 'cheer', color: '白' });
+    p0.archive.push(mkFS(), mkFS(), mkCheer(), mkCheer(), mkCheer());
+    const card = lib.getByNumber('hBP07-100');
+    p0.hand.push(card);
+    e._queueMainPending();
+    const action = e.actions().find((a) => a.handIndex != null && p0.hand[a.handIndex] === card);
+    assert(action, 'フロンティアスピリットをプレイできない');
+    e.apply(action.id);
+    // 駆動: 送り先〈AZKi〉(chooseHolomem)の出現回数を数える。各選択は options[0] を選ぶ
+    let holomemPrompts = 0, guard = 0;
+    while (e.state.pending && e.state.pending.type === 'effectChoice' && guard++ < 30) {
+      if (e.state.pending.request?.kind === 'chooseHolomem') holomemPrompts++;
+      e.apply(e.state.pending.options[0].id);
+    }
+    assertEq(holomemPrompts, 1, '送り先〈AZKi〉の選択が複数回出た（複数人に分けて送れてしまう）');
+    assertEq(azki1.cheers.length, 2, '〈AZKi〉1人にエール2枚（FS2枚ぶん）が送られていない');
+    assertEq(azki2.cheers.length, 0, '別の〈AZKi〉にエールが分散している');
   });
 
   await testAsync('だいふく: アーツ+10とラミィ限定HP+20（実効HP）', async () => {

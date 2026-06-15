@@ -22,6 +22,15 @@ export const CardKind = {
   CHEER: 'cheer',
 };
 
+/**
+ * 制限カードリスト（デッキ構築ルール §4 / 公式デッキ構築ルールページ）: デッキに1枚まで。
+ * カードナンバー → 表示名。新しい制限が出たらここに追記する。
+ */
+export const DECK_LIMIT_1 = {
+  'hBP01-030': 'IRyS',
+  'hBP07-101': 'ASMRマイク',
+};
+
 function parseTokkou(tokkouList) {
   // 例: ['紫+50'] → [{ color: '紫', value: 50 }]
   if (!Array.isArray(tokkouList)) return [];
@@ -237,6 +246,24 @@ export class CardLibrary {
     if (!oshi) errors.push('推しホロメンがありません');
     if (deck.length !== 50) errors.push(`デッキは50枚必要です（現在 ${deck.length}枚）`);
     if (cheerDeck.length !== 20) errors.push(`エールデッキは20枚必要です（現在 ${cheerDeck.length}枚）`);
+
+    // メインデッキの同一カードナンバー枚数制限（デッキ構築ルール §4 / 6.1）:
+    //  ・通常は同番号4枚まで。
+    //  ・エクストラ能力「デッキに何枚でも入れられる」(card.unlimitedInDeck) を持つカードは例外（無制限）。
+    //  ・制限カードリストのカードは1枚まで。
+    const tally = new Map(); // number -> { count, name, unlimited }
+    for (const c of deck) {
+      const t = tally.get(c.number) || { count: 0, name: c.name, unlimited: !!c.unlimitedInDeck };
+      t.count++;
+      tally.set(c.number, t);
+    }
+    for (const [number, t] of tally) {
+      if (DECK_LIMIT_1[number]) {
+        if (t.count > 1) errors.push(`「${t.name}」(${number}) はデッキに1枚までです（制限カード・現在 ${t.count}枚）`);
+      } else if (!t.unlimited && t.count > 4) {
+        errors.push(`「${t.name}」(${number}) は同一カードナンバー4枚までです（現在 ${t.count}枚）`);
+      }
+    }
 
     return { oshi, deck, cheerDeck, errors };
   }
