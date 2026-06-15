@@ -515,6 +515,36 @@ export async function runTests() {
     }
   });
 
+  await testAsync('hBP07-100 フロンティアスピリット: エールは〈AZKi〉1人にまとめて送る（複数人に分けられない）', async () => {
+    const e = await setupMainStep(deckMap, 108);
+    await e.registry.preload(['hBP07-100'], lib);
+    e.state.turn = 3;
+    const p0 = e.state.players[0];
+    // ステージに AZKi 2人（分散できてしまうとバグ）
+    const azki1 = e._createHolomem(fakeHolomen({ name: 'AZKi' }), 1);
+    const azki2 = e._createHolomem(fakeHolomen({ name: 'AZKi' }), 1);
+    p0.center = azki1; p0.collab = azki2; p0.back = [];
+    // アーカイブ: フロンティアスピリット2枚 + エール3枚（戻す用のアーカイブAZKiは置かない）
+    const mkFS = () => ({ number: 'hBP07-100', name: 'フロンティアスピリット', kind: 'support', supportType: 'イベント' });
+    const mkCheer = () => ({ number: 'hY-cheer', name: '白エール', kind: 'cheer', color: '白' });
+    p0.archive.push(mkFS(), mkFS(), mkCheer(), mkCheer(), mkCheer());
+    const card = lib.getByNumber('hBP07-100');
+    p0.hand.push(card);
+    e._queueMainPending();
+    const action = e.actions().find((a) => a.handIndex != null && p0.hand[a.handIndex] === card);
+    assert(action, 'フロンティアスピリットをプレイできない');
+    e.apply(action.id);
+    // 駆動: 送り先〈AZKi〉(chooseHolomem)の出現回数を数える。各選択は options[0] を選ぶ
+    let holomemPrompts = 0, guard = 0;
+    while (e.state.pending && e.state.pending.type === 'effectChoice' && guard++ < 30) {
+      if (e.state.pending.request?.kind === 'chooseHolomem') holomemPrompts++;
+      e.apply(e.state.pending.options[0].id);
+    }
+    assertEq(holomemPrompts, 1, '送り先〈AZKi〉の選択が複数回出た（複数人に分けて送れてしまう）');
+    assertEq(azki1.cheers.length, 2, '〈AZKi〉1人にエール2枚（FS2枚ぶん）が送られていない');
+    assertEq(azki2.cheers.length, 0, '別の〈AZKi〉にエールが分散している');
+  });
+
   await testAsync('だいふく: アーツ+10とラミィ限定HP+20（実効HP）', async () => {
     const e = await setupMainStep(deckMap, 14);
     const p = e.state.players[0];

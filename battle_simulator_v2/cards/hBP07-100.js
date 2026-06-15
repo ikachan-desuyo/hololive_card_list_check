@@ -10,10 +10,11 @@
  * 実装方針:
  *   - 「ターンに1回しか使えない」は名称指定の制限。oncePerTurnUsed/markOncePerTurn で実装。
  *   - 前段: アーカイブの〈AZKi〉（名称一致）を1枚選んで手札に戻す（いなければスキップ）。
- *   - 後段: アーカイブの〈フロンティアスピリット〉の枚数ぶん、
- *     アーカイブのエール1枚をステージの〈AZKi〉1人へ送る処理を繰り返す。
+ *   - 後段: アーカイブの〈フロンティアスピリット〉の枚数ぶん、アーカイブのエールを
+ *     ステージの〈AZKi〉「1人」へまとめて送る。送り先は最初に1人だけ確定し、
+ *     全エールを同じ〈AZKi〉へ送る（「〈AZKi〉1人に送る」＝複数人に分けて送れない）。
  *     ※この処理時点でプレイ中のこのカード自身はまだアーカイブにいないため、枚数に数えない。
- *     ※送り先〈AZKi〉やアーカイブのエールが尽きたら、可能な分だけ送って終了する。
+ *     ※アーカイブのエールが尽きたら、可能な分だけ送って終了する。
  */
 export default {
   number: 'hBP07-100',
@@ -45,28 +46,29 @@ export default {
         (c) => c.name === 'フロンティアスピリット').length;
       if (fsCount === 0) return;
 
-      const onStageAzki = () => ctx.holomems('self', (e) => e.top.name === 'AZKi');
-      if (onStageAzki().length === 0) {
+      if (ctx.holomems('self', (e) => e.top.name === 'AZKi').length === 0) {
         ctx.log('ステージに〈AZKi〉がいないため、エールを送れない');
         return;
       }
+
+      // 送り先〈AZKi〉は「1人」だけ先に確定し、全エールを同じ〈AZKi〉へ送る（複数人に分けない）
+      const target = yield ctx.chooseHolomem({
+        side: 'self',
+        filter: (e) => e.top.name === 'AZKi',
+        title: 'エールを送る〈AZKi〉1人を選択',
+      });
+      if (!target) return;
 
       for (let i = 0; i < fsCount; i++) {
         const cheers = ctx.player.archive.filter((c) => c.kind === 'cheer');
         if (cheers.length === 0) break;
         const cheer = yield ctx.chooseCard({
           cards: cheers,
-          title: `〈AZKi〉に送るエールを選択（アーカイブ・${i + 1}/${fsCount}）`,
+          title: `〈${target.top.name}〉に送るエールを選択（アーカイブ・${i + 1}/${fsCount}）`,
         });
         if (!cheer) break;
-        const entry = yield ctx.chooseHolomem({
-          side: 'self',
-          filter: (e) => e.top.name === 'AZKi',
-          title: 'エールを送る〈AZKi〉を選択',
-        });
-        if (!entry) break;
         ctx.removeFromArchive(cheer);
-        ctx.attachCheer(cheer, entry.holomem);
+        ctx.attachCheer(cheer, target.holomem);
       }
     },
   },
