@@ -14,7 +14,7 @@
 
 import { COLORLESS, STAGE_LIMIT, MULLIGAN_LIMIT, INITIAL_HAND, STEP_NAMES, LOSS_REASONS } from './constants.js';
 import { CardKind } from './cards.js';
-import { createRng, shuffle } from './rng.js';
+import { createRng, shuffle, rollDie } from './rng.js';
 import { EffectContext } from './effects/context.js';
 import { EffectSystem } from './effects/system.js';
 import { EffectRegistry } from './effects/registry.js';
@@ -212,6 +212,23 @@ export class Engine {
    */
   _nameIs(card, name) {
     return !!card && (card.name === name || (card.nameAliases || []).includes(name));
+  }
+
+  /**
+   * サイコロを1個振る（出目を返す）。「目をNとして扱う」継続効果 (diceFixed) を ownerIdx に対して適用する。
+   * 「左手に地図」等で宣言された出目は、ctx.rollDice 以外の経路（V.7 等のリアクティブ割り込み）でも反映される (Q221)。
+   * ※ファンの振り直し割り込み(onDiceRollReact)や diceDouble は含まない（それらは ctx.rollDice 側で扱う）。
+   */
+  _rollDieFor(ownerIdx, batchSize = undefined) {
+    let value = rollDie(this.rng);
+    const fixed = this.state.modifiers.find(
+      (m) => m.kind === 'diceFixed' && m.ownerIdx === ownerIdx && !m.used
+        && (m.batchOf == null || m.batchOf === batchSize));
+    if (fixed) {
+      value = fixed.value;
+      if (fixed.once) fixed.used = true;
+    }
+    return value;
   }
 
   /**
@@ -880,6 +897,7 @@ export class Engine {
     }
     s.step = 'performance';
     s.perfUsed = { center: false, collab: false };
+    s.reArtsPending = null; // 再アーツ「もう1回」の保留状態（Q590: 1回目直後は他アーツを挟ませない）
     // 「相手のパフォーマンスステップに自分のライフが減っていたら」判定用に開始時ライフを記録
     s.lifeAtPerfStart = [s.players[0].life.length, s.players[1].life.length];
     this.log(`【${STEP_NAMES.performance}】`);
@@ -1044,6 +1062,14 @@ export class Engine {
           if (art) pushArtActions(h, zone, art, h.lastArtUsedIndex, true);
         }
       }
+    }
+
+    // Q590: 再アーツ「もう1回」の保留中は、再アーツを使う/使わないを決めるまで他のアーツを挟めない。
+    //   該当ホロメンの再アーツ（reArts:true）のみ提示し、「もう1回使わない」で放棄できる。
+    if (s.reArtsPending) {
+      const reActions = actions.filter((a) => a.kind === 'art' && a.reArts && a.zone === s.reArtsPending.zone);
+      reActions.push({ id: 'declineReArts', label: '同じアーツをもう1回使わない', kind: 'declineReArts' });
+      return reActions;
     }
 
     actions.push({ id: 'pass', label: 'エンドステップへ', kind: 'pass' });
@@ -1528,6 +1554,18 @@ export class Engine {
 
   _executePerformanceAction(action) {
     const s = this.state;
+    // Q590: 再アーツ「もう1回」を放棄する。対応する reArts 修正を使用済みにして通常のパフォーマンスに戻る。
+    if (action.kind === 'declineReArts') {
+      const h = s.reArtsPending ? s.players[s.turnPlayer][s.reArtsPending.zone] : null;
+      if (h) {
+        const reMod = s.modifiers.find(
+          (m) => m.kind === 'reArts' && !m.used && m.ownerIdx === s.turnPlayer && m.match?.(h));
+        if (reMod) reMod.used = true;
+      }
+      s.reArtsPending = null;
+      this._queuePerformancePending();
+      return;
+    }
     if (action.kind === 'pass') {
       // パフォーマンスステップ終了時：防御側（非ターンプレイヤー）の onOpponentPerformanceEnd を実行
       const defIdx = 1 - s.turnPlayer;
@@ -1573,6 +1611,12 @@ export class Engine {
       const reMod = s.modifiers.find(
         (m) => m.kind === 'reArts' && !m.used && m.ownerIdx === s.turnPlayer && m.match?.(h));
       if (reMod) reMod.used = true;
+      s.reArtsPending = null; // 再アーツを使い切った（Q590）
+    } else {
+      // 1回目のアーツ。「もう1回」修正を持つなら、再アーツの可否を決めるまで保留（他アーツを挟ませない Q590）
+      const reMod = s.modifiers.find(
+        (m) => m.kind === 'reArts' && !m.used && m.ownerIdx === s.turnPlayer && m.match?.(h));
+      s.reArtsPending = reMod ? { zone: action.zone } : null;
     }
     this.log(`${card.name} のアーツ「${art.name}」！${action.reArts ? '（再アーツ）' : ''}`);
 

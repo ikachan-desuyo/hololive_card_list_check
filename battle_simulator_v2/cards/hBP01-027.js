@@ -11,8 +11,6 @@
  *     [ターンに1回]振るのを選んだら、奇数で受けるダメージを0にする。相手ターンの被弾のみ engine が提示
  *     （アーツ／特殊どちらの経路でも _collectDamageResponders 経由で提示される）。
  */
-import { rollDie } from '../core/rng.js';
-
 export default {
   number: 'hBP01-027',
   arts: {
@@ -38,7 +36,7 @@ export default {
     },
     apply(engine, info) {
       engine.state.modifiers.push({ duration: 'turn', kind: 'oncePerTurnUsed', key: 'hBP01-027:v7', ownerIdx: info.defIdx });
-      const v = rollDie(engine.rng);
+      const v = engine._rollDieFor(info.defIdx); // 「左手に地図」等の宣言値(diceFixed)も反映 (Q221)
       const negated = v % 2 === 1;
       engine.log(`V.7: サイコロ ${v} → ${negated ? 'そのダメージを受けない' : 'ダメージはそのまま'}`);
       return negated ? 0 : info.dmg;

@@ -740,6 +740,31 @@ export async function runTests() {
     assertEq(art.dmgBonus(ctx), 40, 'デッキから3枚アーカイブで+40になっていない');
   });
 
+  await testAsync('hBP07-008「もういっぺぇ」: 再アーツ保留中はコラボのアーツを挟めない（Q590）', async () => {
+    const e = await setupMainStep(deckMap, 109);
+    await e.registry.preload(['hBP07-008'], lib);
+    const s = e.state; s.turn = 3; s.turnPlayer = 0;
+    const p0 = s.players[0]; const p1 = s.players[1];
+    const watame = e._createHolomem(lib.getByNumber('hBP07-008'), 1);
+    const collab = e._createHolomem(fakeHolomen({ name: 'コラボ', arts: [{ name: 'A', dmg: '30', cost: [], tokkou: [], text: '' }] }), 1);
+    p0.center = watame; p0.collab = collab; p0.back = [];
+    p1.center = e._createHolomem(fakeHolomen({ name: '敵', hp: 200 }), 1); p1.collab = null; p1.back = [];
+    // 再アーツ修正＋「センターわためが1回目アーツを使った直後」を再現
+    s.modifiers.push({ duration: 'turn', kind: 'reArts', ownerIdx: 0, used: false, match: (hm) => hm === watame });
+    s.step = 'performance';
+    s.perfUsed = { center: true, collab: false };
+    watame.lastArtUsedIndex = 0;
+    s.reArtsPending = { zone: 'center' };
+    e._queuePerformancePending();
+    const acts = s.pending.options;
+    assert(acts.some((a) => a.kind === 'declineReArts'), '「もう1回使わない」の選択肢が無い');
+    assert(!acts.some((a) => a.kind === 'art' && a.zone === 'collab'), '再アーツ保留中なのにコラボのアーツが挟める（Q590違反）');
+    // 放棄するとコラボのアーツが解禁される
+    const decline = acts.find((a) => a.kind === 'declineReArts');
+    e.apply(decline.id);
+    assert(s.pending.options.some((a) => a.kind === 'art' && a.zone === 'collab'), '再アーツ放棄後にコラボのアーツが解禁されていない');
+  });
+
   await testAsync('相手の手札ステップで自分の手札が増えない', async () => {
     const e = await setupMainStep(deckMap, 21); // P1(先攻)のメインステップ
     // P1のターンを終わらせてP2のターンへ

@@ -231,19 +231,10 @@ export class EffectContext {
     this.engine.state.modifiers.push({
       duration: 'turn', kind: 'abilityDiceRoll', ownerIdx: this.playerIdx,
     });
-    let value = rollDie(this.engine.rng);
-    // diceFixed: 「目をNとして扱う」。m.batchOf があれば「1度にちょうど batchOf 個振る時」限定
-    // （hBP04-005「1度に3回振る時」）。rollDiceMany(n) が this._diceBatchSize=n を立てている間だけ一致する。
-    const fixed = this.engine.state.modifiers.find(
-      (m) => m.kind === 'diceFixed' && m.ownerIdx === this.playerIdx && !m.used
-        && (m.batchOf == null || m.batchOf === this._diceBatchSize));
-    if (fixed) {
-      this.log(`🎲 サイコロ: ${value} → ${fixed.value} として扱う（${fixed.description || '効果'}）`);
-      value = fixed.value;
-      if (fixed.once) fixed.used = true; // 「次に出る目」だけ＝一発消費（hSD01-002）
-    } else {
-      this.log(`🎲 サイコロ: ${value}`);
-    }
+    // diceFixed（「目をNとして扱う」＝左手に地図等の宣言。batchOf があれば「1度にちょうど N 個振る時」限定）は
+    // engine._rollDieFor が適用する。これにより V.7 等の直叩き経路とも共通の宣言値処理になる (Q221)。
+    let value = this.engine._rollDieFor(this.playerIdx, this._diceBatchSize);
+    this.log(`🎲 サイコロ: ${value}`);
     // 「目を倍として扱う」継続効果 (kind:'diceDouble')。発生源カード（推し含む）が match に合致したら倍化する (hBP08-045)
     const rollerCard = this.sourceCard || (this.sourceHolomem && this.sourceHolomem.stack[0]) || null;
     const dbl = this.engine.state.modifiers.find(
@@ -948,6 +939,17 @@ export class EffectContext {
       if (opts.noLifeOnDown) targetEntry.holomem.noLifeOnDown = true;
       // 「ダウンさせた時」トリガー（雪花ラミィSP推しスキル等）。ダウンしたホロメンを渡す
       this.engine._notifySourceDown(this.sourceHolomem, this.playerIdx, [targetEntry.holomem]);
+      // 発生源ホロメン本体＋装着カードの「（このホロメンが）相手をダウンさせた時」トリガー。
+      // 特殊ダメージ（ブルームエフェクト等）でのダウンも条件を満たす (Q207 hBP01-115)。
+      if (this.sourceHolomem && defIdx !== this.playerIdx) {
+        const downedInfo = { holomem: targetEntry.holomem, downedBySpecial: true };
+        const selfTrig = eng.registry.get(this.sourceHolomem.stack[0].number)?.triggers?.onOpponentDown;
+        if (selfTrig) yield* selfTrig(new EffectContext(eng, this.playerIdx, { sourceHolomem: this.sourceHolomem, sourceCard: this.sourceHolomem.stack[0], downedInfo }));
+        for (const att of this.sourceHolomem.attachments) {
+          const at = eng.registry.get(att.number)?.triggers?.onOpponentDown;
+          if (at) yield* at(new EffectContext(eng, this.playerIdx, { sourceHolomem: this.sourceHolomem, sourceCard: att, downedInfo }));
+        }
+      }
     }
     this.log(
       `${targetEntry.top.name} に特殊ダメージ${total}` +
