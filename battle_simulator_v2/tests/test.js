@@ -515,6 +515,44 @@ export async function runTests() {
     }
   });
 
+  await testAsync('hBP08-107 Otomo: 付けた時に付け先をお休み/アクティブにできる（repro）', async () => {
+    const e = await setupMainStep(deckMap, 200);
+    await e.registry.preload(['hBP08-107'], lib);
+    e.state.turn = 3;
+    const p0 = e.state.players[0];
+    p0.center = e._createHolomem(fakeHolomen({ name: '別センター' }), 1);
+    const cecilia = e._createHolomem(fakeHolomen({ name: 'セシリア・イマーグリーン' }), 1);
+    p0.back = [cecilia];
+    p0.collab = null;
+    // ① アクティブなセシリアに付けて「お休みさせる」→ rested=true になるはず
+    const fan1 = lib.getByNumber('hBP08-107');
+    p0.hand.push(fan1);
+    e._queueMainPending();
+    const attach1 = e.actions().find((a) => a.kind === 'supportAttach'
+      && p0.hand[a.handIndex] === fan1 && e._holomemAt(p0, a.pos) === cecilia);
+    assert(attach1, 'Otomoの〈セシリア〉への付けアクションが生成されていない');
+    e.apply(attach1.id);
+    assert(e.state.pending, '付けた時の選択（confirm）が出ていない');
+    const noOpt = e.state.pending.options.find((o) => o.value === false);
+    assert(noOpt, 'お休みさせる選択肢が無い');
+    e.apply(noOpt.id);
+    assertEq(cecilia.rested, true, 'お休みさせるを選んだのにアクティブのまま（機能していない）');
+
+    // ② お休み中のセシリアに付けて「アクティブにする」→ rested=false になるはず
+    const fan2 = lib.getByNumber('hBP08-107');
+    p0.hand.push(fan2);
+    e._queueMainPending();
+    const attach2 = e.actions().find((a) => a.kind === 'supportAttach'
+      && p0.hand[a.handIndex] === fan2 && e._holomemAt(p0, a.pos) === cecilia);
+    assert(attach2, 'Otomo2枚目の付けアクションが生成されていない');
+    e.apply(attach2.id);
+    assert(e.state.pending, '付けた時の選択（confirm）が出ていない（2枚目）');
+    const yesOpt = e.state.pending.options.find((o) => o.value === true);
+    assert(yesOpt, 'アクティブにする選択肢が無い');
+    e.apply(yesOpt.id);
+    assertEq(cecilia.rested, false, 'アクティブにするを選んだのにお休みのまま（機能していない）');
+  });
+
   await testAsync('hBP07-100 フロンティアスピリット: エールは〈AZKi〉1人にまとめて送る（複数人に分けられない）', async () => {
     const e = await setupMainStep(deckMap, 108);
     await e.registry.preload(['hBP07-100'], lib);
