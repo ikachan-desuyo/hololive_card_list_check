@@ -932,7 +932,7 @@ function renderStatus(s, handPlayer) {
 function primaryAdvanceOption(s) {
   if (!s.pending) return null;
   // ラベルは「次のステップへ進む」に統一（パス/完了等の名称は分かりづらいため）
-  const LABEL = '▶ 次のステップ';
+  const LABEL = '▶ 次ステップ';
   if (s.pending.type === 'stepPause') return { id: 'ok', label: LABEL };
   if (s.pending.player != null && aiEnabled(s.pending.player)) return null;
   const opts = s.pending.options || [];
