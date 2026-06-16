@@ -87,7 +87,7 @@ export class Engine {
         createPlayerState(names[0], opts.decks[0]),
         createPlayerState(names[1], opts.decks[1]),
       ],
-      firstPlayer: opts.firstPlayer ?? (this.rng() < 0.5 ? 0 : 1),
+      firstPlayer: opts.firstPlayer ?? null, // null = start() で決定（ランダム/手動選択の決定ポイントを出す）
       turnPlayer: 0,
       turn: 0,                 // 全体のターン番号（1始まり）
       step: null,
@@ -122,15 +122,26 @@ export class Engine {
   /** ゲーム開始（最初の決定ポイントまで進む） */
   start() {
     const s = this.state;
-    const first = s.firstPlayer;
-    this.log(`先攻: ${s.players[first].name}`);
     for (const p of s.players) {
       shuffle(p.deck, this.rng);
       shuffle(p.cheerDeck, this.rng);
       this._drawCards(p, INITIAL_HAND);
     }
-    // セットアップの決定キュー: 引き直き(先攻→後攻) → マリガン(自動) → 配置(先攻→後攻)
-    this._setupQueue = [
+    if (s.firstPlayer == null) {
+      // 先攻・後攻が未指定なら、最初の決定ポイントで決める（ランダム/手動）。
+      // 決定後に _buildSetupQueue で残りのセットアップ手順を積む。
+      this._setupQueue = [{ kind: 'chooseFirstPlayer' }];
+    } else {
+      this.log(`先攻: ${s.players[s.firstPlayer].name}`);
+      this._setupQueue = this._buildSetupQueue(s.firstPlayer);
+    }
+    this._advanceSetup();
+    this.onChange();
+  }
+
+  /** 先攻決定後のセットアップ手順: 引き直し(先攻→後攻) → マリガン(自動) → 配置(先攻→後攻) */
+  _buildSetupQueue(first) {
+    return [
       { kind: 'redraw', player: first },
       { kind: 'redraw', player: 1 - first },
       { kind: 'mulligan' },
@@ -142,8 +153,6 @@ export class Engine {
       { kind: 'placementBack', player: 1 - first },
       { kind: 'finishSetup' },
     ];
-    this._advanceSetup();
-    this.onChange();
   }
 
   /** 選択肢を適用して次の決定ポイントまで進む */
@@ -427,6 +436,17 @@ export class Engine {
       const item = this._setupQueue.shift();
       if (!item) return;
       switch (item.kind) {
+        case 'chooseFirstPlayer': {
+          s.pending = {
+            type: 'chooseFirstPlayer', player: null,
+            options: [
+              { id: 'random', label: '🎲 ランダムで決める' },
+              { id: 'first_0', label: `${s.players[0].name} が先攻`, value: 0 },
+              { id: 'first_1', label: `${s.players[1].name} が先攻`, value: 1 },
+            ],
+          };
+          break;
+        }
         case 'redraw': {
           const p = s.players[item.player];
           s.pending = {
@@ -1186,6 +1206,14 @@ export class Engine {
   _execute(pending, action) {
     const s = this.state;
     switch (pending.type) {
+      case 'chooseFirstPlayer': {
+        const first = action.id === 'random' ? (this.rng() < 0.5 ? 0 : 1) : action.value;
+        s.firstPlayer = first;
+        this.log(`先攻: ${s.players[first].name}${action.id === 'random' ? '（ランダム）' : '（指定）'}`);
+        this._setupQueue = this._buildSetupQueue(first);
+        this._advanceSetup();
+        break;
+      }
       case 'redraw': {
         const p = s.players[pending.player];
         if (action.id === 'yes') {

@@ -1129,6 +1129,61 @@ body.dragging, body.dragging * { cursor: grabbing !important; }
   cursor: pointer;
 }
 
+/* ===== 対戦開始前モーダル（先攻後攻の決定 / 最初の手札の引き直し）PC・スマホ共通 ===== */
+#pregame-modal {
+  position: absolute;
+  inset: 0;
+  background: rgba(5, 6, 18, 0.82);
+  display: none;
+  align-items: center;
+  justify-content: center;
+  z-index: 105;
+  padding: 16px;
+}
+#pregame-modal.active { display: flex; }
+#pregame-content {
+  background: #141630;
+  border: 1px solid var(--accent);
+  border-radius: 14px;
+  width: min(640px, 94vw);
+  max-height: 90vh;
+  overflow-y: auto;
+  padding: 22px 24px;
+  box-shadow: 0 0 60px rgba(110, 195, 255, 0.3);
+  text-align: center;
+}
+#pregame-title { font-size: 1.3em; font-weight: bold; color: #fff; margin-bottom: 12px; }
+.pregame-note { color: #aab; font-size: 0.9em; line-height: 1.6; margin-bottom: 16px; }
+.pregame-hand {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  justify-content: center;
+  margin-bottom: 18px;
+}
+.pregame-hand img {
+  width: 84px;
+  border-radius: 6px;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.5);
+}
+#pregame-actions { display: flex; flex-wrap: wrap; gap: 10px; justify-content: center; }
+.pregame-btn {
+  padding: 12px 22px;
+  font-size: 1em;
+  background: #222654;
+  border: 1px solid #3c4185;
+  color: #dde;
+  border-radius: 10px;
+  cursor: pointer;
+}
+.pregame-btn:hover { background: #2e3470; border-color: var(--accent); }
+.pregame-btn.primary {
+  background: linear-gradient(135deg, #4a7cff, #9a4aff);
+  border-color: var(--accent);
+  color: #fff;
+  font-weight: bold;
+}
+
 /* スマホ用要素は既定（PC）では非表示 */
 .mobile-only { display: none; }
 
@@ -1147,7 +1202,22 @@ body.dragging, body.dragging * { cursor: grabbing !important; }
   #setup-screen { min-width: 0; width: min(92vw, 420px); padding: 22px 20px; }
 
   /* 盤面シーンを全幅に（右パネル分の余白を無くす） */
-  .scene { right: 0; }
+  .scene { right: 0; perspective-origin: 50% 38%; }
+
+  /* 盤面の拡大: 横長レイアウトを縦画面向けに詰めて、テーブル自体を縮める。
+     ゾーンを左右の死スペースを削って再配置し、テーブル幅を 1060→760 に縮小する。
+     これにより updateBoardScale の拡大率が上がり、盤面が大きく見える。 */
+  .table { width: 664px; height: 720px; }
+  .zone.life      { left: 4px;   top: 40px;  min-width: 92px;  min-height: 150px; }
+  .zone.cheerdeck { left: 4px;   top: 214px; }
+  .zone.collab    { left: 104px; top: 18px; }
+  .zone.center    { left: 212px; top: 18px; }
+  .zone.oshi      { left: 320px; top: 18px; }
+  .zone.revealed  { left: 428px; top: 150px; }
+  .zone.holopower { left: 432px; top: 6px; }
+  .zone.deck      { left: 556px; top: 18px; }
+  .zone.backs     { left: 104px; top: 200px; min-width: 452px; min-height: 120px; }
+  .zone.archive   { left: 556px; top: 196px; }
 
   /* 右の固定パネル → 下からのボトムシート */
   #side-panel {

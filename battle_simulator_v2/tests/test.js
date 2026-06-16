@@ -378,6 +378,38 @@ export async function runTests() {
     assertEq(e.state.turnPlayer, 0);
   });
 
+  test('先攻決定: firstPlayer未指定なら最初の決定ポイントが chooseFirstPlayer（手動指定）', () => {
+    const d0 = lib.buildGameDeck(deckMap);
+    const d1 = lib.buildGameDeck(deckMap);
+    const e = new Engine({ decks: [d0, d1], seed: 42 }); // firstPlayer 未指定
+    e.start();
+    assertEq(e.state.pending.type, 'chooseFirstPlayer', '先攻決定が最初の決定ポイントになっていない');
+    assertEq(e.state.firstPlayer, null, '先攻決定前に firstPlayer が確定している');
+    e.apply('first_1'); // プレイヤー2(index1)を先攻に指定
+    assertEq(e.state.firstPlayer, 1, '手動指定した先攻(1)が反映されていない');
+    assertEq(e.state.pending.type, 'redraw', '先攻決定後に引き直しへ進んでいない');
+    assertEq(e.state.pending.player, 1, '引き直しの順が先攻(1)から始まっていない');
+  });
+
+  test('先攻決定: ランダム選択は有効な先攻を確定する', () => {
+    const d0 = lib.buildGameDeck(deckMap);
+    const d1 = lib.buildGameDeck(deckMap);
+    const e = new Engine({ decks: [d0, d1], seed: 42 });
+    e.start();
+    e.apply('random');
+    assert(e.state.firstPlayer === 0 || e.state.firstPlayer === 1, 'ランダムで先攻が確定していない');
+    assertEq(e.state.pending.type, 'redraw', 'ランダム決定後に引き直しへ進んでいない');
+  });
+
+  test('先攻決定: firstPlayer指定時は chooseFirstPlayer を出さず即引き直し（後方互換）', () => {
+    const d0 = lib.buildGameDeck(deckMap);
+    const d1 = lib.buildGameDeck(deckMap);
+    const e = new Engine({ decks: [d0, d1], seed: 42, firstPlayer: 0 });
+    e.start();
+    assertEq(e.state.pending.type, 'redraw', 'firstPlayer指定時に余計な先攻決定が出ている');
+    assertEq(e.state.firstPlayer, 0, 'firstPlayer指定が反映されていない');
+  });
+
   await testAsync('ランダムプレイアウト×5シード（保存則・クラッシュ無し・決着）', async () => {
     for (const seed of [1, 2, 3, 4, 5]) {
       const { engine, applies } = await randomPlayout(lib, deckMap, seed);
@@ -1819,7 +1851,8 @@ export async function runTests() {
       while (e.state.phase !== 'ended' && applies < 4000) {
         const pending = e.state.pending;
         assert(pending, `seed=${seed}: pending が無いのに終わっていない`);
-        const id = ais[pending.player].choose(e);
+        // 先攻決定(player=null)はランダム(先頭の選択肢)で。それ以外は各AIが選ぶ
+        const id = pending.player == null ? pending.options[0].id : ais[pending.player].choose(e);
         e.apply(id);
         applies++;
       }
