@@ -733,6 +733,7 @@ function render() {
 
   wireDnD();
   renderStatus(s, handPlayer);
+  renderMobileControls(s);
   renderActions(s);
   renderEffectChoiceModal(s);
   renderLog(s);
@@ -918,6 +919,56 @@ function renderStatus(s, handPlayer) {
     <div>${pendingName ? `🎯 ${escapeText(pendingName)} の操作` : ''}</div>
     <div style="color:#889">手札表示: ${escapeText(s.players[handPlayer].name)}</div>
   `;
+}
+
+/**
+ * スマホ用「最も使う進行操作」を1つ抽出する。
+ *  - stepPause（ステップ境界の「間」）→ 'ok' で次へ
+ *  - メイン/パフォーマンス等の pass（ステップ/ターン終了）
+ *  - 配置完了などの done
+ * AIが操作中の選択には介入しない（stepPause は誰のものでもないので対象外）。
+ */
+function primaryAdvanceOption(s) {
+  if (!s.pending) return null;
+  // ラベルは小画面向けに短く固定（正式名称は長くなりがちなので使わない）
+  if (s.pending.type === 'stepPause') return { id: 'ok', label: '▶ 次へ' };
+  if (s.pending.player != null && aiEnabled(s.pending.player)) return null;
+  const opts = s.pending.options || [];
+  const pass = opts.find((o) => o.kind === 'pass');
+  if (pass) return { id: pass.id, label: '▶ パス' };
+  const done = opts.find((o) => o.id === 'done');
+  if (done) return { id: done.id, label: '▶ 完了' };
+  return null;
+}
+
+/** スマホ用コントロール（盤外の概要ステータス・▶次へ・📋アクション有無）を更新 */
+function renderMobileControls(s) {
+  const ms = document.getElementById('mobile-status');
+  if (ms) {
+    const stepName = s.step ? STEP_NAMES[s.step] : 'セットアップ';
+    const pendingName = s.pending && s.pending.player != null ? s.players[s.pending.player].name : '';
+    ms.innerHTML =
+      `<span class="ms-turn">T${s.turn || '-'}・${escapeText(stepName)}</span> `
+      + `<span>${escapeText(s.players[s.turnPlayer]?.name || '-')}</span>`
+      + (pendingName ? ` <span class="ms-pending">🎯${escapeText(pendingName)}</span>` : '');
+  }
+
+  const advBtn = document.getElementById('mobile-advance');
+  if (advBtn) {
+    const adv = primaryAdvanceOption(s);
+    advBtn.hidden = !adv;
+    if (adv) { advBtn.textContent = adv.label; advBtn.dataset.applyId = adv.id; }
+    else { advBtn.dataset.applyId = ''; }
+  }
+
+  const toggle = document.getElementById('panel-toggle-button');
+  if (toggle) {
+    const hasActions = !!(s.pending
+      && s.pending.type !== 'stepPause' && s.pending.type !== 'effectChoice'
+      && (s.pending.player == null || !aiEnabled(s.pending.player))
+      && (s.pending.options || []).length > 0);
+    toggle.classList.toggle('has-actions', hasActions);
+  }
 }
 
 function pendingHint(pending) {
@@ -1148,6 +1199,24 @@ function setupSettingsPanel() {
   // TODO(CPU対戦): ここに「AI適用」（各プレイヤーをCPUに切り替える）項目を追加予定
 }
 
+/** スマホ用コントロールの配線（▶次へ / 📋パネル開閉 / シートの閉じる） */
+function setupMobileControls() {
+  const sidePanel = document.getElementById('side-panel');
+  const advBtn = document.getElementById('mobile-advance');
+  const toggle = document.getElementById('panel-toggle-button');
+  const handle = document.getElementById('panel-sheet-handle');
+
+  advBtn?.addEventListener('click', () => {
+    const id = advBtn.dataset.applyId;
+    if (engine && id) engine.apply(id);
+  });
+  toggle?.addEventListener('click', (e) => {
+    e.stopPropagation();
+    sidePanel.classList.toggle('mobile-open');
+  });
+  handle?.addEventListener('click', () => sidePanel.classList.remove('mobile-open'));
+}
+
 function refreshSettingsUI() {
   const speed = getSettings().stepSpeed;
   for (const btn of document.querySelectorAll('#pause-speed-buttons button')) {
@@ -1168,9 +1237,19 @@ function refreshSettingsUI() {
  * テーブルは 1060x800 の固定レイアウトなので、ウィンドウが狭いと左右端
  * （ライフ・アーカイブ）が見切れる。シーンの実寸に合わせて全体を縮小する。
  */
+const MOBILE_MQ = window.matchMedia('(max-width: 768px)');
+function isMobileLayout() { return MOBILE_MQ.matches; }
+
 function updateBoardScale() {
-  const sceneW = window.innerWidth - 320 - 16; // サイドパネルと余白を除く
-  const sceneH = window.innerHeight - 16;
+  let sceneW, sceneH;
+  if (isMobileLayout()) {
+    // スマホ: 盤面は全幅。上の概要バー(約44px)と下の手札(約120px)ぶんを縦に確保する。
+    sceneW = window.innerWidth - 12;
+    sceneH = window.innerHeight - 44 - 120;
+  } else {
+    sceneW = window.innerWidth - 320 - 16; // サイドパネルと余白を除く
+    sceneH = window.innerHeight - 16;
+  }
   // rotateX(34deg) 投影後の高さは約 0.83 倍 + 手前へのはみ出し分を見込む
   const scale = Math.min(1, sceneW / 1100, sceneH / 760);
   document.documentElement.style.setProperty('--board-scale', String(scale));
@@ -1191,8 +1270,10 @@ async function main() {
   setupModals();
   setupDnDListeners();
   setupSettingsPanel();
+  setupMobileControls();
   updateBoardScale();
   window.addEventListener('resize', updateBoardScale);
+  MOBILE_MQ.addEventListener?.('change', updateBoardScale);
   document.getElementById('restart-button').addEventListener('click', () => location.reload());
   console.log('✅ バトルシミュレーターv2 初期化完了');
 
