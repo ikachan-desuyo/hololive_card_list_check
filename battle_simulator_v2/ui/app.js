@@ -722,7 +722,7 @@ function render() {
   const humans = [0, 1].filter((i) => !aiEnabled(i));
   const handPlayer = humans.length === 1
     ? humans[0]
-    : (s.pending ? s.pending.player : s.turnPlayer);
+    : (s.pending && s.pending.player != null ? s.pending.player : s.turnPlayer);
   renderHand(document.getElementById('hand'), s.players[handPlayer].hand, handPlayer, hooks);
   renderOppHand(document.getElementById('opp-hand'), s.players[1 - handPlayer].hand.length);
 
@@ -734,6 +734,7 @@ function render() {
   wireDnD();
   renderStatus(s, handPlayer);
   renderMobileControls(s);
+  renderPregameModal(s);
   renderActions(s);
   renderEffectChoiceModal(s);
   renderLog(s);
@@ -912,7 +913,7 @@ function renderEffectChoiceModal(s) {
 function renderStatus(s, handPlayer) {
   const status = document.getElementById('status');
   const stepName = s.step ? STEP_NAMES[s.step] : 'セットアップ';
-  const pendingName = s.pending ? s.players[s.pending.player].name : '';
+  const pendingName = s.pending && s.pending.player != null ? s.players[s.pending.player].name : '';
   status.innerHTML = `
     <div class="turn-banner">ターン${s.turn || '-'} ・ ${stepName}</div>
     <div>ターンプレイヤー: ${s.players[s.turnPlayer]?.name || '-'}</div>
@@ -965,10 +966,67 @@ function renderMobileControls(s) {
   if (toggle) {
     const hasActions = !!(s.pending
       && s.pending.type !== 'stepPause' && s.pending.type !== 'effectChoice'
+      && s.pending.type !== 'chooseFirstPlayer' && s.pending.type !== 'redraw'
       && (s.pending.player == null || !aiEnabled(s.pending.player))
       && (s.pending.options || []).length > 0);
     toggle.classList.toggle('has-actions', hasActions);
   }
+}
+
+/**
+ * 対戦開始前の専用モーダル（先攻後攻の決定 / 最初の手札の引き直し）。PC・スマホ共通。
+ * これらは盤面操作ではなく「対戦が始まる前の初期設定」なので、右パネルではなく
+ * 中央モーダルで提示する。AIプレイヤーの手番は自動処理に任せ、モーダルは出さない。
+ */
+function renderPregameModal(s) {
+  const modal = document.getElementById('pregame-modal');
+  const pending = s.pending;
+  const isPregame = !!pending && (pending.type === 'chooseFirstPlayer' || pending.type === 'redraw');
+  // 引き直しがAIの手番なら自動処理（handleAI）に任せ、モーダルは出さない
+  if (isPregame && pending.type === 'redraw' && aiEnabled(pending.player)) { modal.classList.remove('active'); return; }
+  if (!isPregame) { modal.classList.remove('active'); return; }
+
+  const title = document.getElementById('pregame-title');
+  const body = document.getElementById('pregame-body');
+  const actions = document.getElementById('pregame-actions');
+  body.innerHTML = '';
+  actions.innerHTML = '';
+
+  if (pending.type === 'chooseFirstPlayer') {
+    // 両者AI（人間の操作者がいない）の場合は自動でランダム決定
+    if (aiEnabled(0) && aiEnabled(1)) { engine.apply('random'); return; }
+    title.textContent = '⚔️ 先攻・後攻を決める';
+    body.innerHTML = '<div class="pregame-note">先攻プレイヤーを決定します。ランダムで決めるか、手動で指定できます。</div>';
+    for (const opt of pending.options) {
+      const btn = document.createElement('button');
+      btn.className = 'pregame-btn' + (opt.id === 'random' ? ' primary' : '');
+      btn.textContent = opt.label;
+      btn.addEventListener('click', () => engine.apply(opt.id));
+      actions.appendChild(btn);
+    }
+  } else { // redraw
+    const p = s.players[pending.player];
+    title.textContent = `🃏 ${p.name}：最初の手札`;
+    body.innerHTML = '<div class="pregame-note">この手札で対戦を始めますか？「引き直す」を選ぶと、手札を全てデッキに戻してシャッフルし、引き直します（このターンに1回だけ）。</div>';
+    const hand = document.createElement('div');
+    hand.className = 'pregame-hand';
+    for (const c of p.hand) {
+      const img = document.createElement('img');
+      img.src = c.imageUrl || '';
+      img.alt = c.name;
+      img.loading = 'lazy';
+      hand.appendChild(img);
+    }
+    body.appendChild(hand);
+    for (const opt of pending.options) {
+      const btn = document.createElement('button');
+      btn.className = 'pregame-btn' + (opt.id === 'no' ? ' primary' : '');
+      btn.textContent = opt.label;
+      btn.addEventListener('click', () => engine.apply(opt.id));
+      actions.appendChild(btn);
+    }
+  }
+  modal.classList.add('active');
 }
 
 function pendingHint(pending) {
@@ -992,6 +1050,8 @@ function renderActions(s) {
   const box = document.getElementById('actions');
   box.innerHTML = '';
   if (!s.pending) return;
+  // 先攻後攻の決定・引き直しは専用モーダル(renderPregameModal)で扱うため右パネルには出さない
+  if (s.pending.type === 'chooseFirstPlayer' || s.pending.type === 'redraw') return;
 
   const hint = document.createElement('div');
   hint.className = 'actions-title';
@@ -1241,17 +1301,21 @@ const MOBILE_MQ = window.matchMedia('(max-width: 768px)');
 function isMobileLayout() { return MOBILE_MQ.matches; }
 
 function updateBoardScale() {
-  let sceneW, sceneH;
+  let sceneW, sceneH, divW, divH;
   if (isMobileLayout()) {
     // スマホ: 盤面は全幅。上の概要バー(約44px)と下の手札(約120px)ぶんを縦に確保する。
-    sceneW = window.innerWidth - 12;
-    sceneH = window.innerHeight - 44 - 120;
+    // テーブルはモバイル用に 664×720 へ詰めてあるので、その投影footprintで割る。
+    sceneW = window.innerWidth - 8;
+    sceneH = window.innerHeight - 44 - 116;
+    divW = 690;            // 664 + 余白
+    divH = 660;            // 720 * 投影0.83 + 余白
   } else {
     sceneW = window.innerWidth - 320 - 16; // サイドパネルと余白を除く
     sceneH = window.innerHeight - 16;
+    divW = 1100;
+    divH = 760;            // rotateX(34deg) 投影後の高さは約 0.83 倍 + はみ出し分
   }
-  // rotateX(34deg) 投影後の高さは約 0.83 倍 + 手前へのはみ出し分を見込む
-  const scale = Math.min(1, sceneW / 1100, sceneH / 760);
+  const scale = Math.min(1, sceneW / divW, sceneH / divH);
   document.documentElement.style.setProperty('--board-scale', String(scale));
 }
 
