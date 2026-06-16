@@ -444,7 +444,18 @@ body.dragging, body.dragging * { cursor: grabbing !important; }
   gap: 8px;
   z-index: 20;
   max-width: 72%;
+  /* 手札が多くて横幅に収まらない時は横スクロールできるようにする。
+     ホバーで絵柄が持ち上がるぶん上に余白を確保し、クリップされないようにする。 */
+  overflow-x: auto;
+  overflow-y: hidden;
+  padding-top: 32px;
+  scrollbar-width: thin;
+  scrollbar-color: #44488a transparent;
+  -webkit-overflow-scrolling: touch;
 }
+#hand::-webkit-scrollbar { height: 7px; }
+#hand::-webkit-scrollbar-thumb { background: #44488a; border-radius: 4px; }
+#hand::-webkit-scrollbar-track { background: transparent; }
 /* 手札: カード本体（ヒット判定）は動かさず、絵柄(img)だけ持ち上げる
    （カードごと動かすとカーソル下から逃げて hover が点滅するため） */
 #hand .card { width: 104px; height: 145px; background: transparent; border: none; }
@@ -1304,7 +1315,7 @@ body.dragging, body.dragging * { cursor: grabbing !important; }
   #settings-panel { top: 104px; right: 8px; left: 8px; width: auto; }
 
   /* 右パネル(320px)を見込んだ中央寄せオフセットを全幅用に打ち消す */
-  #hand { transform: translateX(-50%); max-width: 96%; gap: 4px; bottom: 6px; }
+  #hand { transform: translateX(-50%); max-width: 96%; gap: 4px; bottom: 6px; padding-top: 6px; }
   #hand .card { width: 66px; height: 92px; }
   #hand .card:hover img { transform: none; } /* タッチではホバー拡大しない */
   #opp-hand { transform: translateX(-50%); top: 52px; }
