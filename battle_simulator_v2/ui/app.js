@@ -931,14 +931,15 @@ function renderStatus(s, handPlayer) {
  */
 function primaryAdvanceOption(s) {
   if (!s.pending) return null;
-  // ラベルは小画面向けに短く固定（正式名称は長くなりがちなので使わない）
-  if (s.pending.type === 'stepPause') return { id: 'ok', label: '▶ 次へ' };
+  // ラベルは「次のステップへ進む」に統一（パス/完了等の名称は分かりづらいため）
+  const LABEL = '▶ 次ステップ';
+  if (s.pending.type === 'stepPause') return { id: 'ok', label: LABEL };
   if (s.pending.player != null && aiEnabled(s.pending.player)) return null;
   const opts = s.pending.options || [];
   const pass = opts.find((o) => o.kind === 'pass');
-  if (pass) return { id: pass.id, label: '▶ パス' };
+  if (pass) return { id: pass.id, label: LABEL };
   const done = opts.find((o) => o.id === 'done');
-  if (done) return { id: done.id, label: '▶ 完了' };
+  if (done) return { id: done.id, label: LABEL };
   return null;
 }
 
