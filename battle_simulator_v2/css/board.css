@@ -1128,3 +1128,128 @@ body.dragging, body.dragging * { cursor: grabbing !important; }
   border-radius: 8px;
   cursor: pointer;
 }
+
+/* スマホ用要素は既定（PC）では非表示 */
+.mobile-only { display: none; }
+
+/* =========================================================================
+ * スマホ（縦・狭幅）レイアウト
+ * 方針: 盤面を全画面に。右の固定サイドパネルは既定で隠し、📋 ボタンで
+ *       下からせり上がるシート表示にする。一番使う「次へ進む」操作は
+ *       ▶ ボタンとして常設（設定ボタンの隣）。ターン/ステップ等の概要は
+ *       盤外の上部に常時表示する。
+ * 注: PCレイアウトの多くは「右320pxパネル」を見込んで calc(50% - 160px)
+ *     で中央寄せしているため、全幅化に合わせて左右オフセットを打ち消す。
+ * ========================================================================= */
+@media (max-width: 768px) {
+  .mobile-only { display: block; }
+
+  #setup-screen { min-width: 0; width: min(92vw, 420px); padding: 22px 20px; }
+
+  /* 盤面シーンを全幅に（右パネル分の余白を無くす） */
+  .scene { right: 0; }
+
+  /* 右の固定パネル → 下からのボトムシート */
+  #side-panel {
+    top: auto;
+    left: 0; right: 0; bottom: 0;
+    width: auto;
+    z-index: 50; /* 開いた時に ▶/手札 を覆う */
+    max-height: 72vh;
+    border-left: none;
+    border-top: 1px solid #34386b;
+    border-radius: 16px 16px 0 0;
+    transform: translateY(100%);
+    transition: transform 0.25s ease;
+    box-shadow: 0 -10px 40px rgba(0, 0, 0, 0.7);
+  }
+  #side-panel.mobile-open { transform: translateY(0); }
+  #panel-sheet-handle {
+    text-align: center;
+    padding: 10px;
+    color: #aab;
+    font-weight: bold;
+    border-bottom: 1px solid #2c2f5c;
+    cursor: pointer;
+  }
+  #log { height: 26vh; }
+
+  /* 盤外に常時表示する概要ステータス（上部） */
+  #mobile-status {
+    position: absolute;
+    top: 8px;
+    left: 56px;
+    right: 56px;
+    z-index: 44;
+    text-align: center;
+    font-size: 0.78em;
+    line-height: 1.4;
+    color: #cdd4ff;
+    background: rgba(12, 13, 30, 0.82);
+    border: 1px solid #34386b;
+    border-radius: 10px;
+    padding: 4px 8px;
+    pointer-events: none;
+  }
+  #mobile-status .ms-turn { font-weight: bold; color: var(--accent); }
+  #mobile-status .ms-pending { color: #ffd98a; }
+
+  /* スマホ用ボタン群（右上に縦並び） */
+  #settings-button { top: 8px; right: 8px; }
+  #panel-toggle-button {
+    position: absolute;
+    top: 56px; right: 8px;
+    width: 40px; height: 40px;
+    font-size: 1.2em;
+    background: rgba(14, 16, 38, 0.9);
+    border: 1px solid #34386b;
+    border-radius: 50%;
+    color: #cdd4ff;
+    cursor: pointer;
+    z-index: 45;
+  }
+  #panel-toggle-button.has-actions {
+    border-color: #ffc850;
+    color: #ffe9b0;
+    box-shadow: 0 0 12px rgba(255, 200, 80, 0.5);
+  }
+  /* 一番使う「次へ進む」操作 = 設定/📋 の右列に常設（手札と被らない上部） */
+  #mobile-advance {
+    position: absolute;
+    top: 104px; right: 8px;
+    padding: 10px 14px;
+    font-size: 0.95em;
+    font-weight: bold;
+    background: linear-gradient(135deg, #2a4a8f, #4a3a9f);
+    border: 1px solid var(--accent);
+    color: #fff;
+    border-radius: 12px;
+    cursor: pointer;
+    z-index: 47;
+    box-shadow: 0 6px 20px rgba(0, 0, 0, 0.6);
+  }
+  #mobile-advance[hidden] { display: none; }
+
+  /* 設定パネルは画面幅に合わせる */
+  #settings-panel { top: 104px; right: 8px; left: 8px; width: auto; }
+
+  /* 右パネル(320px)を見込んだ中央寄せオフセットを全幅用に打ち消す */
+  #hand { transform: translateX(-50%); max-width: 96%; gap: 4px; bottom: 6px; }
+  #hand .card { width: 66px; height: 92px; }
+  #hand .card:hover img { transform: none; } /* タッチではホバー拡大しない */
+  #opp-hand { transform: translateX(-50%); top: 52px; }
+  #hand-owner { transform: translateX(-50%); bottom: 110px; font-size: 0.8em; }
+  /* ステップ進行は概要バー(#mobile-status)に出るのでステップバーは隠す */
+  #step-bar { display: none; }
+  #step-toast,
+  #dice-overlay,
+  #reveal-overlay,
+  #turn-toast,
+  #choice-bar { left: 50%; }
+  #turn-toast { font-size: 1.3em; padding: 16px 28px; }
+  #choice-bar { top: 72px; max-width: 92vw; font-size: 0.82em; padding: 7px 12px; }
+  #choice-restore { right: 16px; }
+
+  /* ホバー前提のプレビューはタッチでは出さない */
+  #card-preview { display: none !important; }
+}
