@@ -24,10 +24,12 @@
  */
 function isExtraUnlimitedDebut(c) {
   if (c.kind !== 'holomen' || c.bloomLevel !== 'Debut') return false;
-  return (c.keywords || []).some((k) => {
-    const txt = `${k.subtype || ''}${k.name || ''}${k.text || ''}`;
-    return txt.includes('デッキに何枚でも');
-  });
+  // 「エクストラ」能力としての記載のみを対象にする（subtype が 'エクストラ' の keyword）。
+  // コラボエフェクト等の効果テキスト内に "エクストラ「…デッキに何枚でも…」" と書かれている
+  // だけのカード（このカード自身など）を誤ってエクストラ扱いしないため subtype を厳密に見る。
+  return (c.keywords || []).some((k) =>
+    k.subtype === 'エクストラ' &&
+    `${k.name || ''}${k.text || ''}`.includes('デッキに何枚でも入れられる'));
 }
 
 export default {

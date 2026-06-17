@@ -547,6 +547,26 @@ export async function runTests() {
     }
   });
 
+  await testAsync('hBP08-062: エクストラ判定はsubtype厳密（コラボ文に"エクストラ"を含む自身を誤検出しない）', async () => {
+    const e = await setupMainStep(deckMap, 202);
+    await e.registry.preload(['hBP08-062'], lib);
+    const p0 = e.state.players[0];
+    // デッキ先頭に hBP08-062（自身・コラボ文に「エクストラ『…デッキに何枚でも…』」を含む）と
+    // 本物のエクストラDebut（hBP04-043 ラミィ＝skill.type エクストラ）を入れる
+    p0.deck.unshift(lib.getByNumber('hBP08-062'), lib.getByNumber('hBP04-043'));
+    p0.hand.push(lib.getByNumber('hBP08-062')); // コスト用の手札
+    const def = e.registry.get('hBP08-062');
+    const ctx = e._effectContext(0, {});
+    const gen = def.collabEffect.run(ctx);
+    let r = gen.next();                 // confirm リクエスト
+    r = gen.next(true);                 // 発動する → コストの chooseCard リクエスト
+    const costCard = r.value.buildOptions().find((o) => o.value)?.value;
+    r = gen.next(costCard);             // コスト支払い → fetch候補の chooseCard リクエスト
+    const nums = r.value.buildOptions().map((o) => o.card?.number).filter(Boolean);
+    assert(nums.includes('hBP04-043'), '本物のエクストラDebut(hBP04-043)が候補に出ていない');
+    assert(!nums.includes('hBP08-062'), 'hBP08-062自身が候補に混入（エクストラ誤判定）');
+  });
+
   await testAsync('hBP08-107 Otomo: 付けた時に付け先をお休み/アクティブにできる（repro）', async () => {
     const e = await setupMainStep(deckMap, 200);
     await e.registry.preload(['hBP08-107'], lib);

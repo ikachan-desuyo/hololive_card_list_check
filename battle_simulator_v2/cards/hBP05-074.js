@@ -21,12 +21,13 @@
  *     card_data の該当Debutホロメンに keywords として格納される＝下記 isUnlimitedDebut で判定可能。）
  */
 
-/** エクストラ「このホロメンはデッキに何枚でも入れられる」を持つDebutホロメンか */
+/** エクストラ「このホロメンはデッキに何枚でも入れられる」を持つDebutホロメンか
+ *  （subtype 'エクストラ' の keyword のみ対象。効果テキストに同句を含むだけのカードは除外） */
 function isUnlimitedDebut(card) {
   if (card.kind !== 'holomen' || card.bloomLevel !== 'Debut') return false;
   return (card.keywords || []).some((kw) =>
-    (kw.text || '').includes('デッキに何枚でも入れられる') ||
-    (kw.name || '').includes('デッキに何枚でも入れられる'));
+    kw.subtype === 'エクストラ' &&
+    `${kw.name || ''}${kw.text || ''}`.includes('デッキに何枚でも入れられる'));
 }
 
 export default {
