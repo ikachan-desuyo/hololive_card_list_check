@@ -273,16 +273,6 @@ export class Engine {
   }
 
   /**
-   * 「ホロメンが能力でステージからデッキに戻った時」の誘発（推しステージスキル onReturnedToDeck）。
-   * ctx.returnHolomemToDeck から呼ばれる。cards = 戻ったスタック（カード配列）。
-   * （選択を伴わない想定のため同期。例: hBP07-004 はあと「はあちゃまなう」）
-   */
-  _dispatchReturnedToDeck(ownerIdx, cards) {
-    const stage = this._oshiStage(ownerIdx);
-    if (stage?.onReturnedToDeck) stage.onReturnedToDeck(this, ownerIdx, cards);
-  }
-
-  /**
    * 推しスキルの実効ホロパワーコスト（消費枚数）。
    * 自ステージのホロメン/装着カードのギフト等がコストを書き換える場合に反映する
    * （カード定義 `oshiSkillCostMod(skill, holomem, zone, engine, ownerIdx)` が必要枚数のデルタを返す。

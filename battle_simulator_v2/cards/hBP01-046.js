@@ -12,20 +12,31 @@ export default {
     name: '開拓者のみんながいたから',
     *run(ctx) {
       for (let i = 0; i < 3; i++) {
-        // 毎回ステージ上の全エールを再列挙（前回の付け替えで構成が変わるため）
-        const entries = [];
-        for (const e of ctx.holomems('self')) {
-          for (const cheer of e.holomem.cheers) entries.push({ cheer, from: e.holomem });
-        }
-        if (entries.length === 0) return;
-        const picked = yield ctx.chooseCard({
-          cards: entries.map((e) => e.cheer),
-          title: `付け替えるエールを選択（${i + 1}枚目 / 最大3枚・任意）`,
+        // 付け替え「元」のホロメンを先に盤面で選ぶ（盤上のカードが光るので、どのホロメンの
+        // エールを動かすのかが一目で分かる。カード画像だけ並べると元が分からない問題への対策）。
+        const hasCheer = (e) => e.holomem.cheers.length > 0;
+        if (ctx.holomems('self', hasCheer).length === 0) return;
+        const fromEntry = yield ctx.chooseHolomem({
+          side: 'self',
+          filter: hasCheer,
+          title: `付け替えるエールの「元」のホロメンを選択（${i + 1}枚目 / 最大3枚・任意）`,
           optional: true,
-          skipLabel: i === 0 ? '付け替えない' : 'ここまでにする',
         });
+        if (!fromEntry) return;
+        const from = fromEntry.holomem;
+
+        // その元ホロメンに付いているエールから1枚選ぶ（1枚だけなら自動）
+        const cheers = [...from.cheers];
+        const picked = cheers.length === 1
+          ? cheers[0]
+          : yield ctx.chooseCard({
+              cards: cheers,
+              title: `〈${from.stack[0].name}〉の付け替えるエールを選択`,
+              optional: true,
+              skipLabel: 'やめる',
+            });
         if (!picked) return;
-        const from = entries.find((e) => e.cheer === picked).from;
+
         const target = yield ctx.chooseHolomem({
           side: 'self',
           title: '付け替え先の自分のホロメンを選択',

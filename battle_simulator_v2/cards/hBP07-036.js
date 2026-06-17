@@ -18,19 +18,24 @@ export default {
     name: 'AKAI HAATO VS HAACHAMA',
     *run(ctx) {
       if (!ctx.isFirstTurnGoingSecond()) return; // 後攻で最初のターンのみ
-      // デッキから Debut の〈赤井はあと〉を2枚、公開してステージに出す
-      const candidates = ctx.deckCards((c) =>
-        c.kind === 'holomen' && c.bloomLevel === 'Debut' && c.name === '赤井はあと');
-      let placed = 0;
-      for (let i = 0; i < 2 && i < candidates.length; i++) {
+      // デッキから Debut の〈赤井はあと〉を2枚、公開してステージに出す。
+      // どの〈赤井はあと〉を出すかはプレイヤーが選ぶ（候補が複数あり得るため、勝手に出さない）。
+      // 「2枚」は必須だが、候補やステージの空きが足りなければ出せる分だけ。
+      for (let i = 0; i < 2; i++) {
         if (ctx.engine._stageCount(ctx.player) >= 6) break; // ステージ上限
-        const card = candidates[i];
-        ctx.removeFromDeck(card);
-        ctx.log(`${ctx.player.name}: ${card.name} を公開`);
-        if (ctx.putToBack(card)) placed++;
+        const candidates = ctx.deckCards((c) =>
+          c.kind === 'holomen' && c.bloomLevel === 'Debut' && c.name === '赤井はあと');
+        if (candidates.length === 0) break;
+        const picked = yield ctx.chooseCard({
+          cards: candidates,
+          title: `ステージに出すDebut〈赤井はあと〉を選択（${i + 1}枚目／2枚）`,
+        });
+        if (!picked) break;
+        ctx.removeFromDeck(picked);
+        ctx.log(`${ctx.player.name}: ${picked.name} を公開`);
+        ctx.putToBack(picked);
       }
       ctx.shuffleDeck(); // 効果が発動した（後攻最初のターン）なら必ずシャッフルする
-      void placed;
     },
   },
 };

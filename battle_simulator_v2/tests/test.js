@@ -547,6 +547,26 @@ export async function runTests() {
     }
   });
 
+  await testAsync('hBP08-062: エクストラ判定はsubtype厳密（コラボ文に"エクストラ"を含む自身を誤検出しない）', async () => {
+    const e = await setupMainStep(deckMap, 202);
+    await e.registry.preload(['hBP08-062'], lib);
+    const p0 = e.state.players[0];
+    // デッキ先頭に hBP08-062（自身・コラボ文に「エクストラ『…デッキに何枚でも…』」を含む）と
+    // 本物のエクストラDebut（hBP04-043 ラミィ＝skill.type エクストラ）を入れる
+    p0.deck.unshift(lib.getByNumber('hBP08-062'), lib.getByNumber('hBP04-043'));
+    p0.hand.push(lib.getByNumber('hBP08-062')); // コスト用の手札
+    const def = e.registry.get('hBP08-062');
+    const ctx = e._effectContext(0, {});
+    const gen = def.collabEffect.run(ctx);
+    let r = gen.next();                 // confirm リクエスト
+    r = gen.next(true);                 // 発動する → コストの chooseCard リクエスト
+    const costCard = r.value.buildOptions().find((o) => o.value)?.value;
+    r = gen.next(costCard);             // コスト支払い → fetch候補の chooseCard リクエスト
+    const nums = r.value.buildOptions().map((o) => o.card?.number).filter(Boolean);
+    assert(nums.includes('hBP04-043'), '本物のエクストラDebut(hBP04-043)が候補に出ていない');
+    assert(!nums.includes('hBP08-062'), 'hBP08-062自身が候補に混入（エクストラ誤判定）');
+  });
+
   await testAsync('hBP08-107 Otomo: 付けた時に付け先をお休み/アクティブにできる（repro）', async () => {
     const e = await setupMainStep(deckMap, 200);
     await e.registry.preload(['hBP08-107'], lib);
@@ -1725,16 +1745,36 @@ export async function runTests() {
     const h1 = e._createHolomem(lib.getByNumber(haatoDebut.number), 0);
     p0.back = [h1];
     const handBefore = p0.hand.length;
-    drive(ctx.returnHolomemToDeck(h1)); // generator化したため drive で駆動
+    drive(ctx.returnHolomemToDeck(h1), true); // 任意発動の確認に「引く(true)」で答える
     assertEq(p0.hand.length, handBefore + 2, 'はあちゃまなうで2枚引いていない');
     assert(!p0.back.includes(h1), 'はあとがバックから除去されていない');
 
-    // [ターンに1回]: 同一ターンの2回目は引かない
+    // [ターンに1回]: 同一ターンの2回目は（発動済みなので）確認も出ず引かない
     const h2 = e._createHolomem(lib.getByNumber(haatoDebut.number), 0);
     p0.back = [h2];
     const handBefore2 = p0.hand.length;
-    drive(ctx.returnHolomemToDeck(h2)); // generator化したため drive で駆動
+    drive(ctx.returnHolomemToDeck(h2), true);
     assertEq(p0.hand.length, handBefore2, '[ターンに1回]を超えて引いている');
+  });
+
+  await testAsync('はあちゃまなう: 任意発動（発動しないと引かず、[ターンに1回]も消費しない）', async () => {
+    const e = await setupMainStep(deckMap, 154);
+    await e.registry.preload(['hBP07-004'], lib);
+    const p0 = e.state.players[0];
+    p0.oshi = lib.getByNumber('hBP07-004');
+    const haatoDebut = [...lib.byNumber.values()].find((c) => c.name === '赤井はあと' && c.bloomLevel === 'Debut');
+    const ctx = new EffectContext(e, 0, {});
+    // 1回目: 発動しない(false) → 引かない
+    const h1 = e._createHolomem(lib.getByNumber(haatoDebut.number), 0);
+    p0.back = [h1];
+    const before = p0.hand.length;
+    drive(ctx.returnHolomemToDeck(h1), false);
+    assertEq(p0.hand.length, before, '発動しないを選んだのに引いている');
+    // 2回目（同ターン）: 1回目で消費していないので、再び発動を選べて2枚引ける
+    const h2 = e._createHolomem(lib.getByNumber(haatoDebut.number), 0);
+    p0.back = [h2];
+    drive(ctx.returnHolomemToDeck(h2), true);
+    assertEq(p0.hand.length, before + 2, '発動しない後の同ターンに発動できない（[ターンに1回]を誤って消費している）');
   });
 
   await testAsync('装着: ネリッサの杖（2ndネリッサの能力で手札アーカイブ→相手前衛に特殊20・ターンに1回）', async () => {

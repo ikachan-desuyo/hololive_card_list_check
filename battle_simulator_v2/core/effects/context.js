@@ -643,10 +643,16 @@ export class EffectContext {
     else owner.deck.unshift(...returned);
     owner.holomemReturnedToDeckThisTurn = true; // 「このターンに自分のホロメンがステージからデッキに戻った」記録（hBP07-042）
     this.log(`${returned[0]?.name} をデッキの${bottom ? '下' : '上'}に戻した`);
-    this.engine._dispatchReturnedToDeck(ownerIdx, returned); // 推しステージスキル onReturnedToDeck（同期）
+    // 推しステージスキル onReturnedToDeck（[ターンに1回]の任意発動など確認を伴える＝ジェネレータ可）。
+    // シグネチャは (ctx, returnedCards)。ジェネレータを返した場合のみ yield* で駆動する。
+    const stageSkill = this.engine.registry.get(owner.oshi?.number)?.oshiStageSkill;
+    if (stageSkill?.onReturnedToDeck) {
+      const sctx = new EffectContext(this.engine, ownerIdx, { returnedToDeckInfo: { cards: returned } });
+      const res = stageSkill.onReturnedToDeck(sctx, returned);
+      if (res && typeof res.next === 'function') yield* res;
+    }
     // ホロメンレベルの「（自分のホロメンが）デッキに戻った時」傍観トリガー（選択を伴える）。hBP07-039
-    const ownerObj = this.engine.state.players[ownerIdx];
-    for (const wh of this.engine._stageHolomems(ownerObj)) {
+    for (const wh of this.engine._stageHolomems(owner)) {
       const t = this.engine.registry.get(wh.stack[0].number)?.triggers?.onReturnedToDeck;
       if (t) yield* t(new EffectContext(this.engine, ownerIdx, { sourceHolomem: wh, returnedToDeckInfo: { cards: returned } }));
     }
