@@ -1210,6 +1210,10 @@ body.dragging, body.dragging * { cursor: grabbing !important; }
 @media (max-width: 768px) {
   .mobile-only { display: block; }
 
+  /* 盤面カードを少し小さくして、バック5体でも横に収まるようにする
+     （バック5体 = 5×84 + gap が archive と重ならない幅に収める） */
+  :root { --card-w: 84px; --card-h: 117px; }
+
   #setup-screen { min-width: 0; width: min(92vw, 420px); padding: 22px 20px; }
 
   /* 盤面シーンを全幅に（右パネル分の余白を無くす） */
@@ -1227,8 +1231,8 @@ body.dragging, body.dragging * { cursor: grabbing !important; }
   .zone.revealed  { left: 428px; top: 150px; }
   .zone.holopower { left: 432px; top: 6px; }
   .zone.deck      { left: 556px; top: 18px; }
-  .zone.backs     { left: 104px; top: 200px; min-width: 452px; min-height: 120px; }
-  .zone.archive   { left: 556px; top: 196px; }
+  .zone.backs     { left: 104px; top: 200px; min-width: 430px; min-height: 124px; gap: 4px; }
+  .zone.archive   { left: 560px; top: 196px; }
 
   /* 右の固定パネル → 下からのボトムシート */
   #side-panel {
@@ -1327,6 +1331,8 @@ body.dragging, body.dragging * { cursor: grabbing !important; }
   #reveal-overlay,
   #turn-toast,
   #choice-bar { left: 50%; }
+  /* ステップ名の通知が相手(上側)のバック行に重なってカード選択を妨げるため、盤面より上へ移動 */
+  #step-toast { top: 13%; font-size: 1em; padding: 8px 18px; }
   #turn-toast { font-size: 1.3em; padding: 16px 28px; }
   #choice-bar { top: 72px; max-width: 92vw; font-size: 0.82em; padding: 7px 12px; }
   #choice-restore { right: 16px; }

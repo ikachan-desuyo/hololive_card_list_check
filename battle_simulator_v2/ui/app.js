@@ -1363,6 +1363,15 @@ async function main() {
     console.log('✅ autostart 完了');
   }
 
+  // 開発用: ?fillbacks=1 で両者のバックを5体にする（レイアウト確認用）
+  if (params.get('fillbacks') && engine && engine.state.phase === 'playing') {
+    const debut = lib.getByNumber('hBP02-042') || lib.getByNumber('hBP04-043');
+    for (const p of engine.state.players) {
+      p.back = [0, 1, 2, 3, 4].map(() => engine._createHolomem(debut, 1));
+    }
+    render();
+  }
+
   // 開発用: ?inspecttest=1 で手札1枚目の詳細モーダルを自動で開く（表示確認用）
   if (params.get('inspecttest')) {
     setTimeout(() => document.querySelector('#hand .card')?.click(), 300);
