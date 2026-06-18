@@ -12,6 +12,7 @@ import { CardLibrary } from '../core/cards.js';
 import { Engine } from '../core/engine.js';
 import { EffectRegistry } from '../core/effects/registry.js';
 import { HeuristicAI } from '../core/ai/heuristic.js';
+import { scoreOptions, bestOptionId } from '../core/ai/score.js';
 import { STEP_NAMES } from '../core/constants.js';
 import { renderSide, renderHand, renderOppHand } from './board.js';
 
@@ -736,6 +737,7 @@ function render() {
   renderMobileControls(s);
   renderPregameModal(s);
   renderActions(s);
+  renderEvalOverlay(s);
   renderEffectChoiceModal(s);
   renderLog(s);
   renderResult(s);
@@ -1030,6 +1032,76 @@ function renderPregameModal(s) {
   modal.classList.add('active');
 }
 
+// ============ 評価値オーバーレイ（CPUと同じ score.js の数値をカード上に表示） ============
+
+function showEvalOn() { return getSettings().showEval === true; }
+
+function clearEvalBadges() {
+  for (const b of document.querySelectorAll('.eval-badge')) b.remove();
+}
+
+/** 選択肢 opt に対応する「評価値を出す要素」のセレクタ（カード/盤上ホロメン） */
+function evalElementSelector(pending, opt) {
+  const a = pending.player;
+  switch (pending.type) {
+    case 'main':
+      if (opt.kind === 'bloom' || opt.kind === 'place' || opt.kind === 'support' || opt.kind === 'supportAttach') {
+        return opt.handIndex != null ? `[data-src="${a}:hand:${opt.handIndex}"]` : null;
+      }
+      if (opt.kind === 'collab' || opt.kind === 'baton') return `[data-src="${a}:back:${opt.backIndex}"]`;
+      return null; // oshiSkill / pass はボタン側に表示
+    case 'performance':
+      return opt.kind === 'art' ? `[data-src="${a}:${opt.zone}:0"]` : null;
+    case 'attachCheer':
+    case 'attachLifeCheer':
+      return opt.pos ? `[data-drop="${a}:mem:${opt.pos.zone}:${opt.pos.index}"]` : null;
+    case 'placementCenter':
+    case 'placementBack':
+    case 'placementPenalty':
+      return opt.handIndex != null ? `[data-src="${a}:hand:${opt.handIndex}"]` : null;
+    case 'chooseCenter':
+      return opt.backIndex != null ? `[data-src="${a}:back:${opt.backIndex}"]` : null;
+    case 'effectChoice':
+      if (pending.request?.kind === 'chooseHolomem' && opt.value?.pos) {
+        const side = opt.side === 'opp' ? (1 - a) : a;
+        return `[data-drop="${side}:mem:${opt.value.pos.zone}:${opt.value.pos.index}"]`;
+      }
+      return null;
+    default:
+      return null;
+  }
+}
+
+function renderEvalOverlay(s) {
+  clearEvalBadges();
+  if (!showEvalOn()) return;
+  const pending = s.pending;
+  if (!pending || pending.player == null || pending.type === 'stepPause') return;
+  if (aiEnabled(pending.player)) return; // AIの手番では出さない（相手の手を覗かない）
+  const scores = scoreOptions(engine, pending.player, pending);
+  const bestId = bestOptionId(engine, pending.player, pending);
+  // 同じ要素に複数選択肢（アーツ複数等）が対応する場合は最大スコアを表示
+  const byEl = new Map();
+  for (const opt of pending.options) {
+    const sel = evalElementSelector(pending, opt);
+    if (!sel) continue;
+    const el = document.querySelector(sel);
+    if (!el) continue;
+    const sc = scores[opt.id];
+    if (sc == null || sc === -Infinity) continue;
+    const cur = byEl.get(el);
+    if (!cur || sc > cur.score) byEl.set(el, { score: sc, best: opt.id === bestId });
+  }
+  for (const [el, info] of byEl) {
+    if (getComputedStyle(el).position === 'static') el.style.position = 'relative';
+    const r = Math.round(info.score);
+    const badge = document.createElement('div');
+    badge.className = 'eval-badge ' + (info.best ? 'best' : r > 0 ? 'pos' : r < 0 ? 'neg' : '');
+    badge.textContent = r > 0 ? `+${r}` : `${r}`;
+    el.appendChild(badge);
+  }
+}
+
 function pendingHint(pending) {
   const map = {
     redraw: '手札を引き直すか選んでください',
@@ -1064,12 +1136,25 @@ function renderActions(s) {
     return;
   }
 
+  // 評価値（CPUと同じ score.js）。設定ON かつ 人間の手番のときボタンにも数値を付ける
+  const evalScores = (showEvalOn() && s.pending.player != null && !aiEnabled(s.pending.player))
+    ? scoreOptions(engine, s.pending.player, s.pending) : null;
+  const appendEval = (btn, opt) => {
+    if (!evalScores || evalScores[opt.id] == null || evalScores[opt.id] === -Infinity) return;
+    const r = Math.round(evalScores[opt.id]);
+    const span = document.createElement('span');
+    span.className = 'action-eval';
+    span.textContent = r > 0 ? `+${r}` : `${r}`;
+    btn.appendChild(span);
+  };
+
   // D&D で操作できない選択肢（パス・引き直し・推しスキル等）はボタンで出す
   const buttonOptions = s.pending.options.filter((opt) => !optionDnD(s.pending, opt));
   for (const opt of buttonOptions) {
     const btn = document.createElement('button');
     btn.textContent = opt.label;
     if (opt.kind === 'pass' || opt.id === 'done' || opt.id === 'no') btn.classList.add('pass-btn');
+    appendEval(btn, opt);
     btn.addEventListener('click', () => engine.apply(opt.id));
     box.appendChild(btn);
   }
@@ -1090,6 +1175,7 @@ function renderActions(s) {
         if (!optionDnD(s.pending, opt)) continue;
         const btn = document.createElement('button');
         btn.textContent = opt.label;
+        appendEval(btn, opt);
         btn.addEventListener('click', () => engine.apply(opt.id));
         box.appendChild(btn);
       }
@@ -1211,6 +1297,15 @@ function setupSettingsPanel() {
     refreshSettingsUI();
   });
 
+  // 評価値の表示（CPUと同じ score.js の数値をカード上に表示）
+  document.getElementById('show-eval-buttons').addEventListener('click', (e) => {
+    const v = e.target.dataset?.showEval;
+    if (!v) return;
+    saveSettings({ showEval: v === 'on' });
+    refreshSettingsUI();
+    if (engine) render(); // 即反映
+  });
+
   // AI適用（CPUが操作するプレイヤーの切り替え）
   document.getElementById('ai-buttons').addEventListener('click', (e) => {
     const idx = e.target.dataset?.ai;
@@ -1290,6 +1385,10 @@ function refreshSettingsUI() {
   for (const btn of document.querySelectorAll('#confirm-optional-buttons button')) {
     btn.classList.toggle('active', (btn.dataset.confirmOptional === 'on') === confirmOptOn);
   }
+  const showEval = getSettings().showEval === true;
+  for (const btn of document.querySelectorAll('#show-eval-buttons button')) {
+    btn.classList.toggle('active', (btn.dataset.showEval === 'on') === showEval);
+  }
   document.getElementById('seed-display').textContent = `シード値: ${currentSeed ?? '-'}`;
 }
 
@@ -1348,6 +1447,8 @@ async function main() {
   if (aiParam) {
     aiOverride = [aiParam === '1' || aiParam === 'both', aiParam === '2' || aiParam === 'both'];
   }
+  // 開発・確認用: ?showeval=1 で「評価値を表示」をONにして起動
+  if (params.get('showeval')) saveSettings({ showEval: true });
 
   // 開発・スモークテスト用: ?autostart=1&seed=42 で即ゲーム開始
   if (params.get('autostart')) {

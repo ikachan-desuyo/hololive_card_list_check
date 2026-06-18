@@ -13,6 +13,8 @@ import { EffectRegistry } from '../core/effects/registry.js';
 import { EffectContext } from '../core/effects/context.js';
 import { compileCard } from '../core/effects/text-compiler.js';
 import { HeuristicAI } from '../core/ai/heuristic.js';
+import { evaluateState, WEIGHTS } from '../core/ai/evaluate.js';
+import { scoreOptions, bestOptionId } from '../core/ai/score.js';
 import { createRng } from '../core/rng.js';
 
 const results = [];
@@ -565,6 +567,81 @@ export async function runTests() {
     const nums = r.value.buildOptions().map((o) => o.card?.number).filter(Boolean);
     assert(nums.includes('hBP04-043'), '本物のエクストラDebut(hBP04-043)が候補に出ていない');
     assert(!nums.includes('hBP08-062'), 'hBP08-062自身が候補に混入（エクストラ誤判定）');
+  });
+
+  await testAsync('AIスコアラ: 全選択肢に数値が付き、CPUの選択とbestOptionIdが一致', async () => {
+    const e = await setupMainStep(deckMap, 170);
+    const sc = scoreOptions(e, 0, e.state.pending);
+    for (const o of e.state.pending.options) {
+      assert(typeof sc[o.id] === 'number', `選択肢 ${o.id} に数値が付いていない（UI評価表示の前提）`);
+    }
+    assertEq(bestOptionId(e, 0, e.state.pending), new HeuristicAI(0).choose(e),
+      'CPUの選択(choose)と最善ID(bestOptionId)が不一致＝CPUと表示の物差しがずれている');
+  });
+
+  await testAsync('AI評価関数: ライフ差・盤面崩壊の符号が妥当', async () => {
+    const e = await setupMainStep(deckMap, 160);
+    const p0 = e.state.players[0]; const p1 = e.state.players[1];
+    p0.life = [{ name: 'l' }, { name: 'l' }, { name: 'l' }];
+    p1.life = [{ name: 'l' }];
+    assert(evaluateState(e, 0).parts.life > 0, 'ライフが多い側の life スコアが正でない');
+    assert(evaluateState(e, 1).parts.life < 0, '相手視点で life スコアが負でない');
+    // ステージ全滅は実質敗北の大ペナルティ
+    p0.center = null; p0.collab = null; p0.back = [];
+    assert(evaluateState(e, 0).parts.structure <= WEIGHTS.noBoard, 'ホロメン不在の崩壊ペナルティが効いていない');
+  });
+
+  await testAsync('AI評価関数: 自センターへのリーサル脅威を検知', async () => {
+    const e = await setupMainStep(deckMap, 161);
+    const p0 = e.state.players[0]; const p1 = e.state.players[1];
+    // 相手センター: アーツ100・支払い可能なエール → 自センター(残HP60)を倒せる
+    const oppC = e._createHolomem(fakeHolomen({ name: '敵C', hp: 100, arts: [{ name: 'A', dmg: 100, dmgPlus: false, cost: ['無色'], tokkou: [] }] }), 1);
+    oppC.cheers = [{ number: 'c', name: '青エール', kind: 'cheer', color: '青' }];
+    p1.center = oppC; p1.collab = null;
+    p0.center = e._createHolomem(fakeHolomen({ name: '自C', hp: 60 }), 1);
+    const ev = evaluateState(e, 0);
+    assert(ev.parts.lethal <= WEIGHTS.lethalThreatToMe, `自センターへのリーサル脅威が反映されていない（lethal=${ev.parts.lethal}）`);
+  });
+
+  await testAsync('AIエール: リーサルに届くアタッカーへエールを置く', async () => {
+    const e = await setupMainStep(deckMap, 163);
+    const s = e.state; s.turnPlayer = 0;
+    const p0 = s.players[0]; const p1 = s.players[1];
+    p1.center = e._createHolomem(fakeHolomen({ name: '敵C', hp: 50 }), 1); // 残50
+    p1.collab = null;
+    // センター: 30火力（1枚で解放するが届かない）
+    const cH = e._createHolomem(fakeHolomen({ name: '自C', arts: [{ name: 'a', dmg: 30, dmgPlus: false, cost: ['無色'], tokkou: [] }] }), 1);
+    // コラボ: 60火力（コスト2）。今1枚→もう1枚で解放かつリーサル到達
+    const colH = e._createHolomem(fakeHolomen({ name: '自Co', arts: [{ name: 'b', dmg: 60, dmgPlus: false, cost: ['無色', '無色'], tokkou: [] }] }), 1);
+    colH.cheers = [{ number: 'x', name: '白エール', kind: 'cheer', color: '白' }];
+    p0.center = cH; p0.collab = colH; p0.back = [];
+    const cheer = { number: 'y', name: '青エール', kind: 'cheer', color: '青' };
+    const pending = { type: 'attachCheer', player: 0, cheer, options: [
+      { id: 'toC', pos: { zone: 'center', index: 0 } },
+      { id: 'toCol', pos: { zone: 'collab', index: 0 } },
+    ] };
+    const id = new HeuristicAI(0)._chooseCheerTarget(e, pending);
+    assertEq(id, 'toCol', 'リーサルに届くコラボへエールを置かなかった');
+  });
+
+  await testAsync('AI防御: 自センターがリーサル脅威下なら硬いバックへバトンタッチする', async () => {
+    const e = await setupMainStep(deckMap, 162);
+    const s = e.state; s.turn = 3; s.turnPlayer = 0;
+    const p0 = s.players[0]; const p1 = s.players[1];
+    // 相手センター: 100火力（支払い済み）→ 自センターへのリーサル脅威
+    const oppC = e._createHolomem(fakeHolomen({ name: '敵C', hp: 150, arts: [{ name: 'A', dmg: 100, dmgPlus: false, cost: ['無色'], tokkou: [] }] }), 1);
+    oppC.cheers = [{ number: 'oc', name: '青エール', kind: 'cheer', color: '青' }];
+    p1.center = oppC; p1.collab = null; p1.back = [];
+    // 自センター: 残HP低＋バトンコスト用エール / バック: 硬い
+    const myC = e._createHolomem(fakeHolomen({ name: '自C', hp: 70, batonTouch: ['無色'] }), 1);
+    myC.cheers = [{ number: 'mc', name: '白エール', kind: 'cheer', color: '白' }];
+    const tank = e._createHolomem(fakeHolomen({ name: 'タンク', hp: 200 }), 1);
+    p0.center = myC; p0.collab = null; p0.back = [tank]; p0.hand = [];
+    e._queueMainPending();
+    assert(s.pending.options.some((o) => o.kind === 'baton'), 'バトンタッチ候補が生成されていない（前提崩れ）');
+    const id = new HeuristicAI(0).choose(e);
+    const opt = s.pending.options.find((o) => o.id === id);
+    assertEq(opt?.kind, 'baton', `脅威下でバトンタッチを選ばなかった（選択=${id}）`);
   });
 
   await testAsync('hSD10-013 ふぐ太郎: アーツ使用判定は個体単位（同名が使っただけでは誘発しない）', async () => {

@@ -1195,6 +1195,36 @@ body.dragging, body.dragging * { cursor: grabbing !important; }
   font-weight: bold;
 }
 
+/* ===== 評価値オーバーレイ（設定「評価値を表示」ON時）===== */
+.eval-badge {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  min-width: 30px;
+  padding: 2px 7px;
+  border-radius: 9px;
+  font-size: 15px;
+  font-weight: bold;
+  text-align: center;
+  color: #fff;
+  background: rgba(20, 24, 48, 0.92);
+  border: 2px solid #6ec3ff;
+  box-shadow: 0 2px 10px rgba(0, 0, 0, 0.7);
+  pointer-events: none;
+  z-index: 30;
+  white-space: nowrap;
+}
+.eval-badge.pos { border-color: #5fcf8f; color: #c8ffe0; }
+.eval-badge.best { border-color: #ffd24a; color: #fff3c8; box-shadow: 0 0 14px rgba(255, 210, 74, 0.8); }
+.eval-badge.neg { border-color: #d0607a; color: #ffd2dd; opacity: 0.9; }
+/* 相手側（180度回転）でも数字を読める向きに戻す */
+.side.opponent .eval-badge { transform: translate(-50%, -50%) rotate(180deg); }
+/* 手札カード上の評価値は上端に出す（絵柄のホバー持ち上げと干渉しにくい位置） */
+#hand .eval-badge { top: 16px; }
+/* アクションボタンに付ける評価値 */
+.action-eval { float: right; font-weight: bold; color: #ffd24a; margin-left: 8px; }
+
 /* スマホ用要素は既定（PC）では非表示 */
 .mobile-only { display: none; }
 
