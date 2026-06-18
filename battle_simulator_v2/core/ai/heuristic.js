@@ -14,7 +14,7 @@
  * 各決定ロジックは段階的にこの共通評価へ寄せていく。
  */
 
-import { evaluateState, maxArtDmg } from './evaluate.js';
+import { evaluateState, maxArtDmg, incomingDamageToCenter } from './evaluate.js';
 
 export class HeuristicAI {
   constructor(playerIdx) {
@@ -137,8 +137,23 @@ export class HeuristicAI {
    */
   _chooseCheerTarget(engine, pending) {
     const p = this._player(engine);
+    const opp = this._opp(engine);
     const cheer = pending.cheer;
     const options = pending.options;
+    // リーサル到達の物差し: 相手センターの残りHP（このエールで届くアタッカーを優先する）
+    const oppCenter = opp.center;
+    const oppCenterRemain = oppCenter ? Math.max(0, engine.effectiveHp(oppCenter) - oppCenter.damage) : 0;
+    const oppColor = oppCenter ? oppCenter.stack[0].color : null;
+    const bestPayableDmg = (h, cheers) => {
+      let d = 0;
+      for (const a of (h.stack[0].arts || [])) {
+        if (!engine._canPayCheers(cheers, a.cost)) continue;
+        let v = (a.dmg || 0) + Math.max(0, engine.effects.artsBonus(h, this.playerIdx));
+        for (const tk of a.tokkou || []) if (oppColor === tk.color) v += tk.value;
+        d = Math.max(d, v);
+      }
+      return d;
+    };
     let best = options[0];
     let bestScore = -Infinity;
     for (const opt of options) {
@@ -167,6 +182,13 @@ export class HeuristicAI {
           // 最大コスト分すでに持っている → 過剰投資
           score -= 30;
         }
+        // リーサル到達: このエールを足すと相手センターを倒せるアタッカーになるなら大加点
+        // （前衛＝センター/コラボのみ。届いていなかったものが届くようになる場合に限る）
+        if (oppCenter && (opt.pos.zone === 'center' || opt.pos.zone === 'collab')) {
+          const before = bestPayableDmg(h, h.cheers);
+          const after = bestPayableDmg(h, afterCheers);
+          if (after >= oppCenterRemain && before < oppCenterRemain) score += 60;
+        }
       }
       if (score > bestScore) {
         bestScore = score;
@@ -184,6 +206,14 @@ export class HeuristicAI {
       return 'pass';
     }
     const p = this._player(engine);
+    // 防御の物差し: 次の相手ターンに自センターが倒され得るか（リーサル脅威）
+    const opp = this._opp(engine);
+    const oppIdx = 1 - this.playerIdx;
+    const myCenter = p.center;
+    const myCenterRemain = myCenter ? engine.effectiveHp(myCenter) - myCenter.damage : 0;
+    const oppThreat = incomingDamageToCenter(engine, opp, oppIdx, myCenter);
+    const underLethal = !!myCenter && oppThreat > 0 && oppThreat >= myCenterRemain;
+
     let best = null;
     let bestScore = 0; // パスのスコア=0。正のスコアの行動だけ実行
     for (const opt of options) {
@@ -202,6 +232,11 @@ export class HeuristicAI {
           if (engine.registry.get(newCard.number)?.bloomEffect) score += 40;
           // ダメージを負っているホロメンのHP上限を上げて延命する価値
           if (h.damage > 0 && hpGain > 0) score += 10;
+          // 防御: 脅威下のセンターをBloomしてHP上限を上げ、リーサルを外せるなら大加点
+          if (underLethal && h === myCenter) {
+            const newRemain = (newCard.hp || 0) - h.damage; // Bloom でダメージは持ち越し
+            if (newRemain > oppThreat) score += 80;
+          }
           break;
         }
         case 'place': {
@@ -241,13 +276,17 @@ export class HeuristicAI {
           break;
         }
         case 'baton': {
-          // センターが瀕死で、バックの方が強ければ交代
+          // センターが瀕死、または脅威下なら、より硬いバックと交代してリーサルを外す
           if (!p.center) break;
           const centerRemain = engine.effectiveHp(p.center) - p.center.damage;
           const back = p.back[opt.backIndex];
           if (!back) break;
           const backRemain = engine.effectiveHp(back) - back.damage;
-          if (centerRemain <= 40 && backRemain > centerRemain + 30) score = 35;
+          if (underLethal && backRemain > oppThreat && backRemain > centerRemain) {
+            score = 70; // 交代でセンターが倒されなくなる
+          } else if (centerRemain <= 40 && backRemain > centerRemain + 30) {
+            score = 35; // 瀕死センターの入れ替え
+          }
           break;
         }
         case 'oshiSkill': {
