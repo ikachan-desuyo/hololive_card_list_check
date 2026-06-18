@@ -33,7 +33,7 @@ export default {
       const host = ctx.sourceHolomem;
       const top = host.stack[0];
       if (!isFG(top)) return;                                            // ◆#FLOW GLOW を持つホロメンに付いていたら
-      if (!(ctx.player.artsUsedNamesThisTurn || []).includes(top.name)) return; // このターンにこのホロメンがアーツを使っていた
+      if (host._artsUsedTurn !== ctx.state.turn) return;                 // このターンに“このホロメン”（個体）がアーツを使っていた
       const cand = ctx.deckCards((c) => c.kind === 'holomen' && isFG(c) && (c.bloomLevel === 'Debut' || c.bloomLevel === 'Spot'));
       if (cand.length === 0) return;
       const ok = yield ctx.confirm('ふぐ太郎: デッキから#FLOW GLOWのDebut/Spotを1枚ステージに出す？（ふぐ太郎はデッキの下に戻る）');

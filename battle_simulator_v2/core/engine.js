@@ -1413,10 +1413,17 @@ export class Engine {
         this.log(`${p.name}: ${topCard(h).name} がコラボ（ホロパワー+1）`);
         // コラボエフェクト (13.2) ＋ 他ホロメンの「（自分のホロメンが）コラボした時」傍観トリガー
         const runners = [];
+        // 傍観/装着の onCollab 用に、カードのキーワード/ギフト名を取り出す（同名カード同士でも
+        // どの能力が誘発したか分かるよう、解決順の選択ラベルに能力名を出す）。
+        const abilityName = (card) => {
+          const kw = (card.keywords || []).find((k) => k.name && k.subtype !== 'コラボエフェクト');
+          return kw ? `「${kw.name}」` : 'コラボ時の能力';
+        };
         const def = this.registry.get(topCard(h).number);
         if (def?.collabEffect) {
           this.log(`《コラボエフェクト》${def.collabEffect.name}`);
-          runners.push({ run: def.collabEffect.run, srcCard: topCard(h), srcH: h });
+          runners.push({ run: def.collabEffect.run, srcCard: topCard(h), srcH: h,
+            label: `${topCard(h).name}: コラボエフェクト「${def.collabEffect.name}」` });
         } else {
           const kw = topCard(h).keywords.find((k) => k.subtype === 'コラボエフェクト');
           if (kw) this.log(`TODO(効果未実装) コラボエフェクト「${kw.name}」: ${kw.text}`);
@@ -1425,20 +1432,22 @@ export class Engine {
           const wh = this._holomemAt(p, pos);
           if (wh === h) continue;
           const wtrig = this.registry.get(topCard(wh).number)?.triggers?.onCollab;
-          if (wtrig) runners.push({ run: wtrig, srcCard: topCard(wh), srcH: wh });
+          if (wtrig) runners.push({ run: wtrig, srcCard: topCard(wh), srcH: wh,
+            label: `${topCard(wh).name}: ${abilityName(topCard(wh))}（コラボ時）` });
         }
         // コラボしたホロメンに付いている装着カードの onCollab（「このカードが付いているホロメンがコラボした時」hBP02-089 等）。
         // sourceHolomem はコラボしたホロメン（=ホスト）、sourceCard は装着カード。
         for (const att of h.attachments) {
           const atrig = this.registry.get(att.number)?.triggers?.onCollab;
-          if (atrig) runners.push({ run: atrig, srcCard: att, srcH: h });
+          if (atrig) runners.push({ run: atrig, srcCard: att, srcH: h,
+            label: `${att.name}: ${abilityName(att)}（コラボ時）` });
         }
         if (runners.length > 0) {
           // コラボエフェクト＋傍観 onCollab が2件以上同時誘発なら解決順をプレイヤーが選ぶ (Q587 等)
           const collabInfo = { holomem: h, card: topCard(h) }; // コラボしたホロメン（傍観 onCollab が参照。hBP08-051）
           const ordered = runners.map((r) => ({
             run: r.run,
-            label: r.srcCard.name || 'コラボエフェクト',
+            label: r.label || (r.srcCard.name || 'コラボエフェクト'),
             opts: { playerIdx: s.turnPlayer, sourceCard: r.srcCard, sourceHolomem: r.srcH, collabInfo },
           }));
           this._runOrderedTriggers(ordered, s.turnPlayer, finish);
@@ -1661,6 +1670,8 @@ export class Engine {
     h.lastArtUsedIndex = action.artIndex; // 再アーツ（同じアーツをもう1回）判定用に記録
     // 「このターンに〈名前〉がアーツを使ったか」判定用に、アーツを使ったホロメン名を記録（hBP05-050 等）
     (p.artsUsedNamesThisTurn || (p.artsUsedNamesThisTurn = [])).push(topCard(h).name);
+    // 「このターンに“このホロメン”がアーツを使ったか」判定用（名前でなく個体単位。hSD10-013 ふぐ太郎 等）
+    h._artsUsedTurn = s.turn;
     // 「このターンにセンターでアーツを使ったか」判定用（hBP08-007 ターン終了時推しスキル）
     if (action.zone === 'center') {
       (p.centerArtsUsedNamesThisTurn || (p.centerArtsUsedNamesThisTurn = [])).push(topCard(h).name);
