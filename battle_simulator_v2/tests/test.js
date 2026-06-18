@@ -13,6 +13,7 @@ import { EffectRegistry } from '../core/effects/registry.js';
 import { EffectContext } from '../core/effects/context.js';
 import { compileCard } from '../core/effects/text-compiler.js';
 import { HeuristicAI } from '../core/ai/heuristic.js';
+import { evaluateState, WEIGHTS } from '../core/ai/evaluate.js';
 import { createRng } from '../core/rng.js';
 
 const results = [];
@@ -565,6 +566,30 @@ export async function runTests() {
     const nums = r.value.buildOptions().map((o) => o.card?.number).filter(Boolean);
     assert(nums.includes('hBP04-043'), '本物のエクストラDebut(hBP04-043)が候補に出ていない');
     assert(!nums.includes('hBP08-062'), 'hBP08-062自身が候補に混入（エクストラ誤判定）');
+  });
+
+  await testAsync('AI評価関数: ライフ差・盤面崩壊の符号が妥当', async () => {
+    const e = await setupMainStep(deckMap, 160);
+    const p0 = e.state.players[0]; const p1 = e.state.players[1];
+    p0.life = [{ name: 'l' }, { name: 'l' }, { name: 'l' }];
+    p1.life = [{ name: 'l' }];
+    assert(evaluateState(e, 0).parts.life > 0, 'ライフが多い側の life スコアが正でない');
+    assert(evaluateState(e, 1).parts.life < 0, '相手視点で life スコアが負でない');
+    // ステージ全滅は実質敗北の大ペナルティ
+    p0.center = null; p0.collab = null; p0.back = [];
+    assert(evaluateState(e, 0).parts.structure <= WEIGHTS.noBoard, 'ホロメン不在の崩壊ペナルティが効いていない');
+  });
+
+  await testAsync('AI評価関数: 自センターへのリーサル脅威を検知', async () => {
+    const e = await setupMainStep(deckMap, 161);
+    const p0 = e.state.players[0]; const p1 = e.state.players[1];
+    // 相手センター: アーツ100・支払い可能なエール → 自センター(残HP60)を倒せる
+    const oppC = e._createHolomem(fakeHolomen({ name: '敵C', hp: 100, arts: [{ name: 'A', dmg: 100, dmgPlus: false, cost: ['無色'], tokkou: [] }] }), 1);
+    oppC.cheers = [{ number: 'c', name: '青エール', kind: 'cheer', color: '青' }];
+    p1.center = oppC; p1.collab = null;
+    p0.center = e._createHolomem(fakeHolomen({ name: '自C', hp: 60 }), 1);
+    const ev = evaluateState(e, 0);
+    assert(ev.parts.lethal <= WEIGHTS.lethalThreatToMe, `自センターへのリーサル脅威が反映されていない（lethal=${ev.parts.lethal}）`);
   });
 
   await testAsync('hSD10-013 ふぐ太郎: アーツ使用判定は個体単位（同名が使っただけでは誘発しない）', async () => {

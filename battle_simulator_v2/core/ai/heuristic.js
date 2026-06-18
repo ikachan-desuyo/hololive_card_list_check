@@ -9,7 +9,12 @@
  * （エンジンの state には全情報があるため、このファイル内で自制する）
  *
  * TODO(Phase 2): 相手の公開カードからのデッキタイプ推測、1手先読み
+ *
+ * 評価の物差しは core/ai/evaluate.js（盤面評価・脅威/リーサル見積り）に集約。
+ * 各決定ロジックは段階的にこの共通評価へ寄せていく。
  */
+
+import { evaluateState, maxArtDmg } from './evaluate.js';
 
 export class HeuristicAI {
   constructor(playerIdx) {
@@ -272,7 +277,12 @@ export class HeuristicAI {
   }
 
   _maxArtDmg(card) {
-    return Math.max(0, ...((card?.arts || []).map((a) => a.dmg)));
+    return maxArtDmg(card); // 共通評価（evaluate.js）の定義に集約
+  }
+
+  /** 現在の盤面評価（idx 視点）。Phase 2 以降で各決定の物差しに使う */
+  _stateValue(engine) {
+    return evaluateState(engine, this.playerIdx).total;
   }
 
   /**
