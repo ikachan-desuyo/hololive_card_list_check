@@ -567,6 +567,51 @@ export async function runTests() {
     assert(!nums.includes('hBP08-062'), 'hBP08-062自身が候補に混入（エクストラ誤判定）');
   });
 
+  await testAsync('hSD10-013 ふぐ太郎: アーツ使用判定は個体単位（同名が使っただけでは誘発しない）', async () => {
+    const e = await setupMainStep(deckMap, 155);
+    await e.registry.preload(['hSD10-013'], lib);
+    const p0 = e.state.players[0];
+    e.state.turnPlayer = 0;
+    const fgDebut = [...lib.byNumber.values()].find((c) => c.kind === 'holomen' && c.bloomLevel === 'Debut'
+      && (c.tags || []).includes('FLOW') && (c.tags || []).includes('GLOW'));
+    assert(fgDebut, '#FLOW GLOW Debutがライブラリに無い');
+    const host = e._createHolomem(lib.getByNumber(fgDebut.number), 1); // #FLOW GLOW ホロメン
+    const fugu = lib.getByNumber('hSD10-013');
+    host.attachments.push(fugu);
+    p0.center = host; p0.collab = null; p0.back = [];
+    p0.deck.unshift(lib.getByNumber(fgDebut.number)); // デッキに#FLOW GLOW Debut
+    const def = e.registry.get('hSD10-013');
+    // ① 同名が使った“ことにする”が、このホスト個体は未使用 → 誘発しない（確認も出ない）
+    p0.artsUsedNamesThisTurn = [host.stack[0].name];
+    let r = def.triggers.onEndStepStart(e._effectContext(0, { sourceHolomem: host, sourceCard: fugu })).next();
+    assert(r.done, '個体未使用なのに誘発した（名前一致での誤誘発）');
+    assert(host.attachments.includes(fugu), 'ふぐ太郎が外れている（誘発しないはず）');
+    // ② このホスト個体がアーツ使用 → 発動確認が出る
+    host._artsUsedTurn = e.state.turn;
+    r = def.triggers.onEndStepStart(e._effectContext(0, { sourceHolomem: host, sourceCard: fugu })).next();
+    assert(!r.done && r.value?.kind === 'confirm', '個体がアーツ使用したのに発動確認が出ない');
+  });
+
+  await testAsync('hBP08-050 水宮枢ギフト: 相手ターンに自ホロメンがダウン→エールデッキ上1枚を自バックへ', async () => {
+    const e = await setupMainStep(deckMap, 156);
+    await e.registry.preload(['hBP08-050'], lib);
+    const p0 = e.state.players[0];
+    e.state.turnPlayer = 1; // 相手のターン
+    const guard = e._createHolomem(lib.getByNumber('hBP08-050'), 1); // ギフト保持者
+    const backH = e._createHolomem(fakeHolomen({ name: 'バック' }), 1);
+    p0.center = guard; p0.collab = null; p0.back = [backH];
+    const cheer = { number: 'c', name: '青エール', kind: 'cheer', color: '青' };
+    p0.cheerDeck.unshift(cheer);
+    const before = backH.cheers.length;
+    const downed = e._createHolomem(fakeHolomen({ name: 'やられ役' }), 1);
+    const def = e.registry.get('hBP08-050');
+    const ctx = e._effectContext(0, { sourceHolomem: guard, downedInfo: { holomem: downed, card: downed.stack[0], ownerIdx: 0, zone: 'center' } });
+    let r = def.triggers.onAnyDown(ctx).next(); // バック1体→自動選択でエール送付（追加yieldなし）
+    assertEq(backH.cheers.length, before + 1, 'バックホロメンにエールデッキ上の1枚が送られていない');
+    assertEq(backH.cheers[backH.cheers.length - 1], cheer, '送られたエールが違う');
+    void r;
+  });
+
   await testAsync('hBP08-107 Otomo: 付けた時に付け先をお休み/アクティブにできる（repro）', async () => {
     const e = await setupMainStep(deckMap, 200);
     await e.registry.preload(['hBP08-107'], lib);
