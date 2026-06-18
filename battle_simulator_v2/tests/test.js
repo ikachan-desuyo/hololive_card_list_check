@@ -14,6 +14,7 @@ import { EffectContext } from '../core/effects/context.js';
 import { compileCard } from '../core/effects/text-compiler.js';
 import { HeuristicAI } from '../core/ai/heuristic.js';
 import { evaluateState, WEIGHTS } from '../core/ai/evaluate.js';
+import { scoreOptions, bestOptionId } from '../core/ai/score.js';
 import { createRng } from '../core/rng.js';
 
 const results = [];
@@ -566,6 +567,16 @@ export async function runTests() {
     const nums = r.value.buildOptions().map((o) => o.card?.number).filter(Boolean);
     assert(nums.includes('hBP04-043'), '本物のエクストラDebut(hBP04-043)が候補に出ていない');
     assert(!nums.includes('hBP08-062'), 'hBP08-062自身が候補に混入（エクストラ誤判定）');
+  });
+
+  await testAsync('AIスコアラ: 全選択肢に数値が付き、CPUの選択とbestOptionIdが一致', async () => {
+    const e = await setupMainStep(deckMap, 170);
+    const sc = scoreOptions(e, 0, e.state.pending);
+    for (const o of e.state.pending.options) {
+      assert(typeof sc[o.id] === 'number', `選択肢 ${o.id} に数値が付いていない（UI評価表示の前提）`);
+    }
+    assertEq(bestOptionId(e, 0, e.state.pending), new HeuristicAI(0).choose(e),
+      'CPUの選択(choose)と最善ID(bestOptionId)が不一致＝CPUと表示の物差しがずれている');
   });
 
   await testAsync('AI評価関数: ライフ差・盤面崩壊の符号が妥当', async () => {
