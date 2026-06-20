@@ -26,10 +26,10 @@ export default {
   bloomEffect: {
     name: '深淵からの信頼',
     *run(ctx) {
-      // 自分のステージ全体の青エール枚数
+      // 自分のステージ全体の青エール枚数（赤→青のエイリアス＝hBP08-003 推しステージスキル等を反映）
       let blue = 0;
       for (const e of ctx.holomems('self')) {
-        blue += (e.holomem.cheers || []).filter((c) => c.color === '青').length;
+        blue += ctx.cheerCountOfColor(e.holomem, '青');
       }
       if (blue < 6) {
         ctx.log('深淵からの信頼: 青エールが6枚未満のため発動しない');
@@ -53,16 +53,16 @@ export default {
 
   arts: {
     'もこもこバウンティハンター': {
-      // このホロメンの青エール1枚につき +20
+      // このホロメンの青エール1枚につき +20（赤→青エイリアス反映）
       dmgBonus(ctx) {
-        const blue = (ctx.sourceHolomem?.cheers || []).filter((c) => c.color === '青').length;
-        return blue * 20;
+        return (ctx.sourceHolomem ? ctx.cheerCountOfColor(ctx.sourceHolomem, '青') : 0) * 20;
       },
       *run(ctx) {
         const self = ctx.sourceHolomem;
         if (!self) return;
+        const isBlue = (c) => ctx.cheerEffectiveColors(self, c).has('青'); // 赤→青エイリアス反映
         // このホロメンの青エールが無ければ付け替え不可
-        if (!(self.cheers || []).some((c) => c.color === '青')) return;
+        if (!(self.cheers || []).some(isBlue)) return;
         // 付け替え先の〈フワワ・アビスガード〉1人（自分自身が〈フワワ〉でない前提だが名前で判定）
         const targets = ctx.holomems('self', (e) => ctx.nameIs(e.top, FUWAWA) && e.holomem !== self);
         if (targets.length === 0) return;
@@ -79,7 +79,7 @@ export default {
 
         // 好きな枚数（このホロメンの青エールの数まで・0枚で打ち切り可）を1枚ずつ付け替える
         while (true) {
-          const blueCheers = (self.cheers || []).filter((c) => c.color === '青');
+          const blueCheers = (self.cheers || []).filter(isBlue);
           if (blueCheers.length === 0) break;
           const picked = yield ctx.chooseCard({
             cards: blueCheers,

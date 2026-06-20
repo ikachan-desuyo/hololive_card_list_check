@@ -30,23 +30,25 @@ export default {
         return;
       }
 
-      // Debutホロメンの〈フワワ・アビスガード〉と〈モココ・アビスガード〉を1枚ずつステージに出す
+      // Debutホロメンの〈フワワ・アビスガード〉と〈モココ・アビスガード〉を1枚ずつステージに出す。
+      // 各名称に複数候補（別カード）があり得るので、どれを出すかはプレイヤーが選ぶ（勝手に出さない）。
       const names = ['フワワ・アビスガード', 'モココ・アビスガード'];
       for (const name of names) {
-        const card = ctx.deckCards(
-          (c) => c.kind === 'holomen' && c.bloomLevel === 'Debut' && c.name === name,
-        )[0];
-        if (!card) {
+        if (ctx.engine._stageCount(ctx.player) >= 6) break; // ステージ上限
+        const cand = ctx.deckCards(
+          (c) => c.kind === 'holomen' && c.bloomLevel === 'Debut' && c.name === name);
+        if (cand.length === 0) {
           ctx.log(`デッキにDebutの〈${name}〉が見つからなかった`);
           continue;
         }
+        const card = yield ctx.chooseCard({
+          cards: cand,
+          title: `ステージに出すDebutの〈${name}〉を選択`,
+        });
+        if (!card) continue;
         ctx.removeFromDeck(card);
         ctx.flashReveal(card); // どのカードを出したか画面に見せる
-        if (!ctx.putToBack(card)) {
-          // ステージ上限などで出せなかった場合はデッキに戻す（領域に属さない瞬間を作らない）
-          ctx.deckToBottom([card]);
-          ctx.log(`ステージに空きがなく〈${name}〉を出せなかった`);
-        }
+        ctx.putToBack(card);
       }
 
       // そしてデッキをシャッフルする

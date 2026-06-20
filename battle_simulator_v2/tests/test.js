@@ -579,6 +579,61 @@ export async function runTests() {
       'CPUの選択(choose)と最善ID(bestOptionId)が不一致＝CPUと表示の物差しがずれている');
   });
 
+  await testAsync('全色扱い: 「相手の推しと異なる色」効果が全色の相手を対象にできる(hBP08-071)', async () => {
+    const e = await setupMainStep(deckMap, 181);
+    await e.registry.preload(['hBP08-071'], lib);
+    const p0 = e.state.players[0]; const p1 = e.state.players[1];
+    p1.oshi = { number: 'x', name: '敵推し', color: '赤', kind: 'holomen', life: 5 };
+    const oppC = e._createHolomem(fakeHolomen({ name: '敵C', color: '赤' }), 1); // 推しと同色→通常は対象外
+    p1.center = oppC; p1.collab = null; p1.back = [];
+    const def = e.registry.get('hBP08-071');
+    // 全色付与前: 同色なので対象なし（候補ゼロでreturn）
+    let r = def.bloomEffect.run(e._effectContext(0, { sourceHolomem: p0.center })).next();
+    assert(r.done, '同色なのに対象になっている（前提崩れ）');
+    // 全色付与後: 「異なる色を持つ」と扱われ対象になる
+    e.state.modifiers.push({ kind: 'treatedAllColors', ownerIdx: 0, match: (h) => h === oppC });
+    r = def.bloomEffect.run(e._effectContext(0, { sourceHolomem: p0.center })).next();
+    assertEq(r.value?.kind, 'chooseHolomem', '全色の相手を特殊ダメージ対象にできていない');
+    const names = r.value.buildOptions().filter((o) => o.value).map((o) => o.value.top.name);
+    assert(names.includes('敵C'), '全色の相手センターが対象候補に含まれない');
+  });
+
+  await testAsync('hBP03-038 遊びの時間: DebutからのBloom時のみ発動（1st→1stでは発動しない）', async () => {
+    const e = await setupMainStep(deckMap, 182);
+    await e.registry.preload(['hBP03-038'], lib);
+    const p0 = e.state.players[0];
+    const fuwawa1 = [...lib.byNumber.values()].find((c) => c.name === 'フワワ・アビスガード' && c.bloomLevel === '1st');
+    if (fuwawa1) p0.deck.unshift(lib.getByNumber(fuwawa1.number));
+    const def = e.registry.get('hBP03-038');
+    const fromDebut = e._createHolomem(fakeHolomen({ name: 'モココ・アビスガード', bloomLevel: '1st' }), 1);
+    fromDebut.stack.push({ name: 'モココ・アビスガード', bloomLevel: 'Debut', kind: 'holomen' });
+    let r = def.bloomEffect.run(e._effectContext(0, { sourceHolomem: fromDebut })).next();
+    assertEq(r.value?.kind, 'chooseCard', 'DebutからのBloomでフワワ選択が出ない');
+    const from1st = e._createHolomem(fakeHolomen({ name: 'モココ・アビスガード', bloomLevel: '1st' }), 1);
+    from1st.stack.push({ name: 'モココ・アビスガード', bloomLevel: '1st', kind: 'holomen' });
+    r = def.bloomEffect.run(e._effectContext(0, { sourceHolomem: from1st })).next();
+    assert(r.done, '1st→1stのBloomで誤発動（DebutからBloom条件違反）');
+  });
+
+  await testAsync('hBP08-039 深淵からの信頼: 赤エールが青として数えられお休みフワワが起きる(hBP08-003連携)', async () => {
+    const e = await setupMainStep(deckMap, 183);
+    await e.registry.preload(['hBP08-039', 'hBP08-003'], lib);
+    const p0 = e.state.players[0];
+    p0.oshi = lib.getByNumber('hBP08-003'); // 〈フワワ/モココ〉の赤エールを青としても扱う
+    const mokoko = e._createHolomem(fakeHolomen({ name: 'モココ・アビスガード', bloomLevel: '2nd' }), 1);
+    for (let i = 0; i < 6; i++) mokoko.cheers.push({ number: 'r', name: '赤エール', kind: 'cheer', color: '赤' });
+    const fuwawaRest = e._createHolomem(fakeHolomen({ name: 'フワワ・アビスガード' }), 1);
+    fuwawaRest.rested = true;
+    p0.center = mokoko; p0.collab = null; p0.back = [fuwawaRest];
+    const def = e.registry.get('hBP08-039');
+    const gen = def.bloomEffect.run(e._effectContext(0, { sourceHolomem: mokoko }));
+    let r = gen.next();
+    assertEq(r.value?.kind, 'chooseHolomem', '赤6枚(青エイリアス)でお休みフワワを起こす選択が出ない');
+    const pick = r.value.buildOptions().find((o) => o.value);
+    r = gen.next(pick.value);
+    assertEq(fuwawaRest.rested, false, 'お休みフワワがアクティブになっていない');
+  });
+
   await testAsync('AI評価関数: ライフ差・盤面崩壊の符号が妥当', async () => {
     const e = await setupMainStep(deckMap, 160);
     const p0 = e.state.players[0]; const p1 = e.state.players[1];
@@ -1132,16 +1187,16 @@ export async function runTests() {
     const gen = def.collabEffect.run(e._effectContext(0, { sourceHolomem: kronii, sourceCard: kronii.stack[0] }));
     let r = gen.next();          // confirm
     assertEq(r.value.kind, 'confirm', 'confirm が出ていない');
-    r = gen.next(true);          // → chooseCard（付け替え可能なエール）
-    assertEq(r.value.kind, 'chooseCard', 'エール選択が出ていない');
-    const cheerNames = r.value.buildOptions().filter((o) => o.value).map((o) => o.value.name);
-    // クロニーのエールは送り先Y(≠自分・≠所有者クロニー・Promise)があるので候補。
-    // Yのエールは送り先が無い（他のPromiseはクロニー=自分のみ）ので候補外。
-    assert(cheerNames.includes('クロのエール'), 'クロニーのエールが付け替え候補に無い');
-    assert(!cheerNames.includes('Yのエール'), 'Yのエールが候補になっている（送り先が無いのに）');
-    // クロニーのエールを選ぶ → 付け替え先候補は Y のみ（自分・非Promise・所有者を除く）
-    const pick = r.value.buildOptions().find((o) => o.value && o.value.name === 'クロのエール');
-    r = gen.next(pick.value);
+    r = gen.next(true);          // → chooseHolomem（付け替え「元」のホロメン）
+    assertEq(r.value.kind, 'chooseHolomem', '元ホロメン選択が出ていない');
+    const fromNames = r.value.buildOptions().filter((o) => o.value).map((o) => o.value.top.name);
+    // クロニー（クロのエール／送り先Y=≠自分・≠所有者・Promiseあり）は元候補。
+    // Y（他のPromiseは自分クロニーのみ→送り先無し）は元候補外。
+    assert(fromNames.includes('オーロ・クロニー'), 'クロニーが付け替え元候補に無い');
+    assert(!fromNames.includes('Y'), 'Y が元候補になっている（送り先が無いのに）');
+    // クロニーを元に選ぶ → エールは1枚(クロのエール)なので自動 → 付け替え先候補は Y のみ
+    const fromPick = r.value.buildOptions().find((o) => o.value && o.value.top.name === 'オーロ・クロニー');
+    r = gen.next(fromPick.value);
     assertEq(r.value.kind, 'chooseHolomem', '付け替え先選択が出ていない');
     const destNames = r.value.buildOptions().filter((o) => o.value).map((o) => o.value.top.name);
     assertEq(destNames.join(','), 'Y', '付け替え先が Y のみになっていない（自分/非Promise/元の所有者が混入）');

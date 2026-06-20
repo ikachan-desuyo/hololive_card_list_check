@@ -13,6 +13,10 @@ export default {
   bloomEffect: {
     name: '遊びの時間だー！',
     *run(ctx) {
+      // 「DebutからBloomした時」: Bloom元（重なりの下＝stack[1]）がDebutの時のみ発動。
+      // 1st→1st の同レベルBloom（公式で可）では発動しない。
+      const prev = ctx.sourceHolomem?.stack?.[1];
+      if (prev && prev.bloomLevel !== 'Debut') return;
       const candidates = ctx.deckCards(
         (c) => c.name === 'フワワ・アビスガード' && c.bloomLevel === '1st'
       );

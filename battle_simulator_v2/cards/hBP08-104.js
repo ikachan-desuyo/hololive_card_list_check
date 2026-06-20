@@ -27,6 +27,11 @@ export default {
       if (!top) return;
       // ◆〈水宮枢〉に付いていたら能力追加
       if (top.name !== '水宮枢') return;
+      // 「Bloomレベルが上がった時」= レベルが実際に上昇した時のみ。
+      // 1st→1st / 2nd→2nd の同レベルBloom（公式で可）では引かない。
+      const RANK = { Debut: 0, '1st': 1, '2nd': 2 };
+      const prev = host.stack[1]; // Bloom前のカード（重なりの下）
+      if (!prev || (RANK[top.bloomLevel] ?? 0) <= (RANK[prev.bloomLevel] ?? 0)) return;
       ctx.draw(1);
     },
   },

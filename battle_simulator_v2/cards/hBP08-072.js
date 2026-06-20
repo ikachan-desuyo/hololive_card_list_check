@@ -58,7 +58,7 @@ export default {
       dmgBonus(ctx) {
         // 相手の推しホロメンと異なる色を持つ相手のステージのホロメン1人につき +10
         const oshiColor = ctx.opponent.oshi?.color;
-        const count = ctx.holomems('opp', (e) => e.top.color && e.top.color !== oshiColor).length;
+        const count = ctx.holomems('opp', (e) => ctx.isAllColors(e.holomem) || (e.top.color && e.top.color !== oshiColor)).length;
         return count * 10;
       },
     },

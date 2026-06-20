@@ -48,7 +48,8 @@ export default {
         // 相手のセンターとコラボのうち、推しと「異なる色」を持つホロメンが対象（条件一致の全員）
         const targets = ctx.holomems(
           'opp',
-          (e) => (e.pos.zone === 'center' || e.pos.zone === 'collab') && e.top.color !== oshiColor,
+          (e) => (e.pos.zone === 'center' || e.pos.zone === 'collab')
+            && (ctx.isAllColors(e.holomem) || e.top.color !== oshiColor), // 全色扱いも「異なる色」
         );
         for (const t of targets) {
           yield* ctx.dealSpecialDamage(t, 20);
