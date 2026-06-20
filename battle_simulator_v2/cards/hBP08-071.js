@@ -22,7 +22,7 @@ export default {
     *run(ctx) {
       const oshiColor = ctx.opponent.oshi?.color || null;
       // 相手の推しホロメンと「異なる色を持つ」相手のホロメンのみ対象
-      const filter = (e) => e.top.color !== oshiColor;
+      const filter = (e) => ctx.isAllColors(e.holomem) || e.top.color !== oshiColor; // 全色扱いも「異なる色」
       const candidates = ctx.holomems('opp', filter);
       if (candidates.length === 0) {
         ctx.log('TOMORROW!?: 相手の推しホロメンと異なる色を持つホロメンがいない');

@@ -81,6 +81,31 @@ export class EffectContext {
     return card.name === name || (card.nameAliases || []).includes(name);
   }
 
+  /**
+   * エール cheer が holomem に付いている時の「実効的な色」集合（推しステージスキルの
+   * エール色エイリアスを反映）。例: FUWAMOCO(hBP08-003) では〈フワワ/モココ〉の赤エールは青も含む。
+   * 効果テキストの「○色エール」判定（枚数カウント・付け替え候補等）はこれを使うこと。
+   */
+  cheerEffectiveColors(holomem, cheer) {
+    const colors = new Set([cheer.color]);
+    const oshiStage = this.engine._oshiStage(this.playerIdx);
+    if (oshiStage?.cheerColorAlias) {
+      for (const c of oshiStage.cheerColorAlias(holomem, cheer, this.engine, this.playerIdx) || []) colors.add(c);
+    }
+    return colors;
+  }
+
+  /** holomem に付いた「実効色 color」のエール枚数（エイリアス反映） */
+  cheerCountOfColor(holomem, color) {
+    return (holomem.cheers || []).filter((c) => this.cheerEffectiveColors(holomem, c).has(color)).length;
+  }
+
+  /** ホロメンが「すべての色を持つ」として扱われているか（全色扱い。Takodachi/Ina推しスキル等）。
+   *  「○色と異なる色を持つ」等の色条件はこれを考慮すること（全色なら必ず該当）。 */
+  isAllColors(holomem) {
+    return this.engine._isTreatedAllColors(holomem);
+  }
+
   /** タグ保持判定（#ID など。タグ表記は "ID" のように # 無しで格納されている） */
   hasTag(card, tag) {
     const t = tag.replace(/^#/, '');

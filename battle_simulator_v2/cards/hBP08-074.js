@@ -35,7 +35,7 @@ export default {
       }
       const oshiColor = ctx.opponent.oshi?.color || null;
       // 相手の推しホロメンと異なる色を持つ、相手ステージのホロメンを数える
-      const diff = ctx.holomems('opp', (e) => e.top.color !== oshiColor);
+      const diff = ctx.holomems('opp', (e) => ctx.isAllColors(e.holomem) || e.top.color !== oshiColor); // 全色扱いも「異なる色」
       if (diff.length === 0) {
         ctx.log('目覚めよ、赤き眼の黒龍: 推しと異なる色のホロメンがいない');
         return;

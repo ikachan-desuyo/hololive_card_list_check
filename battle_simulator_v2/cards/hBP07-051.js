@@ -14,21 +14,23 @@ export default {
       const isDest = (e) => e.holomem !== self && ctx.hasTag(e.top, 'Promise');
       // 付け替え可能なエール＝「そのエールの所有者(from)とは別の」付け替え先が存在するエールだけを候補にする。
       // （付け替え＝別のホロメンへ移すこと。所有者自身へは送れない＝no-op を作らない）
-      const entries = [];
-      for (const e of ctx.holomems('self')) {
-        const hasOtherDest = ctx.holomems('self', (d) => isDest(d) && d.holomem !== e.holomem).length > 0;
-        if (!hasOtherDest) continue;
-        for (const cheer of e.holomem.cheers) entries.push({ cheer, from: e.holomem });
-      }
-      if (entries.length === 0) return; // 付け替えられるエールが無ければ何もしない
+      // 付け替え「元」になれるホロメン＝エールを持ち、かつ「自分以外の付け替え先」が存在するもの。
+      const canBeFrom = (e) => e.holomem.cheers.length > 0
+        && ctx.holomems('self', (d) => isDest(d) && d.holomem !== e.holomem).length > 0;
+      if (ctx.holomems('self', canBeFrom).length === 0) return; // 付け替えられるエールが無ければ何もしない
       const ok = yield ctx.confirm('エール1枚を #Promise ホロメンに付け替えますか？');
       if (!ok) return;
-      const picked = yield ctx.chooseCard({
-        cards: entries.map((e) => e.cheer),
-        title: '付け替えるエールを選択',
+      // まず「元」のホロメンを盤面で選ぶ（盤上カードが光り、どのホロメンのエールか一目で分かる）
+      const fromEntry = yield ctx.chooseHolomem({
+        side: 'self', filter: canBeFrom, optional: true,
+        title: '付け替えるエールの「元」のホロメンを選択',
       });
+      if (!fromEntry) return;
+      const from = fromEntry.holomem;
+      const cheers = [...from.cheers];
+      const picked = cheers.length === 1 ? cheers[0]
+        : yield ctx.chooseCard({ cards: cheers, title: `〈${from.stack[0].name}〉の付け替えるエールを選択`, optional: true });
       if (!picked) return;
-      const from = entries.find((e) => e.cheer === picked).from;
       const target = yield ctx.chooseHolomem({
         side: 'self',
         filter: (e) => isDest(e) && e.holomem !== from, // このホロメン以外の#Promise、かつ元の所有者とは別
