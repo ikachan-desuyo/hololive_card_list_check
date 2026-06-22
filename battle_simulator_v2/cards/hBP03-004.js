@@ -13,7 +13,10 @@
  *     engine のアーツ対象拡張ループが artTargetAnyBack を持つホロメンに相手の全バックを対象として追加する。
  */
 function isMococo1st(e) {
-  return e.top.name === 'モココ・アビスガード' && e.top.bloomLevel === '1st';
+  // 〈モココ・アビスガード〉= 名称参照（FUWAMOCO の別名「〈フワワ〉〈モココ〉として扱う」も一致）
+  const top = e.top;
+  const isMococo = top.name === 'モココ・アビスガード' || (top.nameAliases || []).includes('モココ・アビスガード');
+  return isMococo && top.bloomLevel === '1st';
 }
 
 export default {

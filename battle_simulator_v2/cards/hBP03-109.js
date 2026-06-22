@@ -33,7 +33,7 @@ export default {
         (c) => c.kind === 'cheer' && c.color === '青');
       if (blueCheers.length === 0) return;
       // 送り先: 自分の〈フワワ・アビスガード〉
-      const targets = ctx.holomems('self', (e) => e.top.name === 'フワワ・アビスガード');
+      const targets = ctx.holomems('self', (e) => ctx.nameIs(e.top, 'フワワ・アビスガード'));
       if (targets.length === 0) return;
       const picked = yield ctx.chooseCard({
         cards: blueCheers,
@@ -44,7 +44,7 @@ export default {
       if (!picked) return;
       const target = yield ctx.chooseHolomem({
         side: 'self',
-        filter: (e) => e.top.name === 'フワワ・アビスガード',
+        filter: (e) => ctx.nameIs(e.top, 'フワワ・アビスガード'),
         title: '青エールを送る〈フワワ・アビスガード〉を選択',
       });
       if (!target) return;

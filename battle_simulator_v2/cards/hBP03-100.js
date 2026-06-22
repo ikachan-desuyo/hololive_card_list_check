@@ -19,8 +19,11 @@ export default {
     },
     // ◆〈フワワ/モココ・アビスガード〉に付いていたら: アーツの必要エール色をすべて無色にする
     artsCostAllColorless(holomem) {
-      const n = holomem.stack[0].name;
-      return n === 'フワワ・アビスガード' || n === 'モココ・アビスガード';
+      // 名称参照（FUWAMOCO の別名「〈フワワ〉〈モココ〉として扱う」も一致）
+      const top = holomem.stack[0];
+      const al = top.nameAliases || [];
+      const has = (x) => top.name === x || al.includes(x);
+      return has('フワワ・アビスガード') || has('モココ・アビスガード');
     },
   },
 };

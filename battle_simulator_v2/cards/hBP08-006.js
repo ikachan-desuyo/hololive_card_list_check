@@ -28,8 +28,8 @@ export default {
       const oppHolos = engine._stageHolomems(opp);
       if (oppHolos.length === 0) return []; // 相手にホロメンがいなければ条件不成立
       const oppOshiColor = opp.oshi?.color || null; // 「相手の推しホロメン」の色
-      // 相手のステージのホロメン全員が、相手の推しと異なる色
-      const allDiffer = oppHolos.every((h) => h.stack[0].color !== oppOshiColor);
+      // 相手のステージのホロメン全員が、相手の推しと異なる色（全色扱いなら「異なる色を持つ」＝成立）
+      const allDiffer = oppHolos.every((h) => engine._isTreatedAllColors(h) || h.stack[0].color !== oppOshiColor);
       if (!allDiffer) return [];
       // エール不要＝全色＋無色を大量に軽減
       return [...COLORS, COLORLESS].map((c) => ({ color: c, amount: 99 }));

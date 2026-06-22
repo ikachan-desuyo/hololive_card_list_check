@@ -24,9 +24,13 @@ export default {
   //   青エールとしても扱う（常時）。アーツのコスト判定で赤エールが青コストも満たせる。
   oshiStageSkill: {
     name: '準備は出来てるよね！',
-    cheerColorAlias(holomem, cheer) {
-      const name = holomem.stack[0].name;
-      if (name !== 'フワワ・アビスガード' && name !== 'モココ・アビスガード') return [];
+    cheerColorAlias(holomem, cheer, engine) {
+      // 〈フワワ〉〈モココ〉= 名称参照（FUWAMOCO の別名「として扱う」も対象）
+      const top = holomem.stack[0];
+      const isFuwaMoco = engine
+        ? (engine._nameIs(top, 'フワワ・アビスガード') || engine._nameIs(top, 'モココ・アビスガード'))
+        : (top.name === 'フワワ・アビスガード' || top.name === 'モココ・アビスガード');
+      if (!isFuwaMoco) return [];
       return cheer.color === '赤' ? ['青'] : [];
     },
   },

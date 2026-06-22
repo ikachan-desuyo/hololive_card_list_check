@@ -53,15 +53,18 @@ export default {
 
   arts: {
     'もこもこバウンティハンター': {
-      // このホロメンの青エール1枚につき +20（赤→青エイリアス反映）
-      dmgBonus(ctx) {
-        return (ctx.sourceHolomem ? ctx.cheerCountOfColor(ctx.sourceHolomem, '青') : 0) * 20;
-      },
+      // 「青エール1枚につき+20」→ ダメージ → 「その後 付け替え」。
+      // エンジンは run を damage より前に実行するため、dmgBonus（damage時に計算）では
+      // 付け替えで青エールが減った後の枚数になってしまう。よって run の冒頭で、付け替え前の
+      // 枚数を addArtBonus で確定する（赤→青エイリアス反映）。dmgBonus は使わない。
       *run(ctx) {
         const self = ctx.sourceHolomem;
         if (!self) return;
         const isBlue = (c) => ctx.cheerEffectiveColors(self, c).has('青'); // 赤→青エイリアス反映
-        // このホロメンの青エールが無ければ付け替え不可
+        // 付け替え前の青エール枚数で +20/枚 を先に確定（ダメージ計算はこの枚数で行われる）
+        const blueCount = ctx.cheerCountOfColor(self, '青');
+        if (blueCount > 0) ctx.addArtBonus(blueCount * 20, `青エール${blueCount}枚`);
+        // その後、青エールを好きな枚数〈フワワ・アビスガード〉へ付け替える（任意）
         if (!(self.cheers || []).some(isBlue)) return;
         // 付け替え先の〈フワワ・アビスガード〉1人（自分自身が〈フワワ〉でない前提だが名前で判定）
         const targets = ctx.holomems('self', (e) => ctx.nameIs(e.top, FUWAWA) && e.holomem !== self);

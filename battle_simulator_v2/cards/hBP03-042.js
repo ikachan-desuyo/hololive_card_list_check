@@ -13,7 +13,7 @@ export default {
     name: 'フワ花流水',
     *run(ctx) {
       // 自分のステージに〈モココ・アビスガード〉がいるか判定
-      const hasMococo = ctx.holomems('self', (e) => e.top.name === 'モココ・アビスガード').length > 0;
+      const hasMococo = ctx.holomems('self', (e) => ctx.nameIs(e.top, 'モココ・アビスガード')).length > 0;
       if (!hasMococo) return;
       const target = yield ctx.chooseHolomem({
         side: 'opp',

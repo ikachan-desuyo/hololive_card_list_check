@@ -17,8 +17,9 @@ export default {
       // 1st→1st の同レベルBloom（公式で可）では発動しない。
       const prev = ctx.sourceHolomem?.stack?.[1];
       if (prev && prev.bloomLevel !== 'Debut') return;
+      // 〈フワワ・アビスガード〉= 名称参照（FUWAMOCO のエクストラ「〈フワワ〉〈モココ〉として扱う」も一致）
       const candidates = ctx.deckCards(
-        (c) => c.name === 'フワワ・アビスガード' && c.bloomLevel === '1st'
+        (c) => ctx.nameIs(c, 'フワワ・アビスガード') && c.bloomLevel === '1st'
       );
       const picked = yield ctx.chooseCard({
         cards: candidates,
