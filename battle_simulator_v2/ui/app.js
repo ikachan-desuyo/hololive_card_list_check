@@ -53,13 +53,27 @@ async function resolveDeckMap(key) {
 
 async function initSetupScreen() {
   const sources = await loadDeckSources();
+  const settings = getSettings();
+  const lastKey = { 'deck-p1': settings.lastDeckP1, 'deck-p2': settings.lastDeckP2 };
   for (const id of ['deck-p1', 'deck-p2']) {
     const select = document.getElementById(id);
     select.innerHTML = '';
+    // 前回使用したデッキが（今も候補に）あればそれを初期選択。無ければ「選択してください」を促す
+    const last = lastKey[id];
+    const hasLast = last && sources.some((s) => s.key === last);
+    if (!hasLast) {
+      const ph = document.createElement('option');
+      ph.value = '';
+      ph.textContent = '選択してください';
+      ph.disabled = true;
+      ph.selected = true;
+      select.appendChild(ph);
+    }
     for (const s of sources) {
       const opt = document.createElement('option');
       opt.value = s.key;
       opt.textContent = s.label;
+      if (hasLast && s.key === last) opt.selected = true;
       select.appendChild(opt);
     }
   }
@@ -70,9 +84,15 @@ async function startGame() {
   const errBox = document.getElementById('setup-error');
   errBox.textContent = '';
   try {
+    const key1 = document.getElementById('deck-p1').value;
+    const key2 = document.getElementById('deck-p2').value;
+    if (!key1 || !key2) {
+      errBox.textContent = 'デッキを選択してください';
+      return;
+    }
     // デッキ定義は {id:枚数} / カードID配列 / 構造化形式 のいずれもあり得るので正規化してから使う
-    const map1 = CardLibrary.normalizeDeckMap(await resolveDeckMap(document.getElementById('deck-p1').value));
-    const map2 = CardLibrary.normalizeDeckMap(await resolveDeckMap(document.getElementById('deck-p2').value));
+    const map1 = CardLibrary.normalizeDeckMap(await resolveDeckMap(key1));
+    const map2 = CardLibrary.normalizeDeckMap(await resolveDeckMap(key2));
     const deck1 = lib.buildGameDeck(map1);
     const deck2 = lib.buildGameDeck(map2);
     const errors = [
@@ -83,6 +103,8 @@ async function startGame() {
       errBox.textContent = errors.join('\n');
       return;
     }
+    // 正常に組めたデッキを「前回使用」として記憶（次回の初期選択に使う）
+    saveSettings({ lastDeckP1: key1, lastDeckP2: key2 });
     const seedInput = document.getElementById('seed-input').value;
     const seed = seedInput ? Number(seedInput) : Math.floor(Math.random() * 1e9);
     currentSeed = seed;
@@ -1452,6 +1474,11 @@ async function main() {
 
   // 開発・スモークテスト用: ?autostart=1&seed=42 で即ゲーム開始
   if (params.get('autostart')) {
+    // デッキ未選択（「選択してください」）の時は先頭の実デッキを選ぶ（自動起動用）
+    for (const id of ['deck-p1', 'deck-p2']) {
+      const sel = document.getElementById(id);
+      if (!sel.value) { const real = [...sel.options].find((o) => o.value); if (real) sel.value = real.value; }
+    }
     if (params.get('seed')) document.getElementById('seed-input').value = params.get('seed');
     await startGame();
     const autoplay = Number(params.get('autoplay') || 0);
