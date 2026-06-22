@@ -15,12 +15,61 @@ import { HeuristicAI } from '../core/ai/heuristic.js';
 import { scoreOptions, bestOptionId } from '../core/ai/score.js';
 import { STEP_NAMES } from '../core/constants.js';
 import { renderSide, renderHand, renderOppHand } from './board.js';
+import { IMPLEMENTED } from '../cards/index.js';
 
 const TEST_DECKS = ['ラミィデッキ', 'あの青空のせいだ', 'holoX起動テスト', 'ジジ'];
 
 let lib = null;
 let engine = null;
 let showAllActions = false;
+let resumingStart = false; // リロード後の自動再開中はビルド更新チェックを行わない
+
+// ============ 開発中の更新反映（ゲーム開始時に最新コードを取り込む） ============
+//
+// v2 は SW キャッシュをバイパスしているため、ページを読み込めば最新の JS を取得できる。
+// だがタブを開いたまま編集すると、メモリ上の旧 JS のまま「対戦開始」してしまう。
+// そこで開始時に「主要スクリプト＋このデッキで使うカード定義」の更新時刻(Last-Modified)を確認し、
+// 前回からの変化を検知したらページをリロードして最新コードで自動再開する（ハードリロード不要）。
+const CORE_WATCH_FILES = [
+  'ui/app.js', 'ui/board.js',
+  'core/engine.js', 'core/cards.js',
+  'core/effects/context.js', 'core/effects/registry.js', 'core/effects/text-compiler.js',
+  'cards/index.js',
+];
+
+async function fileStamp(relPath) {
+  try {
+    const res = await fetch(relPath, { method: 'HEAD', cache: 'no-store' });
+    if (!res.ok) return null;
+    return res.headers.get('last-modified') || res.headers.get('etag') || '';
+  } catch {
+    return null; // 取得不可（オフライン等）は「変化なし」扱いにして開始を妨げない
+  }
+}
+
+/** 主要ファイル＋使用カード定義ファイルの更新時刻マップを集める */
+async function collectBuildStamps(cardNumbers) {
+  const paths = [
+    ...CORE_WATCH_FILES.map((p) => `battle_simulator_v2/${p}`),
+    ...[...new Set(cardNumbers)].filter((n) => IMPLEMENTED[n]).map((n) => `battle_simulator_v2/cards/${n}.js`),
+  ];
+  const entries = await Promise.all(paths.map(async (p) => [p, await fileStamp(p)]));
+  const map = {};
+  for (const [p, s] of entries) if (s != null) map[p] = s;
+  return map;
+}
+
+/** 前回記録と比較し、既知ファイルに変化があれば true。新規ファイルは変化扱いしない（記録は更新する） */
+function buildChangedAndStore(stamps) {
+  let prev = {};
+  try { prev = JSON.parse(localStorage.getItem('bsv2_buildStamps') || '{}'); } catch { /* 破損は無視 */ }
+  let changed = false;
+  for (const [p, s] of Object.entries(stamps)) {
+    if (p in prev && prev[p] !== s) changed = true;
+  }
+  localStorage.setItem('bsv2_buildStamps', JSON.stringify({ ...prev, ...stamps }));
+  return changed;
+}
 
 // ============ デッキ選択画面 ============
 
@@ -102,6 +151,22 @@ async function startGame() {
     if (errors.length > 0) {
       errBox.textContent = errors.join('\n');
       return;
+    }
+    // 最新コードの反映: 主要スクリプト＋このデッキで使うカード定義が更新されていたら、
+    // リロードして最新コードで自動再開する（autostart と、リロード後の再開中はスキップ）。
+    const isAutostart = new URLSearchParams(location.search).has('autostart');
+    if (!isAutostart && !resumingStart) {
+      const deckNumbers = [...Object.keys(map1), ...Object.keys(map2)]
+        .map((id) => lib.get(id)?.number)
+        .filter(Boolean);
+      const stamps = await collectBuildStamps(deckNumbers);
+      if (buildChangedAndStore(stamps)) {
+        sessionStorage.setItem('bsv2_pendingStart', JSON.stringify({
+          p1: key1, p2: key2, seed: document.getElementById('seed-input').value,
+        }));
+        location.reload();
+        return;
+      }
     }
     // 正常に組めたデッキを「前回使用」として記憶（次回の初期選択に使う）
     saveSettings({ lastDeckP1: key1, lastDeckP2: key2 });
@@ -1472,6 +1537,21 @@ async function main() {
   }
   // 開発・確認用: ?showeval=1 で「評価値を表示」をONにして起動
   if (params.get('showeval')) saveSettings({ showEval: true });
+
+  // 更新検知でリロードした場合は、保存しておいた選択でそのままゲームを自動再開する
+  let pendingStart = null;
+  try { pendingStart = JSON.parse(sessionStorage.getItem('bsv2_pendingStart') || 'null'); } catch { /* 無視 */ }
+  if (pendingStart && !params.get('autostart')) {
+    sessionStorage.removeItem('bsv2_pendingStart');
+    const sel1 = document.getElementById('deck-p1');
+    const sel2 = document.getElementById('deck-p2');
+    if ([...sel1.options].some((o) => o.value === pendingStart.p1)) sel1.value = pendingStart.p1;
+    if ([...sel2.options].some((o) => o.value === pendingStart.p2)) sel2.value = pendingStart.p2;
+    if (pendingStart.seed) document.getElementById('seed-input').value = pendingStart.seed;
+    resumingStart = true; // 再開時は再チェック不要（既に最新を読み込んでいる）
+    await startGame();
+    resumingStart = false;
+  }
 
   // 開発・スモークテスト用: ?autostart=1&seed=42 で即ゲーム開始
   if (params.get('autostart')) {
