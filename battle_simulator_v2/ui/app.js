@@ -402,11 +402,12 @@ function cardDetailHtml(card) {
       `</div>`
     );
   }
-  for (const skill of card.oshiSkills || []) {
-    rows.push(`<div class="detail-skill"><b>${skill.sp ? 'SP' : ''}推しスキル</b><br>${escapeText(skill.text)}</div>`);
-  }
+  // 推しステージスキル（常時能力）は推しスキルより上に表示する
   if (card.oshiStageText) {
     rows.push(`<div class="detail-skill"><b>推しステージスキル</b><br>${escapeText(card.oshiStageText)}</div>`);
+  }
+  for (const skill of card.oshiSkills || []) {
+    rows.push(`<div class="detail-skill"><b>${skill.sp ? 'SP' : ''}推しスキル</b><br>${escapeText(skill.text)}</div>`);
   }
   if (card.supportText) {
     rows.push(`<div class="detail-skill"><b>サポート効果</b><br>${escapeText(card.supportText)}</div>`);
