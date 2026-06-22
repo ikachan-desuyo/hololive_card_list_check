@@ -26,11 +26,10 @@ export default {
       if (cand.length === 0) {
         ctx.log('デッキに1stの〈モココ・アビスガード〉が見つからなかった');
       } else {
-        const target = yield ctx.chooseCard({
+        // 「1枚を公開し手札に加える」は必須（候補があれば必ず加える）。どれを加えるかだけ選ぶ。
+        const target = cand.length === 1 ? cand[0] : yield ctx.chooseCard({
           cards: cand,
           title: '手札に加える1stホロメンの〈モココ・アビスガード〉を選択',
-          optional: true,
-          skipLabel: '見つからなかったことにする',
         });
         if (target) {
           ctx.removeFromDeck(target);

@@ -579,6 +579,44 @@ export async function runTests() {
       'CPUの選択(choose)と最善ID(bestOptionId)が不一致＝CPUと表示の物差しがずれている');
   });
 
+  await testAsync('hBP08-006 WORLD DOMINATION: 相手が全色扱いなら成立（異なる色を持つ）', async () => {
+    const e = await setupMainStep(deckMap, 186);
+    await e.registry.preload(['hBP08-006'], lib);
+    const p0 = e.state.players[0]; const p1 = e.state.players[1];
+    p0.oshi = lib.getByNumber('hBP08-006');
+    p1.oshi = { number: 'x', name: '敵推し', color: '赤', kind: 'holomen', life: 5 };
+    const ina = e._createHolomem(fakeHolomen({ name: '一伊那尓栖', color: '紫' }), 1);
+    p0.center = ina; p0.collab = null; p0.back = [];
+    const oppC = e._createHolomem(fakeHolomen({ name: '敵C', color: '赤' }), 1); // 推しと同色
+    p1.center = oppC; p1.collab = null; p1.back = [];
+    const wd = e._oshiStage(0);
+    assertEq((wd.artsCostReduce(ina, e, 0) || []).length, 0, '同色相手で成立してしまっている（前提崩れ）');
+    e.state.modifiers.push({ kind: 'treatedAllColors', ownerIdx: 0, match: (h) => h === oppC });
+    assert((wd.artsCostReduce(ina, e, 0) || []).length > 0, '全色扱いの相手で WORLD DOMINATION が成立しない');
+  });
+
+  await testAsync('hBP08-039 アーツ: 付け替え前の青エール枚数で+20が確定（ダメージ計算順）', async () => {
+    const e = await setupMainStep(deckMap, 185);
+    await e.registry.preload(['hBP08-039'], lib);
+    const p0 = e.state.players[0];
+    const mokoko = e._createHolomem(fakeHolomen({ name: 'モココ・アビスガード', bloomLevel: '2nd' }), 1);
+    for (let i = 0; i < 3; i++) mokoko.cheers.push({ number: 'b', name: '青エール', kind: 'cheer', color: '青' });
+    const fuwawa = e._createHolomem(fakeHolomen({ name: 'フワワ・アビスガード' }), 1);
+    p0.center = mokoko; p0.collab = null; p0.back = [fuwawa];
+    const ctx = e._effectContext(0, { sourceHolomem: mokoko });
+    const def = e.registry.get('hBP08-039');
+    const gen = def.arts['もこもこバウンティハンター'].run(ctx);
+    let r = gen.next();              // 付け替え前に +60 確定済み → confirm
+    assertEq(ctx.artBonus, 60, '付け替え前の青エール3枚で+60が確定していない');
+    r = gen.next(true);             // confirm yes → 先(フワワ)選択
+    const pick = r.value.buildOptions().find((o) => o.value);
+    r = gen.next(pick.value);       // → 付け替える青エール選択
+    const blue = r.value.buildOptions().find((o) => o.value);
+    gen.next(blue.value);           // 青1枚をフワワへ移動
+    assertEq(ctx.artBonus, 60, '付け替え後に+20が減っている（順序バグ）');
+    assertEq(mokoko.cheers.filter((c) => c.color === '青').length, 2, '青エールが1枚フワワへ移っていない');
+  });
+
   await testAsync('全色扱い: 「相手の推しと異なる色」効果が全色の相手を対象にできる(hBP08-071)', async () => {
     const e = await setupMainStep(deckMap, 181);
     await e.registry.preload(['hBP08-071'], lib);
