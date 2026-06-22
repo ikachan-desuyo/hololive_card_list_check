@@ -612,6 +612,19 @@ export async function runTests() {
     assert(cands.includes('フワワ・アビスガード'), '1stフワワが手札に加える候補に出ていない');
   });
 
+  await testAsync('hBP08-003連携: FUWAMOCO(別名)の赤エールも青として扱う', async () => {
+    const e = await setupMainStep(deckMap, 193);
+    await e.registry.preload(['hBP08-003'], lib);
+    const p0 = e.state.players[0];
+    p0.oshi = lib.getByNumber('hBP08-003');
+    const fuwamoco = e._createHolomem({ number: 'fm', name: 'FUWAMOCO', kind: 'holomen', bloomLevel: '1st', hp: 170, color: '青', tags: [], arts: [], nameAliases: ['フワワ・アビスガード', 'モココ・アビスガード'] }, 1);
+    const red = { number: 'r', name: '赤エール', kind: 'cheer', color: '赤' };
+    fuwamoco.cheers.push(red);
+    p0.center = fuwamoco; p0.collab = null; p0.back = [];
+    const ctx = e._effectContext(0, {});
+    assert(ctx.cheerEffectiveColors(fuwamoco, red).has('青'), 'FUWAMOCO(別名フワモコ)の赤エールが青扱いになっていない');
+  });
+
   await testAsync('hBP08-039 アーツ: 赤エール(hBP08-003で青扱い)も付け替え対象になる', async () => {
     const e = await setupMainStep(deckMap, 190);
     await e.registry.preload(['hBP08-039', 'hBP08-003'], lib);
