@@ -20,8 +20,9 @@ export default {
     name: 'ドキドキDoggy -Fuwawa-',
     *run(ctx) {
       // デッキから1stホロメンの〈モココ・アビスガード〉を最大1枚、公開して手札に加える
+      // 〈モココ・アビスガード〉= 名称参照（FUWAMOCO のエクストラ「〈フワワ〉〈モココ〉として扱う」も一致）
       const cand = ctx.deckCards(
-        (c) => c.kind === 'holomen' && c.bloomLevel === '1st' && c.name === 'モココ・アビスガード',
+        (c) => c.kind === 'holomen' && c.bloomLevel === '1st' && ctx.nameIs(c, 'モココ・アビスガード'),
       );
       if (cand.length === 0) {
         ctx.log('デッキに1stの〈モココ・アビスガード〉が見つからなかった');

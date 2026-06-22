@@ -579,6 +579,56 @@ export async function runTests() {
       'CPUの選択(choose)と最善ID(bestOptionId)が不一致＝CPUと表示の物差しがずれている');
   });
 
+  await testAsync('FUWAMOCO別名: 〈フワワ〉名指しのデッキ探索がFUWAMOCO(別名)も拾う(hBP03-038)', async () => {
+    const e = await setupMainStep(deckMap, 192);
+    await e.registry.preload(['hBP03-038'], lib);
+    const p0 = e.state.players[0];
+    // デッキにはリテラル『フワワ』カードを入れず、FUWAMOCO(1st・別名=フワワ/モココ)だけ入れる
+    p0.deck.unshift({ number: 'fm1', name: 'FUWAMOCO', kind: 'holomen', bloomLevel: '1st', hp: 170, color: '青', tags: [], arts: [], nameAliases: ['フワワ・アビスガード', 'モココ・アビスガード'] });
+    const fromDebut = e._createHolomem(fakeHolomen({ name: 'モココ・アビスガード', bloomLevel: '1st', hp: 130 }), 1);
+    fromDebut.stack.push({ name: 'モココ・アビスガード', bloomLevel: 'Debut', kind: 'holomen' });
+    const r = e.registry.get('hBP03-038').bloomEffect.run(e._effectContext(0, { sourceHolomem: fromDebut })).next();
+    assertEq(r.value?.kind, 'chooseCard', 'FUWAMOCOを候補に出せていない');
+    const cands = r.value.buildOptions().filter((o) => o.value).map((o) => o.value.name);
+    assert(cands.includes('FUWAMOCO'), 'FUWAMOCO(別名フワワ)が〈フワワ・アビスガード〉探索で拾われていない');
+  });
+
+  await testAsync('hBP03-038 遊びの時間: 実Bloomアクション経由でフワワ候補が出る', async () => {
+    const e = await setupMainStep(deckMap, 191);
+    await e.registry.preload(['hBP03-038'], lib);
+    const q0 = e.state.players[0];
+    e.state.turn = 3; e.state.turnPlayer = 0; q0.turnCount = 2; // 2ターン目以降＝Bloom可
+    const debutMoko = e._createHolomem(fakeHolomen({ name: 'モココ・アビスガード', bloomLevel: 'Debut', hp: 120 }), 1);
+    q0.center = debutMoko; q0.collab = null; q0.back = [];
+    q0.hand = [lib.getByNumber('hBP03-038')];
+    q0.deck.unshift({ number: 'fw1', name: 'フワワ・アビスガード', kind: 'holomen', bloomLevel: '1st', hp: 160, color: '青', tags: [], arts: [] });
+    e._queueMainPending();
+    const bloomAct = e.state.pending.options.find((o) => o.kind === 'bloom');
+    assert(bloomAct, 'Debutモココ→hBP03-038のBloomアクションが生成されない');
+    e.apply(bloomAct.id);
+    const pend = e.state.pending;
+    assertEq(pend?.request?.kind, 'chooseCard', 'ブルームエフェクトのカード選択が出ない');
+    const cands = pend.options.filter((o) => o.card).map((o) => o.card.name);
+    assert(cands.includes('フワワ・アビスガード'), '1stフワワが手札に加える候補に出ていない');
+  });
+
+  await testAsync('hBP08-039 アーツ: 赤エール(hBP08-003で青扱い)も付け替え対象になる', async () => {
+    const e = await setupMainStep(deckMap, 190);
+    await e.registry.preload(['hBP08-039', 'hBP08-003'], lib);
+    const p0 = e.state.players[0];
+    p0.oshi = lib.getByNumber('hBP08-003');
+    const mokoko = e._createHolomem(fakeHolomen({ name: 'モココ・アビスガード', bloomLevel: '2nd' }), 1);
+    mokoko.cheers.push({ number: 'r1', name: '赤エール', kind: 'cheer', color: '赤' });
+    mokoko.cheers.push({ number: 'r2', name: '赤エール', kind: 'cheer', color: '赤' });
+    const fuwawa = e._createHolomem(fakeHolomen({ name: 'フワワ・アビスガード' }), 1);
+    p0.center = mokoko; p0.collab = null; p0.back = [fuwawa];
+    const ctx = e._effectContext(0, { sourceHolomem: mokoko });
+    const gen = e.registry.get('hBP08-039').arts['もこもこバウンティハンター'].run(ctx);
+    const r = gen.next();
+    assertEq(r.value?.kind, 'confirm', '赤エール(青扱い)で付け替えの確認が出ない');
+    assertEq(ctx.artBonus, 40, '赤2枚を青として+40していない（付け替え前に確定）');
+  });
+
   await testAsync('hBP08-006 WORLD DOMINATION: 相手が全色扱いなら成立（異なる色を持つ）', async () => {
     const e = await setupMainStep(deckMap, 186);
     await e.registry.preload(['hBP08-006'], lib);

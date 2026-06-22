@@ -33,7 +33,7 @@ export default {
     const owner = engine.state.players.find((p) => engine._stageHolomems(p).includes(src));
     if (!owner) return [];
     const center = owner.center;
-    if (center && center.stack[0]?.name === 'フワワ・アビスガード') {
+    if (center && engine._nameIs(center.stack[0], 'フワワ・アビスガード')) {
       return [{ color: '無色', amount: 1 }];
     }
     return [];

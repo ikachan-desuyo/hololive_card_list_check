@@ -15,7 +15,7 @@ export default {
   // ギフト「魔界乃番犬の暴れん坊」: センターが〈フワワ・アビスガード〉なら、リセットでバックへ移動してもお休みしない
   noRestOnReset(holomem, engine, ownerIdx) {
     const center = engine.state.players[ownerIdx].center;
-    return !!center && center.stack[0].name === 'フワワ・アビスガード';
+    return !!center && engine._nameIs(center.stack[0], 'フワワ・アビスガード');
   },
   arts: {
     'もこもこしてる方': {
@@ -24,7 +24,7 @@ export default {
         if (ctx.engine._zoneOf(ctx.sourceHolomem) !== 'collab') return 0;
         // 自分のセンターホロメンが〈フワワ・アビスガード〉か
         const center = ctx.holomems('self', (e) => e.pos.zone === 'center')[0];
-        return center && center.top.name === 'フワワ・アビスガード' ? 30 : 0;
+        return center && ctx.nameIs(center.top, 'フワワ・アビスガード') ? 30 : 0;
       },
     },
   },

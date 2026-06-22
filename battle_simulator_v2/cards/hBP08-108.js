@@ -17,7 +17,12 @@
 export default {
   number: 'hBP08-108',
   attachRule: {
-    canAttach: (h) => h.stack[0].name === 'フワワ・アビスガード' || h.stack[0].name === 'モココ・アビスガード',
+    // 〈フワワ〉〈モココ〉= 名称参照（FUWAMOCO の別名「として扱う」も対象）
+    canAttach: (h) => {
+      const top = h.stack[0]; const al = top.nameAliases || [];
+      const has = (x) => top.name === x || al.includes(x);
+      return has('フワワ・アビスガード') || has('モココ・アビスガード');
+    },
     unlimited: true, // 1人に何枚でも
   },
   attached: {

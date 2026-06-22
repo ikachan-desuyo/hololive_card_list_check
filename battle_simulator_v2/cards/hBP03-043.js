@@ -26,7 +26,7 @@ export default {
         // 付け替え可能なエールが必要
         if (h.cheers.length === 0) return;
         // 付け替え先：自分のステージの〈モココ・アビスガード〉
-        const mococos = ctx.holomems('self', (e) => e.top.name === 'モココ・アビスガード');
+        const mococos = ctx.holomems('self', (e) => ctx.nameIs(e.top, 'モココ・アビスガード'));
         if (mococos.length === 0) return;
 
         const cheer = yield ctx.chooseCard({
@@ -39,7 +39,7 @@ export default {
 
         const target = yield ctx.chooseHolomem({
           side: 'self',
-          filter: (e) => e.top.name === 'モココ・アビスガード',
+          filter: (e) => ctx.nameIs(e.top, 'モココ・アビスガード'),
           title: '付け替え先の〈モココ・アビスガード〉を選択',
         });
         if (!target) return;

@@ -20,7 +20,7 @@ export default {
     name: 'トゥインクル・アイドル',
     *run(ctx) {
       // 自分のステージに〈フワワ・アビスガード〉がいるか
-      const hasFuwawa = ctx.holomems('self').some((e) => e.top.name === 'フワワ・アビスガード');
+      const hasFuwawa = ctx.holomems('self').some((e) => ctx.nameIs(e.top, 'フワワ・アビスガード'));
       if (!hasFuwawa) return;
       // 相手のセンターかコラボに特殊ダメージ20（対象はプレイヤー選択）
       const target = yield ctx.chooseHolomem({
@@ -40,13 +40,13 @@ export default {
         if (!self) return;
         const blueCheers = (self.cheers || []).filter((c) => c.color === '青');
         if (blueCheers.length < 2) return;
-        const fuwawa = ctx.holomems('self', (e) => e.top.name === 'フワワ・アビスガード');
+        const fuwawa = ctx.holomems('self', (e) => ctx.nameIs(e.top, 'フワワ・アビスガード'));
         if (fuwawa.length === 0) return;
         let dest = fuwawa[0];
         if (fuwawa.length > 1) {
           dest = yield ctx.chooseHolomem({
             side: 'self',
-            filter: (e) => e.top.name === 'フワワ・アビスガード',
+            filter: (e) => ctx.nameIs(e.top, 'フワワ・アビスガード'),
             title: 'エールを送る〈フワワ・アビスガード〉を選択',
           });
         }

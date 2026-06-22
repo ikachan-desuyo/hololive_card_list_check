@@ -36,7 +36,7 @@ export default {
       for (const name of names) {
         if (ctx.engine._stageCount(ctx.player) >= 6) break; // ステージ上限
         const cand = ctx.deckCards(
-          (c) => c.kind === 'holomen' && c.bloomLevel === 'Debut' && c.name === name);
+          (c) => c.kind === 'holomen' && c.bloomLevel === 'Debut' && ctx.nameIs(c, name));
         if (cand.length === 0) {
           ctx.log(`デッキにDebutの〈${name}〉が見つからなかった`);
           continue;
