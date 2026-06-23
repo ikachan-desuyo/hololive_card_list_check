@@ -2239,6 +2239,29 @@ export async function runTests() {
 
   // ---- AI判断の質 ----
 
+  await testAsync('AIコラボ順序: Bloom後の形のコラボ効果が上なら先にBloom（逆なら先にコラボ）', async () => {
+    const e = await setupMainStep(deckMap, 66);
+    const p0 = e.state.players[0];
+    p0.turnCount = 2; // Bloom解禁
+    const weak = 'このホロメンのアーツ+10'; // テキスト推定: 低
+    const strong = '自分のデッキからホロメン1枚を公開し手札に加える'; // テキスト推定: 高
+    const mk = (number, level, hp, collabText) => ({
+      number, name: 'XUNIT', kind: 'holomen', bloomLevel: level, hp, color: '白', tags: [], arts: [],
+      keywords: [{ subtype: 'コラボエフェクト', name: '', text: collabText }],
+    });
+    const scoreCollab = (debutText, firstText) => {
+      const dh = e._createHolomem(mk('DBT', 'Debut', 80, debutText), 1);
+      dh.bloomedTurn = null; dh.damage = 0; dh.placedTurn = 0; // 前ターン設置（Bloom可能に）
+      p0.back = [dh];
+      p0.hand = [mk('FST', '1st', 150, firstText)];
+      return scoreOptions(e, 0, { type: 'main', options: [{ id: 'col', kind: 'collab', backIndex: 0 }] }).col;
+    };
+    const deferScore = scoreCollab(weak, strong); // 1stの方が上 → 後回し（低スコア）
+    const nowScore = scoreCollab(strong, weak); // Debutの方が上 → 即コラボ（高スコア）
+    assert(nowScore > deferScore, `Debut強は即コラボ・1st強は後回しのはず (now=${nowScore}, defer=${deferScore})`);
+    assert(deferScore <= 6, `1stコラボが上なら今のコラボは後回し(低スコア)のはず: ${deferScore}`);
+  });
+
   await testAsync('AIアタックの質: ライフ圧が大きい相手(Buzz=2)を優先して倒す', async () => {
     const e = await setupMainStep(deckMap, 65);
     const p0 = e.state.players[0];
