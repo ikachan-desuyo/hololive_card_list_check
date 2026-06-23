@@ -251,7 +251,10 @@ function scoreMainActions(engine, idx, pending, out) {
         const top = h.stack[0];
         const curCollab = collabValueOf(engine, p, top, h);
         score = 22 + curCollab;
-        if ((top.arts || []).some((a) => engine._canPayCheers(h.cheers, a.cost))) score += 15;
+        // バックは攻撃できないので、コラボは「攻撃枠を増やす」行為。今払えるアーツの火力で重み付けし、
+        // 強いアタッカー（センター/コラボ限定の大型アーツ持ち等）を優先コラボする。
+        const payableArts = (top.arts || []).filter((a) => engine._canPayCheers(h.cheers, a.cost));
+        if (payableArts.length) score += 15 + Math.max(...payableArts.map((a) => a.dmg || 0)) * 0.08;
         // コラボ↔Bloomの順序判断: 今ターンこのバックをBloomでき、Bloom後の形のコラボ効果の方が
         // 価値が高いなら、先にBloomしてから（より良い形で）コラボするため今のコラボは後回しにする。
         // （コラボは1回限り・Bloom効果はどちらの順でも誘発・本体は最終的に同じ形になるため、差は

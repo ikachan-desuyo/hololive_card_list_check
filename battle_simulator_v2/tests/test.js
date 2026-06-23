@@ -2239,6 +2239,20 @@ export async function runTests() {
 
   // ---- AI判断の質 ----
 
+  await testAsync('AIコラボ: 攻撃力の高いアタッカーを優先してコラボ（ポジション限定アーツ活用）', async () => {
+    const e = await setupMainStep(deckMap, 67);
+    const p0 = e.state.players[0];
+    p0.hand = []; // Bloom後回し判定の干渉を避ける
+    const mk = (number, dmg) => ({ number, name: 'AT' + number, kind: 'holomen', bloomLevel: '1st', hp: 150, color: '白', tags: [], arts: [{ name: 'a', dmg, cost: [], tokkou: [] }], keywords: [] });
+    p0.back = [e._createHolomem(mk('BIG', 100), 1), e._createHolomem(mk('SML', 20), 1)];
+    p0.collab = null;
+    const sc = scoreOptions(e, 0, { type: 'main', options: [
+      { id: 'cBig', kind: 'collab', backIndex: 0 },
+      { id: 'cSml', kind: 'collab', backIndex: 1 },
+    ] });
+    assert(sc.cBig > sc.cSml, `火力の高いアタッカーを優先コラボすべき (big=${sc.cBig}, small=${sc.cSml})`);
+  });
+
   await testAsync('AIコラボ順序: Bloom後の形のコラボ効果が上なら先にBloom（逆なら先にコラボ）', async () => {
     const e = await setupMainStep(deckMap, 66);
     const p0 = e.state.players[0];
