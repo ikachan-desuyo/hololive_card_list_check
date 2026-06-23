@@ -14,7 +14,7 @@ import { EffectContext } from '../core/effects/context.js';
 import { compileCard } from '../core/effects/text-compiler.js';
 import { HeuristicAI } from '../core/ai/heuristic.js';
 import { evaluateState, WEIGHTS } from '../core/ai/evaluate.js';
-import { scoreOptions, bestOptionId } from '../core/ai/score.js';
+import { scoreOptions, bestOptionId, holomenValue } from '../core/ai/score.js';
 import { createRng } from '../core/rng.js';
 
 const results = [];
@@ -2245,6 +2245,25 @@ export async function runTests() {
     const id2 = ai.choose(e);
     const opt2 = s.pending.options.find((o) => o.id === id2);
     assertEq(opt2.kind, 'bloom', '利益のあるBloomを選ばなかった');
+  });
+
+  await testAsync('AI配置: コラボエフェクト持ちDebutはバック優先・効果無しをセンターへ', async () => {
+    const e = await setupMainStep(deckMap, 58);
+    await e.registry.preload(['hBP04-044', 'hBP02-042'], lib);
+    const p0 = e.state.players[0];
+    const collabCard = lib.getByNumber('hBP04-044'); // コラボエフェクトあり
+    const plainCard = lib.getByNumber('hBP02-042');  // コラボエフェクトなし（バニラDebut）
+    p0.hand = [collabCard, plainCard];
+    // placementCenter: コラボ持ちは -25、効果無しは素のまま → 効果無しがセンターに選ばれる
+    const center = { type: 'placementCenter', options: [{ id: 'c0', handIndex: 0 }, { id: 'c1', handIndex: 1 }] };
+    const scC = scoreOptions(e, 0, center);
+    assertEq(scC.c0, holomenValue(collabCard) - 25, 'コラボ持ちのセンタースコアが-25されていない');
+    assertEq(scC.c1, holomenValue(plainCard), '効果無しのセンタースコアが素の値でない');
+    assert(scC.c1 > scC.c0, '効果無しDebutがセンターに選ばれるべき');
+    // placementBack: コラボ持ちは +25 でバックに置かれやすい
+    const back = { type: 'placementBack', options: [{ id: 'b0', handIndex: 0 }, { id: 'done' }] };
+    const scB = scoreOptions(e, 0, back);
+    assertEq(scB.b0, holomenValue(collabCard) + 25, 'コラボ持ちのバックスコアが+25されていない');
   });
 
   await testAsync('AI効果選択: 相手を狙う時は倒しやすい個体を選ぶ(意図damage)', async () => {

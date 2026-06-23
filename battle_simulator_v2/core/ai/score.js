@@ -64,13 +64,26 @@ export function scoreOptions(engine, idx, pending = engine.state.pending) {
       break;
     }
     case 'placementCenter':
-      for (const o of pending.options) out[o.id] = holomenValue(p.hand[o.handIndex]);
+      for (const o of pending.options) {
+        const card = p.hand[o.handIndex];
+        let v = holomenValue(card);
+        // コラボエフェクト持ちはバックに温存したい（コラボはバック→コラボ位置への移動で誘発するため、
+        // センターに置くと活かせない）。同程度のステータスなら効果無しをセンターへ回す。
+        if (engine.registry.get(card.number)?.collabEffect) v -= 25;
+        out[o.id] = v;
+      }
       break;
     case 'placementPenalty':
       for (const o of pending.options) out[o.id] = -cardKeepValue(p.hand[o.handIndex]);
       break;
     case 'placementBack':
-      for (const o of pending.options) out[o.id] = o.id === 'done' ? 0 : holomenValue(p.hand[o.handIndex]);
+      for (const o of pending.options) {
+        if (o.id === 'done') { out[o.id] = 0; continue; }
+        const card = p.hand[o.handIndex];
+        let v = holomenValue(card);
+        if (engine.registry.get(card.number)?.collabEffect) v += 25; // コラボ候補はバックに置く
+        out[o.id] = v;
+      }
       break;
     case 'chooseCenter':
       for (const o of pending.options) {
