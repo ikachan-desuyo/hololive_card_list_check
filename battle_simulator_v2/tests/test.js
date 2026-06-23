@@ -2181,6 +2181,40 @@ export async function runTests() {
     }
   });
 
+  await testAsync('AI: 全テストデッキのミラー対戦でCPUが停止/クラッシュしない', async () => {
+    const names = ['Azki単', 'FUWAMOCO', 'あの青空のせいだ', 'ござる', 'さかまた', 'すぅ', 'はあと',
+      'るい', 'わため', 'イナ', 'クロニ―', 'ジジ', 'セシジジ', 'ネリッサ単', 'ラミィデッキ', '塩ルイ', '月ルイ'];
+    const issues = [];
+    for (const n of names) {
+      // ファイル名の正規化差(NFC/NFD)等で読めないデッキはスキップ（CPU挙動の検査とは無関係）
+      let dm = null;
+      for (const cand of [n, n.normalize('NFD'), n.normalize('NFC')]) {
+        try { const r = await fetch('../test_deck/' + encodeURIComponent(cand) + '.json'); if (r.ok) { dm = await r.json(); break; } } catch { /* 次の候補へ */ }
+      }
+      if (!dm) { console.log(`SKIP deck (読込不可): ${n}`); continue; }
+      const reg = await buildRegistry(lib, dm);
+      for (let seed = 1; seed <= 20; seed++) {
+        const e = new Engine({ decks: [lib.buildGameDeck(dm), lib.buildGameDeck(dm)], seed, names: ['A', 'B'], registry: reg });
+        e.start();
+        const ais = [new HeuristicAI(0), new HeuristicAI(1)];
+        let applies = 0; let prev = null; let sameCount = 0;
+        while (e.state.phase !== 'ended' && applies < 8000) {
+          const pending = e.state.pending;
+          if (!pending) { issues.push(`${n} seed=${seed}: pending無で未終了`); break; }
+          let id;
+          try { id = pending.player == null ? pending.options[0].id : ais[pending.player].choose(e); }
+          catch (err) { issues.push(`${n} seed=${seed}: choose例外 type=${pending.type} req=${pending.request?.kind}: ${err.message}`); break; }
+          if (id == null) { issues.push(`${n} seed=${seed}: choose=null type=${pending.type} req=${pending.request?.kind} opts=${pending.options?.length}`); break; }
+          if (pending === prev) { if (++sameCount > 5) { issues.push(`${n} seed=${seed}: 同一pending停滞 type=${pending.type} req=${pending.request?.kind} id=${id}`); break; } } else { sameCount = 0; prev = pending; }
+          try { e.apply(id); } catch (err) { issues.push(`${n} seed=${seed}: apply例外 type=${pending.type} id=${id}: ${err.message}`); break; }
+          applies++;
+        }
+        if (applies >= 8000) issues.push(`${n} seed=${seed}: 8000手でループ（最後 type=${e.state.pending?.type} req=${e.state.pending?.request?.kind}）`);
+      }
+    }
+    assert(issues.length === 0, 'CPUが停止/クラッシュする対戦あり: ' + JSON.stringify(issues.slice(0, 10)));
+  });
+
   await testAsync('AI: 倒せる相手を優先して攻撃する（リーサル選択）', async () => {
     const e = await setupMainStep(deckMap, 41);
     const s = e.state;
@@ -2204,6 +2238,25 @@ export async function runTests() {
   });
 
   // ---- AI判断の質 ----
+
+  await testAsync('AIアタックの質: ライフ圧が大きい相手(Buzz=2)を優先して倒す', async () => {
+    const e = await setupMainStep(deckMap, 65);
+    const p0 = e.state.players[0];
+    const p1 = e.state.players[1];
+    p0.center = e._createHolomem(lib.get('hBP04-048_RR'), 1); // アーツ持ちアタッカー
+    const normal = e._createHolomem(lib.getByNumber('hBP02-042'), 1); // 通常（ダウンでライフ-1）
+    const buzz = e._createHolomem(lib.getByNumber('hBP03-039'), 1); // Buzz（ダウンでライフ-2）
+    assert(buzz.stack[0].buzz, 'テスト前提: hBP03-039 がBuzz扱いでない');
+    normal.damage = e.effectiveHp(normal) - 10; // 残10（倒せる）
+    buzz.damage = e.effectiveHp(buzz) - 10; // 残10（倒せる）
+    p1.center = normal; p1.collab = buzz; p1.back = [];
+    const pending = { type: 'performance', player: 0, options: [
+      { id: 'killNormal', kind: 'art', zone: 'center', artIndex: 0, target: { zone: 'center', index: 0 } },
+      { id: 'killBuzz', kind: 'art', zone: 'center', artIndex: 0, target: { zone: 'collab', index: 0 } },
+    ] };
+    const sc = scoreOptions(e, 0, pending);
+    assert(sc.killBuzz > sc.killNormal, `Buzz(ライフ-2)を優先すべき (buzz=${sc.killBuzz}, normal=${sc.killNormal})`);
+  });
 
   await testAsync('AI: エールを撃てるホロメンに過剰投資しない', async () => {
     const e = await setupMainStep(deckMap, 51);
