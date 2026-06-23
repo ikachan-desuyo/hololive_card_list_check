@@ -285,11 +285,14 @@ function scorePerformance(engine, idx, pending, out) {
   const p = engine.state.players[idx];
   const opp = engine.state.players[1 - idx];
   for (const opt of pending.options) {
-    if (opt.kind !== 'art') { out[opt.id] = 0; continue; } // pass 等は 0
+    if (opt.kind !== 'art') { out[opt.id] = 0; continue; } // pass / declineReArts 等は 0
     const h = p[opt.zone];
-    const target = opp[opt.target.zone];
+    // 対象は zone+index で解決する（back は配列なので opp['back'] では取れない）
+    const target = engine._targetHolomem(opp, opt.target);
     if (!h || !target) { out[opt.id] = -Infinity; continue; }
-    const art = h.stack[0].arts[opt.artIndex];
+    // 借用アーツ（hBP07-048）は artObj を使う。通常は自分のアーツ配列から引く。
+    const art = opt.artObj || h.stack[0].arts?.[opt.artIndex];
+    if (!art) { out[opt.id] = -Infinity; continue; }
     let dmg = art.dmg;
     const targetTop = target.stack[0];
     for (const tk of art.tokkou || []) if (targetTop.color === tk.color) dmg += tk.value;
