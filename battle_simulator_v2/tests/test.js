@@ -2266,6 +2266,22 @@ export async function runTests() {
     def.ai = origAi; def.support = origSupport; // 復元
   });
 
+  await testAsync('AIエール配分: 攻撃できる前衛に集中（大型アーツのバックに吸わせない）', async () => {
+    const e = await setupMainStep(deckMap, 70);
+    const p0 = e.state.players[0];
+    p0.hand = []; // budget由来の加点干渉を避ける
+    const mk = (number, dmg) => ({ number, name: 'AT' + number, kind: 'holomen', bloomLevel: '1st', hp: 150, color: '青', tags: [], arts: [{ name: 'a', dmg, cost: ['青', '青'], tokkou: [] }], keywords: [] });
+    p0.center = e._createHolomem(mk('CEN', 50), 1); p0.center.cheers = [];
+    p0.back = [e._createHolomem(mk('BACK', 200), 1)]; p0.back[0].cheers = []; // 大型アーツだが攻撃できない
+    p0.collab = null;
+    const blue = { number: 'bc', name: '青', kind: 'cheer', color: '青' };
+    const sc = scoreOptions(e, 0, { type: 'attachCheer', player: 0, cheer: blue, options: [
+      { id: 'toCenter', pos: { zone: 'center', index: 0 } },
+      { id: 'toBack', pos: { zone: 'back', index: 0 } },
+    ] });
+    assert(sc.toCenter > sc.toBack, `攻撃できる前衛に集中すべき (center=${sc.toCenter}, back=${sc.toBack})`);
+  });
+
   await testAsync('AIエール配分: 与えられた色が活きる（前進する）ホロメンに送る', async () => {
     const e = await setupMainStep(deckMap, 68);
     const p0 = e.state.players[0];

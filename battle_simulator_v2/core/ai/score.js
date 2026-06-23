@@ -187,40 +187,45 @@ function scoreCheerTargets(engine, idx, pending, out) {
     const h = engine._holomemAt(p, opt.pos);
     if (!h) { out[opt.id] = -Infinity; continue; }
     const arts = h.stack[0].arts || [];
+    const isActive = opt.pos.zone === 'center' || opt.pos.zone === 'collab'; // 攻撃できる前衛か
     let score = 0;
-    if (opt.pos.zone === 'center') score += 12;
-    else if (opt.pos.zone === 'collab') score += 8;
     if (arts.length > 0 && cheer) {
       const payableBefore = arts.filter((a) => engine._canPayCheers(h.cheers, a.cost));
       const afterCheers = [...h.cheers, cheer];
       const payableAfter = arts.filter((a) => engine._canPayCheers(afterCheers, a.cost));
       const maxCost = Math.max(...arts.map((a) => a.cost.length));
+      let useful = false;
       if (payableAfter.length > payableBefore.length) {
-        // このエールでアーツが解放される（色も満たす）→ 解放アーツの火力で加点
+        // このエールでアーツが解放される（色も満たす）→ 解放アーツの火力で加点（バックは攻撃不可なので小）
+        useful = true;
         const unlocked = payableAfter.filter((a) => !payableBefore.includes(a));
-        score += 40 + Math.max(...unlocked.map((a) => a.dmg)) * 0.2;
+        const udmg = Math.max(...unlocked.map((a) => a.dmg || 0));
+        score += isActive ? 40 + udmg * 0.2 : 12;
       } else {
-        // まだ解放されないアーツへ「色を満たす方向に前進」したか（色一致・火力で重み付け）。
-        // この1枚で未充足要求が減るアーツのうち、最も火力が高いものを評価する。
-        let bestProgress = 0;
+        // 色を満たす方向に前進したか。前衛は火力比例で重く、バックは小さい固定（攻撃できないため吸い込み防止）
+        let advanced = false; let bestDmg = 0;
         for (const a of arts) {
-          if (payableBefore.includes(a)) continue; // 既に撃てるアーツは前進対象外
-          if (unmetCost(afterCheers, a.cost) < unmetCost(h.cheers, a.cost)) {
-            bestProgress = Math.max(bestProgress, 12 + (a.dmg || 0) * 0.1);
-          }
+          if (payableBefore.includes(a)) continue;
+          if (unmetCost(afterCheers, a.cost) < unmetCost(h.cheers, a.cost)) { advanced = true; bestDmg = Math.max(bestDmg, a.dmg || 0); }
         }
-        if (bestProgress > 0) score += bestProgress; // 強いアーツへ前進するほど高い
+        if (advanced) { useful = true; score += isActive ? 12 + bestDmg * 0.1 : 5; }
         else if (h.cheers.length >= maxCost) score -= 30; // どのアーツも進まず満杯＝過剰投資
         else score += 2; // 色が噛み合わず前進しない（最小限）
       }
-      if (oppCenter && (opt.pos.zone === 'center' || opt.pos.zone === 'collab')) {
+      // 位置ボーナスは「有用なエール」のときだけ＝攻撃できる前衛にエールを集中させ、
+      // 無駄な色のエールを位置目的で前衛に置かない／攻撃できないバックへの吸い込みも防ぐ。
+      if (useful) {
+        if (opt.pos.zone === 'center') score += 12;
+        else if (opt.pos.zone === 'collab') score += 8;
+      }
+      // リーサル到達（前衛のみ）
+      if (oppCenter && isActive) {
         const before = bestPayableDmg(h, h.cheers);
         const after = bestPayableDmg(h, afterCheers);
         if (after >= oppCenterRemain && before < oppCenterRemain) {
           score += 60; // このエールだけで即リーサル到達
         } else if (budget > 0) {
-          // このエール＋今ターンの追加エール(budget)で、相手センターを倒せる火力に届くなら
-          // 「今ターン中にリーサルを組める」前進として加点（即リーサルより控えめ）
+          // このエール＋今ターンの追加エール(budget)で相手センターを倒せる火力に届くなら前進加点（控えめ）
           const reachAfter = bestReachableDmg(h, afterCheers, budget);
           const reachBefore = bestReachableDmg(h, h.cheers, budget);
           if (reachAfter >= oppCenterRemain && reachBefore < oppCenterRemain) score += 25;
