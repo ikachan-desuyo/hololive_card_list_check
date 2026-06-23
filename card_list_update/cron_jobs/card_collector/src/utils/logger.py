@@ -1,10 +1,10 @@
-"""日誌配置模組"""
+"""ロガー設定モジュール"""
 import logging
 import os
 
 def setup_logger():
-    """設置日誌配置"""
-    # 確保日誌目錄存在
+    """ロガーを設定する"""
+    # ログ用ディレクトリの存在を保証
     log_dir = 'logs'
     if not os.path.exists(log_dir):
         os.makedirs(log_dir)
