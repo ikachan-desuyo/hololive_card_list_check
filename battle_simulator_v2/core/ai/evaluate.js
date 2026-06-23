@@ -14,6 +14,8 @@
  * 基準に、盤面火力・生存力などを相対化している。
  */
 
+import { COLORLESS } from '../constants.js';
+
 export const WEIGHTS = {
   life: 120, // ライフ1枚差の価値（勝利条件に直結するため最も重い）
   hpRemain: 0.30, // 盤上ホロメンの残りHP1につき（生存力）
@@ -76,16 +78,69 @@ function artDamageVs(engine, h, a, defColor, attackerIdx) {
   return d;
 }
 
+/** コスト cost に対して cheers で満たせていない要求数（色一致を考慮）。少ないほど解放に近い。
+ *  すなわち「最善の色のエールを unmetCost 枚足せば、このアーツは払える」ことを意味する。 */
+export function unmetCost(cheers, cost) {
+  const pool = cheers.map((c) => c.color);
+  const specific = cost.filter((c) => c !== COLORLESS);
+  const anyCount = cost.length - specific.length;
+  let unmet = 0;
+  for (const color of specific) {
+    const i = pool.indexOf(color);
+    if (i === -1) unmet++;
+    else pool.splice(i, 1);
+  }
+  unmet += Math.max(0, anyCount - pool.length); // 残ったエールで無色枠を埋める
+  return unmet;
+}
+
+const CHEER_BUDGET_CAP = 4; // 過大評価防止の上限
+
+function resolveNum(v, ctx) { return typeof v === 'function' ? (Number(v(ctx)) || 0) : (Number(v) || 0); }
+
+/** 効果テキストから「付けられるエール枚数」を控えめに見積る（エールを送る/付ける系のみ） */
+export function cheerGainFromText(text) {
+  if (!text || !/エール/.test(text) || !/(送る|送り|付け|アタッチ)/.test(text)) return 0;
+  const m = text.match(/([0-9０-９]+)\s*枚/);
+  let n = 1;
+  if (m) { n = Number(m[1].replace(/[０-９]/g, (c) => String('０１２３４５６７８９'.indexOf(c)))) || 1; }
+  return Math.min(n, 3);
+}
+
 /**
- * attacker 側が defenderCenter に対して「次の1ターンで与えうる」最大ダメージの概算。
- * 公開情報のみ: attacker 側の盤上ホロメンそれぞれの最大火力（特攻込み）を、センター＋コラボの
- * 最大2回ぶん合計する（おおまかなリーサル脅威の見積り）。
- *
- * projectExtraCheer=true のとき（相手ターンの脅威を読む防御用）: 相手は次ターンに最低1枚エールを
- * 付けられるので、「エール1枚追加で解放されるアーツ」も脅威に数える（過小評価による防御不足を防ぐ）。
- * 自分の攻撃力（この場のリーサル好機）を測る用途では false（エールは既に置かれている）。
+ * このターン、現在の手札・盤面の効果で「あと何枚エールを付けられるか」の見積り（自分視点・上限キャップ付き）。
+ *   - 手札の支援カード（実装済み・エール付与テキスト or ai.cheerGain）
+ *   - 盤面ホロメン／推しスキル（条件付き効果の過大評価を避け、ai.cheerGain を持つカードのみ）
+ * ※相手の手札は見ない（公開情報のみ）。基本エールステップの1枚はここに含めない（別枠・既に置かれている想定）。
  */
-export function incomingDamageToCenter(engine, attacker, attackerIdx, defenderCenter, { projectExtraCheer = false } = {}) {
+export function cheerBudgetThisTurn(engine, idx) {
+  const p = engine.state.players[idx];
+  let budget = 0;
+  for (const c of p.hand) {
+    if (c.kind !== 'support') continue;
+    const def = engine.registry.get(c.number);
+    if (!def?.support) continue; // 未実装は数えない
+    budget += def.ai?.cheerGain != null ? resolveNum(def.ai.cheerGain, { engine, player: p, card: c })
+      : cheerGainFromText(c.supportText);
+  }
+  for (const h of engine._stageHolomems(p)) {
+    const def = engine.registry.get(h.stack[0].number);
+    if (def?.ai?.cheerGain != null) budget += resolveNum(def.ai.cheerGain, { engine, player: p, holomem: h });
+  }
+  const odef = engine.registry.get(p.oshi?.number);
+  if (odef?.ai?.cheerGain != null && p.holoPower.length > 0) budget += resolveNum(odef.ai.cheerGain, { engine, player: p });
+  return Math.min(budget, CHEER_BUDGET_CAP);
+}
+
+/**
+ * attacker 側が defenderCenter に対して「（追加エールも込みで）このターンで与えうる」最大ダメージの概算。
+ * 公開情報のみ: attacker 側の盤上ホロメン（センター＋コラボ最大2回ぶん）の最大火力（特攻込み）を合計。
+ *
+ * extraCheers: 「最善の色のエールをあと何枚足せるか」。そのぶんで解放されるアーツも到達可能として数える。
+ *   - 防御（相手ターンの脅威）: 1（相手は次ターンに基本エール1枚。相手の手札効果は見ない＝公開情報のみ）。
+ *   - 攻撃（自分のリーサル好機）: cheerBudgetThisTurn（自分が今ターン効果で足せる枚数）。
+ */
+export function incomingDamageToCenter(engine, attacker, attackerIdx, defenderCenter, { extraCheers = 0 } = {}) {
   if (!defenderCenter) return 0;
   const defColor = defenderCenter.stack[0].color;
   const perAttacker = [];
@@ -94,14 +149,10 @@ export function incomingDamageToCenter(engine, attacker, attackerIdx, defenderCe
     if (!h || h.rested) continue;
     let best = 0;
     for (const a of (h.stack[0].arts || [])) {
-      let reachable = engine._canPayCheers(h.cheers, a.cost);
-      if (!reachable && projectExtraCheer) {
-        // エール1枚追加（最も都合のよい色）で解放されるか
-        for (const col of new Set(a.cost)) {
-          if (engine._canPayCheers([...h.cheers, { color: col }], a.cost)) { reachable = true; break; }
-        }
+      // 今払える、または最善の色で extraCheers 枚足せば払える（=今/今ターン到達可能）
+      if (engine._canPayCheers(h.cheers, a.cost) || unmetCost(h.cheers, a.cost) <= extraCheers) {
+        best = Math.max(best, artDamageVs(engine, h, a, defColor, attackerIdx));
       }
-      if (reachable) best = Math.max(best, artDamageVs(engine, h, a, defColor, attackerIdx));
     }
     if (best > 0) perAttacker.push(best);
   }
@@ -140,11 +191,12 @@ export function evaluateState(engine, idx) {
   // 5) リーサル脅威/好機（次の1ターンの読み）
   parts.lethal = 0;
   const myCenterRemain = me.center ? remainHp(engine, me.center) : 0;
-  // 相手の脅威は「次ターンにエール1枚追加で解放されるアーツ」も見込む（防御不足を防ぐ）
-  const oppToMe = incomingDamageToCenter(engine, opp, 1 - idx, me.center, { projectExtraCheer: true });
+  // 相手の脅威は「次ターンに基本エール1枚で解放されるアーツ」も見込む（防御不足を防ぐ。相手の手札効果は見ない）
+  const oppToMe = incomingDamageToCenter(engine, opp, 1 - idx, me.center, { extraCheers: 1 });
   if (me.center && oppToMe >= myCenterRemain) parts.lethal += WEIGHTS.lethalThreatToMe;
   const oppCenterRemain = opp.center ? remainHp(engine, opp.center) : 0;
-  const meToOpp = incomingDamageToCenter(engine, me, idx, opp.center);
+  // 自分のリーサル好機は「今ターン効果で足せるエール（cheer budget）で解放されるアーツ」も見込む
+  const meToOpp = incomingDamageToCenter(engine, me, idx, opp.center, { extraCheers: cheerBudgetThisTurn(engine, idx) });
   if (opp.center && meToOpp >= oppCenterRemain) parts.lethal += WEIGHTS.lethalChanceToOpp;
 
   const total = Object.values(parts).reduce((a, b) => a + b, 0);

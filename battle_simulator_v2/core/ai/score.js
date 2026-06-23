@@ -13,23 +13,7 @@
  * 公平性: 公開情報のみ（相手の手札/山札の中身・順序は見ない）。
  */
 
-import { maxArtDmg, incomingDamageToCenter } from './evaluate.js';
-import { COLORLESS } from '../constants.js';
-
-/** コスト cost に対して cheers で満たせていない要求数（色一致を考慮。少ないほど解放に近い） */
-function unmetCost(cheers, cost) {
-  const pool = cheers.map((c) => c.color);
-  const specific = cost.filter((c) => c !== COLORLESS);
-  const anyCount = cost.length - specific.length;
-  let unmet = 0;
-  for (const color of specific) {
-    const i = pool.indexOf(color);
-    if (i === -1) unmet++;
-    else pool.splice(i, 1);
-  }
-  unmet += Math.max(0, anyCount - pool.length); // 残ったエールで無色枠を埋める
-  return unmet;
-}
+import { maxArtDmg, incomingDamageToCenter, unmetCost, cheerBudgetThisTurn } from './evaluate.js';
 
 /** ホロメン（カード）の基礎評価: HP＋アーツ火力 */
 export function holomenValue(card) {
@@ -179,16 +163,26 @@ function scoreCheerTargets(engine, idx, pending, out) {
   const oppCenter = opp.center;
   const oppCenterRemain = oppCenter ? Math.max(0, engine.effectiveHp(oppCenter) - oppCenter.damage) : 0;
   const oppColor = oppCenter ? oppCenter.stack[0].color : null;
+  const artDmgVs = (h, a) => {
+    let v = (a.dmg || 0) + Math.max(0, engine.effects.artsBonus(h, idx));
+    for (const tk of a.tokkou || []) if (oppColor === tk.color) v += tk.value;
+    return v;
+  };
   const bestPayableDmg = (h, cheers) => {
     let d = 0;
+    for (const a of (h.stack[0].arts || [])) if (engine._canPayCheers(cheers, a.cost)) d = Math.max(d, artDmgVs(h, a));
+    return d;
+  };
+  // 最善の色であと extra 枚足せば撃てるアーツも含めた最大火力（今ターン到達可能火力）
+  const bestReachableDmg = (h, cheers, extra) => {
+    let d = 0;
     for (const a of (h.stack[0].arts || [])) {
-      if (!engine._canPayCheers(cheers, a.cost)) continue;
-      let v = (a.dmg || 0) + Math.max(0, engine.effects.artsBonus(h, idx));
-      for (const tk of a.tokkou || []) if (oppColor === tk.color) v += tk.value;
-      d = Math.max(d, v);
+      if (engine._canPayCheers(cheers, a.cost) || unmetCost(cheers, a.cost) <= extra) d = Math.max(d, artDmgVs(h, a));
     }
     return d;
   };
+  // 今ターン効果で足せるエール枚数（自分の手札・盤面のみ。リーサル準備の見積りに使う）
+  const budget = cheerBudgetThisTurn(engine, idx);
   for (const opt of pending.options) {
     const h = engine._holomemAt(p, opt.pos);
     if (!h) { out[opt.id] = -Infinity; continue; }
@@ -222,7 +216,15 @@ function scoreCheerTargets(engine, idx, pending, out) {
       if (oppCenter && (opt.pos.zone === 'center' || opt.pos.zone === 'collab')) {
         const before = bestPayableDmg(h, h.cheers);
         const after = bestPayableDmg(h, afterCheers);
-        if (after >= oppCenterRemain && before < oppCenterRemain) score += 60;
+        if (after >= oppCenterRemain && before < oppCenterRemain) {
+          score += 60; // このエールだけで即リーサル到達
+        } else if (budget > 0) {
+          // このエール＋今ターンの追加エール(budget)で、相手センターを倒せる火力に届くなら
+          // 「今ターン中にリーサルを組める」前進として加点（即リーサルより控えめ）
+          const reachAfter = bestReachableDmg(h, afterCheers, budget);
+          const reachBefore = bestReachableDmg(h, h.cheers, budget);
+          if (reachAfter >= oppCenterRemain && reachBefore < oppCenterRemain) score += 25;
+        }
       }
     }
     out[opt.id] = score;
@@ -236,8 +238,8 @@ function scoreMainActions(engine, idx, pending, out) {
   const oppIdx = 1 - idx;
   const myCenter = p.center;
   const myCenterRemain = myCenter ? engine.effectiveHp(myCenter) - myCenter.damage : 0;
-  // 相手の脅威は次ターンのエール1枚追加で解放されるアーツも見込む（過小評価による防御不足を防ぐ）
-  const oppThreat = incomingDamageToCenter(engine, opp, oppIdx, myCenter, { projectExtraCheer: true });
+  // 相手の脅威は次ターンの基本エール1枚で解放されるアーツも見込む（過小評価による防御不足を防ぐ）
+  const oppThreat = incomingDamageToCenter(engine, opp, oppIdx, myCenter, { extraCheers: 1 });
   const underLethal = !!myCenter && oppThreat > 0 && oppThreat >= myCenterRemain;
 
   for (const opt of pending.options) {

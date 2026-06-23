@@ -13,7 +13,7 @@ import { EffectRegistry } from '../core/effects/registry.js';
 import { EffectContext } from '../core/effects/context.js';
 import { compileCard } from '../core/effects/text-compiler.js';
 import { HeuristicAI } from '../core/ai/heuristic.js';
-import { evaluateState, WEIGHTS, incomingDamageToCenter } from '../core/ai/evaluate.js';
+import { evaluateState, WEIGHTS, incomingDamageToCenter, cheerBudgetThisTurn } from '../core/ai/evaluate.js';
 import { scoreOptions, bestOptionId, holomenValue, isFreePlaySupport } from '../core/ai/score.js';
 import { createRng } from '../core/rng.js';
 
@@ -2239,6 +2239,33 @@ export async function runTests() {
 
   // ---- AI判断の質 ----
 
+  await testAsync('AIエール見積り: 今ターンの追加エール枚数(cheer budget)と到達可能アーツ', async () => {
+    const e = await setupMainStep(deckMap, 69);
+    const p0 = e.state.players[0];
+    const p1 = e.state.players[1];
+    // 手札に「エールを2枚送る」支援カードがあると見立てる（registryにai.cheerGainを注入）
+    const num = 'hSD01-016';
+    await e.registry.preload([num], lib);
+    const def = e.registry.get(num);
+    const origAi = def.ai; const origSupport = def.support;
+    def.support = def.support || {}; // support定義ありとみなす
+    def.ai = { ...(def.ai || {}), cheerGain: 2 };
+    const card = lib.getByNumber(num);
+    p0.hand = [card];
+    const budget = cheerBudgetThisTurn(e, 0);
+    assertEq(budget, 2, `手札の支援カードのエール供給2枚が見積れていない: ${budget}`);
+    // 到達可能アーツ: 相手センター、攻撃側センターは「青3」のアーツ(80)を持ち、現在エール1枚
+    p1.center = e._createHolomem(lib.getByNumber('hBP02-042'), 1);
+    p0.center = e._createHolomem({ number: 'AT', name: 'AT', kind: 'holomen', bloomLevel: '1st', hp: 150, color: '青', tags: [], arts: [{ name: 'big', dmg: 80, cost: ['青', '青', '青'], tokkou: [] }], keywords: [] }, 1);
+    p0.center.cheers = [{ number: 'c', name: '青', kind: 'cheer', color: '青' }]; // 残り2枚で解放
+    p0.collab = null;
+    const now = incomingDamageToCenter(e, p0, 0, p1.center, { extraCheers: 0 }); // 今は撃てない
+    const withBudget = incomingDamageToCenter(e, p0, 0, p1.center, { extraCheers: 2 }); // budget2で到達
+    assertEq(now, 0, '現在エールでは撃てないはず');
+    assert(withBudget >= 80, `追加2枚で解放される80火力が見積れていない: ${withBudget}`);
+    def.ai = origAi; def.support = origSupport; // 復元
+  });
+
   await testAsync('AIエール配分: 与えられた色が活きる（前進する）ホロメンに送る', async () => {
     const e = await setupMainStep(deckMap, 68);
     const p0 = e.state.players[0];
@@ -2364,7 +2391,7 @@ export async function runTests() {
     p1.collab = null;
     const myCenter = p0.center;
     const now = incomingDamageToCenter(e, p1, 1, myCenter);
-    const proj = incomingDamageToCenter(e, p1, 1, myCenter, { projectExtraCheer: true });
+    const proj = incomingDamageToCenter(e, p1, 1, myCenter, { extraCheers: 1 });
     assertEq(now, 0, '今は撃てない（エール1枚）はずなのに脅威>0');
     assert(proj >= 50, `+1エールで解放される50点アーツが脅威に数えられていない（proj=${proj}）`);
   });
