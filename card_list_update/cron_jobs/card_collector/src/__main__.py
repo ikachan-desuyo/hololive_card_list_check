@@ -1,16 +1,16 @@
-"""主程式入口"""
+"""メインプログラムのエントリポイント"""
 import logging
 from src.collectors.card_collector import CardCollector
 from src.utils.logger import setup_logger
 
 def main():
-    """主程式入口點"""
-    # 設置日誌
+    """メインプログラムのエントリポイント"""
+    # ロガーを設定
     setup_logger()
     logging.info("Starting card collection process...")
     
     try:
-        # 創建收集器實例並開始收集
+        # コレクターのインスタンスを作成して収集を開始
         collector = CardCollector()
         collector.fetch_cards()
     except Exception as e:

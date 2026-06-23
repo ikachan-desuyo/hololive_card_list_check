@@ -1,4 +1,4 @@
-"""負責收集卡片數據的主要模組"""
+"""カードデータを収集するメインモジュール"""
 import requests
 import json
 import os
@@ -35,7 +35,7 @@ class CardCollector:
             logging.error(f"Error saving data: {e}")
 
     def parse_card(self, card_element):
-        """解析卡片元素並返回卡片數據"""
+        """カード要素を解析してカードデータを返す"""
         try:
             parser = CardParser(card_element)
             parser.parse_basic_info()
@@ -95,12 +95,12 @@ class CardCollector:
                 
                 logging.info(f"Page {page} completed. Cards processed: {page_processed_count}, New cards: {page_new_cards_count}")
                 
-                # 保存每頁的進度
+                # 1ページごとの進捗を保存
                 self.save_data(all_cards)
-                
-                # 繼續下一頁
+
+                # 次のページへ
                 page += 1
-                time.sleep(1)  # 避免請求過於頻繁
+                time.sleep(1)  # リクエストが頻繁になりすぎるのを避ける
                 
             except Exception as e:
                 logging.error(f"Error on page {page}: {e}")

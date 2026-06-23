@@ -17,7 +17,8 @@ import { STEP_NAMES } from '../core/constants.js';
 import { renderSide, renderHand, renderOppHand } from './board.js';
 import { IMPLEMENTED } from '../cards/index.js';
 
-const TEST_DECKS = ['ラミィデッキ', 'あの青空のせいだ', 'holoX起動テスト', 'ジジ'];
+// test_deck/ にあるデッキ一覧の取得に失敗した時のフォールバック（通常は manifest.json を読む）
+const TEST_DECKS_FALLBACK = ['ラミィデッキ', 'あの青空のせいだ', 'ジジ', 'FUWAMOCO'];
 
 let lib = null;
 let engine = null;
@@ -75,7 +76,16 @@ function buildChangedAndStore(stamps) {
 
 async function loadDeckSources() {
   const sources = [];
-  for (const name of TEST_DECKS) {
+  // test_deck/ の実在デッキを manifest.json（ディレクトリから生成）から取得。失敗時はフォールバック。
+  let testDecks = TEST_DECKS_FALLBACK;
+  try {
+    const res = await fetch('battle_simulator_v2/test_deck/manifest.json', { cache: 'no-store' });
+    if (res.ok) {
+      const list = await res.json();
+      if (Array.isArray(list) && list.length) testDecks = list;
+    }
+  } catch { /* フォールバックを使う */ }
+  for (const name of testDecks) {
     sources.push({ label: `テスト: ${name}`, key: `test:${name}` });
   }
   try {

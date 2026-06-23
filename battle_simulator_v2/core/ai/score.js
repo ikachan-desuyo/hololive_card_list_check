@@ -63,6 +63,32 @@ export function isFreePlaySupport(engine, card) {
   return !hasDownside;
 }
 
+/** 効果テキストからおおまかな価値を推定する（ドロー/サーチ/特殊ダメージ/エール/回復/回収など） */
+function estimateEffectText(text, engine, p) {
+  if (!text) return 0;
+  let v = 8; // 効果がある事自体の基礎点
+  if (/[\d１２３４５６７８９]枚(引|ドロー)/.test(text)) v = Math.max(v, 22 + Math.max(0, 6 - p.hand.length) * 2);
+  if (/デッキ(から|の中)/.test(text) && /(手札に加える|公開)/.test(text)) v = Math.max(v, 24);
+  if (/ステージに出す|登場させる/.test(text)) v = Math.max(v, engine._stageCount(p) < 4 ? 26 : 8);
+  const sd = text.match(/特殊ダメージ(\d+)/); if (sd) v = Math.max(v, 16 + Number(sd[1]) * 0.4);
+  if (/エール/.test(text) && /(付ける|送る|アタッチ)/.test(text)) v = Math.max(v, 18);
+  if (/回復/.test(text)) v = Math.max(v, 14);
+  if (/(アーカイブから|手札に戻|回収)/.test(text)) v = Math.max(v, 16);
+  return v;
+}
+
+/**
+ * コラボエフェクトの価値（この形でコラボした時に得られる効果の見積り）。
+ *   カード定義 ai.collabValue 優先 → 効果テキスト(コラボエフェクト)からの汎用推定 → フックのみある場合の保険(18)。
+ */
+function collabValueOf(engine, p, card, holomem) {
+  const def = engine.registry.get(card.number);
+  if (def?.ai?.collabValue) return def.ai.collabValue({ engine, player: p, card, holomem });
+  const kw = (card.keywords || []).find((k) => /コラボ/.test(k.subtype || ''));
+  if (kw) return estimateEffectText(kw.text, engine, p);
+  return def?.collabEffect ? 18 : 0;
+}
+
 /**
  * 現在の決定ポイントの各選択肢に点数を付ける。
  * @returns {Object<string, number>} optionId -> score
@@ -223,13 +249,22 @@ function scoreMainActions(engine, idx, pending, out) {
         const h = p.back[opt.backIndex];
         if (!h) break;
         const top = h.stack[0];
-        const cdef = engine.registry.get(top.number);
-        // コラボエフェクトの価値: カード定義 ai.collabValue 優先、無ければ「効果あり=+18」
-        const effVal = cdef?.ai?.collabValue
-          ? cdef.ai.collabValue({ engine, player: p, card: top, holomem: h })
-          : (cdef?.collabEffect ? 18 : 0);
-        score = 22 + effVal;
-        if ((top.arts || []).some((a) => engine._canPayCheers(h.cheers, a.cost))) score += 15;
+        const curCollab = collabValueOf(engine, p, top, h);
+        score = 22 + curCollab;
+        // バックは攻撃できないので、コラボは「攻撃枠を増やす」行為。今払えるアーツの火力で重み付けし、
+        // 強いアタッカー（センター/コラボ限定の大型アーツ持ち等）を優先コラボする。
+        const payableArts = (top.arts || []).filter((a) => engine._canPayCheers(h.cheers, a.cost));
+        if (payableArts.length) score += 15 + Math.max(...payableArts.map((a) => a.dmg || 0)) * 0.08;
+        // コラボ↔Bloomの順序判断: 今ターンこのバックをBloomでき、Bloom後の形のコラボ効果の方が
+        // 価値が高いなら、先にBloomしてから（より良い形で）コラボするため今のコラボは後回しにする。
+        // （コラボは1回限り・Bloom効果はどちらの順でも誘発・本体は最終的に同じ形になるため、差は
+        //  「どちらのコラボ効果が誘発するか」だけ）。逆（現形の方が上）ならそのままコラボを優先。
+        if (p.turnCount > 1) {
+          const bloomCard = p.hand.find((c) => c.kind === 'holomen' && engine._canBloom(h, c));
+          if (bloomCard && collabValueOf(engine, p, bloomCard, h) > curCollab + 3) {
+            score = Math.min(score, 6); // 先にBloomさせる（このコラボは後回し）
+          }
+        }
         break;
       }
       case 'support': {
