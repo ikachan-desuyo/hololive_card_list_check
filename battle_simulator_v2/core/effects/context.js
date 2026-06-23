@@ -150,7 +150,7 @@ export class EffectContext {
    * deckSearch:true を明示してもよい。確認したら効果完了時に必ずシャッフルされる
    * （_deckViewedNeedsShuffle フラグ→engine._runEffect で flush。ctx.shuffleDeck() で明示シャッフル済みなら二重シャッフルしない）。
    */
-  chooseCard({ cards, title, optional = false, skipLabel = '選ばない', displayCards = [], deckSearch = undefined }) {
+  chooseCard({ cards, title, optional = false, skipLabel = '選ばない', displayCards = [], deckSearch = undefined, intent = undefined }) {
     const deck = this.player.deck;
     // デッキサーチ判定: 明示指定 / deckCards(...) のタグ付き配列 / 候補が全てデッキ内
     const isDeckSearch = deckSearch === true
@@ -165,6 +165,9 @@ export class EffectContext {
       player: this.playerIdx,
       title,
       deckSearch: isDeckSearch,
+      // AI用の意図ヒント: 'gain'(手札/盤面に得る=最有用を選ぶ) / 'discard'(コスト破棄=最も不要を選ぶ)。
+      // 未指定ならデッキサーチは得る前提で 'gain'。それ以外は汎用（カード価値で選ぶ）。
+      intent: intent || (isDeckSearch ? 'gain' : undefined),
       displayCards: displayCards.filter((c) => !cards.includes(c)),
       buildOptions: () => [
         ...cards.map((c, i) => ({ id: `card_${i}`, label: c.name, card: c, value: c })),
@@ -197,12 +200,15 @@ export class EffectContext {
   }
 
   /** 自分/相手のホロメンを1人選ぶ（filter適用後）。optional 可 */
-  chooseHolomem({ side = 'self', filter = null, title, optional = false }) {
+  chooseHolomem({ side = 'self', filter = null, title, optional = false, intent = undefined }) {
     const entries = this.holomems(side, filter);
     return {
       kind: 'chooseHolomem',
       player: this.playerIdx,
       title,
+      // AI用の意図ヒント: 'damage'(相手を狙う=倒しやすい個体) / 'benefit'(自分への利益=主力)
+      //  / 'sacrifice'|'returnToDeck'(自分を失う=価値の低い個体)。未指定なら相手=damage・自分=benefit。
+      intent: intent || (side === 'opp' ? 'damage' : 'benefit'),
       buildOptions: () => [
         ...entries.map((e, i) => ({
           id: `mem_${e.pos.zone}_${e.pos.index}`,
@@ -221,6 +227,8 @@ export class EffectContext {
     return {
       kind: 'confirm',
       player: this.playerIdx,
+      // AI が発生源カードの ai.confirmValue を引けるよう発生源カード番号を載せる（任意効果の発動可否判断用）
+      sourceNumber: this.sourceCard?.number,
       title,
       // デフォルトラベル（発動する/発動しない）= 任意効果の「発動するか」ゲート。
       // 設定「任意効果の発動確認」がOFFのとき、エンジンが確認を出さず自動で発動(true)する対象。
@@ -1051,7 +1059,7 @@ export class EffectContext {
   *reBloom(holomem, { title = 'もう1回Bloomするホロメンを選択', optional = true } = {}) {
     const candidates = this.player.hand.filter((c) => this.canReBloom(holomem, c));
     if (candidates.length === 0) return false;
-    const card = yield this.chooseCard({ cards: candidates, title, optional, skipLabel: 'Bloomしない' });
+    const card = yield this.chooseCard({ cards: candidates, title, optional, skipLabel: 'Bloomしない', intent: 'gain' });
     if (!card) return false;
     this.removeFromHand(card);
     holomem.stack.unshift(card);
@@ -1117,6 +1125,7 @@ export class EffectContext {
       title: 'アーカイブからBloomさせるホロメンカードを選択',
       optional,
       skipLabel: 'Bloomしない',
+      intent: 'gain',
     });
     if (!card) return false;
     const entry = yield this.chooseHolomem({

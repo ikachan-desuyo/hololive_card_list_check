@@ -13,8 +13,8 @@ import { EffectRegistry } from '../core/effects/registry.js';
 import { EffectContext } from '../core/effects/context.js';
 import { compileCard } from '../core/effects/text-compiler.js';
 import { HeuristicAI } from '../core/ai/heuristic.js';
-import { evaluateState, WEIGHTS } from '../core/ai/evaluate.js';
-import { scoreOptions, bestOptionId } from '../core/ai/score.js';
+import { evaluateState, WEIGHTS, incomingDamageToCenter } from '../core/ai/evaluate.js';
+import { scoreOptions, bestOptionId, holomenValue, isFreePlaySupport } from '../core/ai/score.js';
 import { createRng } from '../core/rng.js';
 
 const results = [];
@@ -2245,6 +2245,152 @@ export async function runTests() {
     const id2 = ai.choose(e);
     const opt2 = s.pending.options.find((o) => o.id === id2);
     assertEq(opt2.kind, 'bloom', '利益のあるBloomを選ばなかった');
+  });
+
+  await testAsync('AI脅威見積り(#1): 次ターンのエール1枚追加で解放されるアーツも脅威に数える', async () => {
+    const e = await setupMainStep(deckMap, 60);
+    const p0 = e.state.players[0];
+    const p1 = e.state.players[1];
+    // 相手センター: 1stラミィ（青1+無色1で50点アーツ）にエール1枚だけ → 今は撃てないが+1で解放
+    p1.center = e._createHolomem(lib.get('hBP04-047_R'), 1);
+    p1.center.cheers = [{ number: 'c', name: '青エール', kind: 'cheer', color: '青' }];
+    p1.collab = null;
+    const myCenter = p0.center;
+    const now = incomingDamageToCenter(e, p1, 1, myCenter);
+    const proj = incomingDamageToCenter(e, p1, 1, myCenter, { projectExtraCheer: true });
+    assertEq(now, 0, '今は撃てない（エール1枚）はずなのに脅威>0');
+    assert(proj >= 50, `+1エールで解放される50点アーツが脅威に数えられていない（proj=${proj}）`);
+  });
+
+  await testAsync('AI推しスキル(#2): SP(ゲーム1回)は通常スキルより温存寄りに評価', async () => {
+    const e = await setupMainStep(deckMap, 59);
+    const p0 = e.state.players[0];
+    // 通常スキルとSPスキルを両方持つ推しを探して据える
+    const oshiCard = [...lib.byNumber.values()].find((c) => c.kind === CardKind.OSHI
+      && (c.oshiSkills || []).some((s) => !s.sp) && (c.oshiSkills || []).some((s) => s.sp));
+    assert(oshiCard, 'テスト前提: 通常+SPの両スキルを持つ推しが見つからない');
+    p0.oshi = oshiCard;
+    const regIdx = oshiCard.oshiSkills.findIndex((s) => !s.sp);
+    const spIdx = oshiCard.oshiSkills.findIndex((s) => s.sp);
+    const pending = { type: 'main', options: [
+      { id: 'reg', kind: 'oshiSkill', skillIndex: regIdx },
+      { id: 'sp', kind: 'oshiSkill', skillIndex: spIdx },
+    ] };
+    const sc = scoreOptions(e, 0, pending);
+    assert(sc.reg > sc.sp, `通常(${sc.reg})はSP(${sc.sp})より高く評価されるべき（SP温存）`);
+  });
+
+  await testAsync('AI任意効果(#3): ai.confirmValueが負なら発動しないを選ぶ', async () => {
+    const e = await setupMainStep(deckMap, 64);
+    const num = 'hBP04-043';
+    await e.registry.preload([num], lib);
+    const def = e.registry.get(num);
+    const origAi = def.ai;
+    def.ai = { ...(def.ai || {}), confirmValue: () => -5 }; // この状況では発動しない方が良い、と申告
+    const pending = { type: 'effectChoice', request: { kind: 'confirm', sourceNumber: num, activation: true },
+      options: [{ id: 'yes', value: true }, { id: 'no', value: false }] };
+    const sc = scoreOptions(e, 0, pending);
+    def.ai = origAi; // 復元
+    assert(sc.yes < sc.no, `ai.confirmValue<0 なら見送りが高評価のはず（yes=${sc.yes}, no=${sc.no}）`);
+    // 既定（フック無し）は発動が高評価のまま
+    const sc2 = scoreOptions(e, 0, { type: 'effectChoice',
+      request: { kind: 'confirm', sourceNumber: 'NONE', activation: true },
+      options: [{ id: 'yes', value: true }, { id: 'no', value: false }] });
+    assert(sc2.yes > sc2.no, '既定では任意効果は発動が高評価であるべき');
+  });
+
+  await testAsync('AIフリープレイ: ノーリスクのドロー/サーチを認識（コスト付きや明示は除外/上書き）', async () => {
+    // engine.registry.get をスタブ化して判定だけを検証する
+    const stub = (def) => ({ registry: { get: () => def } });
+    const card = (supportText) => ({ number: 'X', supportText });
+    // 純ドロー → フリー
+    assert(isFreePlaySupport(stub({ support: {} }), card('自分のデッキから2枚引く。')), '純ドローがフリー判定されない');
+    // デッキサーチ→手札に加える → フリー
+    assert(isFreePlaySupport(stub({ support: {} }), card('自分のデッキからホロメン1枚を公開し手札に加える。')), 'サーチがフリー判定されない');
+    // コスト付き（手札を捨てる）→ フリーではない
+    assert(!isFreePlaySupport(stub({ support: {} }), card('手札を1枚捨てる。その後2枚引く。')), 'コスト付きをフリー扱いした');
+    // 手札を戻して引く → フリーではない
+    assert(!isFreePlaySupport(stub({ support: {} }), card('手札をすべてデッキに戻し、5枚引く。')), '手札戻しをフリー扱いした');
+    // 効果未実装(support定義なし) → 対象外
+    assert(!isFreePlaySupport(stub({}), card('2枚引く。')), '効果未実装をフリー扱いした');
+    // ai.freePlay による明示上書き（テキストはドローでも false 指定なら除外）
+    assert(!isFreePlaySupport(stub({ support: {}, ai: { freePlay: false } }), card('2枚引く。')), 'ai.freePlay=false の上書きが効かない');
+    assert(isFreePlaySupport(stub({ support: {}, ai: { freePlay: true } }), card('盤面を整える。')), 'ai.freePlay=true の上書きが効かない');
+  });
+
+  await testAsync('AI配置: コラボエフェクト持ちDebutはバック優先・効果無しをセンターへ', async () => {
+    const e = await setupMainStep(deckMap, 58);
+    await e.registry.preload(['hBP04-044', 'hBP02-042'], lib);
+    const p0 = e.state.players[0];
+    const collabCard = lib.getByNumber('hBP04-044'); // コラボエフェクトあり
+    const plainCard = lib.getByNumber('hBP02-042');  // コラボエフェクトなし（バニラDebut）
+    p0.hand = [collabCard, plainCard];
+    // placementCenter: コラボ持ちは -25、効果無しは素のまま → 効果無しがセンターに選ばれる
+    const center = { type: 'placementCenter', options: [{ id: 'c0', handIndex: 0 }, { id: 'c1', handIndex: 1 }] };
+    const scC = scoreOptions(e, 0, center);
+    assertEq(scC.c0, holomenValue(collabCard) - 25, 'コラボ持ちのセンタースコアが-25されていない');
+    assertEq(scC.c1, holomenValue(plainCard), '効果無しのセンタースコアが素の値でない');
+    assert(scC.c1 > scC.c0, '効果無しDebutがセンターに選ばれるべき');
+    // placementBack: コラボ持ちは +25 でバックに置かれやすい
+    const back = { type: 'placementBack', options: [{ id: 'b0', handIndex: 0 }, { id: 'done' }] };
+    const scB = scoreOptions(e, 0, back);
+    assertEq(scB.b0, holomenValue(collabCard) + 25, 'コラボ持ちのバックスコアが+25されていない');
+  });
+
+  await testAsync('AI効果選択: 相手を狙う時は倒しやすい個体を選ぶ(意図damage)', async () => {
+    const e = await setupMainStep(deckMap, 55);
+    const p1 = e.state.players[1];
+    p1.center = e._createHolomem(lib.get('hBP04-048_RR'), 1); // HP190（高い=倒しにくい）
+    const weak = e._createHolomem(lib.get('hBP02-042_C'), 1); // HP130
+    weak.damage = 110; // 残20＝倒しやすい
+    p1.back = [weak];
+    p1.collab = null;
+    const ctx = new EffectContext(e, 0, {});
+    const req = ctx.chooseHolomem({ side: 'opp', title: 'ダメージ対象' });
+    const pending = { type: 'effectChoice', request: req, options: req.buildOptions() };
+    const sc = scoreOptions(e, 0, pending);
+    let best = null; let bv = -Infinity;
+    for (const o of pending.options) if (sc[o.id] > bv) { bv = sc[o.id]; best = o; }
+    assertEq(best.value.holomem, weak, '残HPの少ない（倒しやすい）相手を選んでいない');
+  });
+
+  await testAsync('AI効果選択: 自分への利益は主力(センター)、犠牲(sacrifice)は価値の低い個体', async () => {
+    const e = await setupMainStep(deckMap, 56);
+    const p0 = e.state.players[0];
+    p0.center = e._createHolomem(lib.get('hBP04-048_RR'), 1); // 主力
+    const backWeak = e._createHolomem(lib.get('hBP04-043_C'), 1); // Debut（価値低）
+    p0.back = [backWeak];
+    p0.collab = null;
+    const ctx = new EffectContext(e, 0, {});
+    const pick = (req) => {
+      const pending = { type: 'effectChoice', request: req, options: req.buildOptions() };
+      const sc = scoreOptions(e, 0, pending);
+      let best = null; let bv = -Infinity;
+      for (const o of pending.options) if (sc[o.id] > bv) { bv = sc[o.id]; best = o; }
+      return best;
+    };
+    const benefit = pick(ctx.chooseHolomem({ side: 'self', title: '回復対象' }));
+    assertEq(benefit.value.holomem, p0.center, '利益(benefit)は主力センターを選ぶべき');
+    const sac = pick(ctx.chooseHolomem({ side: 'self', intent: 'sacrifice', title: '退場対象' }));
+    assertEq(sac.value.holomem, backWeak, '犠牲(sacrifice)は価値の低い個体を選ぶべき');
+  });
+
+  await testAsync('AI効果選択: 得る(gain)は最有用カード、捨てる(discard)は最も不要なカード', async () => {
+    const e = await setupMainStep(deckMap, 57);
+    const strong = lib.get('hBP04-048_RR'); // 2nd・高HP高火力
+    const weak = lib.get('hBP04-047_R');     // 1st
+    const ctx = new EffectContext(e, 0, {});
+    const pick = (req) => {
+      const pending = { type: 'effectChoice', request: req, options: req.buildOptions() };
+      const sc = scoreOptions(e, 0, pending);
+      let best = null; let bv = -Infinity;
+      for (const o of pending.options) if (sc[o.id] != null && sc[o.id] > bv) { bv = sc[o.id]; best = o; }
+      return best;
+    };
+    const gain = pick(ctx.chooseCard({ cards: [weak, strong], title: '手札に加える', deckSearch: true }));
+    assertEq(gain.card, strong, 'gainは最有用カードを選ぶべき');
+    const discard = pick(ctx.chooseCard({ cards: [weak, strong], title: 'コスト破棄', intent: 'discard' }));
+    assertEq(discard.card, weak, 'discardは最も不要なカードを選ぶべき');
   });
 
   // ---- 推しスキル ----
