@@ -69,28 +69,41 @@ function remainHp(engine, h) {
   return Math.max(0, engine.effectiveHp(h) - h.damage);
 }
 
+/** アーツ a を defColor のセンターに当てた時の火力（特攻・実効修正込み） */
+function artDamageVs(engine, h, a, defColor, attackerIdx) {
+  let d = (a.dmg || 0) + Math.max(0, engine.effects.artsBonus(h, attackerIdx));
+  for (const tk of a.tokkou || []) if (defColor === tk.color) d += tk.value;
+  return d;
+}
+
 /**
  * attacker 側が defenderCenter に対して「次の1ターンで与えうる」最大ダメージの概算。
- * 公開情報のみ: attacker 側の盤上ホロメンそれぞれの「いま支払えるアーツの最大火力（特攻込み）」を、
- * センター＋コラボの最大2回ぶん合計する（おおまかなリーサル脅威の見積り）。
- * ※ 効果による追加・割り込みや、エール追加でのアーツ解放までは見ない（過小評価寄り＝安全側）。
+ * 公開情報のみ: attacker 側の盤上ホロメンそれぞれの最大火力（特攻込み）を、センター＋コラボの
+ * 最大2回ぶん合計する（おおまかなリーサル脅威の見積り）。
+ *
+ * projectExtraCheer=true のとき（相手ターンの脅威を読む防御用）: 相手は次ターンに最低1枚エールを
+ * 付けられるので、「エール1枚追加で解放されるアーツ」も脅威に数える（過小評価による防御不足を防ぐ）。
+ * 自分の攻撃力（この場のリーサル好機）を測る用途では false（エールは既に置かれている）。
  */
-export function incomingDamageToCenter(engine, attacker, attackerIdx, defenderCenter) {
+export function incomingDamageToCenter(engine, attacker, attackerIdx, defenderCenter, { projectExtraCheer = false } = {}) {
   if (!defenderCenter) return 0;
   const defColor = defenderCenter.stack[0].color;
   const perAttacker = [];
   for (const pos of ['center', 'collab']) {
     const h = attacker[pos];
     if (!h || h.rested) continue;
-    const arts = (h.stack[0].arts || []).filter((a) => engine._canPayCheers(h.cheers, a.cost));
-    if (arts.length === 0) continue;
     let best = 0;
-    for (const a of arts) {
-      let d = (a.dmg || 0) + Math.max(0, engine.effects.artsBonus(h, attackerIdx));
-      for (const tk of a.tokkou || []) if (defColor === tk.color) d += tk.value;
-      best = Math.max(best, d);
+    for (const a of (h.stack[0].arts || [])) {
+      let reachable = engine._canPayCheers(h.cheers, a.cost);
+      if (!reachable && projectExtraCheer) {
+        // エール1枚追加（最も都合のよい色）で解放されるか
+        for (const col of new Set(a.cost)) {
+          if (engine._canPayCheers([...h.cheers, { color: col }], a.cost)) { reachable = true; break; }
+        }
+      }
+      if (reachable) best = Math.max(best, artDamageVs(engine, h, a, defColor, attackerIdx));
     }
-    perAttacker.push(best);
+    if (best > 0) perAttacker.push(best);
   }
   return perAttacker.reduce((s, d) => s + d, 0);
 }
@@ -127,7 +140,8 @@ export function evaluateState(engine, idx) {
   // 5) リーサル脅威/好機（次の1ターンの読み）
   parts.lethal = 0;
   const myCenterRemain = me.center ? remainHp(engine, me.center) : 0;
-  const oppToMe = incomingDamageToCenter(engine, opp, 1 - idx, me.center);
+  // 相手の脅威は「次ターンにエール1枚追加で解放されるアーツ」も見込む（防御不足を防ぐ）
+  const oppToMe = incomingDamageToCenter(engine, opp, 1 - idx, me.center, { projectExtraCheer: true });
   if (me.center && oppToMe >= myCenterRemain) parts.lethal += WEIGHTS.lethalThreatToMe;
   const oppCenterRemain = opp.center ? remainHp(engine, opp.center) : 0;
   const meToOpp = incomingDamageToCenter(engine, me, idx, opp.center);

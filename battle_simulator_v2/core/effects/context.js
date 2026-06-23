@@ -227,6 +227,8 @@ export class EffectContext {
     return {
       kind: 'confirm',
       player: this.playerIdx,
+      // AI が発生源カードの ai.confirmValue を引けるよう発生源カード番号を載せる（任意効果の発動可否判断用）
+      sourceNumber: this.sourceCard?.number,
       title,
       // デフォルトラベル（発動する/発動しない）= 任意効果の「発動するか」ゲート。
       // 設定「任意効果の発動確認」がOFFのとき、エンジンが確認を出さず自動で発動(true)する対象。

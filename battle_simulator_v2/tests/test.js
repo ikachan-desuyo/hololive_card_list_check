@@ -13,7 +13,7 @@ import { EffectRegistry } from '../core/effects/registry.js';
 import { EffectContext } from '../core/effects/context.js';
 import { compileCard } from '../core/effects/text-compiler.js';
 import { HeuristicAI } from '../core/ai/heuristic.js';
-import { evaluateState, WEIGHTS } from '../core/ai/evaluate.js';
+import { evaluateState, WEIGHTS, incomingDamageToCenter } from '../core/ai/evaluate.js';
 import { scoreOptions, bestOptionId, holomenValue, isFreePlaySupport } from '../core/ai/score.js';
 import { createRng } from '../core/rng.js';
 
@@ -2245,6 +2245,58 @@ export async function runTests() {
     const id2 = ai.choose(e);
     const opt2 = s.pending.options.find((o) => o.id === id2);
     assertEq(opt2.kind, 'bloom', '利益のあるBloomを選ばなかった');
+  });
+
+  await testAsync('AI脅威見積り(#1): 次ターンのエール1枚追加で解放されるアーツも脅威に数える', async () => {
+    const e = await setupMainStep(deckMap, 60);
+    const p0 = e.state.players[0];
+    const p1 = e.state.players[1];
+    // 相手センター: 1stラミィ（青1+無色1で50点アーツ）にエール1枚だけ → 今は撃てないが+1で解放
+    p1.center = e._createHolomem(lib.get('hBP04-047_R'), 1);
+    p1.center.cheers = [{ number: 'c', name: '青エール', kind: 'cheer', color: '青' }];
+    p1.collab = null;
+    const myCenter = p0.center;
+    const now = incomingDamageToCenter(e, p1, 1, myCenter);
+    const proj = incomingDamageToCenter(e, p1, 1, myCenter, { projectExtraCheer: true });
+    assertEq(now, 0, '今は撃てない（エール1枚）はずなのに脅威>0');
+    assert(proj >= 50, `+1エールで解放される50点アーツが脅威に数えられていない（proj=${proj}）`);
+  });
+
+  await testAsync('AI推しスキル(#2): SP(ゲーム1回)は通常スキルより温存寄りに評価', async () => {
+    const e = await setupMainStep(deckMap, 59);
+    const p0 = e.state.players[0];
+    // 通常スキルとSPスキルを両方持つ推しを探して据える
+    const oshiCard = [...lib.byNumber.values()].find((c) => c.kind === CardKind.OSHI
+      && (c.oshiSkills || []).some((s) => !s.sp) && (c.oshiSkills || []).some((s) => s.sp));
+    assert(oshiCard, 'テスト前提: 通常+SPの両スキルを持つ推しが見つからない');
+    p0.oshi = oshiCard;
+    const regIdx = oshiCard.oshiSkills.findIndex((s) => !s.sp);
+    const spIdx = oshiCard.oshiSkills.findIndex((s) => s.sp);
+    const pending = { type: 'main', options: [
+      { id: 'reg', kind: 'oshiSkill', skillIndex: regIdx },
+      { id: 'sp', kind: 'oshiSkill', skillIndex: spIdx },
+    ] };
+    const sc = scoreOptions(e, 0, pending);
+    assert(sc.reg > sc.sp, `通常(${sc.reg})はSP(${sc.sp})より高く評価されるべき（SP温存）`);
+  });
+
+  await testAsync('AI任意効果(#3): ai.confirmValueが負なら発動しないを選ぶ', async () => {
+    const e = await setupMainStep(deckMap, 64);
+    const num = 'hBP04-043';
+    await e.registry.preload([num], lib);
+    const def = e.registry.get(num);
+    const origAi = def.ai;
+    def.ai = { ...(def.ai || {}), confirmValue: () => -5 }; // この状況では発動しない方が良い、と申告
+    const pending = { type: 'effectChoice', request: { kind: 'confirm', sourceNumber: num, activation: true },
+      options: [{ id: 'yes', value: true }, { id: 'no', value: false }] };
+    const sc = scoreOptions(e, 0, pending);
+    def.ai = origAi; // 復元
+    assert(sc.yes < sc.no, `ai.confirmValue<0 なら見送りが高評価のはず（yes=${sc.yes}, no=${sc.no}）`);
+    // 既定（フック無し）は発動が高評価のまま
+    const sc2 = scoreOptions(e, 0, { type: 'effectChoice',
+      request: { kind: 'confirm', sourceNumber: 'NONE', activation: true },
+      options: [{ id: 'yes', value: true }, { id: 'no', value: false }] });
+    assert(sc2.yes > sc2.no, '既定では任意効果は発動が高評価であるべき');
   });
 
   await testAsync('AIフリープレイ: ノーリスクのドロー/サーチを認識（コスト付きや明示は除外/上書き）', async () => {

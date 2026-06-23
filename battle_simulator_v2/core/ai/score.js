@@ -184,7 +184,8 @@ function scoreMainActions(engine, idx, pending, out) {
   const oppIdx = 1 - idx;
   const myCenter = p.center;
   const myCenterRemain = myCenter ? engine.effectiveHp(myCenter) - myCenter.damage : 0;
-  const oppThreat = incomingDamageToCenter(engine, opp, oppIdx, myCenter);
+  // 相手の脅威は次ターンのエール1枚追加で解放されるアーツも見込む（過小評価による防御不足を防ぐ）
+  const oppThreat = incomingDamageToCenter(engine, opp, oppIdx, myCenter, { projectExtraCheer: true });
   const underLethal = !!myCenter && oppThreat > 0 && oppThreat >= myCenterRemain;
 
   for (const opt of pending.options) {
@@ -266,7 +267,10 @@ function scoreMainActions(engine, idx, pending, out) {
         const odef = engine.registry.get(p.oshi.number);
         const skillDef = skill?.sp ? odef?.spOshiSkill : odef?.oshiSkill;
         if (skillDef?.aiSkip && skillDef.aiSkip(engine, idx)) break;
-        score = 18;
+        // カード定義 ai.value 優先（状況に応じた価値）。無ければ既定:
+        //   通常推しスキル(ターンに1回・再利用可)=18 / SP推しスキル(ゲームに1回・温存したい)=12。
+        if (skillDef?.ai?.value) score = skillDef.ai.value({ engine, idx, player: p });
+        else score = skill?.sp ? 12 : 18;
         break;
       }
       default:
@@ -328,7 +332,10 @@ function scoreEffect(engine, idx, pending, out) {
   const req = pending.request || {};
   const kind = req.kind;
   if (kind === 'confirm') {
-    for (const o of pending.options) out[o.id] = o.value ? 10 : 0; // 任意効果は基本発動
+    // カード定義 ai.confirmValue があれば発動価値を計算（負なら見送り）。無ければ既定で発動。
+    const cdef = req.sourceNumber ? engine.registry.get(req.sourceNumber) : null;
+    const yesVal = cdef?.ai?.confirmValue ? cdef.ai.confirmValue({ engine, idx, request: req }) : 10;
+    for (const o of pending.options) out[o.id] = o.value ? yesVal : 0;
     return;
   }
   if (kind === 'chooseHolomem') {
