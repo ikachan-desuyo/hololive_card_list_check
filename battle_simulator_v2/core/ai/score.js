@@ -38,6 +38,9 @@ function supportValue(engine, p, card) {
   if (/デッキから/.test(text) && /(手札に加える|公開し)/.test(text)) score = Math.max(score, 26);
   if (/ステージに出す/.test(text)) score = Math.max(score, engine._stageCount(p) < 4 ? 30 : 8);
   if (/交代/.test(text)) score = Math.max(score, 16);
+  const sd = text.match(/特殊ダメージ(\d+)/); // 特殊ダメージ系は火力ぶん価値を上げる
+  if (sd) score = Math.max(score, 18 + Number(sd[1]) * 0.4);
+  if (/回復/.test(text)) score = Math.max(score, 14);
   return score;
 }
 
@@ -165,8 +168,12 @@ function scoreMainActions(engine, idx, pending, out) {
         const top = h.stack[0];
         const hpGain = (newCard.hp || 0) - (top.hp || 0);
         const dmgGain = maxArtDmg(newCard) - maxArtDmg(top);
-        score = hpGain * 0.4 + dmgGain * 0.5;
-        if (engine.registry.get(newCard.number)?.bloomEffect) score += 40;
+        const bdef = engine.registry.get(newCard.number);
+        // ブルームエフェクトの価値: カード定義 ai.bloomValue 優先、無ければ「効果あり=+40」
+        const effVal = bdef?.ai?.bloomValue
+          ? bdef.ai.bloomValue({ engine, player: p, card: newCard, holomem: h })
+          : (bdef?.bloomEffect ? 40 : 0);
+        score = hpGain * 0.4 + dmgGain * 0.5 + effVal;
         if (h.damage > 0 && hpGain > 0) score += 10;
         if (underLethal && h === myCenter) {
           const newRemain = (newCard.hp || 0) - h.damage;
@@ -182,9 +189,13 @@ function scoreMainActions(engine, idx, pending, out) {
       case 'collab': {
         const h = p.back[opt.backIndex];
         if (!h) break;
-        score = 22;
         const top = h.stack[0];
-        if (engine.registry.get(top.number)?.collabEffect) score += 18;
+        const cdef = engine.registry.get(top.number);
+        // コラボエフェクトの価値: カード定義 ai.collabValue 優先、無ければ「効果あり=+18」
+        const effVal = cdef?.ai?.collabValue
+          ? cdef.ai.collabValue({ engine, player: p, card: top, holomem: h })
+          : (cdef?.collabEffect ? 18 : 0);
+        score = 22 + effVal;
         if ((top.arts || []).some((a) => engine._canPayCheers(h.cheers, a.cost))) score += 15;
         break;
       }
@@ -258,35 +269,67 @@ function scorePerformance(engine, idx, pending, out) {
   }
 }
 
-/** カード効果内の選択スコア */
+/** 効果で「得る/選ぶ」カードの価値（種類を問わず同じ物差しで比較する） */
+function cardGainValue(engine, idx, card) {
+  if (!card) return 0;
+  const p = engine.state.players[idx];
+  if (card.kind === 'holomen') {
+    let v = holomenValue(card);
+    // 盤面が薄いときは、すぐ置けるDebutの価値を上げる（展開を優先）
+    if (engine._stageCount(p) < 4 && card.bloomLevel === 'Debut') v += 30;
+    return v;
+  }
+  if (card.kind === 'support') return supportValue(engine, p, card);
+  if (card.kind === 'cheer') return 15;
+  return 12;
+}
+
+/**
+ * カード効果内の選択スコア。効果の「意図」(pending.request.intent) を見て、
+ * 相手を狙う/自分の利益/自分を失う・得る/捨てる を区別して選ぶ。
+ * intent は共通プリミティブ(ctx.chooseCard/chooseHolomem)が付与（既定: 相手=damage, 自分=benefit,
+ * デッキサーチ=gain）。個別カードは intent 引数で上書きできる（例: コスト破棄=discard, 退場=sacrifice）。
+ */
 function scoreEffect(engine, idx, pending, out) {
-  const kind = pending.request?.kind;
+  const req = pending.request || {};
+  const kind = req.kind;
   if (kind === 'confirm') {
     for (const o of pending.options) out[o.id] = o.value ? 10 : 0; // 任意効果は基本発動
     return;
   }
   if (kind === 'chooseHolomem') {
+    const intent = req.intent;
     for (const opt of pending.options) {
       if (!opt.value) { out[opt.id] = 0; continue; } // 「選ばない」
       const { holomem, pos } = opt.value;
-      let score = 0;
-      if (opt.side === 'opp') {
-        const remain = engine.effectiveHp(holomem) - holomem.damage;
-        score = 100 - remain * 0.3;
-        if (pos.zone === 'center') score += 8;
+      const remain = engine.effectiveHp(holomem) - holomem.damage;
+      const val = holomenValue(holomem.stack[0]);
+      let score;
+      if (opt.side === 'opp' || intent === 'damage') {
+        // 相手を狙う＝倒しやすい個体（残HP小）・センター優先
+        score = 120 - remain * 0.4;
+        if (pos.zone === 'center') score += 10;
+      } else if (intent === 'sacrifice' || intent === 'returnToDeck') {
+        // 自分を失う系＝価値が低く負傷した個体を差し出し、主力を残す
+        score = 80 - val * 0.12 + holomem.damage * 0.2;
+        if (pos.zone === 'back') score += 6;
       } else {
+        // 自分への利益（回復/強化/エール送り等）＝主力（前衛・高価値・負傷）を選ぶ
+        score = 10 + val * 0.05 + holomem.damage * 0.1;
         if (pos.zone === 'center') score += 25;
         else if (pos.zone === 'collab') score += 18;
-        score += holomem.damage * 0.1;
+        if ((holomem.stack[0].arts || []).some((a) => engine._canPayCheers(holomem.cheers, a.cost))) score += 8;
       }
       out[opt.id] = score;
     }
     return;
   }
   if (kind === 'chooseCard') {
+    const intent = req.intent; // 'gain' | 'discard' | undefined
     for (const opt of pending.options) {
       if (!opt.card) { out[opt.id] = -1; continue; } // skip はカードが無い時のみ
-      out[opt.id] = opt.card.kind === 'holomen' ? holomenValue(opt.card) : 20;
+      const v = cardGainValue(engine, idx, opt.card);
+      out[opt.id] = intent === 'discard' ? -v : v; // 破棄系は不要なカードを選ぶ
     }
     return;
   }

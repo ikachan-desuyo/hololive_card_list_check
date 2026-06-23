@@ -2247,6 +2247,62 @@ export async function runTests() {
     assertEq(opt2.kind, 'bloom', '利益のあるBloomを選ばなかった');
   });
 
+  await testAsync('AI効果選択: 相手を狙う時は倒しやすい個体を選ぶ(意図damage)', async () => {
+    const e = await setupMainStep(deckMap, 55);
+    const p1 = e.state.players[1];
+    p1.center = e._createHolomem(lib.get('hBP04-048_RR'), 1); // HP190（高い=倒しにくい）
+    const weak = e._createHolomem(lib.get('hBP02-042_C'), 1); // HP130
+    weak.damage = 110; // 残20＝倒しやすい
+    p1.back = [weak];
+    p1.collab = null;
+    const ctx = new EffectContext(e, 0, {});
+    const req = ctx.chooseHolomem({ side: 'opp', title: 'ダメージ対象' });
+    const pending = { type: 'effectChoice', request: req, options: req.buildOptions() };
+    const sc = scoreOptions(e, 0, pending);
+    let best = null; let bv = -Infinity;
+    for (const o of pending.options) if (sc[o.id] > bv) { bv = sc[o.id]; best = o; }
+    assertEq(best.value.holomem, weak, '残HPの少ない（倒しやすい）相手を選んでいない');
+  });
+
+  await testAsync('AI効果選択: 自分への利益は主力(センター)、犠牲(sacrifice)は価値の低い個体', async () => {
+    const e = await setupMainStep(deckMap, 56);
+    const p0 = e.state.players[0];
+    p0.center = e._createHolomem(lib.get('hBP04-048_RR'), 1); // 主力
+    const backWeak = e._createHolomem(lib.get('hBP04-043_C'), 1); // Debut（価値低）
+    p0.back = [backWeak];
+    p0.collab = null;
+    const ctx = new EffectContext(e, 0, {});
+    const pick = (req) => {
+      const pending = { type: 'effectChoice', request: req, options: req.buildOptions() };
+      const sc = scoreOptions(e, 0, pending);
+      let best = null; let bv = -Infinity;
+      for (const o of pending.options) if (sc[o.id] > bv) { bv = sc[o.id]; best = o; }
+      return best;
+    };
+    const benefit = pick(ctx.chooseHolomem({ side: 'self', title: '回復対象' }));
+    assertEq(benefit.value.holomem, p0.center, '利益(benefit)は主力センターを選ぶべき');
+    const sac = pick(ctx.chooseHolomem({ side: 'self', intent: 'sacrifice', title: '退場対象' }));
+    assertEq(sac.value.holomem, backWeak, '犠牲(sacrifice)は価値の低い個体を選ぶべき');
+  });
+
+  await testAsync('AI効果選択: 得る(gain)は最有用カード、捨てる(discard)は最も不要なカード', async () => {
+    const e = await setupMainStep(deckMap, 57);
+    const strong = lib.get('hBP04-048_RR'); // 2nd・高HP高火力
+    const weak = lib.get('hBP04-047_R');     // 1st
+    const ctx = new EffectContext(e, 0, {});
+    const pick = (req) => {
+      const pending = { type: 'effectChoice', request: req, options: req.buildOptions() };
+      const sc = scoreOptions(e, 0, pending);
+      let best = null; let bv = -Infinity;
+      for (const o of pending.options) if (sc[o.id] != null && sc[o.id] > bv) { bv = sc[o.id]; best = o; }
+      return best;
+    };
+    const gain = pick(ctx.chooseCard({ cards: [weak, strong], title: '手札に加える', deckSearch: true }));
+    assertEq(gain.card, strong, 'gainは最有用カードを選ぶべき');
+    const discard = pick(ctx.chooseCard({ cards: [weak, strong], title: 'コスト破棄', intent: 'discard' }));
+    assertEq(discard.card, weak, 'discardは最も不要なカードを選ぶべき');
+  });
+
   // ---- 推しスキル ----
 
   await testAsync('推しスキル: ラミィSP（特殊ダメージ+100とダウン時2ドロー）', async () => {
