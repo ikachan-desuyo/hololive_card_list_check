@@ -14,6 +14,22 @@
  */
 
 import { maxArtDmg, incomingDamageToCenter } from './evaluate.js';
+import { COLORLESS } from '../constants.js';
+
+/** コスト cost に対して cheers で満たせていない要求数（色一致を考慮。少ないほど解放に近い） */
+function unmetCost(cheers, cost) {
+  const pool = cheers.map((c) => c.color);
+  const specific = cost.filter((c) => c !== COLORLESS);
+  const anyCount = cost.length - specific.length;
+  let unmet = 0;
+  for (const color of specific) {
+    const i = pool.indexOf(color);
+    if (i === -1) unmet++;
+    else pool.splice(i, 1);
+  }
+  unmet += Math.max(0, anyCount - pool.length); // 残ったエールで無色枠を埋める
+  return unmet;
+}
 
 /** ホロメン（カード）の基礎評価: HP＋アーツ火力 */
 export function holomenValue(card) {
@@ -186,12 +202,22 @@ function scoreCheerTargets(engine, idx, pending, out) {
       const payableAfter = arts.filter((a) => engine._canPayCheers(afterCheers, a.cost));
       const maxCost = Math.max(...arts.map((a) => a.cost.length));
       if (payableAfter.length > payableBefore.length) {
+        // このエールでアーツが解放される（色も満たす）→ 解放アーツの火力で加点
         const unlocked = payableAfter.filter((a) => !payableBefore.includes(a));
         score += 40 + Math.max(...unlocked.map((a) => a.dmg)) * 0.2;
-      } else if (h.cheers.length < maxCost) {
-        score += 18;
       } else {
-        score -= 30;
+        // まだ解放されないアーツへ「色を満たす方向に前進」したか（色一致・火力で重み付け）。
+        // この1枚で未充足要求が減るアーツのうち、最も火力が高いものを評価する。
+        let bestProgress = 0;
+        for (const a of arts) {
+          if (payableBefore.includes(a)) continue; // 既に撃てるアーツは前進対象外
+          if (unmetCost(afterCheers, a.cost) < unmetCost(h.cheers, a.cost)) {
+            bestProgress = Math.max(bestProgress, 12 + (a.dmg || 0) * 0.1);
+          }
+        }
+        if (bestProgress > 0) score += bestProgress; // 強いアーツへ前進するほど高い
+        else if (h.cheers.length >= maxCost) score -= 30; // どのアーツも進まず満杯＝過剰投資
+        else score += 2; // 色が噛み合わず前進しない（最小限）
       }
       if (oppCenter && (opt.pos.zone === 'center' || opt.pos.zone === 'collab')) {
         const before = bestPayableDmg(h, h.cheers);

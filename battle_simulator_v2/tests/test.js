@@ -2239,6 +2239,23 @@ export async function runTests() {
 
   // ---- AI判断の質 ----
 
+  await testAsync('AIエール配分: 与えられた色が活きる（前進する）ホロメンに送る', async () => {
+    const e = await setupMainStep(deckMap, 68);
+    const p0 = e.state.players[0];
+    const mk = (number, costColors) => ({ number, name: 'AT' + number, kind: 'holomen', bloomLevel: '1st', hp: 150, color: '白', tags: [], arts: [{ name: 'a', dmg: 50, cost: costColors, tokkou: [] }], keywords: [] });
+    p0.center = e._createHolomem(mk('RED', ['赤', '赤']), 1); // 赤2が必要（青エールでは前進しない）
+    p0.center.cheers = [];
+    p0.back = [e._createHolomem(mk('BLUE', ['青', '青']), 1)]; // 青2が必要（青エールで前進する）
+    p0.back[0].cheers = [];
+    p0.collab = null;
+    const blue = { number: 'bc', name: '青エール', kind: 'cheer', color: '青' };
+    const sc = scoreOptions(e, 0, { type: 'attachCheer', player: 0, cheer: blue, options: [
+      { id: 'toCenter', pos: { zone: 'center', index: 0 } },
+      { id: 'toBack', pos: { zone: 'back', index: 0 } },
+    ] });
+    assert(sc.toBack > sc.toCenter, `青エールは青を必要とするホロメン（前進する方）に送るべき (back=${sc.toBack}, center=${sc.toCenter})`);
+  });
+
   await testAsync('AIコラボ: 攻撃力の高いアタッカーを優先してコラボ（ポジション限定アーツ活用）', async () => {
     const e = await setupMainStep(deckMap, 67);
     const p0 = e.state.players[0];
