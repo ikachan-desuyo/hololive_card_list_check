@@ -45,6 +45,25 @@ function supportValue(engine, p, card) {
 }
 
 /**
+ * 「フリープレイ」= 発動にコスト/犠牲/デメリットが無く、ドロー/サーチで手札・情報を
+ * 増やすだけの行動か。これらは引いた結果が他の判断を変えうるので「先に・必ず」打つべき。
+ *   - カード定義 ai.freePlay があれば最優先で従う（明示指定）
+ *   - 無ければテキストから汎用判定（ドロー/デッキサーチ かつ コスト語が無い）
+ */
+export function isFreePlaySupport(engine, card) {
+  const def = engine.registry.get(card.number);
+  if (!def?.support) return false; // 効果未実装は対象外（温存）
+  if (def.ai?.freePlay != null) return !!def.ai.freePlay;
+  const text = card.supportText || '';
+  const gains = /[\d１２３４５６７８９]枚(引|ドロー)/.test(text)
+    || (/デッキ(から|の中)/.test(text) && /(手札に加える|公開)/.test(text));
+  if (!gains) return false;
+  // コスト/犠牲/デメリットを示す語があればフリーではない
+  const hasDownside = /(アーカイブ|捨て|ダウン|コスト|減ら|手札[^。]*戻|失う|エール[^。]*取り除|お休み|ホロパワー)/.test(text);
+  return !hasDownside;
+}
+
+/**
  * 現在の決定ポイントの各選択肢に点数を付ける。
  * @returns {Object<string, number>} optionId -> score
  */
@@ -215,7 +234,9 @@ function scoreMainActions(engine, idx, pending, out) {
       case 'support': {
         const card = p.hand[opt.handIndex];
         if (!engine.registry.get(card.number)?.support) break; // 効果未実装は温存
-        score = supportValue(engine, p, card);
+        // ノーリスクのドロー/サーチは「先に打って情報を増やす」= 配置・ブルームより優先（70）。
+        // 緊急の防御（リーサル回避の bloom +80 等）はそれより上なので、危機時は防御が先になる。
+        score = isFreePlaySupport(engine, card) ? 70 : supportValue(engine, p, card);
         break;
       }
       case 'supportAttach': {

@@ -14,7 +14,7 @@ import { EffectContext } from '../core/effects/context.js';
 import { compileCard } from '../core/effects/text-compiler.js';
 import { HeuristicAI } from '../core/ai/heuristic.js';
 import { evaluateState, WEIGHTS } from '../core/ai/evaluate.js';
-import { scoreOptions, bestOptionId, holomenValue } from '../core/ai/score.js';
+import { scoreOptions, bestOptionId, holomenValue, isFreePlaySupport } from '../core/ai/score.js';
 import { createRng } from '../core/rng.js';
 
 const results = [];
@@ -2245,6 +2245,25 @@ export async function runTests() {
     const id2 = ai.choose(e);
     const opt2 = s.pending.options.find((o) => o.id === id2);
     assertEq(opt2.kind, 'bloom', '利益のあるBloomを選ばなかった');
+  });
+
+  await testAsync('AIフリープレイ: ノーリスクのドロー/サーチを認識（コスト付きや明示は除外/上書き）', async () => {
+    // engine.registry.get をスタブ化して判定だけを検証する
+    const stub = (def) => ({ registry: { get: () => def } });
+    const card = (supportText) => ({ number: 'X', supportText });
+    // 純ドロー → フリー
+    assert(isFreePlaySupport(stub({ support: {} }), card('自分のデッキから2枚引く。')), '純ドローがフリー判定されない');
+    // デッキサーチ→手札に加える → フリー
+    assert(isFreePlaySupport(stub({ support: {} }), card('自分のデッキからホロメン1枚を公開し手札に加える。')), 'サーチがフリー判定されない');
+    // コスト付き（手札を捨てる）→ フリーではない
+    assert(!isFreePlaySupport(stub({ support: {} }), card('手札を1枚捨てる。その後2枚引く。')), 'コスト付きをフリー扱いした');
+    // 手札を戻して引く → フリーではない
+    assert(!isFreePlaySupport(stub({ support: {} }), card('手札をすべてデッキに戻し、5枚引く。')), '手札戻しをフリー扱いした');
+    // 効果未実装(support定義なし) → 対象外
+    assert(!isFreePlaySupport(stub({}), card('2枚引く。')), '効果未実装をフリー扱いした');
+    // ai.freePlay による明示上書き（テキストはドローでも false 指定なら除外）
+    assert(!isFreePlaySupport(stub({ support: {}, ai: { freePlay: false } }), card('2枚引く。')), 'ai.freePlay=false の上書きが効かない');
+    assert(isFreePlaySupport(stub({ support: {}, ai: { freePlay: true } }), card('盤面を整える。')), 'ai.freePlay=true の上書きが効かない');
   });
 
   await testAsync('AI配置: コラボエフェクト持ちDebutはバック優先・効果無しをセンターへ', async () => {
