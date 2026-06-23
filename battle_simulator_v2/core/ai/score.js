@@ -280,7 +280,25 @@ function scoreMainActions(engine, idx, pending, out) {
   }
 }
 
-/** パフォーマンス（アタック）のスコア: 倒せる相手を最優先、次に火力 */
+/** このホロメンを倒した時に相手が失うライフ枚数（Buzz=2 / 特殊指定 / 軽減 / ノーライフ を反映） */
+function expectedLifeLoss(engine, h) {
+  if (h.noLifeOnDown) return 0;
+  const card = h.stack[0];
+  const base = card.extraLifeLossOnDown ?? (card.buzz ? 2 : 1);
+  return Math.max(0, base - (h.lifeReductionOnDown || 0));
+}
+
+/** このホロメンのダウンで相手が得をする誘発(onDown)を持つか（同点時に倒す価値をやや下げる） */
+function oppGainsOnDown(engine, h) {
+  if (engine.registry.get(h.stack[0].number)?.triggers?.onDown) return true;
+  return (h.attachments || []).some((a) => engine.registry.get(a.number)?.triggers?.onDown);
+}
+
+/**
+ * パフォーマンス（アタック）のスコア。倒せる相手を最優先しつつ、倒す価値を実態に寄せる:
+ *   ライフ圧（Buzz=2等のライフ損失量）・脅威除去・相手の残ライフ・センター除去のテンポ。
+ *   ダウンで相手が得をする(onDown)相手は同点時に控えめ。倒せない時は脅威の高い相手を優先的に削る。
+ */
 function scorePerformance(engine, idx, pending, out) {
   const p = engine.state.players[idx];
   const opp = engine.state.players[1 - idx];
@@ -298,13 +316,20 @@ function scorePerformance(engine, idx, pending, out) {
     for (const tk of art.tokkou || []) if (targetTop.color === tk.color) dmg += tk.value;
     dmg += engine.effects.artsBonus(h, idx);
     const remain = engine.effectiveHp(target) - target.damage;
+    const threat = maxArtDmg(targetTop); // 倒せば消せる相手の脅威
     let score = dmg * 0.2;
     if (dmg >= remain) {
-      score += 100;
-      if (opt.target.zone === 'center') score += 10;
-      score += (6 - opp.life.length) * 5;
-    } else if (opt.target.zone === 'center') {
-      score += 5;
+      // 倒せる: ライフ圧（Buzz=2等）・脅威除去・相手の残ライフ・センター除去を反映
+      const lifeLoss = expectedLifeLoss(engine, target);
+      score += 70 + lifeLoss * 25;
+      score += (6 - opp.life.length) * 5 * Math.max(1, lifeLoss); // 相手のライフが少ないほど致命的
+      score += threat * 0.05;                                     // 強い相手ほど倒す価値が高い
+      if (opt.target.zone === 'center') score += 10;              // センター除去は前衛入替を強制（テンポ）
+      if (lifeLoss > 0 && oppGainsOnDown(engine, target)) score -= 12; // ダウンで相手が得をするなら控えめ
+    } else {
+      // 倒せない: チップダメージ＋脅威の高い相手を削る方をやや優先
+      score += threat * 0.03;
+      if (opt.target.zone === 'center') score += 5;
     }
     out[opt.id] = score;
   }

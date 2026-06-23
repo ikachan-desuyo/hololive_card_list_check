@@ -2239,6 +2239,25 @@ export async function runTests() {
 
   // ---- AI判断の質 ----
 
+  await testAsync('AIアタックの質: ライフ圧が大きい相手(Buzz=2)を優先して倒す', async () => {
+    const e = await setupMainStep(deckMap, 65);
+    const p0 = e.state.players[0];
+    const p1 = e.state.players[1];
+    p0.center = e._createHolomem(lib.get('hBP04-048_RR'), 1); // アーツ持ちアタッカー
+    const normal = e._createHolomem(lib.getByNumber('hBP02-042'), 1); // 通常（ダウンでライフ-1）
+    const buzz = e._createHolomem(lib.getByNumber('hBP03-039'), 1); // Buzz（ダウンでライフ-2）
+    assert(buzz.stack[0].buzz, 'テスト前提: hBP03-039 がBuzz扱いでない');
+    normal.damage = e.effectiveHp(normal) - 10; // 残10（倒せる）
+    buzz.damage = e.effectiveHp(buzz) - 10; // 残10（倒せる）
+    p1.center = normal; p1.collab = buzz; p1.back = [];
+    const pending = { type: 'performance', player: 0, options: [
+      { id: 'killNormal', kind: 'art', zone: 'center', artIndex: 0, target: { zone: 'center', index: 0 } },
+      { id: 'killBuzz', kind: 'art', zone: 'center', artIndex: 0, target: { zone: 'collab', index: 0 } },
+    ] };
+    const sc = scoreOptions(e, 0, pending);
+    assert(sc.killBuzz > sc.killNormal, `Buzz(ライフ-2)を優先すべき (buzz=${sc.killBuzz}, normal=${sc.killNormal})`);
+  });
+
   await testAsync('AI: エールを撃てるホロメンに過剰投資しない', async () => {
     const e = await setupMainStep(deckMap, 51);
     const s = e.state;
