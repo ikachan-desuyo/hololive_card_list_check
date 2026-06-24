@@ -1443,3 +1443,28 @@ body.dragging, body.dragging * { cursor: grabbing !important; }
   60% { transform: translateX(-3px); }
   80% { transform: translateX(3px); }
 }
+
+/* ===== デッキ選択画面のCPUトグル: 選択状態を明確にする（#setup-screen button の上書きを打ち消す） ===== */
+#setup-ai-buttons { margin-top: 4px; }
+#setup-ai-buttons button {
+  margin-top: 0;
+  width: auto;
+  flex: 1;
+  padding: 10px 8px;
+  font-size: 0.95em;
+  font-weight: 600;
+  background: #1b1e3a;            /* 非選択=暗くくすませて「OFF」を明示 */
+  border: 2px solid #3c4185;
+  color: #9aa2c8;
+  border-radius: 8px;
+  cursor: pointer;
+}
+#setup-ai-buttons button::after { content: '：手動'; font-weight: 400; opacity: 0.85; }
+#setup-ai-buttons button.active {
+  background: linear-gradient(135deg, #1f9d55, #27c06a); /* 選択=緑で強調 */
+  border-color: #7cffb0;
+  color: #fff;
+  box-shadow: 0 0 12px rgba(40, 200, 110, 0.55);
+}
+#setup-ai-buttons button.active::after { content: '：CPU'; font-weight: 700; opacity: 1; }
+#setup-ai-buttons button:hover { filter: brightness(1.12); }
