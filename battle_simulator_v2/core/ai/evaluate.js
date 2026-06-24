@@ -71,6 +71,22 @@ function remainHp(engine, h) {
   return Math.max(0, engine.effectiveHp(h) - h.damage);
 }
 
+/**
+ * 相手が次ターンに付けられそうな追加エール枚数の見積り（公開情報のみ）。
+ * 相手の手札は見ないが、「相手の盤面に見えるエール付与効果（コラボ/ブルーム/ギフト）は使ってくる」という
+ * 行動傾向で、基本エール1枚＋効果ぶんを見込む。これにより相手の脅威の過小評価をさらに減らす。
+ */
+export function opponentExtraCheerProjection(engine, oppIdx) {
+  const opp = engine.state.players[oppIdx];
+  let effGain = 0;
+  for (const h of engine._stageHolomems(opp)) {
+    for (const kw of (h.stack[0].keywords || [])) {
+      if (/コラボ|ブルーム|ギフト/.test(kw.subtype || '')) effGain = Math.max(effGain, cheerGainFromText(kw.text));
+    }
+  }
+  return 1 + Math.min(effGain, 3); // 基本1枚＋効果で付けられそうな枚数（上限3）
+}
+
 /** アーツ a を defColor のセンターに当てた時の火力（特攻・実効修正込み） */
 function artDamageVs(engine, h, a, defColor, attackerIdx) {
   let d = (a.dmg || 0) + Math.max(0, engine.effects.artsBonus(h, attackerIdx));
@@ -196,8 +212,9 @@ export function evaluateState(engine, idx) {
   // 5) リーサル脅威/好機（次の1ターンの読み）
   parts.lethal = 0;
   const myCenterRemain = me.center ? remainHp(engine, me.center) : 0;
-  // 相手の脅威は「次ターンに基本エール1枚＋バックからもう1体コラボ」して殴ってくる前提で見積もる（防御不足を防ぐ）
-  const oppToMe = incomingDamageToCenter(engine, opp, 1 - idx, me.center, { extraCheers: 1, includeBackAttackers: true });
+  // 相手の脅威は「次ターンに（基本＋見えている効果で）エールを付け、バックからもう1体コラボ」する前提で見積もる
+  const oppToMe = incomingDamageToCenter(engine, opp, 1 - idx, me.center,
+    { extraCheers: opponentExtraCheerProjection(engine, 1 - idx), includeBackAttackers: true });
   if (me.center && oppToMe >= myCenterRemain) parts.lethal += WEIGHTS.lethalThreatToMe;
   const oppCenterRemain = opp.center ? remainHp(engine, opp.center) : 0;
   // 自分のリーサル好機は「今ターン効果で足せるエール（cheer budget）で解放されるアーツ」も見込む

@@ -13,7 +13,7 @@ import { EffectRegistry } from '../core/effects/registry.js';
 import { EffectContext } from '../core/effects/context.js';
 import { compileCard } from '../core/effects/text-compiler.js';
 import { HeuristicAI } from '../core/ai/heuristic.js';
-import { evaluateState, WEIGHTS, incomingDamageToCenter, cheerBudgetThisTurn } from '../core/ai/evaluate.js';
+import { evaluateState, WEIGHTS, incomingDamageToCenter, cheerBudgetThisTurn, opponentExtraCheerProjection } from '../core/ai/evaluate.js';
 import { scoreOptions, bestOptionId, holomenValue, isFreePlaySupport } from '../core/ai/score.js';
 import { reconstruct, evaluateCandidate } from '../core/ai/rollout.js';
 import { LookaheadAI } from '../core/ai/lookahead.js';
@@ -2556,6 +2556,16 @@ export async function runTests() {
     const id2 = ai.choose(e);
     const opt2 = s.pending.options.find((o) => o.id === id2);
     assertEq(opt2.kind, 'bloom', '利益のあるBloomを選ばなかった');
+  });
+
+  await testAsync('AI相手脅威モデル(段階2): 相手の見えるエール付与効果ぶんも脅威に見込む', async () => {
+    const e = await setupMainStep(deckMap, 76);
+    const p1 = e.state.players[1];
+    p1.center = e._createHolomem({ number: 'CG', name: 'CG', kind: 'holomen', bloomLevel: '1st', hp: 150, color: '青', tags: [], arts: [{ name: 'a', dmg: 30, cost: [], tokkou: [] }], keywords: [{ subtype: 'コラボエフェクト', name: '', text: '自分のエールデッキから2枚を好きなホロメンに送る。' }] }, 1);
+    p1.collab = null; p1.back = [];
+    assertEq(opponentExtraCheerProjection(e, 1), 3, '基本1＋見える効果2枚で3と見積もるべき');
+    p1.center = e._createHolomem({ number: 'N', name: 'N', kind: 'holomen', bloomLevel: 'Debut', hp: 100, color: '青', tags: [], arts: [], keywords: [] }, 1);
+    assertEq(opponentExtraCheerProjection(e, 1), 1, 'エール付与効果が見えなければ基本1枚');
   });
 
   await testAsync('AI脅威見積り: 相手はバックからもう1体コラボして殴る前提で脅威を見積もる', async () => {

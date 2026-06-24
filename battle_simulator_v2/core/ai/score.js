@@ -13,7 +13,7 @@
  * 公平性: 公開情報のみ（相手の手札/山札の中身・順序は見ない）。
  */
 
-import { maxArtDmg, incomingDamageToCenter, unmetCost, cheerBudgetThisTurn } from './evaluate.js';
+import { maxArtDmg, incomingDamageToCenter, unmetCost, cheerBudgetThisTurn, opponentExtraCheerProjection } from './evaluate.js';
 
 /** 今のエールで撃てるアーツの最大実効火力（dmgBonus/枚数依存込み）。攻撃要員としての即戦力。 */
 function bestPayableEffDmg(engine, h, idx) {
@@ -259,8 +259,9 @@ function scoreMainActions(engine, idx, pending, out) {
   const oppIdx = 1 - idx;
   const myCenter = p.center;
   const myCenterRemain = myCenter ? engine.effectiveHp(myCenter) - myCenter.damage : 0;
-  // 相手の脅威は「次ターンに基本エール1枚＋バックからもう1体コラボ」して殴ってくる前提（過小評価による防御不足を防ぐ）
-  const oppThreat = incomingDamageToCenter(engine, opp, oppIdx, myCenter, { extraCheers: 1, includeBackAttackers: true });
+  // 相手の脅威は「次ターンに（基本＋見えている効果で）エールを付け、バックからもう1体コラボ」する前提（防御不足を防ぐ）
+  const oppThreat = incomingDamageToCenter(engine, opp, oppIdx, myCenter,
+    { extraCheers: opponentExtraCheerProjection(engine, oppIdx), includeBackAttackers: true });
   const underLethal = !!myCenter && oppThreat > 0 && oppThreat >= myCenterRemain;
 
   for (const opt of pending.options) {
