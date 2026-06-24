@@ -210,6 +210,7 @@ async function startGame() {
       registry,
       confirmOptionalEffects: getSettings().confirmOptionalEffects !== false, // 任意効果の発動確認（既定ON）
       detailLog: true, // 実対戦は常に詳細ログを記録（コピーは設定「詳細ログ」ON時に詳細版を出力）
+      cardLibrary: lib, // AIの相手ブルーム脅威見積り用（公開のカードプール参照）
     });
     document.getElementById('setup-screen').style.display = 'none';
     document.getElementById('game-screen').classList.add('active');

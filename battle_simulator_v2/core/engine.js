@@ -97,6 +97,8 @@ export class Engine {
     // 詳細ログ: true のとき、行動ログに加えて毎ターン頭に「全プレイヤーの盤面・手札・各種カウント」の
     // 完全スナップショットを detailLogs に記録する（表示用 logs は変えない）。先読みの再生エンジンでは無効。
     this.detailLog = opts.detailLog === true;
+    // AI用: カードプール参照（相手のブルーム後フォームの火力見積り等に使う。公開知識）。
+    this.cardLibrary = opts.cardLibrary || null;
     // カード効果システム（registry は事前に preload しておくこと）
     this.registry = opts.registry || new EffectRegistry();
     this.effects = new EffectSystem(this, this.registry);
@@ -246,6 +248,28 @@ export class Engine {
     if (!target) return null;
     if (target.zone === 'back') return playerObj.back[target.index] || null;
     return playerObj[target.zone] || null;
+  }
+
+  /**
+   * AI用: card（盤上ホロメンのトップ）が「ブルームして上がりうる上位フォーム」のアーツ一覧。
+   * 公開のカードプールから「同名（別名含む）かつBloomレベルが上のカード」を集める（結果は名前単位でキャッシュ）。
+   * 相手の脅威見積りで「相手は次ターンにブルームして大技を撃つ」を織り込むのに使う。
+   */
+  _higherFormArts(card) {
+    if (!this.cardLibrary?.byNumber || !card || card.bloomLevel === 'Spot') return [];
+    const order = { Debut: 0, '1st': 1, '2nd': 2 };
+    const cur = order[card.bloomLevel] ?? 0;
+    const cache = (this.cardLibrary._higherFormArtsCache ||= new Map());
+    if (cache.has(card.number)) return cache.get(card.number);
+    const names = [card.name, ...(card.nameAliases || [])];
+    const arts = [];
+    for (const c of this.cardLibrary.byNumber.values()) {
+      if ((order[c.bloomLevel] ?? 0) <= cur) continue; // 同等以下のフォームは対象外
+      const cn = [c.name, ...(c.nameAliases || [])];
+      if (names.some((n) => cn.includes(n))) arts.push(...(c.arts || []));
+    }
+    cache.set(card.number, arts);
+    return arts;
   }
 
   /**

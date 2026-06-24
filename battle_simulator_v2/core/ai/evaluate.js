@@ -166,9 +166,12 @@ export function incomingDamageToCenter(engine, attacker, attackerIdx, defenderCe
   const perAttacker = [];
   for (const h of pool) {
     if (!h || h.rested) continue; // お休み中は次ターンにコラボへ出せない
+    // 相手の脅威見積りでは「次ターンにブルームして上位フォームの大技を撃つ」も候補に含める（公開のカードプールから）
+    const arts = [...(h.stack[0].arts || [])];
+    if (includeBackAttackers) arts.push(...engine._higherFormArts(h.stack[0]));
     let best = 0;
-    for (const a of (h.stack[0].arts || [])) {
-      // 今払える、または最善の色で extraCheers 枚足せば払える（=今/今ターン到達可能）
+    for (const a of arts) {
+      // 今払える、または最善の色で extraCheers 枚足せば払える（=今/今ターン到達可能。エールはブルームしても引き継ぐ）
       if (engine._canPayCheers(h.cheers, a.cost) || unmetCost(h.cheers, a.cost) <= extraCheers) {
         best = Math.max(best, artDamageVs(engine, h, a, defColor, attackerIdx));
       }

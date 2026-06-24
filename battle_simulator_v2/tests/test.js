@@ -2558,6 +2558,17 @@ export async function runTests() {
     assertEq(opt2.kind, 'bloom', '利益のあるBloomを選ばなかった');
   });
 
+  await testAsync('AI相手脅威モデル(段階3): 同名の上位フォーム(ブルーム後)のアーツを脅威候補に集められる', async () => {
+    const reg = await buildRegistry(lib, deckMap);
+    const e = new Engine({ decks: [lib.buildGameDeck(deckMap), lib.buildGameDeck(deckMap)], seed: 77, names: ['A', 'B'], registry: reg, cardLibrary: lib });
+    // 雪花ラミィ Debut → 同名の1st/2ndのアーツが集まる（相手のブルーム後脅威の見積りに使う）
+    const higher = e._higherFormArts(lib.getByNumber('hBP04-043'));
+    assert(higher.length > 0, '上位フォーム(1st/2nd)のアーツを集められていない');
+    // cardLibrary 無しのエンジンでは参照しない（自動テスト/全デッキ対戦の挙動は不変）
+    const e2 = new Engine({ decks: [lib.buildGameDeck(deckMap), lib.buildGameDeck(deckMap)], seed: 77, names: ['A', 'B'], registry: reg });
+    assertEq(e2._higherFormArts(lib.getByNumber('hBP04-043')).length, 0, 'cardLibrary無しでは上位フォームを参照しないべき');
+  });
+
   await testAsync('AI相手脅威モデル(段階2): 相手の見えるエール付与効果ぶんも脅威に見込む', async () => {
     const e = await setupMainStep(deckMap, 76);
     const p1 = e.state.players[1];

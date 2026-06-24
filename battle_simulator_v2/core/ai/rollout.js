@@ -29,6 +29,7 @@ export function reconstruct(engine) {
     // 再生時に決定ポイントの構造を一致させるため、挙動に関わる設定は元エンジンに合わせる
     stepPauses: engine.stepPauses,
     confirmOptionalEffects: engine.confirmOptionalEffects,
+    cardLibrary: engine.cardLibrary, // 相手ブルーム脅威見積り用（先読み内でも使う）
     onChange: () => {},
   });
   fresh.start();
