@@ -233,6 +233,15 @@ function scoreCheerTargets(engine, idx, pending, out) {
         if (opt.pos.zone === 'center') score += 12;
         else if (opt.pos.zone === 'collab') score += 8;
       }
+      // 集約ボーナス: 1ターンに殴れるのは前衛(センター+コラボ)中心なので、
+      // 「弱い体を量産」より「最強の1体を伸ばす」方が正しい。このエールでチーム最強前衛の
+      // 実効火力がどれだけ上がるかを重く評価する（既に強い主力＝スケールするアーツに積むほど高い）。
+      if (isActive && dmgAfter > 0) {
+        const fronts = [p.center, p.collab].filter(Boolean);
+        const teamBestBefore = Math.max(0, ...fronts.map((x) => bestEffDmg(x, x.cheers)));
+        const lift = Math.max(0, dmgAfter - teamBestBefore); // h にこのエールを足して最強前衛火力が増えるぶん
+        if (lift > 0) score += Math.min(50, lift * 0.5);
+      }
       // リーサル到達（前衛のみ）。センター＋コラボの「合算」実効火力で判定する＝
       // 1体に盛るより両前衛に振った方が合計火力が高く倒し切れる、というケースも拾う。
       if (oppCenter && isActive) {

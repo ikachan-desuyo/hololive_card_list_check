@@ -49,7 +49,7 @@ export function canActNow(engine, h) {
  * 脅威は「今のエールで撃てる実効火力」を主に評価する。エールが無くて撃てない大型ホロメンは
  * 火力上限(maxArtDmg)を満額では数えず、潜在ぶんを軽く見るだけ（＝燃料の無い2ndだらけの盤面を過大評価しない）。
  */
-export function holomemBoardValue(engine, h, idx) {
+export function holomemBoardValue(engine, h, idx, attackSoon = true) {
   const top = h.stack[0];
   const hpRemain = Math.max(0, engine.effectiveHp(h) - h.damage);
   let payableDmg = 0;
@@ -58,9 +58,12 @@ export function holomemBoardValue(engine, h, idx) {
   }
   if (payableDmg > 0) payableDmg += Math.max(0, engine.effects.artsBonus(h, idx));
   const potential = maxArtDmg(top); // エールを足せば届く火力（将来性）
-  const threat = payableDmg + potential * 0.15; // 今撃てる火力を重く、未燃料の潜在は軽く
+  let threat = payableDmg + potential * 0.15; // 今撃てる火力を重く、未燃料の潜在は軽く
+  // 1ターンに殴れるのは前衛(センター+コラボ)だけ。バック/お休みのホロメンに火力を盛っても今は使えないので、
+  // 攻撃価値は将来ぶんに割り引く（＝「弱い体に薄く広げる」より「前衛を強くする」方を高く評価する）。
+  if (!attackSoon) threat *= 0.4;
   let v = hpRemain * WEIGHTS.hpRemain + threat * WEIGHTS.threat;
-  if (payableDmg > 0) v += WEIGHTS.ready; // 今すぐ攻撃に使える
+  if (payableDmg > 0 && attackSoon) v += WEIGHTS.ready; // 今すぐ攻撃に使える
   return v;
 }
 
@@ -68,7 +71,10 @@ export function holomemBoardValue(engine, h, idx) {
 export function boardPower(engine, p, idx) {
   const mems = engine._stageHolomems(p);
   let power = 0;
-  for (const h of mems) power += holomemBoardValue(engine, h, idx);
+  for (const h of mems) {
+    const attackSoon = (h === p.center || h === p.collab) && !h.rested; // 今ターン攻撃に使える前衛か
+    power += holomemBoardValue(engine, h, idx, attackSoon);
+  }
   if (p.center && !p.center.rested) power += WEIGHTS.centerActive;
   if (p.collab && !p.collab.rested) power += WEIGHTS.collabActive;
   return power;

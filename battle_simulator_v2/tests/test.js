@@ -13,7 +13,7 @@ import { EffectRegistry } from '../core/effects/registry.js';
 import { EffectContext } from '../core/effects/context.js';
 import { compileCard } from '../core/effects/text-compiler.js';
 import { HeuristicAI } from '../core/ai/heuristic.js';
-import { evaluateState, WEIGHTS, incomingDamageToCenter, cheerBudgetThisTurn, opponentExtraCheerProjection } from '../core/ai/evaluate.js';
+import { evaluateState, WEIGHTS, incomingDamageToCenter, cheerBudgetThisTurn, opponentExtraCheerProjection, holomemBoardValue } from '../core/ai/evaluate.js';
 import { scoreOptions, bestOptionId, holomenValue, isFreePlaySupport } from '../core/ai/score.js';
 import { reconstruct, evaluateCandidate } from '../core/ai/rollout.js';
 import { LookaheadAI } from '../core/ai/lookahead.js';
@@ -2312,6 +2312,36 @@ export async function runTests() {
       if (b.phase === 'ended') { games++; if (b.winner === 1) lookWins++; }
     }
     assert(lookWins >= games * 0.6, `先読みAIが有意に強くない: ${lookWins}/${games}`);
+  });
+
+  await testAsync('AI評価: 同じ火力なら前衛(今殴れる)の方をバックより高く評価（攻撃価値の集約）', async () => {
+    const e = await setupMainStep(deckMap, 51);
+    const mk = { number: 'ATK', name: 'ATK', kind: 'holomen', bloomLevel: '1st', hp: 150, color: '白', tags: [], arts: [{ name: 'a', dmg: 100, cost: [], tokkou: [] }], keywords: [] };
+    const h = e._createHolomem(mk, 0); h.cheers = [];
+    const front = holomemBoardValue(e, h, 0, true);  // 前衛＝今ターン攻撃に使える
+    const back = holomemBoardValue(e, h, 0, false);   // バック／お休み＝今は殴れない
+    assert(front > back, `今殴れる前衛の攻撃価値を高く評価すべき (front=${front}, back=${back})`);
+  });
+
+  await testAsync('AIエール配分: 主力前衛に積んで大型アーツを解放する手を、弱いバックの解放より優先（集約加点）', async () => {
+    const e = await setupMainStep(deckMap, 52);
+    const p0 = e.state.players[0];
+    p0.hand = [];
+    const blueC = () => ({ number: 'b', name: '青', kind: 'cheer', color: '青' });
+    // センター(主力): 小(青1=40)と大(青2=120)を持つ。青1所持→もう1枚で大型解放＝チーム最強火力が大きく伸びる。
+    const primary = { number: 'PRI', name: 'PRI', kind: 'holomen', bloomLevel: '1st', hp: 150, color: '青', tags: [],
+      arts: [{ name: '小', dmg: 40, cost: ['青'], tokkou: [] }, { name: '大', dmg: 120, cost: ['青', '青'], tokkou: [] }], keywords: [] };
+    // バック(弱小): 青1で40を解放するだけ。攻撃にも使えない。
+    const weak = { number: 'WK', name: 'WK', kind: 'holomen', bloomLevel: '1st', hp: 120, color: '青', tags: [],
+      arts: [{ name: 'w', dmg: 40, cost: ['青'], tokkou: [] }], keywords: [] };
+    p0.center = e._createHolomem(primary, 1); p0.center.cheers = [blueC()];
+    p0.collab = null;
+    p0.back = [e._createHolomem(weak, 1)]; p0.back[0].cheers = [];
+    const sc = scoreOptions(e, 0, { type: 'attachCheer', player: 0, cheer: blueC(), options: [
+      { id: 'toCenter', pos: { zone: 'center', index: 0 } },
+      { id: 'toBack', pos: { zone: 'back', index: 0 } },
+    ] });
+    assert(sc.toCenter > sc.toBack, `最強前衛を伸ばす方を、弱いバックの解放より優先すべき (center=${sc.toCenter}, back=${sc.toBack})`);
   });
 
   await testAsync('深い先読み(2手): クラッシュせず対戦が完了し、合法手を返す', async () => {
