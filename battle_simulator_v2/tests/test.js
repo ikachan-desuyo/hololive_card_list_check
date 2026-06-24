@@ -2266,6 +2266,34 @@ export async function runTests() {
     def.ai = origAi; def.support = origSupport; // 復元
   });
 
+  await testAsync('AIブルーム: 今のエールで撃てる形へのブルームを高く評価（燃料なし大型2ndを過大評価しない）', async () => {
+    const e = await setupMainStep(deckMap, 72);
+    const p0 = e.state.players[0]; p0.turnCount = 2;
+    const first = { number: 'F1', name: 'XX', kind: 'holomen', bloomLevel: '1st', hp: 150, color: '青', tags: [], arts: [{ name: 's', dmg: 20, cost: ['青'], tokkou: [] }], keywords: [] };
+    const second = { number: 'S2', name: 'XX', kind: 'holomen', bloomLevel: '2nd', hp: 200, color: '青', tags: [], arts: [{ name: 'big', dmg: 100, cost: ['青', '青'], tokkou: [] }], keywords: [] };
+    const blue = () => ({ number: 'b', name: '青', kind: 'cheer', color: '青' });
+    const scoreBloom = (cheers) => {
+      const h = e._createHolomem(first, 1); h.placedTurn = 0; h.bloomedTurn = null; h.damage = 0; h.cheers = cheers;
+      p0.center = h; p0.collab = null; p0.back = []; p0.hand = [second];
+      return scoreOptions(e, 0, { type: 'main', options: [{ id: 'b', kind: 'bloom', handIndex: 0, pos: { zone: 'center', index: 0 } }] }).b;
+    };
+    const fueled = scoreBloom([blue(), blue()]); // 2ndの大型アーツを今すぐ撃てる
+    const dry = scoreBloom([]); // 撃てない
+    assert(fueled > dry, `燃料のあるブルームを高く評価すべき (fueled=${fueled}, dry=${dry})`);
+  });
+
+  await testAsync('AIエール: 枚数依存アーツは実効火力で評価（dmgBonus探査・デッキ非依存）', async () => {
+    const e = await setupMainStep(deckMap, 71);
+    await e.registry.preload(['hBP08-039'], lib);
+    const card = lib.getByNumber('hBP08-039'); // もこもこバウンティハンター: 青エール1枚につき+20
+    const h = e._createHolomem(card, 1);
+    const art = (card.arts || []).find((a) => /もこもこバウンティ/.test(a.name)) || card.arts[0];
+    const blue = () => ({ number: 'b', name: '青', kind: 'cheer', color: '青' });
+    h.cheers = [blue(), blue()]; const d2 = e._artEffectiveDamage(h, art, 0);
+    h.cheers = [blue(), blue(), blue()]; const d3 = e._artEffectiveDamage(h, art, 0);
+    assert(d3 > d2, `青エールが増えると実効火力が上がるはず (青2枚=${d2}, 青3枚=${d3})`);
+  });
+
   await testAsync('AIエール配分: 攻撃できる前衛に集中（大型アーツのバックに吸わせない）', async () => {
     const e = await setupMainStep(deckMap, 70);
     const p0 = e.state.players[0];

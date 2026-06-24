@@ -190,6 +190,44 @@ export class Engine {
     return playerObj[target.zone] || null;
   }
 
+  /**
+   * AI用: ホロメン h の指定アーツの実効火力の概算（基本値＋条件dmgBonus＋ターン修正＋相手センターへの特攻）。
+   * h の現在の状態（cheers/zone 等）で評価する。AIが仮のエールで試す時は h.cheers を一時的に差し替えて呼ぶ。
+   * dmgBonus は見積り用途で1回だけ呼ぶ（純粋な実装を想定。失敗・対象未確定時は基本値にフォールバック）。
+   * これにより「エールを足すと火力が伸びるか（枚数依存アーツ等）」をカード番号を見ずに一般的に判定できる。
+   */
+  _artEffectiveDamage(h, art, ownerIdx) {
+    const card = topCard(h);
+    let dmg = art.dmg || 0;
+    const artDef = this.registry.getArt(card.number, art.name);
+    if (artDef?.dmgBonus) {
+      try {
+        const ctx = new EffectContext(this, ownerIdx, { sourceCard: card, sourceHolomem: h });
+        dmg += artDef.dmgBonus(ctx) || 0;
+      } catch { /* 見積り失敗は基本値のまま */ }
+    } else if (art.text) {
+      // dmgBonus を持たない（run内で加算する等）アーツは、テキストから「枚数依存/閾値」ボーナスを推定。
+      // 赤→青等のエール色エイリアス（推しステージスキル）も反映して色を数える。二重計上を避けるため dmgBonus が無い時だけ。
+      const oshiStage = this._oshiStage(ownerIdx);
+      const countColor = (color) => (h.cheers || []).filter((c) =>
+        c.color === color || ((oshiStage?.cheerColorAlias?.(h, c, this, ownerIdx)) || []).includes(color)).length;
+      const per = art.text.match(/([赤青黄緑紫白])エール1枚につき[^。]*?\+\s*(\d+)/);
+      if (per) dmg += countColor(per[1]) * Number(per[2]);
+      const thr = art.text.match(/([赤青黄緑紫白])エールが\s*([0-9０-９]+)\s*枚以上[^。]*?\+\s*(\d+)/);
+      if (thr) {
+        const need = Number(thr[2].replace(/[０-９]/g, (d) => String('０１２３４５６７８９'.indexOf(d))));
+        if (countColor(thr[1]) >= need) dmg += Number(thr[3]);
+      }
+    }
+    dmg += Math.max(0, this.effects.artsBonus(h, ownerIdx));
+    const oppCenter = this.state.players[1 - ownerIdx]?.center;
+    if (oppCenter) {
+      const oc = oppCenter.stack[0].color;
+      for (const tk of art.tokkou || []) if (oc === tk.color) dmg += tk.value;
+    }
+    return dmg;
+  }
+
   /** ホロメンの現在の配置ゾーンを返す（'center'|'collab'|'back'|null） */
   _zoneOf(holomem) {
     for (const p of this.state.players) {
