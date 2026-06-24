@@ -21,6 +21,11 @@
       <select id="deck-p2"></select>
       <label for="seed-input">シード値（空欄でランダム / 同じ値で同じ展開を再現）</label>
       <input id="seed-input" type="number" placeholder="例: 42">
+      <div class="settings-label">CPU（自動操作するプレイヤー）</div>
+      <div class="settings-row" id="setup-ai-buttons">
+        <button data-ai="0">プレイヤー1</button>
+        <button data-ai="1">プレイヤー2</button>
+      </div>
       <button id="start-button">ゲーム開始</button>
       <div id="setup-error"></div>
     </div>
