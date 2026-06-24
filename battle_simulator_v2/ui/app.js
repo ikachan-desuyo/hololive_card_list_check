@@ -209,6 +209,7 @@ async function startGame() {
       onChange: render,
       registry,
       confirmOptionalEffects: getSettings().confirmOptionalEffects !== false, // 任意効果の発動確認（既定ON）
+      detailLog: true, // 実対戦は常に詳細ログを記録（コピーは設定「詳細ログ」ON時に詳細版を出力）
     });
     document.getElementById('setup-screen').style.display = 'none';
     document.getElementById('game-screen').classList.add('active');
@@ -1496,6 +1497,14 @@ function setupSettingsPanel() {
     if (engine) render(); // 即反映
   });
 
+  // 詳細ログ（コピー出力を詳細版にするか）
+  document.getElementById('detail-log-buttons').addEventListener('click', (e) => {
+    const v = e.target.dataset?.detailLog;
+    if (!v) return;
+    saveSettings({ detailLog: v === 'on' });
+    refreshSettingsUI();
+  });
+
   // AI適用（CPUが操作するプレイヤーの切り替え）
   document.getElementById('ai-buttons').addEventListener('click', (e) => {
     const idx = e.target.dataset?.ai;
@@ -1508,10 +1517,12 @@ function setupSettingsPanel() {
     if (engine) render(); // AIループを起動
   });
 
-  // ログコピー
+  // ログコピー（設定「詳細ログ」ONなら全情報スナップショット付きの詳細版を出力）
   document.getElementById('copy-log-button').addEventListener('click', async () => {
     if (!engine) return;
-    const text = `[seed=${currentSeed}]\n` + engine.state.logs.join('\n');
+    const detail = getSettings().detailLog === true && engine.state.detailLogs?.length;
+    const lines = detail ? engine.state.detailLogs : engine.state.logs;
+    const text = `[seed=${currentSeed}]${detail ? '（詳細ログ）' : ''}\n` + lines.join('\n');
     try {
       await navigator.clipboard.writeText(text);
       document.getElementById('copy-log-button').textContent = '✅ コピーしました';
@@ -1579,6 +1590,10 @@ function refreshSettingsUI() {
   const showEval = getSettings().showEval === true;
   for (const btn of document.querySelectorAll('#show-eval-buttons button')) {
     btn.classList.toggle('active', (btn.dataset.showEval === 'on') === showEval);
+  }
+  const detailLog = getSettings().detailLog === true;
+  for (const btn of document.querySelectorAll('#detail-log-buttons button')) {
+    btn.classList.toggle('active', (btn.dataset.detailLog === 'on') === detailLog);
   }
   document.getElementById('seed-display').textContent = `シード値: ${currentSeed ?? '-'}`;
 }

@@ -94,6 +94,9 @@ export class Engine {
     this.stepPauses = opts.stepPauses !== false;
     // 任意効果の発動確認（true=確認を出す/false=自動発動）。設定で切替。既定は確認する。
     this.confirmOptionalEffects = opts.confirmOptionalEffects !== false;
+    // 詳細ログ: true のとき、行動ログに加えて毎ターン頭に「全プレイヤーの盤面・手札・各種カウント」の
+    // 完全スナップショットを detailLogs に記録する（表示用 logs は変えない）。先読みの再生エンジンでは無効。
+    this.detailLog = opts.detailLog === true;
     // カード効果システム（registry は事前に preload しておくこと）
     this.registry = opts.registry || new EffectRegistry();
     this.effects = new EffectSystem(this, this.registry);
@@ -112,6 +115,7 @@ export class Engine {
       winner: null,            // 0 | 1 | 'draw'
       lossReason: null,
       logs: [],
+      detailLogs: [],          // 詳細ログ（detailLog=true 時。行動ログ＋毎ターンの全情報スナップショット）
       modifiers: [],           // ターン中などの継続修正（EffectSystem が管理）
       lastReveal: null,        // 効果による公開カードの演出用 { card, seq }（UIが監視）
       perfUsed: { center: false, collab: false }, // このパフォーマンスステップでアーツ使用済みか (9.2.1.3-5)
@@ -138,6 +142,33 @@ export class Engine {
 
   log(msg) {
     this.state.logs.push(msg);
+    if (this.detailLog) this.state.detailLogs.push(msg);
+  }
+
+  /**
+   * 詳細ログ用スナップショット: その時点で「プレイヤーが知りえる全情報」を記録する。
+   * 両者の盤面（HP/被ダメ/エール色/装着/お休み）・手札の中身・ライフ/山/アーカイブ/ホロパワー/エール山の枚数・継続効果。
+   * （山札の順序や未公開のライフ中身など、誰も知り得ない情報は枚数のみ。）
+   */
+  _detailSnapshot() {
+    if (!this.detailLog) return;
+    const s = this.state;
+    const out = this.state.detailLogs;
+    out.push(`──── 詳細状態（ターン${s.turn} / 手番:${s.players[s.turnPlayer]?.name}） ────`);
+    for (const p of s.players) {
+      const hand = p.hand.map((c) => c.name).join(', ') || '-';
+      out.push(`[${p.name}] ライフ${p.life.length} 手札${p.hand.length}[${hand}] 山${p.deck.length} アーカイブ${p.archive.length} ホロパワー${p.holoPower.length} エール山${p.cheerDeck.length} 推し:${p.oshi?.name || '-'}`);
+      for (const pos of this._stagePositions(p)) {
+        const h = this._holomemAt(p, pos);
+        const top = topCard(h);
+        const zone = pos.zone === 'center' ? 'センター' : pos.zone === 'collab' ? 'コラボ' : `バック${pos.index}`;
+        const cheers = h.cheers.map((c) => c.color).join('') || '-';
+        const att = h.attachments.map((a) => a.name).join(',') || '-';
+        const eff = this.effectiveHp(h);
+        out.push(`    ${zone}: ${top.name}〔${top.bloomLevel}〕HP${eff - h.damage}/${eff}(被${h.damage}) エール[${cheers}] 装着[${att}]${h.rested ? ' お休み' : ''}`);
+      }
+    }
+    if (s.modifiers.length) out.push(`  継続効果: ${s.modifiers.map((m) => m.description || m.kind).join(' / ')}`);
   }
 
   /** 現在の決定ポイントの選択肢一覧 */
@@ -651,6 +682,7 @@ export class Engine {
     // （「相手のターンでダウンした時に使える」等、相手ターン中に使うスキルがあるため）
     for (const pl of s.players) pl.usedOshiSkillThisTurn = 0;
     this.log(`―― ターン${s.turn}: ${p.name} のターン ――`);
+    this._detailSnapshot(); // 詳細ログ: ターン頭の全情報スナップショット
     this._resetStep();
   }
 

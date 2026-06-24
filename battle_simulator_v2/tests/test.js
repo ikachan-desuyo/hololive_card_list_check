@@ -2269,6 +2269,26 @@ export async function runTests() {
     assert(mainByLookahead > 0, '先読みAIのメイン決定が一度も発生しなかった');
   });
 
+  await testAsync('詳細ログ: detailLog有効時に全情報スナップショット（盤面・手札・枚数）が記録される', async () => {
+    const reg = await buildRegistry(lib, deckMap);
+    const e = new Engine({ decks: [lib.buildGameDeck(deckMap), lib.buildGameDeck(deckMap)], seed: 9, names: ['A', 'B'], registry: reg, detailLog: true });
+    e.start();
+    const ais = [new HeuristicAI(0), new HeuristicAI(1)];
+    let applies = 0;
+    while (e.state.phase !== 'ended' && applies < 60) {
+      const pd = e.state.pending; if (!pd) break;
+      const id = pd.player == null ? pd.options[0].id : ais[pd.player].choose(e);
+      if (id == null) break; e.apply(id); applies++;
+    }
+    assert(e.state.detailLogs.length > e.state.logs.length, '詳細ログが通常ログより情報量が多いはず');
+    assert(e.state.detailLogs.some((l) => /詳細状態（ターン/.test(l)), 'ターン頭スナップショットが無い');
+    assert(e.state.detailLogs.some((l) => /手札\d+\[/.test(l)), '手札の中身が記録されていない');
+    // detailLog 無効のエンジンは detailLogs を貯めない（先読み再生のオーバーヘッド回避）
+    const e2 = new Engine({ decks: [lib.buildGameDeck(deckMap), lib.buildGameDeck(deckMap)], seed: 9, names: ['A', 'B'], registry: reg });
+    e2.start();
+    assertEq(e2.state.detailLogs.length, 0, 'detailLog無効なのに詳細ログが記録された');
+  });
+
   await testAsync('先読みAI: ヒューリスティックより有意に強い（FUWAMOCO・両側合計の勝率）', async () => {
     const r = await fetch('../test_deck/' + encodeURIComponent('FUWAMOCO') + '.json'); const dm = await r.json();
     const reg = await buildRegistry(lib, dm);
