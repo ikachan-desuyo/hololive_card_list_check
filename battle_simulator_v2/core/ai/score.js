@@ -223,14 +223,17 @@ function scoreCheerTargets(engine, idx, pending, out) {
         if (opt.pos.zone === 'center') score += 12;
         else if (opt.pos.zone === 'collab') score += 8;
       }
-      // リーサル到達（前衛のみ・実効火力で判定）
+      // リーサル到達（前衛のみ）。センター＋コラボの「合算」実効火力で判定する＝
+      // 1体に盛るより両前衛に振った方が合計火力が高く倒し切れる、というケースも拾う。
       if (oppCenter && isActive) {
-        if (dmgAfter >= oppCenterRemain && dmgNow < oppCenterRemain) {
-          score += 60; // このエールだけで即リーサル到達
+        const others = [p.center, p.collab].filter((x) => x && x !== h);
+        const otherDmg = others.reduce((s, x) => s + bestEffDmg(x, x.cheers), 0);
+        if (dmgAfter + otherDmg >= oppCenterRemain && dmgNow + otherDmg < oppCenterRemain) {
+          score += 60; // このエールで（合算）リーサル到達
         } else if (budget > 0) {
-          // このエール＋今ターンの追加エール(budget)で相手センターを倒せる火力に届くなら前進加点（控えめ）
-          const reachAfter = bestReachableDmg(h, afterCheers, budget);
-          const reachBefore = bestReachableDmg(h, h.cheers, budget);
+          const otherReach = others.reduce((s, x) => s + bestReachableDmg(x, x.cheers, budget), 0);
+          const reachAfter = bestReachableDmg(h, afterCheers, budget) + otherReach;
+          const reachBefore = bestReachableDmg(h, h.cheers, budget) + otherReach;
           if (reachAfter >= oppCenterRemain && reachBefore < oppCenterRemain) score += 25;
         }
       }
