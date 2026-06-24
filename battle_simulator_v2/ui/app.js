@@ -209,10 +209,18 @@ async function startGame() {
       onChange: render,
       registry,
       confirmOptionalEffects: getSettings().confirmOptionalEffects !== false, // 任意効果の発動確認（既定ON）
+      detailLog: true, // 実対戦は常に詳細ログを記録（コピーは設定「詳細ログ」ON時に詳細版を出力）
+      cardLibrary: lib, // AIの相手ブルーム脅威見積り用（公開のカードプール参照）
     });
     document.getElementById('setup-screen').style.display = 'none';
     document.getElementById('game-screen').classList.add('active');
     engine.start();
+    // 詳細ログ用: 各プレイヤーが「人間 / CPU(先読み or 簡易)」のどれかを記録（どのAIで打ったか後で確認できる）
+    for (let i = 0; i < 2; i++) {
+      const mode = !aiEnabled(i) ? '人間'
+        : (lookaheadEnabled(i) ? `CPU(先読みAI・${lookaheadTurns()}手)` : 'CPU(簡易AI)');
+      engine.state.detailLogs.push(`[プレイヤー${i + 1}] = ${mode}`);
+    }
   } catch (e) {
     errBox.textContent = e.message;
   }
@@ -566,9 +574,15 @@ function showArchive(sideIdx) {
  * 小ポップアップ（例: アーツ選択・推しスキル選択）。
  * opt.run があればそれを実行、無ければ engine.apply(opt.id)
  */
-function showChooser(x, y, options) {
+function showChooser(x, y, options, infoHtml = '') {
   const chooser = document.getElementById('chooser');
   chooser.innerHTML = '';
+  if (infoHtml) {
+    const info = document.createElement('div');
+    info.className = 'chooser-info';
+    info.innerHTML = infoHtml;
+    chooser.appendChild(info);
+  }
   for (const opt of options) {
     const btn = document.createElement('button');
     btn.textContent = opt.label;
@@ -644,10 +658,14 @@ const hooks = {
       showInspector(detail);
       return;
     }
+    // 推しステージスキル（常在能力）はアクション選択ポップアップにも常時表示する
+    const info = card.oshiStageText
+      ? `<b>推しステージスキル</b><br>${escapeText(card.oshiStageText)}`
+      : '';
     showChooser(ev.clientX, ev.clientY, [
       ...acts,
       { label: '📄 カード詳細を見る', run: () => showInspector(detail) },
-    ]);
+    ], info);
   },
 };
 
@@ -1382,6 +1400,7 @@ function renderResult(s) {
   const overlay = document.getElementById('result-overlay');
   if (s.phase !== 'ended') {
     overlay.classList.remove('active');
+    document.getElementById('show-result-button').classList.remove('show');
     return;
   }
   overlay.classList.add('active');
@@ -1423,7 +1442,16 @@ function aiEnabled(idx) {
 }
 
 function lookaheadEnabled(idx) {
-  return !!(lookaheadOverride && lookaheadOverride[idx]);
+  // 既定: CPUは1手先読みAI（ヒューリスティックより有意に強い）。?lookahead=0 で高速な簡易AIに切替。
+  if (lookaheadOverride) return lookaheadOverride[idx];
+  return true;
+}
+
+// 先読みの深さ（何ターン先まで擬似対戦するか）。1=自分のターンのみ / 2=相手の応手 / 3=自分の次まで。
+// 既定は3手（自己対戦での実測で最も強い。2手は「攻めると損」で消極化し弱い）。
+function lookaheadTurns() {
+  const t = Number(getSettings().lookaheadTurns);
+  return t === 1 || t === 2 ? t : 3;
 }
 
 /** AI担当プレイヤーの決定ポイントを少し間を置いて自動で進める */
@@ -1437,7 +1465,7 @@ function handleAI(s) {
     aiTimer = null;
     if (!engine || engine.state.pending !== pendingRef) return;
     // 既定はヒューリスティック。?lookahead=1|2|both で該当プレイヤーを1手先読みAIにする（実験用）。
-    if (!aiAgents[idx]) aiAgents[idx] = lookaheadEnabled(idx) ? new LookaheadAI(idx) : new HeuristicAI(idx);
+    if (!aiAgents[idx]) aiAgents[idx] = lookaheadEnabled(idx) ? new LookaheadAI(idx, { turns: lookaheadTurns() }) : new HeuristicAI(idx);
     try {
       const id = aiAgents[idx].choose(engine);
       if (id != null) engine.apply(id);
@@ -1484,6 +1512,15 @@ function setupSettingsPanel() {
     refreshSettingsUI();
   });
 
+  // 先読みの深さ（1手/2手/3手）
+  document.getElementById('lookahead-turns-buttons').addEventListener('click', (e) => {
+    const v = e.target.dataset?.lookaheadTurns;
+    if (!v) return;
+    saveSettings({ lookaheadTurns: Number(v) });
+    aiAgents[0] = aiAgents[1] = null; // 深さが変わるので次の手番でAIを作り直す（実行中のゲームにも即反映）
+    refreshSettingsUI();
+  });
+
   // 評価値の表示（CPUと同じ score.js の数値をカード上に表示）
   document.getElementById('show-eval-buttons').addEventListener('click', (e) => {
     const v = e.target.dataset?.showEval;
@@ -1491,6 +1528,14 @@ function setupSettingsPanel() {
     saveSettings({ showEval: v === 'on' });
     refreshSettingsUI();
     if (engine) render(); // 即反映
+  });
+
+  // 詳細ログ（コピー出力を詳細版にするか）
+  document.getElementById('detail-log-buttons').addEventListener('click', (e) => {
+    const v = e.target.dataset?.detailLog;
+    if (!v) return;
+    saveSettings({ detailLog: v === 'on' });
+    refreshSettingsUI();
   });
 
   // AI適用（CPUが操作するプレイヤーの切り替え）
@@ -1505,10 +1550,12 @@ function setupSettingsPanel() {
     if (engine) render(); // AIループを起動
   });
 
-  // ログコピー
+  // ログコピー（設定「詳細ログ」ONなら全情報スナップショット付きの詳細版を出力）
   document.getElementById('copy-log-button').addEventListener('click', async () => {
     if (!engine) return;
-    const text = `[seed=${currentSeed}]\n` + engine.state.logs.join('\n');
+    const detail = getSettings().detailLog === true && engine.state.detailLogs?.length;
+    const lines = detail ? engine.state.detailLogs : engine.state.logs;
+    const text = `[seed=${currentSeed}]${detail ? '（詳細ログ）' : ''}\n` + lines.join('\n');
     try {
       await navigator.clipboard.writeText(text);
       document.getElementById('copy-log-button').textContent = '✅ コピーしました';
@@ -1577,6 +1624,14 @@ function refreshSettingsUI() {
   for (const btn of document.querySelectorAll('#show-eval-buttons button')) {
     btn.classList.toggle('active', (btn.dataset.showEval === 'on') === showEval);
   }
+  const laTurns = lookaheadTurns();
+  for (const btn of document.querySelectorAll('#lookahead-turns-buttons button')) {
+    btn.classList.toggle('active', Number(btn.dataset.lookaheadTurns) === laTurns);
+  }
+  const detailLog = getSettings().detailLog === true;
+  for (const btn of document.querySelectorAll('#detail-log-buttons button')) {
+    btn.classList.toggle('active', (btn.dataset.detailLog === 'on') === detailLog);
+  }
   document.getElementById('seed-display').textContent = `シード値: ${currentSeed ?? '-'}`;
 }
 
@@ -1627,6 +1682,15 @@ async function main() {
   window.addEventListener('resize', updateBoardScale);
   MOBILE_MQ.addEventListener?.('change', updateBoardScale);
   document.getElementById('restart-button').addEventListener('click', () => location.reload());
+  // 勝敗画面で盤面を確認できるようにする（結果オーバーレイを一時的に隠す→フローティングボタンで戻す）
+  document.getElementById('view-board-button').addEventListener('click', () => {
+    document.getElementById('result-overlay').classList.remove('active');
+    document.getElementById('show-result-button').classList.add('show');
+  });
+  document.getElementById('show-result-button').addEventListener('click', () => {
+    document.getElementById('result-overlay').classList.add('active');
+    document.getElementById('show-result-button').classList.remove('show');
+  });
   console.log('✅ バトルシミュレーターv2 初期化完了');
 
   // 開発用: ?ai=1|2|both でAI適用を一時的に上書き（設定には保存しない）
@@ -1635,13 +1699,19 @@ async function main() {
   if (aiParam) {
     aiOverride = [aiParam === '1' || aiParam === 'both', aiParam === '2' || aiParam === 'both'];
   }
-  // 実験用: ?lookahead=1|2|both で該当プレイヤーのCPUを1手先読みAIにする（既定はヒューリスティック）
+  // CPUは既定で1手先読み。?lookahead=0|none で高速な簡易AI（ヒューリスティック）に切替。
+  // ?lookahead=1|2 で片側だけ先読み等の指定も可能。
   const laParam = params.get('lookahead');
-  if (laParam) {
-    lookaheadOverride = [laParam === '1' || laParam === 'both', laParam === '2' || laParam === 'both'];
-  }
+  if (laParam === '0' || laParam === 'none') lookaheadOverride = [false, false];
+  else if (laParam) lookaheadOverride = [laParam === '1' || laParam === 'both', laParam === '2' || laParam === 'both'];
   // 開発・確認用: ?showeval=1 で「評価値を表示」をONにして起動
   if (params.get('showeval')) saveSettings({ showEval: true });
+  // 開発・確認用: ?deep=1|2|3 で「先読みの深さ（手数）」を指定して起動
+  const deepParam = params.get('deep');
+  if (deepParam != null) {
+    const t = Number(deepParam);
+    saveSettings({ lookaheadTurns: t === 1 || t === 2 ? t : 3 });
+  }
   if (aiParam) refreshSettingsUI(); // URL上書きをCPUトグル表示にも反映
 
   // 更新検知でリロードした場合は、保存しておいた選択でそのままゲームを自動再開する

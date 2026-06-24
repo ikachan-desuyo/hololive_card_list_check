@@ -40,10 +40,15 @@ export default {
     canUse(engine, ownerIdx) {
       const ctxColors = new Set();
       const p = engine.state.players[ownerIdx];
+      const oshiStage = engine._oshiStage(ownerIdx);
       for (const pos of engine._stagePositions(p)) {
         const h = engine._holomemAt(p, pos);
         for (const cheer of h.cheers) {
           if (cheer.color) ctxColors.add(cheer.color);
+          // 推しステージスキルのエール色エイリアス（〈フワワ/モココ〉の赤＝青）を反映
+          if (oshiStage?.cheerColorAlias) {
+            for (const c of oshiStage.cheerColorAlias(h, cheer, engine, ownerIdx) || []) ctxColors.add(c);
+          }
         }
       }
       const hasRed = ctxColors.has('赤');

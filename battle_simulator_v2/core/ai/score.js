@@ -13,7 +13,17 @@
  * 公平性: 公開情報のみ（相手の手札/山札の中身・順序は見ない）。
  */
 
-import { maxArtDmg, incomingDamageToCenter, unmetCost, cheerBudgetThisTurn } from './evaluate.js';
+import { maxArtDmg, incomingDamageToCenter, unmetCost, cheerBudgetThisTurn, opponentExtraCheerProjection } from './evaluate.js';
+
+/** 今のエールで撃てるアーツの最大実効火力（dmgBonus/枚数依存込み）。攻撃要員としての即戦力。 */
+function bestPayableEffDmg(engine, h, idx) {
+  if (!h) return 0;
+  let d = 0;
+  for (const a of (h.stack[0].arts || [])) {
+    if (engine._canPayCheers(h.cheers, a.cost)) d = Math.max(d, engine._artEffectiveDamage(h, a, idx));
+  }
+  return d;
+}
 
 /** ホロメン（カード）の基礎評価: HP＋アーツ火力 */
 export function holomenValue(card) {
@@ -223,6 +233,15 @@ function scoreCheerTargets(engine, idx, pending, out) {
         if (opt.pos.zone === 'center') score += 12;
         else if (opt.pos.zone === 'collab') score += 8;
       }
+      // 集約ボーナス: 1ターンに殴れるのは前衛(センター+コラボ)中心なので、
+      // 「弱い体を量産」より「最強の1体を伸ばす」方が正しい。このエールでチーム最強前衛の
+      // 実効火力がどれだけ上がるかを重く評価する（既に強い主力＝スケールするアーツに積むほど高い）。
+      if (isActive && dmgAfter > 0) {
+        const fronts = [p.center, p.collab].filter(Boolean);
+        const teamBestBefore = Math.max(0, ...fronts.map((x) => bestEffDmg(x, x.cheers)));
+        const lift = Math.max(0, dmgAfter - teamBestBefore); // h にこのエールを足して最強前衛火力が増えるぶん
+        if (lift > 0) score += Math.min(50, lift * 0.5);
+      }
       // リーサル到達（前衛のみ）。センター＋コラボの「合算」実効火力で判定する＝
       // 1体に盛るより両前衛に振った方が合計火力が高く倒し切れる、というケースも拾う。
       if (oppCenter && isActive) {
@@ -249,8 +268,9 @@ function scoreMainActions(engine, idx, pending, out) {
   const oppIdx = 1 - idx;
   const myCenter = p.center;
   const myCenterRemain = myCenter ? engine.effectiveHp(myCenter) - myCenter.damage : 0;
-  // 相手の脅威は次ターンの基本エール1枚で解放されるアーツも見込む（過小評価による防御不足を防ぐ）
-  const oppThreat = incomingDamageToCenter(engine, opp, oppIdx, myCenter, { extraCheers: 1 });
+  // 相手の脅威は「次ターンに（基本＋見えている効果で）エールを付け、バックからもう1体コラボ」する前提（防御不足を防ぐ）
+  const oppThreat = incomingDamageToCenter(engine, opp, oppIdx, myCenter,
+    { extraCheers: opponentExtraCheerProjection(engine, oppIdx), includeBackAttackers: true });
   const underLethal = !!myCenter && oppThreat > 0 && oppThreat >= myCenterRemain;
 
   for (const opt of pending.options) {
@@ -342,7 +362,22 @@ function scoreMainActions(engine, idx, pending, out) {
         if (!back) break;
         const backRemain = engine.effectiveHp(back) - back.damage;
         if (underLethal && backRemain > oppThreat && backRemain > centerRemain) score = 70;
-        else if (centerRemain <= 40 && backRemain > centerRemain + 30) score = 35;
+        // 育てた（エールを積んだ）センターは下げない＝攻撃機会とエール投資を捨てない。
+        // 安易な入替は「センターが瀕死かつ実質エール無し」のときだけ。
+        else if (centerRemain <= 40 && backRemain > centerRemain + 30 && (p.center.cheers || []).length <= 1) score = 35;
+        else {
+          // 明確に強いアタッカーがアクティブなバックにいるなら、センターへ据えて毎ターン殴る
+          // （コラボは毎リセットで休むため、大技要員はセンターで継続攻撃させたい）。
+          const backOff = bestPayableEffDmg(engine, back, idx);
+          const centerOff = bestPayableEffDmg(engine, p.center, idx);
+          // ただし「大技に向けてエール投資が進んでいるセンター」はバトンで捨てない（バトンコストでエールを失う＝無駄打ちの原因）。
+          const centerInvesting = (p.center.cheers || []).length >= 2 && (p.center.stack[0].arts || []).some((a) => {
+            const need = a.cost.length || 0; if (need === 0) return false;
+            const unmet = unmetCost(p.center.cheers, a.cost);
+            return unmet > 0 && (need - unmet) / need >= 0.5 && (a.dmg || 0) >= backOff; // 半分以上投資済みで、バック火力以上の大技
+          });
+          if (!back.rested && backOff >= centerOff + 60 && !centerInvesting) score = 30;
+        }
         break;
       }
       case 'oshiSkill': {
@@ -410,8 +445,8 @@ function scorePerformance(engine, idx, pending, out) {
       if (opt.target.zone === 'center') score += 10;              // センター除去は前衛入替を強制（テンポ）
       if (lifeLoss > 0 && oppGainsOnDown(engine, target)) score -= 12; // ダウンで相手が得をするなら控えめ
     } else {
-      // 倒せない: チップダメージ＋脅威の高い相手を削る方をやや優先
-      score += threat * 0.03;
+      // 倒せない時も、既にダメージを負った相手に集中して削り、KOを早める（散らさない）。脅威の高い相手も優先。
+      score += threat * 0.03 + target.damage * 0.05;
       if (opt.target.zone === 'center') score += 5;
     }
     out[opt.id] = score;

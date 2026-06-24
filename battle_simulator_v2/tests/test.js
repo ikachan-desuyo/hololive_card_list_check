@@ -13,7 +13,7 @@ import { EffectRegistry } from '../core/effects/registry.js';
 import { EffectContext } from '../core/effects/context.js';
 import { compileCard } from '../core/effects/text-compiler.js';
 import { HeuristicAI } from '../core/ai/heuristic.js';
-import { evaluateState, WEIGHTS, incomingDamageToCenter, cheerBudgetThisTurn } from '../core/ai/evaluate.js';
+import { evaluateState, WEIGHTS, incomingDamageToCenter, cheerBudgetThisTurn, opponentExtraCheerProjection, holomemBoardValue } from '../core/ai/evaluate.js';
 import { scoreOptions, bestOptionId, holomenValue, isFreePlaySupport } from '../core/ai/score.js';
 import { reconstruct, evaluateCandidate } from '../core/ai/rollout.js';
 import { LookaheadAI } from '../core/ai/lookahead.js';
@@ -625,6 +625,43 @@ export async function runTests() {
     p0.center = fuwamoco; p0.collab = null; p0.back = [];
     const ctx = e._effectContext(0, {});
     assert(ctx.cheerEffectiveColors(fuwamoco, red).has('青'), 'FUWAMOCO(別名フワモコ)の赤エールが青扱いになっていない');
+  });
+
+  await testAsync('UI詳細モーダル土台: 推しステージスキルのテキストが推しカードに乗る(cardDetailHtmlが読むoshiStageText)', async () => {
+    // ライブラリのパース: skills の「推しステージスキル」→ card.oshiStageText
+    const oshiLib = lib.getByNumber('hBP08-003');
+    assert(oshiLib.oshiStageText && oshiLib.oshiStageText.length > 0, 'ライブラリの推しに oshiStageText が無い（パース不全）');
+    // buildGameDeck 経由（実ゲームの player.oshi と同じ生成）でも保持される＝モーダルに出るはず
+    const r = await fetch('../test_deck/' + encodeURIComponent('FUWAMOCO') + '.json'); const dm = await r.json();
+    const gd = lib.buildGameDeck(dm);
+    assert(gd.oshi && gd.oshi.oshiStageText && gd.oshi.oshiStageText.length > 0, 'buildGameDeck の oshi に oshiStageText が無い');
+  });
+
+  await testAsync('hBP08-003 推しスキル: 赤エール(青扱い)で青条件が成立し、アーカイブのエールを#Adventに送れる', async () => {
+    const e = await setupMainStep(deckMap, 194);
+    await e.registry.preload(['hBP08-003'], lib);
+    const p0 = e.state.players[0];
+    p0.oshi = lib.getByNumber('hBP08-003');
+    const fuwawa = e._createHolomem({ number: 'fw', name: 'フワワ・アビスガード', kind: 'holomen', bloomLevel: '1st', hp: 150, color: '青', tags: ['Advent'], arts: [] }, 1);
+    fuwawa.cheers.push({ number: 'r0', name: '赤エール', kind: 'cheer', color: '赤' }); // ステージには赤エールのみ
+    p0.center = fuwawa; p0.collab = null; p0.back = [];
+    const archivedCheer = { number: 'ra', name: '赤エール', kind: 'cheer', color: '赤' };
+    p0.archive = [archivedCheer]; // アーカイブにエール(赤)。#Adventホロメンは入れない＝青条件のみ検証
+    const ctx = e._effectContext(0, {});
+    // 核心: ステージの赤エールが青としても数えられる（推しステージスキルのエイリアス反映）
+    assert(ctx.ownStageCheerColors().includes('青'), 'ステージの赤エールが青として数えられていない');
+    const skill = e.registry.get('hBP08-003').oshiSkill;
+    assert(skill.canUse(e, 0), '赤エール(青扱い)で青条件が成立していない');
+    // run の青分岐でアーカイブの赤エールを#Adventへ送れる
+    const gen = skill.run(ctx);
+    let r = gen.next();          // 赤分岐(archiveに#Adventホロメン無し→ログのみ)→青分岐のchooseCard
+    assertEq(r.value?.kind, 'chooseCard', '青分岐でアーカイブのエール選択が出ない');
+    r = gen.next(archivedCheer); // エールを選択→送り先#Advent選択
+    assertEq(r.value?.kind, 'chooseHolomem', '送り先#Adventの選択が出ない');
+    const entry = ctx.holomems('self', ({ top }) => (top.tags || []).includes('Advent'))[0];
+    gen.next(entry);             // フワワへ付ける
+    assertEq(fuwawa.cheers.length, 2, 'アーカイブの赤エールが#Advent(フワワ)に付いていない');
+    assert(!p0.archive.includes(archivedCheer), 'アーカイブから赤エールが取り除かれていない');
   });
 
   await testAsync('hBP08-039 アーツ: 赤エール(hBP08-003で青扱い)も付け替え対象になる', async () => {
@@ -2269,6 +2306,138 @@ export async function runTests() {
     assert(mainByLookahead > 0, '先読みAIのメイン決定が一度も発生しなかった');
   });
 
+  await testAsync('詳細ログ: detailLog有効時に全情報スナップショット（盤面・手札・枚数）が記録される', async () => {
+    const reg = await buildRegistry(lib, deckMap);
+    const e = new Engine({ decks: [lib.buildGameDeck(deckMap), lib.buildGameDeck(deckMap)], seed: 9, names: ['A', 'B'], registry: reg, detailLog: true });
+    e.start();
+    const ais = [new HeuristicAI(0), new HeuristicAI(1)];
+    let applies = 0;
+    while (e.state.phase !== 'ended' && applies < 60) {
+      const pd = e.state.pending; if (!pd) break;
+      const id = pd.player == null ? pd.options[0].id : ais[pd.player].choose(e);
+      if (id == null) break; e.apply(id); applies++;
+    }
+    assert(e.state.detailLogs.length > e.state.logs.length, '詳細ログが通常ログより情報量が多いはず');
+    assert(e.state.detailLogs.some((l) => /詳細状態（ターン/.test(l)), 'ターン頭スナップショットが無い');
+    assert(e.state.detailLogs.some((l) => /手札\d+\[/.test(l)), '手札の中身が記録されていない');
+    // detailLog 無効のエンジンは detailLogs を貯めない（先読み再生のオーバーヘッド回避）
+    const e2 = new Engine({ decks: [lib.buildGameDeck(deckMap), lib.buildGameDeck(deckMap)], seed: 9, names: ['A', 'B'], registry: reg });
+    e2.start();
+    assertEq(e2.state.detailLogs.length, 0, 'detailLog無効なのに詳細ログが記録された');
+  });
+
+  await testAsync('先読みAI: ヒューリスティックより有意に強い（FUWAMOCO・両側合計の勝率）', async () => {
+    const r = await fetch('../test_deck/' + encodeURIComponent('FUWAMOCO') + '.json'); const dm = await r.json();
+    const reg = await buildRegistry(lib, dm);
+    const run = (mk0, mk1, seed) => {
+      const e = new Engine({ decks: [lib.buildGameDeck(dm), lib.buildGameDeck(dm)], seed, names: ['P0', 'P1'], registry: reg });
+      e.start();
+      const ais = [mk0(0), mk1(1)];
+      let applies = 0;
+      while (e.state.phase !== 'ended' && applies < 2500) {
+        const pd = e.state.pending; if (!pd) break;
+        const id = pd.player == null ? pd.options[0].id : ais[pd.player].choose(e);
+        if (id == null) break; try { e.apply(id); } catch { break; } applies++;
+      }
+      return { winner: e.state.winner, phase: e.state.phase };
+    };
+    let lookWins = 0; let games = 0;
+    for (const seed of [1, 2, 3, 4]) { // 先攻有利を相殺するため先読みをP0/P1の両側で1回ずつ
+      const a = run((i) => new LookaheadAI(i), (i) => new HeuristicAI(i), seed);
+      if (a.phase === 'ended') { games++; if (a.winner === 0) lookWins++; }
+      const b = run((i) => new HeuristicAI(i), (i) => new LookaheadAI(i), seed);
+      if (b.phase === 'ended') { games++; if (b.winner === 1) lookWins++; }
+    }
+    assert(lookWins >= games * 0.6, `先読みAIが有意に強くない: ${lookWins}/${games}`);
+  });
+
+  await testAsync('AI評価: 同じ火力なら前衛(今殴れる)の方をバックより高く評価（攻撃価値の集約）', async () => {
+    const e = await setupMainStep(deckMap, 51);
+    const mk = { number: 'ATK', name: 'ATK', kind: 'holomen', bloomLevel: '1st', hp: 150, color: '白', tags: [], arts: [{ name: 'a', dmg: 100, cost: [], tokkou: [] }], keywords: [] };
+    const h = e._createHolomem(mk, 0); h.cheers = [];
+    const front = holomemBoardValue(e, h, 0, true);  // 前衛＝今ターン攻撃に使える
+    const back = holomemBoardValue(e, h, 0, false);   // バック／お休み＝今は殴れない
+    assert(front > back, `今殴れる前衛の攻撃価値を高く評価すべき (front=${front}, back=${back})`);
+  });
+
+  await testAsync('深い先読み(3手)はヒューリスティックより明確に強い（消極化せず攻める）', async () => {
+    const r = await fetch('../test_deck/' + encodeURIComponent('FUWAMOCO') + '.json'); const dm = await r.json();
+    const reg = await buildRegistry(lib, dm);
+    const run = (mk0, mk1, seed) => {
+      const e = new Engine({ decks: [lib.buildGameDeck(dm), lib.buildGameDeck(dm)], seed, names: ['P0', 'P1'], registry: reg, cardLibrary: lib });
+      e.start();
+      const ais = [mk0(0), mk1(1)];
+      let applies = 0;
+      while (e.state.phase !== 'ended' && applies < 3000) {
+        const pd = e.state.pending; if (!pd) break;
+        const id = pd.player == null ? pd.options[0].id : ais[pd.player].choose(e);
+        if (id == null) break; try { e.apply(id); } catch { break; } applies++;
+      }
+      return { winner: e.state.winner, phase: e.state.phase };
+    };
+    let w = 0, g = 0;
+    for (const seed of [11, 22, 33, 44]) { // 先後を入れ替えて両側で測定
+      const a = run((i) => new LookaheadAI(i, { turns: 3 }), (i) => new HeuristicAI(i), seed);
+      if (a.phase === 'ended') { g++; if (a.winner === 0) w++; }
+      const b = run((i) => new HeuristicAI(i), (i) => new LookaheadAI(i, { turns: 3 }), seed);
+      if (b.phase === 'ended') { g++; if (b.winner === 1) w++; }
+    }
+    assert(w >= g * 0.7, `3手先読みが明確に強くない: ${w}/${g}`); // 1手(基準)より高い水準を要求
+  });
+
+  await testAsync('AIエール配分: 主力前衛に積んで大型アーツを解放する手を、弱いバックの解放より優先（集約加点）', async () => {
+    const e = await setupMainStep(deckMap, 52);
+    const p0 = e.state.players[0];
+    p0.hand = [];
+    const blueC = () => ({ number: 'b', name: '青', kind: 'cheer', color: '青' });
+    // センター(主力): 小(青1=40)と大(青2=120)を持つ。青1所持→もう1枚で大型解放＝チーム最強火力が大きく伸びる。
+    const primary = { number: 'PRI', name: 'PRI', kind: 'holomen', bloomLevel: '1st', hp: 150, color: '青', tags: [],
+      arts: [{ name: '小', dmg: 40, cost: ['青'], tokkou: [] }, { name: '大', dmg: 120, cost: ['青', '青'], tokkou: [] }], keywords: [] };
+    // バック(弱小): 青1で40を解放するだけ。攻撃にも使えない。
+    const weak = { number: 'WK', name: 'WK', kind: 'holomen', bloomLevel: '1st', hp: 120, color: '青', tags: [],
+      arts: [{ name: 'w', dmg: 40, cost: ['青'], tokkou: [] }], keywords: [] };
+    p0.center = e._createHolomem(primary, 1); p0.center.cheers = [blueC()];
+    p0.collab = null;
+    p0.back = [e._createHolomem(weak, 1)]; p0.back[0].cheers = [];
+    const sc = scoreOptions(e, 0, { type: 'attachCheer', player: 0, cheer: blueC(), options: [
+      { id: 'toCenter', pos: { zone: 'center', index: 0 } },
+      { id: 'toBack', pos: { zone: 'back', index: 0 } },
+    ] });
+    assert(sc.toCenter > sc.toBack, `最強前衛を伸ばす方を、弱いバックの解放より優先すべき (center=${sc.toCenter}, back=${sc.toBack})`);
+  });
+
+  await testAsync('AI評価: 大技に向けたエール投資が進んだホロメンを高く評価（バトンで捨てると損＝無駄打ち抑制）', async () => {
+    const e = await setupMainStep(deckMap, 53);
+    const blue = () => ({ number: 'b', name: '青', kind: 'cheer', color: '青' });
+    const mk = { number: 'BIG', name: 'BIG', kind: 'holomen', bloomLevel: '2nd', hp: 200, color: '青', tags: [],
+      arts: [{ name: '大技', dmg: 200, cost: ['青', '青', '青', '青', '青', '青'], tokkou: [] }], keywords: [] };
+    const h0 = e._createHolomem(mk, 0); h0.cheers = [];                       // 投資なし
+    const h5 = e._createHolomem(mk, 0); h5.cheers = [blue(), blue(), blue(), blue(), blue()]; // 5/6投資（あと1枚で大技）
+    const empty = holomemBoardValue(e, h0, 0, true);
+    const invested = holomemBoardValue(e, h5, 0, true);
+    assert(invested > empty, `大技に向けたエール投資が進んだ方を高く評価すべき (empty=${empty}, invested=${invested})`);
+  });
+
+  await testAsync('深い先読み(2手/3手): クラッシュせず対戦が完了し、合法手を返す', async () => {
+    const r = await fetch('../test_deck/' + encodeURIComponent('FUWAMOCO') + '.json'); const dm = await r.json();
+    const reg = await buildRegistry(lib, dm);
+    for (const turns of [2, 3]) {
+      const e = new Engine({ decks: [lib.buildGameDeck(dm), lib.buildGameDeck(dm)], seed: 7, names: ['DEEP', 'H'], registry: reg, cardLibrary: lib });
+      e.start();
+      const ais = [new LookaheadAI(0, { turns }), new HeuristicAI(1)]; // P0 を深い先読みに
+      let applies = 0;
+      while (e.state.phase !== 'ended' && applies < 2500) {
+        const pd = e.state.pending; if (!pd) break;
+        const id = pd.player == null ? pd.options[0].id : ais[pd.player].choose(e);
+        assert(id == null || pd.options.some((o) => o.id === id), `深い先読み(${turns}手)が非合法な手を返した`);
+        if (id == null) break;
+        try { e.apply(id); } catch { break; }
+        applies++;
+      }
+      assertEq(e.state.phase, 'ended', `深い先読み(${turns}手)を含む対戦が決着しなかった`);
+    }
+  });
+
   await testAsync('AI: 倒せる相手を優先して攻撃する（リーサル選択）', async () => {
     const e = await setupMainStep(deckMap, 41);
     const s = e.state;
@@ -2438,6 +2607,20 @@ export async function runTests() {
     assert(deferScore <= 6, `1stコラボが上なら今のコラボは後回し(低スコア)のはず: ${deferScore}`);
   });
 
+  await testAsync('AIアタック: 倒せない時は既にダメージを負った相手に集中（KOを早める）', async () => {
+    const e = await setupMainStep(deckMap, 74);
+    const p0 = e.state.players[0]; const p1 = e.state.players[1];
+    const mk = (hp) => e._createHolomem({ number: 'T', name: 'T', kind: 'holomen', bloomLevel: '1st', hp, color: '白', tags: [], arts: [], keywords: [] }, 1);
+    p0.center = e._createHolomem({ number: 'AT', name: 'AT', kind: 'holomen', bloomLevel: '1st', hp: 150, color: '青', tags: [], arts: [{ name: 'a', dmg: 30, cost: [], tokkou: [] }], keywords: [] }, 1);
+    p1.center = mk(150); p1.center.damage = 30; // 残120
+    p1.collab = mk(240); p1.collab.damage = 200; // 残40（瀕死・ただし30では倒せない）
+    const sc = scoreOptions(e, 0, { type: 'performance', player: 0, options: [
+      { id: 'atC', kind: 'art', zone: 'center', artIndex: 0, target: { zone: 'center', index: 0 } },
+      { id: 'atCo', kind: 'art', zone: 'center', artIndex: 0, target: { zone: 'collab', index: 0 } },
+    ] });
+    assert(sc.atCo > sc.atC, `ダメージを負った相手(コラボ)に集中すべき (collab=${sc.atCo}, center=${sc.atC})`);
+  });
+
   await testAsync('AIアタックの質: ライフ圧が大きい相手(Buzz=2)を優先して倒す', async () => {
     const e = await setupMainStep(deckMap, 65);
     const p0 = e.state.players[0];
@@ -2497,6 +2680,42 @@ export async function runTests() {
     const id2 = ai.choose(e);
     const opt2 = s.pending.options.find((o) => o.id === id2);
     assertEq(opt2.kind, 'bloom', '利益のあるBloomを選ばなかった');
+  });
+
+  await testAsync('AI相手脅威モデル(段階3): 同名の上位フォーム(ブルーム後)のアーツを脅威候補に集められる', async () => {
+    const reg = await buildRegistry(lib, deckMap);
+    const e = new Engine({ decks: [lib.buildGameDeck(deckMap), lib.buildGameDeck(deckMap)], seed: 77, names: ['A', 'B'], registry: reg, cardLibrary: lib });
+    // 雪花ラミィ Debut → 同名の1st/2ndのアーツが集まる（相手のブルーム後脅威の見積りに使う）
+    const higher = e._higherFormArts(lib.getByNumber('hBP04-043'));
+    assert(higher.length > 0, '上位フォーム(1st/2nd)のアーツを集められていない');
+    // cardLibrary 無しのエンジンでは参照しない（自動テスト/全デッキ対戦の挙動は不変）
+    const e2 = new Engine({ decks: [lib.buildGameDeck(deckMap), lib.buildGameDeck(deckMap)], seed: 77, names: ['A', 'B'], registry: reg });
+    assertEq(e2._higherFormArts(lib.getByNumber('hBP04-043')).length, 0, 'cardLibrary無しでは上位フォームを参照しないべき');
+  });
+
+  await testAsync('AI相手脅威モデル(段階2): 相手の見えるエール付与効果ぶんも脅威に見込む', async () => {
+    const e = await setupMainStep(deckMap, 76);
+    const p1 = e.state.players[1];
+    p1.center = e._createHolomem({ number: 'CG', name: 'CG', kind: 'holomen', bloomLevel: '1st', hp: 150, color: '青', tags: [], arts: [{ name: 'a', dmg: 30, cost: [], tokkou: [] }], keywords: [{ subtype: 'コラボエフェクト', name: '', text: '自分のエールデッキから2枚を好きなホロメンに送る。' }] }, 1);
+    p1.collab = null; p1.back = [];
+    assertEq(opponentExtraCheerProjection(e, 1), 3, '基本1＋見える効果2枚で3と見積もるべき');
+    p1.center = e._createHolomem({ number: 'N', name: 'N', kind: 'holomen', bloomLevel: 'Debut', hp: 100, color: '青', tags: [], arts: [], keywords: [] }, 1);
+    assertEq(opponentExtraCheerProjection(e, 1), 1, 'エール付与効果が見えなければ基本1枚');
+  });
+
+  await testAsync('AI脅威見積り: 相手はバックからもう1体コラボして殴る前提で脅威を見積もる', async () => {
+    const e = await setupMainStep(deckMap, 75);
+    const p1 = e.state.players[1];
+    const mkAtk = (dmg) => ({ number: 'X', name: 'X', kind: 'holomen', bloomLevel: '1st', hp: 150, color: '青', tags: [], arts: [{ name: 'a', dmg, cost: [], tokkou: [] }], keywords: [] });
+    p1.center = e._createHolomem(mkAtk(40), 1);
+    p1.collab = null;
+    p1.back = [e._createHolomem(mkAtk(60), 1)]; // アクティブなバック＝次ターンにコラボして殴れる
+    p1.back[0].rested = false;
+    const myCenter = e.state.players[0].center;
+    const noBack = incomingDamageToCenter(e, p1, 1, myCenter, { extraCheers: 1 });
+    const withBack = incomingDamageToCenter(e, p1, 1, myCenter, { extraCheers: 1, includeBackAttackers: true });
+    assertEq(noBack, 40, 'センターのみの脅威は40のはず');
+    assertEq(withBack, 100, 'バックのアタッカー(60)も含め2体合計100で見積もるべき');
   });
 
   await testAsync('AI脅威見積り(#1): 次ターンのエール1枚追加で解放されるアーツも脅威に数える', async () => {

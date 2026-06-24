@@ -55,6 +55,15 @@
           </div>
         </div>
         <div class="settings-section">
+          <div class="settings-label">先読みの深さ（CPU・深いほど高精度＆重い）</div>
+          <div class="settings-row" id="lookahead-turns-buttons">
+            <button data-lookahead-turns="1">1手</button>
+            <button data-lookahead-turns="2">2手</button>
+            <button data-lookahead-turns="3">3手</button>
+          </div>
+          <div class="settings-note">各手を何ターン先まで擬似対戦して選ぶか。1手=自分のターンのみ（最速）。2手=相手の反撃まで。3手=自分の次のターンまで（倒し返されても取り返せるかを読む＝最高精度・最重）。深いほどCPUの思考時間が増えます。</div>
+        </div>
+        <div class="settings-section">
           <div class="settings-label">ステップ送り</div>
           <div class="settings-row" id="pause-speed-buttons">
             <button data-speed="fast">速い</button>
@@ -78,6 +87,14 @@
             <button data-show-eval="off">表示しない</button>
           </div>
           <div class="settings-note">各選択肢の「おすすめ度」を数値でカード上に表示します（高いほど有利）。CPUもこの数値で行動します。</div>
+        </div>
+        <div class="settings-section">
+          <div class="settings-label">詳細ログ（コピー用・全情報）</div>
+          <div class="settings-row" id="detail-log-buttons">
+            <button data-detail-log="on">詳細</button>
+            <button data-detail-log="off">通常</button>
+          </div>
+          <div class="settings-note">ONにすると「ログをコピー」が、毎ターンの全盤面・両者の手札・各種枚数を含む詳細版になります（画面表示は変わりません）。</div>
         </div>
         <div class="settings-section">
           <button id="copy-log-button" class="settings-action">📋 ログをコピー</button>
@@ -169,8 +186,12 @@
 
       <div id="result-overlay">
         <div id="result-message"></div>
-        <button id="restart-button">もう一度</button>
+        <div id="result-buttons">
+          <button id="view-board-button">盤面を確認</button>
+          <button id="restart-button">もう一度</button>
+        </div>
       </div>
+      <button id="show-result-button">🏆 結果を表示</button>
     </div>
 
   </div>

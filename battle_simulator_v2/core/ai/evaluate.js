@@ -45,14 +45,35 @@ export function canActNow(engine, h) {
 
 /**
  * 盤上ホロメン1体の価値（idx 視点・正の値）。
- *   生存力（残りHP）＋ 脅威（最大火力＋実効アーツ修正）＋ 即アタッカー度。
+ *   生存力（残りHP）＋ 脅威（今実際に撃てる火力を重視）＋ 即アタッカー度。
+ * 脅威は「今のエールで撃てる実効火力」を主に評価する。エールが無くて撃てない大型ホロメンは
+ * 火力上限(maxArtDmg)を満額では数えず、潜在ぶんを軽く見るだけ（＝燃料の無い2ndだらけの盤面を過大評価しない）。
  */
-export function holomemBoardValue(engine, h, idx) {
+export function holomemBoardValue(engine, h, idx, attackSoon = true) {
   const top = h.stack[0];
   const hpRemain = Math.max(0, engine.effectiveHp(h) - h.damage);
-  const threat = maxArtDmg(top) + Math.max(0, engine.effects.artsBonus(h, idx));
+  // 今払えるアーツの火力（payable）と、まだ払えないが「エール投資が進んでいる大技」の到達度つき価値（reaching）。
+  // reaching は大技に向けて貯めたエールの価値を表す＝バトン等でこのエールを捨てると評価が下がる（無駄打ちを抑制）。
+  let payableDmg = 0;
+  let reaching = 0;
+  for (const a of (top.arts || [])) {
+    const need = a.cost.length || 0;
+    const unmet = unmetCost(h.cheers, a.cost);
+    if (unmet === 0) {
+      payableDmg = Math.max(payableDmg, a.dmg || 0);
+    } else if (need > 0) {
+      // どれだけコストを満たせているか（0..1）。大技に近いほど（=投資が進むほど）価値を認める。
+      reaching = Math.max(reaching, (a.dmg || 0) * ((need - unmet) / need));
+    }
+  }
+  if (payableDmg > 0) payableDmg += Math.max(0, engine.effects.artsBonus(h, idx));
+  const potential = maxArtDmg(top); // エールを足せば届く火力上限（薄い将来性）
+  let threat = payableDmg + reaching * 0.4 + potential * 0.1;
+  // 1ターンに殴れるのは前衛(センター+コラボ)だけ。バック/お休みのホロメンに火力を盛っても今は使えないので、
+  // 攻撃価値は将来ぶんに割り引く（＝「弱い体に薄く広げる」より「前衛を強くする」方を高く評価する）。
+  if (!attackSoon) threat *= 0.4;
   let v = hpRemain * WEIGHTS.hpRemain + threat * WEIGHTS.threat;
-  if (canActNow(engine, h)) v += WEIGHTS.ready;
+  if (payableDmg > 0 && attackSoon) v += WEIGHTS.ready; // 今すぐ攻撃に使える
   return v;
 }
 
@@ -60,7 +81,10 @@ export function holomemBoardValue(engine, h, idx) {
 export function boardPower(engine, p, idx) {
   const mems = engine._stageHolomems(p);
   let power = 0;
-  for (const h of mems) power += holomemBoardValue(engine, h, idx);
+  for (const h of mems) {
+    const attackSoon = (h === p.center || h === p.collab) && !h.rested; // 今ターン攻撃に使える前衛か
+    power += holomemBoardValue(engine, h, idx, attackSoon);
+  }
   if (p.center && !p.center.rested) power += WEIGHTS.centerActive;
   if (p.collab && !p.collab.rested) power += WEIGHTS.collabActive;
   return power;
@@ -69,6 +93,22 @@ export function boardPower(engine, p, idx) {
 /** ホロメン h の現在の残りHP */
 function remainHp(engine, h) {
   return Math.max(0, engine.effectiveHp(h) - h.damage);
+}
+
+/**
+ * 相手が次ターンに付けられそうな追加エール枚数の見積り（公開情報のみ）。
+ * 相手の手札は見ないが、「相手の盤面に見えるエール付与効果（コラボ/ブルーム/ギフト）は使ってくる」という
+ * 行動傾向で、基本エール1枚＋効果ぶんを見込む。これにより相手の脅威の過小評価をさらに減らす。
+ */
+export function opponentExtraCheerProjection(engine, oppIdx) {
+  const opp = engine.state.players[oppIdx];
+  let effGain = 0;
+  for (const h of engine._stageHolomems(opp)) {
+    for (const kw of (h.stack[0].keywords || [])) {
+      if (/コラボ|ブルーム|ギフト/.test(kw.subtype || '')) effGain = Math.max(effGain, cheerGainFromText(kw.text));
+    }
+  }
+  return 1 + Math.min(effGain, 3); // 基本1枚＋効果で付けられそうな枚数（上限3）
 }
 
 /** アーツ a を defColor のセンターに当てた時の火力（特攻・実効修正込み） */
@@ -139,24 +179,32 @@ export function cheerBudgetThisTurn(engine, idx) {
  * extraCheers: 「最善の色のエールをあと何枚足せるか」。そのぶんで解放されるアーツも到達可能として数える。
  *   - 防御（相手ターンの脅威）: 1（相手は次ターンに基本エール1枚。相手の手札効果は見ない＝公開情報のみ）。
  *   - 攻撃（自分のリーサル好機）: cheerBudgetThisTurn（自分が今ターン効果で足せる枚数）。
+ * includeBackAttackers: 相手の脅威見積り用。相手は次ターンに「センター＋バックから1体コラボ」して殴ってくるため、
+ *   バックのアクティブなホロメンも攻撃要員候補に含める（攻撃できるのは最大2体なので上位2体ぶんを合計）。
  */
-export function incomingDamageToCenter(engine, attacker, attackerIdx, defenderCenter, { extraCheers = 0 } = {}) {
+export function incomingDamageToCenter(engine, attacker, attackerIdx, defenderCenter, { extraCheers = 0, includeBackAttackers = false } = {}) {
   if (!defenderCenter) return 0;
   const defColor = defenderCenter.stack[0].color;
+  const pool = [attacker.center, attacker.collab];
+  if (includeBackAttackers) pool.push(...(attacker.back || [])); // 次ターンにコラボへ上げてくる候補
   const perAttacker = [];
-  for (const pos of ['center', 'collab']) {
-    const h = attacker[pos];
-    if (!h || h.rested) continue;
+  for (const h of pool) {
+    if (!h || h.rested) continue; // お休み中は次ターンにコラボへ出せない
+    // 相手の脅威見積りでは「次ターンにブルームして上位フォームの大技を撃つ」も候補に含める（公開のカードプールから）
+    const arts = [...(h.stack[0].arts || [])];
+    if (includeBackAttackers) arts.push(...engine._higherFormArts(h.stack[0]));
     let best = 0;
-    for (const a of (h.stack[0].arts || [])) {
-      // 今払える、または最善の色で extraCheers 枚足せば払える（=今/今ターン到達可能）
+    for (const a of arts) {
+      // 今払える、または最善の色で extraCheers 枚足せば払える（=今/今ターン到達可能。エールはブルームしても引き継ぐ）
       if (engine._canPayCheers(h.cheers, a.cost) || unmetCost(h.cheers, a.cost) <= extraCheers) {
         best = Math.max(best, artDamageVs(engine, h, a, defColor, attackerIdx));
       }
     }
     if (best > 0) perAttacker.push(best);
   }
-  return perAttacker.reduce((s, d) => s + d, 0);
+  // 1ターンに攻撃できるのは最大2体（センター＋コラボ）なので、火力上位2体ぶんを脅威とみなす
+  perAttacker.sort((x, y) => y - x);
+  return perAttacker.slice(0, 2).reduce((s, d) => s + d, 0);
 }
 
 /**
@@ -191,14 +239,33 @@ export function evaluateState(engine, idx) {
   // 5) リーサル脅威/好機（次の1ターンの読み）
   parts.lethal = 0;
   const myCenterRemain = me.center ? remainHp(engine, me.center) : 0;
-  // 相手の脅威は「次ターンに基本エール1枚で解放されるアーツ」も見込む（防御不足を防ぐ。相手の手札効果は見ない）
-  const oppToMe = incomingDamageToCenter(engine, opp, 1 - idx, me.center, { extraCheers: 1 });
+  // 相手の脅威は「次ターンに（基本＋見えている効果で）エールを付け、バックからもう1体コラボ」する前提で見積もる
+  const oppToMe = incomingDamageToCenter(engine, opp, 1 - idx, me.center,
+    { extraCheers: opponentExtraCheerProjection(engine, 1 - idx), includeBackAttackers: true });
   if (me.center && oppToMe >= myCenterRemain) parts.lethal += WEIGHTS.lethalThreatToMe;
   const oppCenterRemain = opp.center ? remainHp(engine, opp.center) : 0;
   // 自分のリーサル好機は「今ターン効果で足せるエール（cheer budget）で解放されるアーツ」も見込む
   const meToOpp = incomingDamageToCenter(engine, me, idx, opp.center, { extraCheers: cheerBudgetThisTurn(engine, idx) });
   if (opp.center && meToOpp >= oppCenterRemain) parts.lethal += WEIGHTS.lethalChanceToOpp;
 
+  // 6) 継続攻撃力: 最大火力のホロメンがコラボにいると次のリセットで休む＝来ターン殴れない。
+  //    大技要員はセンター（持続）に据えるべき、という方向に評価を寄せる（自分は減点・相手は加点）。
+  parts.persistence = -collabRestPenalty(engine, me, idx) + collabRestPenalty(engine, opp, 1 - idx);
+
   const total = Object.values(parts).reduce((a, b) => a + b, 0);
   return { total, parts };
+}
+
+/** 最大火力(実効)のホロメンがコラボにいる場合のペナルティ量（来ターンに休んで使えないぶん） */
+function collabRestPenalty(engine, p, idx) {
+  const eff = (h) => {
+    if (!h) return 0;
+    let d = 0;
+    for (const a of (h.stack[0].arts || [])) {
+      if (engine._canPayCheers(h.cheers, a.cost)) d = Math.max(d, engine._artEffectiveDamage(h, a, idx));
+    }
+    return d;
+  };
+  const kf = eff(p.collab);
+  return kf > eff(p.center) ? kf * 0.15 : 0;
 }
