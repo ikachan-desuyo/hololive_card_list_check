@@ -19,6 +19,23 @@ import { EffectContext } from './effects/context.js';
 import { EffectSystem } from './effects/system.js';
 import { EffectRegistry } from './effects/registry.js';
 
+/** カードデータ（関数を含まないプレーンデータ）の複製。先読み再生用の独立デッキ生成に使う。 */
+function _cloneCard(c) {
+  if (!c) return c;
+  try { return (typeof structuredClone === 'function') ? structuredClone(c) : JSON.parse(JSON.stringify(c)); }
+  catch { return { ...c }; }
+}
+
+/** gameDeck（buildGameDeck の戻り値）を独立コピーする（カードは別オブジェクトにして相互汚染を防ぐ） */
+export function cloneGameDeck(d) {
+  return {
+    oshi: _cloneCard(d.oshi),
+    deck: (d.deck || []).map(_cloneCard),
+    cheerDeck: (d.cheerDeck || []).map(_cloneCard),
+    errors: [],
+  };
+}
+
 /** ステージのホロメン1人分（カードのスタック + 付帯情報）(4.4) */
 function createHolomem(card, turn) {
   return {
@@ -101,6 +118,15 @@ export class Engine {
     };
     this._setupQueue = [];
     this._revealSeq = 0;
+    // 先読み(replay)用: 同シードで最初から再生して現在状態を再現できるよう、
+    // 初期デッキ構成（独立コピー）と適用した決定列を保持する。決定的エンジンなのでスナップショット不要。
+    this.state.appliedIds = [];
+    this._replayInfo = {
+      seed: opts.seed ?? 1,
+      firstPlayer: opts.firstPlayer ?? null,
+      names,
+      decks: (opts.decks || []).map(cloneGameDeck),
+    };
   }
 
   /** 効果でカードを公開した時の演出通知（UIが lastReveal を監視して大きく表示する） */
@@ -161,6 +187,7 @@ export class Engine {
     if (!s.pending) throw new Error('決定ポイントがありません');
     const action = s.pending.options.find((o) => o.id === actionId);
     if (!action) throw new Error(`不正なアクション: ${actionId}`);
+    s.appliedIds.push(actionId); // 先読み再生用に決定列を記録（決定的エンジンなので id 列だけで状態を再現できる）
     const pending = s.pending;
     s.pending = null;
     this._execute(pending, action);

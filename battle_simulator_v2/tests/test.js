@@ -15,6 +15,8 @@ import { compileCard } from '../core/effects/text-compiler.js';
 import { HeuristicAI } from '../core/ai/heuristic.js';
 import { evaluateState, WEIGHTS, incomingDamageToCenter, cheerBudgetThisTurn } from '../core/ai/evaluate.js';
 import { scoreOptions, bestOptionId, holomenValue, isFreePlaySupport } from '../core/ai/score.js';
+import { reconstruct, evaluateCandidate } from '../core/ai/rollout.js';
+import { LookaheadAI } from '../core/ai/lookahead.js';
 import { createRng } from '../core/rng.js';
 
 const results = [];
@@ -2215,6 +2217,58 @@ export async function runTests() {
     assert(issues.length === 0, 'CPUが停止/クラッシュする対戦あり: ' + JSON.stringify(issues.slice(0, 10)));
   });
 
+  await testAsync('先読み基盤: 決定列の再生(replay)で現在状態を完全再現する（スナップショット不要）', async () => {
+    const fp = (eng) => {
+      const s = eng.state;
+      const parts = [s.phase, 'T' + s.turn, 'TP' + s.turnPlayer, 'pend' + (s.pending?.type || '-')];
+      for (const p of s.players) {
+        parts.push(`L${p.life.length}H${p.hand.length}D${p.deck.length}A${p.archive.length}HP${p.holoPower.length}CD${p.cheerDeck.length}`);
+        for (const pos of eng._stagePositions(p)) {
+          const h = eng._holomemAt(p, pos);
+          parts.push(`${pos.zone}${pos.index}:${h.stack[0].number}d${h.damage}c${h.cheers.length}s${h.stack.length}r${h.rested ? 1 : 0}`);
+        }
+      }
+      parts.push('M' + s.modifiers.length);
+      return parts.join('|');
+    };
+    for (const seed of [123, 321]) {
+      const reg = await buildRegistry(lib, deckMap);
+      const e = new Engine({ decks: [lib.buildGameDeck(deckMap), lib.buildGameDeck(deckMap)], seed, names: ['A', 'B'], registry: reg });
+      e.start();
+      const ais = [new HeuristicAI(0), new HeuristicAI(1)];
+      let applies = 0;
+      while (e.state.phase !== 'ended' && applies < 100) {
+        const pd = e.state.pending; if (!pd) break;
+        const id = pd.player == null ? pd.options[0].id : ais[pd.player].choose(e);
+        if (id == null) break;
+        e.apply(id); applies++;
+      }
+      const before = fp(e);
+      const recon = reconstruct(e);
+      assertEq(fp(recon), before, `seed=${seed}: replay再構築が現在状態と一致しない`);
+      assertEq(fp(e), before, `seed=${seed}: reconstruct が元エンジンを変更してしまった`);
+    }
+  });
+
+  await testAsync('先読みAI: 主要決定を1手先読みして有効手を返し、対戦が進行する', async () => {
+    const reg = await buildRegistry(lib, deckMap);
+    const e = new Engine({ decks: [lib.buildGameDeck(deckMap), lib.buildGameDeck(deckMap)], seed: 5, names: ['LA', 'H'], registry: reg });
+    e.start();
+    const la = new LookaheadAI(0); const h = new HeuristicAI(1);
+    let applies = 0; let mainByLookahead = 0;
+    while (e.state.phase !== 'ended' && applies < 600 && e.state.turn <= 8) {
+      const pd = e.state.pending; if (!pd) break;
+      let id;
+      if (pd.player == null) id = pd.options[0].id;
+      else if (pd.player === 0) { id = la.choose(e); if (pd.type === 'main') mainByLookahead++; }
+      else id = h.choose(e);
+      assert(id != null && pd.options.some((o) => o.id === id), `先読みAIが不正な手を返した: ${id} (${pd.type})`);
+      e.apply(id); applies++;
+    }
+    assert(applies > 0, '進行しなかった');
+    assert(mainByLookahead > 0, '先読みAIのメイン決定が一度も発生しなかった');
+  });
+
   await testAsync('AI: 倒せる相手を優先して攻撃する（リーサル選択）', async () => {
     const e = await setupMainStep(deckMap, 41);
     const s = e.state;
@@ -2292,6 +2346,26 @@ export async function runTests() {
     h.cheers = [blue(), blue()]; const d2 = e._artEffectiveDamage(h, art, 0);
     h.cheers = [blue(), blue(), blue()]; const d3 = e._artEffectiveDamage(h, art, 0);
     assert(d3 > d2, `青エールが増えると実効火力が上がるはず (青2枚=${d2}, 青3枚=${d3})`);
+  });
+
+  await testAsync('AIエール配分: 合算リーサル（センター+コラボ合計で削り切る所へ振る）', async () => {
+    const e = await setupMainStep(deckMap, 73);
+    const p0 = e.state.players[0];
+    const p1 = e.state.players[1];
+    p0.hand = [];
+    const mk = (number, dmg) => ({ number, name: 'AT' + number, kind: 'holomen', bloomLevel: '1st', hp: 150, color: '青', tags: [], arts: [{ name: 'a', dmg, cost: ['青'], tokkou: [] }], keywords: [] });
+    const blue = () => ({ number: 'b', name: '青', kind: 'cheer', color: '青' });
+    p0.center = e._createHolomem(mk('CEN', 60), 1); p0.center.cheers = [blue()]; // 既に60出せる
+    p0.collab = e._createHolomem(mk('COL', 60), 1); p0.collab.cheers = []; // 青1で60出せる（未解放）
+    p0.back = [];
+    p1.center = e._createHolomem(lib.getByNumber('hBP02-042'), 1);
+    p1.center.damage = e.effectiveHp(p1.center) - 100; // 残100（単体60では倒せないが合計120で倒せる）
+    const sc = scoreOptions(e, 0, { type: 'attachCheer', player: 0, cheer: blue(), options: [
+      { id: 'toCenter', pos: { zone: 'center', index: 0 } },
+      { id: 'toCollab', pos: { zone: 'collab', index: 0 } },
+    ] });
+    assert(sc.toCollab > sc.toCenter, `合算リーサルを完成させるコラボ側に振るべき (collab=${sc.toCollab}, center=${sc.toCenter})`);
+    assert(sc.toCollab >= 60, `合算リーサル到達のボーナスが乗っていない (collab=${sc.toCollab})`);
   });
 
   await testAsync('AIエール配分: 攻撃できる前衛に集中（大型アーツのバックに吸わせない）', async () => {
