@@ -127,12 +127,15 @@ export class EffectContext {
     return (this.player.supportsPlayedThisTurn || []).filter(filter).length;
   }
 
-  /** ステージ上の自分のエールの色一覧（重複なし） */
+  /** ステージ上の自分のエールの色一覧（重複なし）。推しステージスキルのエール色エイリアスを反映
+   *  （例 FUWAMOCO: 〈フワワ/モココ〉の赤エールは青としても数える）。「○色エールがあるなら」判定に使う。 */
   ownStageCheerColors() {
     const colors = new Set();
     for (const { holomem } of this.holomems('self')) {
       for (const cheer of holomem.cheers) {
-        if (cheer.color && cheer.color !== COLORLESS) colors.add(cheer.color);
+        for (const c of this.cheerEffectiveColors(holomem, cheer)) {
+          if (c && c !== COLORLESS) colors.add(c);
+        }
       }
     }
     return [...colors];

@@ -627,6 +627,33 @@ export async function runTests() {
     assert(ctx.cheerEffectiveColors(fuwamoco, red).has('青'), 'FUWAMOCO(別名フワモコ)の赤エールが青扱いになっていない');
   });
 
+  await testAsync('hBP08-003 推しスキル: 赤エール(青扱い)で青条件が成立し、アーカイブのエールを#Adventに送れる', async () => {
+    const e = await setupMainStep(deckMap, 194);
+    await e.registry.preload(['hBP08-003'], lib);
+    const p0 = e.state.players[0];
+    p0.oshi = lib.getByNumber('hBP08-003');
+    const fuwawa = e._createHolomem({ number: 'fw', name: 'フワワ・アビスガード', kind: 'holomen', bloomLevel: '1st', hp: 150, color: '青', tags: ['Advent'], arts: [] }, 1);
+    fuwawa.cheers.push({ number: 'r0', name: '赤エール', kind: 'cheer', color: '赤' }); // ステージには赤エールのみ
+    p0.center = fuwawa; p0.collab = null; p0.back = [];
+    const archivedCheer = { number: 'ra', name: '赤エール', kind: 'cheer', color: '赤' };
+    p0.archive = [archivedCheer]; // アーカイブにエール(赤)。#Adventホロメンは入れない＝青条件のみ検証
+    const ctx = e._effectContext(0, {});
+    // 核心: ステージの赤エールが青としても数えられる（推しステージスキルのエイリアス反映）
+    assert(ctx.ownStageCheerColors().includes('青'), 'ステージの赤エールが青として数えられていない');
+    const skill = e.registry.get('hBP08-003').oshiSkill;
+    assert(skill.canUse(e, 0), '赤エール(青扱い)で青条件が成立していない');
+    // run の青分岐でアーカイブの赤エールを#Adventへ送れる
+    const gen = skill.run(ctx);
+    let r = gen.next();          // 赤分岐(archiveに#Adventホロメン無し→ログのみ)→青分岐のchooseCard
+    assertEq(r.value?.kind, 'chooseCard', '青分岐でアーカイブのエール選択が出ない');
+    r = gen.next(archivedCheer); // エールを選択→送り先#Advent選択
+    assertEq(r.value?.kind, 'chooseHolomem', '送り先#Adventの選択が出ない');
+    const entry = ctx.holomems('self', ({ top }) => (top.tags || []).includes('Advent'))[0];
+    gen.next(entry);             // フワワへ付ける
+    assertEq(fuwawa.cheers.length, 2, 'アーカイブの赤エールが#Advent(フワワ)に付いていない');
+    assert(!p0.archive.includes(archivedCheer), 'アーカイブから赤エールが取り除かれていない');
+  });
+
   await testAsync('hBP08-039 アーツ: 赤エール(hBP08-003で青扱い)も付け替え対象になる', async () => {
     const e = await setupMainStep(deckMap, 190);
     await e.registry.preload(['hBP08-039', 'hBP08-003'], lib);
