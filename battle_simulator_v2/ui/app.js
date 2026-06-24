@@ -138,6 +138,18 @@ async function initSetupScreen() {
     }
   }
   document.getElementById('start-button').addEventListener('click', startGame);
+
+  // デッキ選択画面のCPU設定（設定パネルと同じ settings.aiPlayers を読み書き＝自動的に同期）
+  document.getElementById('setup-ai-buttons').addEventListener('click', (e) => {
+    const idx = e.target.dataset?.ai;
+    if (idx == null) return;
+    const current = getSettings().aiPlayers || [false, false];
+    current[Number(idx)] = !current[Number(idx)];
+    aiOverride = null; // 手動変更したらURL上書きは解除
+    saveSettings({ aiPlayers: current });
+    refreshSettingsUI();
+  });
+  refreshSettingsUI(); // 現在の設定をボタンに反映
 }
 
 async function startGame() {
@@ -1553,7 +1565,8 @@ function refreshSettingsUI() {
   for (const btn of document.querySelectorAll('#pause-speed-buttons button')) {
     btn.classList.toggle('active', btn.dataset.speed === speed);
   }
-  for (const btn of document.querySelectorAll('#ai-buttons button')) {
+  // 設定パネルとデッキ選択画面、両方のCPUトグルを同期表示する
+  for (const btn of document.querySelectorAll('#ai-buttons button, #setup-ai-buttons button')) {
     btn.classList.toggle('active', aiEnabled(Number(btn.dataset.ai)));
   }
   const confirmOptOn = getSettings().confirmOptionalEffects !== false;
@@ -1629,6 +1642,7 @@ async function main() {
   }
   // 開発・確認用: ?showeval=1 で「評価値を表示」をONにして起動
   if (params.get('showeval')) saveSettings({ showEval: true });
+  if (aiParam) refreshSettingsUI(); // URL上書きをCPUトグル表示にも反映
 
   // 更新検知でリロードした場合は、保存しておいた選択でそのままゲームを自動再開する
   let pendingStart = null;
