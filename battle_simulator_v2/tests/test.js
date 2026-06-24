@@ -2558,6 +2558,21 @@ export async function runTests() {
     assertEq(opt2.kind, 'bloom', '利益のあるBloomを選ばなかった');
   });
 
+  await testAsync('AI脅威見積り: 相手はバックからもう1体コラボして殴る前提で脅威を見積もる', async () => {
+    const e = await setupMainStep(deckMap, 75);
+    const p1 = e.state.players[1];
+    const mkAtk = (dmg) => ({ number: 'X', name: 'X', kind: 'holomen', bloomLevel: '1st', hp: 150, color: '青', tags: [], arts: [{ name: 'a', dmg, cost: [], tokkou: [] }], keywords: [] });
+    p1.center = e._createHolomem(mkAtk(40), 1);
+    p1.collab = null;
+    p1.back = [e._createHolomem(mkAtk(60), 1)]; // アクティブなバック＝次ターンにコラボして殴れる
+    p1.back[0].rested = false;
+    const myCenter = e.state.players[0].center;
+    const noBack = incomingDamageToCenter(e, p1, 1, myCenter, { extraCheers: 1 });
+    const withBack = incomingDamageToCenter(e, p1, 1, myCenter, { extraCheers: 1, includeBackAttackers: true });
+    assertEq(noBack, 40, 'センターのみの脅威は40のはず');
+    assertEq(withBack, 100, 'バックのアタッカー(60)も含め2体合計100で見積もるべき');
+  });
+
   await testAsync('AI脅威見積り(#1): 次ターンのエール1枚追加で解放されるアーツも脅威に数える', async () => {
     const e = await setupMainStep(deckMap, 60);
     const p0 = e.state.players[0];

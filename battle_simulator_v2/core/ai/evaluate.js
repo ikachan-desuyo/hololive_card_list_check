@@ -139,14 +139,17 @@ export function cheerBudgetThisTurn(engine, idx) {
  * extraCheers: 「最善の色のエールをあと何枚足せるか」。そのぶんで解放されるアーツも到達可能として数える。
  *   - 防御（相手ターンの脅威）: 1（相手は次ターンに基本エール1枚。相手の手札効果は見ない＝公開情報のみ）。
  *   - 攻撃（自分のリーサル好機）: cheerBudgetThisTurn（自分が今ターン効果で足せる枚数）。
+ * includeBackAttackers: 相手の脅威見積り用。相手は次ターンに「センター＋バックから1体コラボ」して殴ってくるため、
+ *   バックのアクティブなホロメンも攻撃要員候補に含める（攻撃できるのは最大2体なので上位2体ぶんを合計）。
  */
-export function incomingDamageToCenter(engine, attacker, attackerIdx, defenderCenter, { extraCheers = 0 } = {}) {
+export function incomingDamageToCenter(engine, attacker, attackerIdx, defenderCenter, { extraCheers = 0, includeBackAttackers = false } = {}) {
   if (!defenderCenter) return 0;
   const defColor = defenderCenter.stack[0].color;
+  const pool = [attacker.center, attacker.collab];
+  if (includeBackAttackers) pool.push(...(attacker.back || [])); // 次ターンにコラボへ上げてくる候補
   const perAttacker = [];
-  for (const pos of ['center', 'collab']) {
-    const h = attacker[pos];
-    if (!h || h.rested) continue;
+  for (const h of pool) {
+    if (!h || h.rested) continue; // お休み中は次ターンにコラボへ出せない
     let best = 0;
     for (const a of (h.stack[0].arts || [])) {
       // 今払える、または最善の色で extraCheers 枚足せば払える（=今/今ターン到達可能）
@@ -156,7 +159,9 @@ export function incomingDamageToCenter(engine, attacker, attackerIdx, defenderCe
     }
     if (best > 0) perAttacker.push(best);
   }
-  return perAttacker.reduce((s, d) => s + d, 0);
+  // 1ターンに攻撃できるのは最大2体（センター＋コラボ）なので、火力上位2体ぶんを脅威とみなす
+  perAttacker.sort((x, y) => y - x);
+  return perAttacker.slice(0, 2).reduce((s, d) => s + d, 0);
 }
 
 /**
@@ -191,8 +196,8 @@ export function evaluateState(engine, idx) {
   // 5) リーサル脅威/好機（次の1ターンの読み）
   parts.lethal = 0;
   const myCenterRemain = me.center ? remainHp(engine, me.center) : 0;
-  // 相手の脅威は「次ターンに基本エール1枚で解放されるアーツ」も見込む（防御不足を防ぐ。相手の手札効果は見ない）
-  const oppToMe = incomingDamageToCenter(engine, opp, 1 - idx, me.center, { extraCheers: 1 });
+  // 相手の脅威は「次ターンに基本エール1枚＋バックからもう1体コラボ」して殴ってくる前提で見積もる（防御不足を防ぐ）
+  const oppToMe = incomingDamageToCenter(engine, opp, 1 - idx, me.center, { extraCheers: 1, includeBackAttackers: true });
   if (me.center && oppToMe >= myCenterRemain) parts.lethal += WEIGHTS.lethalThreatToMe;
   const oppCenterRemain = opp.center ? remainHp(engine, opp.center) : 0;
   // 自分のリーサル好機は「今ターン効果で足せるエール（cheer budget）で解放されるアーツ」も見込む

@@ -259,8 +259,8 @@ function scoreMainActions(engine, idx, pending, out) {
   const oppIdx = 1 - idx;
   const myCenter = p.center;
   const myCenterRemain = myCenter ? engine.effectiveHp(myCenter) - myCenter.damage : 0;
-  // 相手の脅威は次ターンの基本エール1枚で解放されるアーツも見込む（過小評価による防御不足を防ぐ）
-  const oppThreat = incomingDamageToCenter(engine, opp, oppIdx, myCenter, { extraCheers: 1 });
+  // 相手の脅威は「次ターンに基本エール1枚＋バックからもう1体コラボ」して殴ってくる前提（過小評価による防御不足を防ぐ）
+  const oppThreat = incomingDamageToCenter(engine, opp, oppIdx, myCenter, { extraCheers: 1, includeBackAttackers: true });
   const underLethal = !!myCenter && oppThreat > 0 && oppThreat >= myCenterRemain;
 
   for (const opt of pending.options) {
