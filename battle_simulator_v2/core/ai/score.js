@@ -342,7 +342,9 @@ function scoreMainActions(engine, idx, pending, out) {
         if (!back) break;
         const backRemain = engine.effectiveHp(back) - back.damage;
         if (underLethal && backRemain > oppThreat && backRemain > centerRemain) score = 70;
-        else if (centerRemain <= 40 && backRemain > centerRemain + 30) score = 35;
+        // 育てた（エールを積んだ）センターは下げない＝攻撃機会とエール投資を捨てない。
+        // 安易な入替は「センターが瀕死かつ実質エール無し」のときだけ。
+        else if (centerRemain <= 40 && backRemain > centerRemain + 30 && (p.center.cheers || []).length <= 1) score = 35;
         break;
       }
       case 'oshiSkill': {
@@ -410,8 +412,8 @@ function scorePerformance(engine, idx, pending, out) {
       if (opt.target.zone === 'center') score += 10;              // センター除去は前衛入替を強制（テンポ）
       if (lifeLoss > 0 && oppGainsOnDown(engine, target)) score -= 12; // ダウンで相手が得をするなら控えめ
     } else {
-      // 倒せない: チップダメージ＋脅威の高い相手を削る方をやや優先
-      score += threat * 0.03;
+      // 倒せない時も、既にダメージを負った相手に集中して削り、KOを早める（散らさない）。脅威の高い相手も優先。
+      score += threat * 0.03 + target.damage * 0.05;
       if (opt.target.zone === 'center') score += 5;
     }
     out[opt.id] = score;

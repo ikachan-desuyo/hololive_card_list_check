@@ -2269,6 +2269,31 @@ export async function runTests() {
     assert(mainByLookahead > 0, '先読みAIのメイン決定が一度も発生しなかった');
   });
 
+  await testAsync('先読みAI: ヒューリスティックより有意に強い（FUWAMOCO・両側合計の勝率）', async () => {
+    const r = await fetch('../test_deck/' + encodeURIComponent('FUWAMOCO') + '.json'); const dm = await r.json();
+    const reg = await buildRegistry(lib, dm);
+    const run = (mk0, mk1, seed) => {
+      const e = new Engine({ decks: [lib.buildGameDeck(dm), lib.buildGameDeck(dm)], seed, names: ['P0', 'P1'], registry: reg });
+      e.start();
+      const ais = [mk0(0), mk1(1)];
+      let applies = 0;
+      while (e.state.phase !== 'ended' && applies < 2500) {
+        const pd = e.state.pending; if (!pd) break;
+        const id = pd.player == null ? pd.options[0].id : ais[pd.player].choose(e);
+        if (id == null) break; try { e.apply(id); } catch { break; } applies++;
+      }
+      return { winner: e.state.winner, phase: e.state.phase };
+    };
+    let lookWins = 0; let games = 0;
+    for (const seed of [1, 2, 3, 4]) { // 先攻有利を相殺するため先読みをP0/P1の両側で1回ずつ
+      const a = run((i) => new LookaheadAI(i), (i) => new HeuristicAI(i), seed);
+      if (a.phase === 'ended') { games++; if (a.winner === 0) lookWins++; }
+      const b = run((i) => new HeuristicAI(i), (i) => new LookaheadAI(i), seed);
+      if (b.phase === 'ended') { games++; if (b.winner === 1) lookWins++; }
+    }
+    assert(lookWins >= games * 0.6, `先読みAIが有意に強くない: ${lookWins}/${games}`);
+  });
+
   await testAsync('AI: 倒せる相手を優先して攻撃する（リーサル選択）', async () => {
     const e = await setupMainStep(deckMap, 41);
     const s = e.state;
@@ -2436,6 +2461,20 @@ export async function runTests() {
     const nowScore = scoreCollab(strong, weak); // Debutの方が上 → 即コラボ（高スコア）
     assert(nowScore > deferScore, `Debut強は即コラボ・1st強は後回しのはず (now=${nowScore}, defer=${deferScore})`);
     assert(deferScore <= 6, `1stコラボが上なら今のコラボは後回し(低スコア)のはず: ${deferScore}`);
+  });
+
+  await testAsync('AIアタック: 倒せない時は既にダメージを負った相手に集中（KOを早める）', async () => {
+    const e = await setupMainStep(deckMap, 74);
+    const p0 = e.state.players[0]; const p1 = e.state.players[1];
+    const mk = (hp) => e._createHolomem({ number: 'T', name: 'T', kind: 'holomen', bloomLevel: '1st', hp, color: '白', tags: [], arts: [], keywords: [] }, 1);
+    p0.center = e._createHolomem({ number: 'AT', name: 'AT', kind: 'holomen', bloomLevel: '1st', hp: 150, color: '青', tags: [], arts: [{ name: 'a', dmg: 30, cost: [], tokkou: [] }], keywords: [] }, 1);
+    p1.center = mk(150); p1.center.damage = 30; // 残120
+    p1.collab = mk(240); p1.collab.damage = 200; // 残40（瀕死・ただし30では倒せない）
+    const sc = scoreOptions(e, 0, { type: 'performance', player: 0, options: [
+      { id: 'atC', kind: 'art', zone: 'center', artIndex: 0, target: { zone: 'center', index: 0 } },
+      { id: 'atCo', kind: 'art', zone: 'center', artIndex: 0, target: { zone: 'collab', index: 0 } },
+    ] });
+    assert(sc.atCo > sc.atC, `ダメージを負った相手(コラボ)に集中すべき (collab=${sc.atCo}, center=${sc.atC})`);
   });
 
   await testAsync('AIアタックの質: ライフ圧が大きい相手(Buzz=2)を優先して倒す', async () => {

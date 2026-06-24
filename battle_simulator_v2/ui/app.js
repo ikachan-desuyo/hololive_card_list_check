@@ -1424,7 +1424,9 @@ function aiEnabled(idx) {
 }
 
 function lookaheadEnabled(idx) {
-  return !!(lookaheadOverride && lookaheadOverride[idx]);
+  // 既定: CPUは1手先読みAI（ヒューリスティックより有意に強い）。?lookahead=0 で高速な簡易AIに切替。
+  if (lookaheadOverride) return lookaheadOverride[idx];
+  return true;
 }
 
 /** AI担当プレイヤーの決定ポイントを少し間を置いて自動で進める */
@@ -1645,11 +1647,11 @@ async function main() {
   if (aiParam) {
     aiOverride = [aiParam === '1' || aiParam === 'both', aiParam === '2' || aiParam === 'both'];
   }
-  // 実験用: ?lookahead=1|2|both で該当プレイヤーのCPUを1手先読みAIにする（既定はヒューリスティック）
+  // CPUは既定で1手先読み。?lookahead=0|none で高速な簡易AI（ヒューリスティック）に切替。
+  // ?lookahead=1|2 で片側だけ先読み等の指定も可能。
   const laParam = params.get('lookahead');
-  if (laParam) {
-    lookaheadOverride = [laParam === '1' || laParam === 'both', laParam === '2' || laParam === 'both'];
-  }
+  if (laParam === '0' || laParam === 'none') lookaheadOverride = [false, false];
+  else if (laParam) lookaheadOverride = [laParam === '1' || laParam === 'both', laParam === '2' || laParam === 'both'];
   // 開発・確認用: ?showeval=1 で「評価値を表示」をONにして起動
   if (params.get('showeval')) saveSettings({ showEval: true });
   if (aiParam) refreshSettingsUI(); // URL上書きをCPUトグル表示にも反映
