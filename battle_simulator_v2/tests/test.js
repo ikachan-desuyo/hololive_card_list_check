@@ -15,6 +15,8 @@ import { compileCard } from '../core/effects/text-compiler.js';
 import { HeuristicAI } from '../core/ai/heuristic.js';
 import { evaluateState, WEIGHTS, incomingDamageToCenter, cheerBudgetThisTurn } from '../core/ai/evaluate.js';
 import { scoreOptions, bestOptionId, holomenValue, isFreePlaySupport } from '../core/ai/score.js';
+import { reconstruct, evaluateCandidate } from '../core/ai/rollout.js';
+import { LookaheadAI } from '../core/ai/lookahead.js';
 import { createRng } from '../core/rng.js';
 
 const results = [];
@@ -2213,6 +2215,58 @@ export async function runTests() {
       }
     }
     assert(issues.length === 0, 'CPUが停止/クラッシュする対戦あり: ' + JSON.stringify(issues.slice(0, 10)));
+  });
+
+  await testAsync('先読み基盤: 決定列の再生(replay)で現在状態を完全再現する（スナップショット不要）', async () => {
+    const fp = (eng) => {
+      const s = eng.state;
+      const parts = [s.phase, 'T' + s.turn, 'TP' + s.turnPlayer, 'pend' + (s.pending?.type || '-')];
+      for (const p of s.players) {
+        parts.push(`L${p.life.length}H${p.hand.length}D${p.deck.length}A${p.archive.length}HP${p.holoPower.length}CD${p.cheerDeck.length}`);
+        for (const pos of eng._stagePositions(p)) {
+          const h = eng._holomemAt(p, pos);
+          parts.push(`${pos.zone}${pos.index}:${h.stack[0].number}d${h.damage}c${h.cheers.length}s${h.stack.length}r${h.rested ? 1 : 0}`);
+        }
+      }
+      parts.push('M' + s.modifiers.length);
+      return parts.join('|');
+    };
+    for (const seed of [123, 321]) {
+      const reg = await buildRegistry(lib, deckMap);
+      const e = new Engine({ decks: [lib.buildGameDeck(deckMap), lib.buildGameDeck(deckMap)], seed, names: ['A', 'B'], registry: reg });
+      e.start();
+      const ais = [new HeuristicAI(0), new HeuristicAI(1)];
+      let applies = 0;
+      while (e.state.phase !== 'ended' && applies < 100) {
+        const pd = e.state.pending; if (!pd) break;
+        const id = pd.player == null ? pd.options[0].id : ais[pd.player].choose(e);
+        if (id == null) break;
+        e.apply(id); applies++;
+      }
+      const before = fp(e);
+      const recon = reconstruct(e);
+      assertEq(fp(recon), before, `seed=${seed}: replay再構築が現在状態と一致しない`);
+      assertEq(fp(e), before, `seed=${seed}: reconstruct が元エンジンを変更してしまった`);
+    }
+  });
+
+  await testAsync('先読みAI: 主要決定を1手先読みして有効手を返し、対戦が進行する', async () => {
+    const reg = await buildRegistry(lib, deckMap);
+    const e = new Engine({ decks: [lib.buildGameDeck(deckMap), lib.buildGameDeck(deckMap)], seed: 5, names: ['LA', 'H'], registry: reg });
+    e.start();
+    const la = new LookaheadAI(0); const h = new HeuristicAI(1);
+    let applies = 0; let mainByLookahead = 0;
+    while (e.state.phase !== 'ended' && applies < 600 && e.state.turn <= 8) {
+      const pd = e.state.pending; if (!pd) break;
+      let id;
+      if (pd.player == null) id = pd.options[0].id;
+      else if (pd.player === 0) { id = la.choose(e); if (pd.type === 'main') mainByLookahead++; }
+      else id = h.choose(e);
+      assert(id != null && pd.options.some((o) => o.id === id), `先読みAIが不正な手を返した: ${id} (${pd.type})`);
+      e.apply(id); applies++;
+    }
+    assert(applies > 0, '進行しなかった');
+    assert(mainByLookahead > 0, '先読みAIのメイン決定が一度も発生しなかった');
   });
 
   await testAsync('AI: 倒せる相手を優先して攻撃する（リーサル選択）', async () => {

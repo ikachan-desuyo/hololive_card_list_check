@@ -12,6 +12,7 @@ import { CardLibrary } from '../core/cards.js';
 import { Engine } from '../core/engine.js';
 import { EffectRegistry } from '../core/effects/registry.js';
 import { HeuristicAI } from '../core/ai/heuristic.js';
+import { LookaheadAI } from '../core/ai/lookahead.js';
 import { scoreOptions, bestOptionId } from '../core/ai/score.js';
 import { STEP_NAMES } from '../core/constants.js';
 import { renderSide, renderHand, renderOppHand } from './board.js';
@@ -1330,12 +1331,17 @@ function setupPreview() {
 
 const aiAgents = [null, null];
 let aiOverride = null; // URLパラメータによる一時上書き（保存しない）
+let lookaheadOverride = null; // ?lookahead=1|2|both で先読みAIを使うプレイヤー（実験用）
 let aiTimer = null;
 const AI_DELAY_MS = 600;
 
 function aiEnabled(idx) {
   if (aiOverride) return aiOverride[idx];
   return !!(getSettings().aiPlayers || [false, false])[idx];
+}
+
+function lookaheadEnabled(idx) {
+  return !!(lookaheadOverride && lookaheadOverride[idx]);
 }
 
 /** AI担当プレイヤーの決定ポイントを少し間を置いて自動で進める */
@@ -1348,7 +1354,8 @@ function handleAI(s) {
   aiTimer = setTimeout(() => {
     aiTimer = null;
     if (!engine || engine.state.pending !== pendingRef) return;
-    if (!aiAgents[idx]) aiAgents[idx] = new HeuristicAI(idx);
+    // 既定はヒューリスティック。?lookahead=1|2|both で該当プレイヤーを1手先読みAIにする（実験用）。
+    if (!aiAgents[idx]) aiAgents[idx] = lookaheadEnabled(idx) ? new LookaheadAI(idx) : new HeuristicAI(idx);
     try {
       const id = aiAgents[idx].choose(engine);
       if (id != null) engine.apply(id);
@@ -1544,6 +1551,11 @@ async function main() {
   const aiParam = params.get('ai');
   if (aiParam) {
     aiOverride = [aiParam === '1' || aiParam === 'both', aiParam === '2' || aiParam === 'both'];
+  }
+  // 実験用: ?lookahead=1|2|both で該当プレイヤーのCPUを1手先読みAIにする（既定はヒューリスティック）
+  const laParam = params.get('lookahead');
+  if (laParam) {
+    lookaheadOverride = [laParam === '1' || laParam === 'both', laParam === '2' || laParam === 'both'];
   }
   // 開発・確認用: ?showeval=1 で「評価値を表示」をONにして起動
   if (params.get('showeval')) saveSettings({ showEval: true });
