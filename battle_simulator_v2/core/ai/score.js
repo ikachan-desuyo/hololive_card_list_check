@@ -262,13 +262,22 @@ function scoreMainActions(engine, idx, pending, out) {
         if (!newCard || !h) break;
         const top = h.stack[0];
         const hpGain = (newCard.hp || 0) - (top.hp || 0);
-        const dmgGain = maxArtDmg(newCard) - maxArtDmg(top);
         const bdef = engine.registry.get(newCard.number);
         // ブルームエフェクトの価値: カード定義 ai.bloomValue 優先、無ければ「効果あり=+40」
         const effVal = bdef?.ai?.bloomValue
           ? bdef.ai.bloomValue({ engine, player: p, card: newCard, holomem: h })
           : (bdef?.bloomEffect ? 40 : 0);
-        score = hpGain * 0.4 + dmgGain * 0.5 + effVal;
+        // 火力の伸びは「今のエールで実際に出せる火力(即)」を重く、「火力上限(将来)」を軽く評価する。
+        // → 燃料の無い大型2ndへの過大評価（ブルームしても撃てない）を防ぎつつ、育成の布石も少し評価。
+        const bestEff = (card, arts) => {
+          const saved = h.stack[0]; h.stack[0] = card; let d = 0;
+          try { for (const a of (arts || [])) if (engine._canPayCheers(h.cheers, a.cost)) d = Math.max(d, engine._artEffectiveDamage(h, a, idx)); }
+          finally { h.stack[0] = saved; }
+          return d;
+        };
+        const immediateGain = Math.max(0, bestEff(newCard, newCard.arts) - bestEff(top, top.arts));
+        const futureGain = Math.max(0, maxArtDmg(newCard) - maxArtDmg(top));
+        score = hpGain * 0.4 + immediateGain * 0.4 + futureGain * 0.15 + effVal;
         if (h.damage > 0 && hpGain > 0) score += 10;
         if (underLethal && h === myCenter) {
           const newRemain = (newCard.hp || 0) - h.damage;
