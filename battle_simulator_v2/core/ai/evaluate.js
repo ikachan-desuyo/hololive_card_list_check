@@ -199,6 +199,24 @@ export function evaluateState(engine, idx) {
   const meToOpp = incomingDamageToCenter(engine, me, idx, opp.center, { extraCheers: cheerBudgetThisTurn(engine, idx) });
   if (opp.center && meToOpp >= oppCenterRemain) parts.lethal += WEIGHTS.lethalChanceToOpp;
 
+  // 6) 継続攻撃力: 最大火力のホロメンがコラボにいると次のリセットで休む＝来ターン殴れない。
+  //    大技要員はセンター（持続）に据えるべき、という方向に評価を寄せる（自分は減点・相手は加点）。
+  parts.persistence = -collabRestPenalty(engine, me, idx) + collabRestPenalty(engine, opp, 1 - idx);
+
   const total = Object.values(parts).reduce((a, b) => a + b, 0);
   return { total, parts };
+}
+
+/** 最大火力(実効)のホロメンがコラボにいる場合のペナルティ量（来ターンに休んで使えないぶん） */
+function collabRestPenalty(engine, p, idx) {
+  const eff = (h) => {
+    if (!h) return 0;
+    let d = 0;
+    for (const a of (h.stack[0].arts || [])) {
+      if (engine._canPayCheers(h.cheers, a.cost)) d = Math.max(d, engine._artEffectiveDamage(h, a, idx));
+    }
+    return d;
+  };
+  const kf = eff(p.collab);
+  return kf > eff(p.center) ? kf * 0.15 : 0;
 }

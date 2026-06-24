@@ -29,8 +29,12 @@ export class LookaheadAI {
     const s = engine.state;
     const pending = s.pending;
     if (!pending) return null;
-    // 主要決定（自分のメイン行動）だけ先読み。それ以外はヒューリスティックに委ねる。
-    if (pending.type !== 'main' || pending.player !== this.playerIdx) {
+    // 自分の「メイン行動」と「パフォーマンス(攻撃)」を先読み対象にする。
+    // （メイン＝配置/ブルーム/コラボ/バトン等の戦術、パフォーマンス＝どの攻撃をどの順で・どこへ。）
+    // それ以外（エール送付・効果選択等）はヒューリスティックに委ねる。
+    const isLookaheadStep = (pending.type === 'main' || pending.type === 'performance')
+      && pending.player === this.playerIdx;
+    if (!isLookaheadStep) {
       return this.fallback.choose(engine);
     }
     const cands = pending.options;
