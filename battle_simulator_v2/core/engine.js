@@ -1754,6 +1754,13 @@ export class Engine {
       s.reArtsPending = reMod ? { zone: action.zone } : null;
     }
     this.log(`${card.name} のアーツ「${art.name}」！${action.reArts ? '（再アーツ）' : ''}`);
+    // 演出用: どこからどこへ攻撃したか（UIが矢印・ハイライトで可視化。lastReveal と同じ監視方式）
+    this._attackSeq = (this._attackSeq || 0) + 1;
+    this.state.lastAttack = {
+      attackerSide: s.turnPlayer, attackerZone: action.zone,
+      targetSide: 1 - s.turnPlayer, targetZone: action.target.zone, targetIndex: action.target.index ?? 0,
+      artName: art.name, dmg: 0, seq: this._attackSeq,
+    };
 
     const artDef = this.registry.getArt(action.artFrom || card.number, art.name); // 借用アーツは出どころカードの定義を使う
     const ctxOpts = { playerIdx: s.turnPlayer, sourceCard: card, sourceHolomem: h };
@@ -1845,6 +1852,7 @@ export class Engine {
           }
           recv.damage += finalDmg;
           totalDealt += finalDmg;
+          if (this.state.lastAttack && recv === primary) this.state.lastAttack.dmg += finalDmg; // 演出用: 主対象への与ダメ
           if (finalDmg > 0) dealtList.push({ target: recv, zone: this._zoneOf(recv), dealt: finalDmg });
           this.log(
             `「${art.name}」→ ${recvCard.name} に ${finalDmg}ダメージ（累計${recv.damage}/${this.effectiveHp(recv)}）`

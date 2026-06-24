@@ -766,6 +766,75 @@ function handleCardReveal(s) {
   overlay.classList.add('show');
 }
 
+/** アタック演出: 攻撃元→対象を矢印・ハイライト・ダメージ表示で可視化（engine.state.lastAttack を監視） */
+let lastAttackSeq = 0;
+const SVG_NS = 'http://www.w3.org/2000/svg';
+
+function ensureAttackLayer() {
+  let svg = document.getElementById('attack-fx');
+  if (!svg) {
+    svg = document.createElementNS(SVG_NS, 'svg');
+    svg.id = 'attack-fx';
+    svg.innerHTML = '<defs><marker id="fx-arrowhead" markerWidth="10" markerHeight="10" refX="7" refY="5" orient="auto">'
+      + '<path d="M0,0 L10,5 L0,10 Z" fill="#ffd54a"/></marker></defs>';
+    document.body.appendChild(svg);
+  }
+  return svg;
+}
+
+function fxCellElement(side, zone, index) {
+  // まず該当ホロメンのセル。倒れて消えていればゾーン枠にフォールバック
+  const cell = document.querySelector(`[data-src="${side}:${zone}:${index}"]`);
+  if (cell) return cell;
+  const sideEl = document.getElementById(side === 0 ? 'side-player' : 'side-opponent');
+  return sideEl ? sideEl.querySelector('.' + (zone === 'back' ? 'backs' : zone)) : null;
+}
+
+function handleAttack(s) {
+  const atk = s.lastAttack;
+  if (!atk || atk.seq === lastAttackSeq) return;
+  lastAttackSeq = atk.seq;
+  const fromEl = fxCellElement(atk.attackerSide, atk.attackerZone, 0);
+  const toEl = fxCellElement(atk.targetSide, atk.targetZone, atk.targetIndex || 0);
+  if (!fromEl || !toEl) return;
+  const fr = fromEl.getBoundingClientRect();
+  const tr = toEl.getBoundingClientRect();
+  const x1 = fr.left + fr.width / 2; const y1 = fr.top + fr.height / 2;
+  const x2 = tr.left + tr.width / 2; const y2 = tr.top + tr.height / 2;
+
+  const svg = ensureAttackLayer();
+  const line = document.createElementNS(SVG_NS, 'line');
+  line.setAttribute('class', 'fx-line');
+  line.setAttribute('x1', x1); line.setAttribute('y1', y1);
+  line.setAttribute('x2', x2); line.setAttribute('y2', y2);
+  line.setAttribute('marker-end', 'url(#fx-arrowhead)');
+  svg.appendChild(line);
+
+  const label = document.createElement('div');
+  label.className = 'fx-label';
+  label.textContent = `⚔ ${atk.artName || 'アーツ'}`;
+  label.style.left = `${(x1 + x2) / 2}px`;
+  label.style.top = `${(y1 + y2) / 2}px`;
+  document.body.appendChild(label);
+
+  let dmgEl = null;
+  if (atk.dmg > 0) {
+    dmgEl = document.createElement('div');
+    dmgEl.className = 'fx-dmg';
+    dmgEl.textContent = `−${atk.dmg}`;
+    dmgEl.style.left = `${x2}px`;
+    dmgEl.style.top = `${y2}px`;
+    document.body.appendChild(dmgEl);
+  }
+
+  fromEl.classList.add('fx-attacking');
+  toEl.classList.add('fx-hit');
+  setTimeout(() => {
+    line.remove(); label.remove(); if (dmgEl) dmgEl.remove();
+    fromEl.classList.remove('fx-attacking'); toEl.classList.remove('fx-hit');
+  }, 1000);
+}
+
 /** 常時表示のステップ進行バー */
 const STEP_ORDER = ['reset', 'draw', 'cheer', 'main', 'performance', 'end'];
 const STEP_SHORT = { reset: 'リセット', draw: '手札', cheer: 'エール', main: 'メイン', performance: 'パフォーマンス', end: 'エンド' };
@@ -817,6 +886,7 @@ function render() {
   renderStepBar(s);
   enqueueStepToasts(s);
   handleCardReveal(s);
+  handleAttack(s);
 
   // 手札表示: 人間が1人だけなら常にその人の手札を固定表示（AIの手札は見せない）
   const humans = [0, 1].filter((i) => !aiEnabled(i));
