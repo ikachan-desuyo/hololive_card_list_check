@@ -15,6 +15,16 @@
 
 import { maxArtDmg, incomingDamageToCenter, unmetCost, cheerBudgetThisTurn } from './evaluate.js';
 
+/** 今のエールで撃てるアーツの最大実効火力（dmgBonus/枚数依存込み）。攻撃要員としての即戦力。 */
+function bestPayableEffDmg(engine, h, idx) {
+  if (!h) return 0;
+  let d = 0;
+  for (const a of (h.stack[0].arts || [])) {
+    if (engine._canPayCheers(h.cheers, a.cost)) d = Math.max(d, engine._artEffectiveDamage(h, a, idx));
+  }
+  return d;
+}
+
 /** ホロメン（カード）の基礎評価: HP＋アーツ火力 */
 export function holomenValue(card) {
   if (!card || card.kind !== 'holomen') return 0;
@@ -345,6 +355,13 @@ function scoreMainActions(engine, idx, pending, out) {
         // 育てた（エールを積んだ）センターは下げない＝攻撃機会とエール投資を捨てない。
         // 安易な入替は「センターが瀕死かつ実質エール無し」のときだけ。
         else if (centerRemain <= 40 && backRemain > centerRemain + 30 && (p.center.cheers || []).length <= 1) score = 35;
+        else {
+          // 明確に強いアタッカーがアクティブなバックにいるなら、センターへ据えて毎ターン殴る
+          // （コラボは毎リセットで休むため、大技要員はセンターで継続攻撃させたい）。
+          const backOff = bestPayableEffDmg(engine, back, idx);
+          const centerOff = bestPayableEffDmg(engine, p.center, idx);
+          if (!back.rested && backOff >= centerOff + 60) score = 30;
+        }
         break;
       }
       case 'oshiSkill': {
