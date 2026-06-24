@@ -215,6 +215,11 @@ async function startGame() {
     document.getElementById('setup-screen').style.display = 'none';
     document.getElementById('game-screen').classList.add('active');
     engine.start();
+    // 詳細ログ用: 各プレイヤーが「人間 / CPU(先読み or 簡易)」のどれかを記録（どのAIで打ったか後で確認できる）
+    for (let i = 0; i < 2; i++) {
+      const mode = !aiEnabled(i) ? '人間' : (lookaheadEnabled(i) ? 'CPU(先読みAI)' : 'CPU(簡易AI)');
+      engine.state.detailLogs.push(`[プレイヤー${i + 1}] = ${mode}`);
+    }
   } catch (e) {
     errBox.textContent = e.message;
   }
