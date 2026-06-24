@@ -168,12 +168,18 @@ function scoreCheerTargets(engine, idx, pending, out) {
     for (const tk of a.tokkou || []) if (oppColor === tk.color) v += tk.value;
     return v;
   };
-  const bestPayableDmg = (h, cheers) => {
-    let d = 0;
-    for (const a of (h.stack[0].arts || [])) if (engine._canPayCheers(cheers, a.cost)) d = Math.max(d, artDmgVs(h, a));
+  // 指定エール構成で「今払えるアーツ」の最大実効火力（dmgBonus=枚数依存等を含む。カード番号は見ない）。
+  // h.cheers を一時的に差し替えて engine._artEffectiveDamage で評価し、必ず元に戻す。
+  const bestEffDmg = (h, cheers) => {
+    const saved = h.cheers; h.cheers = cheers; let d = 0;
+    try {
+      for (const a of (h.stack[0].arts || [])) {
+        if (engine._canPayCheers(cheers, a.cost)) d = Math.max(d, engine._artEffectiveDamage(h, a, idx));
+      }
+    } finally { h.cheers = saved; }
     return d;
   };
-  // 最善の色であと extra 枚足せば撃てるアーツも含めた最大火力（今ターン到達可能火力）
+  // 最善の色であと extra 枚足せば撃てるアーツも含めた最大火力（今ターン到達可能火力。budgetリーサル用の概算）
   const bestReachableDmg = (h, cheers, extra) => {
     let d = 0;
     for (const a of (h.stack[0].arts || [])) {
@@ -190,39 +196,36 @@ function scoreCheerTargets(engine, idx, pending, out) {
     const isActive = opt.pos.zone === 'center' || opt.pos.zone === 'collab'; // 攻撃できる前衛か
     let score = 0;
     if (arts.length > 0 && cheer) {
-      const payableBefore = arts.filter((a) => engine._canPayCheers(h.cheers, a.cost));
       const afterCheers = [...h.cheers, cheer];
-      const payableAfter = arts.filter((a) => engine._canPayCheers(afterCheers, a.cost));
       const maxCost = Math.max(...arts.map((a) => a.cost.length));
       let useful = false;
-      if (payableAfter.length > payableBefore.length) {
-        // このエールでアーツが解放される（色も満たす）→ 解放アーツの火力で加点（バックは攻撃不可なので小）
+      // 実効火力の伸び（解放＋枚数依存スケールを一般的に捕捉。カード番号は見ない）
+      const dmgNow = bestEffDmg(h, h.cheers);
+      const dmgAfter = bestEffDmg(h, afterCheers);
+      const gain = dmgAfter - dmgNow;
+      if (gain > 0) {
+        // このエールで火力が増える（解放 or 枚数依存で上昇）＝価値。前衛は厚く、バックは攻撃不可なので薄く。
         useful = true;
-        const unlocked = payableAfter.filter((a) => !payableBefore.includes(a));
-        const udmg = Math.max(...unlocked.map((a) => a.dmg || 0));
-        score += isActive ? 40 + udmg * 0.2 : 12;
+        score += isActive ? Math.min(70, 18 + gain * 0.35) : Math.min(20, 6 + gain * 0.08);
       } else {
-        // 色を満たす方向に前進したか。前衛は火力比例で重く、バックは小さい固定（攻撃できないため吸い込み防止）
-        let advanced = false; let bestDmg = 0;
+        // 火力は増えないが、未解放アーツへ色が前進したか（将来の解放準備）
+        let advanced = false;
         for (const a of arts) {
-          if (payableBefore.includes(a)) continue;
-          if (unmetCost(afterCheers, a.cost) < unmetCost(h.cheers, a.cost)) { advanced = true; bestDmg = Math.max(bestDmg, a.dmg || 0); }
+          if (engine._canPayCheers(h.cheers, a.cost)) continue;
+          if (unmetCost(afterCheers, a.cost) < unmetCost(h.cheers, a.cost)) { advanced = true; break; }
         }
-        if (advanced) { useful = true; score += isActive ? 12 + bestDmg * 0.1 : 5; }
-        else if (h.cheers.length >= maxCost) score -= 30; // どのアーツも進まず満杯＝過剰投資
+        if (advanced) { useful = true; score += isActive ? 12 : 5; }
+        else if (h.cheers.length >= maxCost) score -= 30; // どのアーツも伸びず満杯＝過剰投資
         else score += 2; // 色が噛み合わず前進しない（最小限）
       }
-      // 位置ボーナスは「有用なエール」のときだけ＝攻撃できる前衛にエールを集中させ、
-      // 無駄な色のエールを位置目的で前衛に置かない／攻撃できないバックへの吸い込みも防ぐ。
+      // 位置ボーナスは「有用なエール」のときだけ＝攻撃できる前衛に集中。無駄な色を位置目的で前衛に置かない。
       if (useful) {
         if (opt.pos.zone === 'center') score += 12;
         else if (opt.pos.zone === 'collab') score += 8;
       }
-      // リーサル到達（前衛のみ）
+      // リーサル到達（前衛のみ・実効火力で判定）
       if (oppCenter && isActive) {
-        const before = bestPayableDmg(h, h.cheers);
-        const after = bestPayableDmg(h, afterCheers);
-        if (after >= oppCenterRemain && before < oppCenterRemain) {
+        if (dmgAfter >= oppCenterRemain && dmgNow < oppCenterRemain) {
           score += 60; // このエールだけで即リーサル到達
         } else if (budget > 0) {
           // このエール＋今ターンの追加エール(budget)で相手センターを倒せる火力に届くなら前進加点（控えめ）

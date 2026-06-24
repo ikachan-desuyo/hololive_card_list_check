@@ -2266,6 +2266,18 @@ export async function runTests() {
     def.ai = origAi; def.support = origSupport; // 復元
   });
 
+  await testAsync('AIエール: 枚数依存アーツは実効火力で評価（dmgBonus探査・デッキ非依存）', async () => {
+    const e = await setupMainStep(deckMap, 71);
+    await e.registry.preload(['hBP08-039'], lib);
+    const card = lib.getByNumber('hBP08-039'); // もこもこバウンティハンター: 青エール1枚につき+20
+    const h = e._createHolomem(card, 1);
+    const art = (card.arts || []).find((a) => /もこもこバウンティ/.test(a.name)) || card.arts[0];
+    const blue = () => ({ number: 'b', name: '青', kind: 'cheer', color: '青' });
+    h.cheers = [blue(), blue()]; const d2 = e._artEffectiveDamage(h, art, 0);
+    h.cheers = [blue(), blue(), blue()]; const d3 = e._artEffectiveDamage(h, art, 0);
+    assert(d3 > d2, `青エールが増えると実効火力が上がるはず (青2枚=${d2}, 青3枚=${d3})`);
+  });
+
   await testAsync('AIエール配分: 攻撃できる前衛に集中（大型アーツのバックに吸わせない）', async () => {
     const e = await setupMainStep(deckMap, 70);
     const p0 = e.state.players[0];
