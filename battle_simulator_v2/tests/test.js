@@ -2406,6 +2406,18 @@ export async function runTests() {
     assert(sc.toCenter > sc.toBack, `最強前衛を伸ばす方を、弱いバックの解放より優先すべき (center=${sc.toCenter}, back=${sc.toBack})`);
   });
 
+  await testAsync('AI評価: 大技に向けたエール投資が進んだホロメンを高く評価（バトンで捨てると損＝無駄打ち抑制）', async () => {
+    const e = await setupMainStep(deckMap, 53);
+    const blue = () => ({ number: 'b', name: '青', kind: 'cheer', color: '青' });
+    const mk = { number: 'BIG', name: 'BIG', kind: 'holomen', bloomLevel: '2nd', hp: 200, color: '青', tags: [],
+      arts: [{ name: '大技', dmg: 200, cost: ['青', '青', '青', '青', '青', '青'], tokkou: [] }], keywords: [] };
+    const h0 = e._createHolomem(mk, 0); h0.cheers = [];                       // 投資なし
+    const h5 = e._createHolomem(mk, 0); h5.cheers = [blue(), blue(), blue(), blue(), blue()]; // 5/6投資（あと1枚で大技）
+    const empty = holomemBoardValue(e, h0, 0, true);
+    const invested = holomemBoardValue(e, h5, 0, true);
+    assert(invested > empty, `大技に向けたエール投資が進んだ方を高く評価すべき (empty=${empty}, invested=${invested})`);
+  });
+
   await testAsync('深い先読み(2手/3手): クラッシュせず対戦が完了し、合法手を返す', async () => {
     const r = await fetch('../test_deck/' + encodeURIComponent('FUWAMOCO') + '.json'); const dm = await r.json();
     const reg = await buildRegistry(lib, dm);

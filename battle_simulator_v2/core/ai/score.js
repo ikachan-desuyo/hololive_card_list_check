@@ -370,7 +370,13 @@ function scoreMainActions(engine, idx, pending, out) {
           // （コラボは毎リセットで休むため、大技要員はセンターで継続攻撃させたい）。
           const backOff = bestPayableEffDmg(engine, back, idx);
           const centerOff = bestPayableEffDmg(engine, p.center, idx);
-          if (!back.rested && backOff >= centerOff + 60) score = 30;
+          // ただし「大技に向けてエール投資が進んでいるセンター」はバトンで捨てない（バトンコストでエールを失う＝無駄打ちの原因）。
+          const centerInvesting = (p.center.cheers || []).length >= 2 && (p.center.stack[0].arts || []).some((a) => {
+            const need = a.cost.length || 0; if (need === 0) return false;
+            const unmet = unmetCost(p.center.cheers, a.cost);
+            return unmet > 0 && (need - unmet) / need >= 0.5 && (a.dmg || 0) >= backOff; // 半分以上投資済みで、バック火力以上の大技
+          });
+          if (!back.rested && backOff >= centerOff + 60 && !centerInvesting) score = 30;
         }
         break;
       }

@@ -52,13 +52,23 @@ export function canActNow(engine, h) {
 export function holomemBoardValue(engine, h, idx, attackSoon = true) {
   const top = h.stack[0];
   const hpRemain = Math.max(0, engine.effectiveHp(h) - h.damage);
+  // 今払えるアーツの火力（payable）と、まだ払えないが「エール投資が進んでいる大技」の到達度つき価値（reaching）。
+  // reaching は大技に向けて貯めたエールの価値を表す＝バトン等でこのエールを捨てると評価が下がる（無駄打ちを抑制）。
   let payableDmg = 0;
+  let reaching = 0;
   for (const a of (top.arts || [])) {
-    if (engine._canPayCheers(h.cheers, a.cost)) payableDmg = Math.max(payableDmg, a.dmg || 0);
+    const need = a.cost.length || 0;
+    const unmet = unmetCost(h.cheers, a.cost);
+    if (unmet === 0) {
+      payableDmg = Math.max(payableDmg, a.dmg || 0);
+    } else if (need > 0) {
+      // どれだけコストを満たせているか（0..1）。大技に近いほど（=投資が進むほど）価値を認める。
+      reaching = Math.max(reaching, (a.dmg || 0) * ((need - unmet) / need));
+    }
   }
   if (payableDmg > 0) payableDmg += Math.max(0, engine.effects.artsBonus(h, idx));
-  const potential = maxArtDmg(top); // エールを足せば届く火力（将来性）
-  let threat = payableDmg + potential * 0.15; // 今撃てる火力を重く、未燃料の潜在は軽く
+  const potential = maxArtDmg(top); // エールを足せば届く火力上限（薄い将来性）
+  let threat = payableDmg + reaching * 0.4 + potential * 0.1;
   // 1ターンに殴れるのは前衛(センター+コラボ)だけ。バック/お休みのホロメンに火力を盛っても今は使えないので、
   // 攻撃価値は将来ぶんに割り引く（＝「弱い体に薄く広げる」より「前衛を強くする」方を高く評価する）。
   if (!attackSoon) threat *= 0.4;
