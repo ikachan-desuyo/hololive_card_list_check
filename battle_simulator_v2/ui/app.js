@@ -1382,6 +1382,7 @@ function renderResult(s) {
   const overlay = document.getElementById('result-overlay');
   if (s.phase !== 'ended') {
     overlay.classList.remove('active');
+    document.getElementById('show-result-button').classList.remove('show');
     return;
   }
   overlay.classList.add('active');
@@ -1627,6 +1628,15 @@ async function main() {
   window.addEventListener('resize', updateBoardScale);
   MOBILE_MQ.addEventListener?.('change', updateBoardScale);
   document.getElementById('restart-button').addEventListener('click', () => location.reload());
+  // 勝敗画面で盤面を確認できるようにする（結果オーバーレイを一時的に隠す→フローティングボタンで戻す）
+  document.getElementById('view-board-button').addEventListener('click', () => {
+    document.getElementById('result-overlay').classList.remove('active');
+    document.getElementById('show-result-button').classList.add('show');
+  });
+  document.getElementById('show-result-button').addEventListener('click', () => {
+    document.getElementById('result-overlay').classList.add('active');
+    document.getElementById('show-result-button').classList.remove('show');
+  });
   console.log('✅ バトルシミュレーターv2 初期化完了');
 
   // 開発用: ?ai=1|2|both でAI適用を一時的に上書き（設定には保存しない）
