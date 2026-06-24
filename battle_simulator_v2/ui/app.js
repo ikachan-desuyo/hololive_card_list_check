@@ -574,9 +574,15 @@ function showArchive(sideIdx) {
  * 小ポップアップ（例: アーツ選択・推しスキル選択）。
  * opt.run があればそれを実行、無ければ engine.apply(opt.id)
  */
-function showChooser(x, y, options) {
+function showChooser(x, y, options, infoHtml = '') {
   const chooser = document.getElementById('chooser');
   chooser.innerHTML = '';
+  if (infoHtml) {
+    const info = document.createElement('div');
+    info.className = 'chooser-info';
+    info.innerHTML = infoHtml;
+    chooser.appendChild(info);
+  }
   for (const opt of options) {
     const btn = document.createElement('button');
     btn.textContent = opt.label;
@@ -652,10 +658,14 @@ const hooks = {
       showInspector(detail);
       return;
     }
+    // 推しステージスキル（常在能力）はアクション選択ポップアップにも常時表示する
+    const info = card.oshiStageText
+      ? `<b>推しステージスキル</b><br>${escapeText(card.oshiStageText)}`
+      : '';
     showChooser(ev.clientX, ev.clientY, [
       ...acts,
       { label: '📄 カード詳細を見る', run: () => showInspector(detail) },
-    ]);
+    ], info);
   },
 };
 

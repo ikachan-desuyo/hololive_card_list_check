@@ -627,6 +627,16 @@ export async function runTests() {
     assert(ctx.cheerEffectiveColors(fuwamoco, red).has('青'), 'FUWAMOCO(別名フワモコ)の赤エールが青扱いになっていない');
   });
 
+  await testAsync('UI詳細モーダル土台: 推しステージスキルのテキストが推しカードに乗る(cardDetailHtmlが読むoshiStageText)', async () => {
+    // ライブラリのパース: skills の「推しステージスキル」→ card.oshiStageText
+    const oshiLib = lib.getByNumber('hBP08-003');
+    assert(oshiLib.oshiStageText && oshiLib.oshiStageText.length > 0, 'ライブラリの推しに oshiStageText が無い（パース不全）');
+    // buildGameDeck 経由（実ゲームの player.oshi と同じ生成）でも保持される＝モーダルに出るはず
+    const r = await fetch('../test_deck/' + encodeURIComponent('FUWAMOCO') + '.json'); const dm = await r.json();
+    const gd = lib.buildGameDeck(dm);
+    assert(gd.oshi && gd.oshi.oshiStageText && gd.oshi.oshiStageText.length > 0, 'buildGameDeck の oshi に oshiStageText が無い');
+  });
+
   await testAsync('hBP08-003 推しスキル: 赤エール(青扱い)で青条件が成立し、アーカイブのエールを#Adventに送れる', async () => {
     const e = await setupMainStep(deckMap, 194);
     await e.registry.preload(['hBP08-003'], lib);

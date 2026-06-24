@@ -1115,6 +1115,19 @@ body.dragging, body.dragging * { cursor: grabbing !important; }
   font-size: 0.85em;
 }
 #chooser button:hover { background: #2e3470; border-color: var(--accent); }
+/* ポップアップ先頭の情報行（推しステージスキルなど常在能力の説明） */
+.chooser-info {
+  padding: 8px 10px;
+  margin-bottom: 4px;
+  background: #1a1d3a;
+  border: 1px solid #3a3f6e;
+  border-radius: 6px;
+  font-size: 0.8em;
+  line-height: 1.4;
+  color: #cdd2ff;
+  max-width: 310px;
+}
+.chooser-info b { color: var(--accent); }
 
 /* ===== 勝敗オーバーレイ ===== */
 #result-overlay {
