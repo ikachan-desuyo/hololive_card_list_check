@@ -55,12 +55,13 @@
           </div>
         </div>
         <div class="settings-section">
-          <div class="settings-label">深い先読み（CPU・重い）</div>
-          <div class="settings-row" id="deep-lookahead-buttons">
-            <button data-deep-lookahead="on">2手（相手の反撃まで読む）</button>
-            <button data-deep-lookahead="off">1手（自分のターンのみ・既定）</button>
+          <div class="settings-label">先読みの深さ（CPU・深いほど高精度＆重い）</div>
+          <div class="settings-row" id="lookahead-turns-buttons">
+            <button data-lookahead-turns="1">1手</button>
+            <button data-lookahead-turns="2">2手</button>
+            <button data-lookahead-turns="3">3手</button>
           </div>
-          <div class="settings-note">ONにすると、各手を「自分のターン→相手の応手まで」進めた結果で選びます。強くなりますが思考が重く（特に終盤）なります。重いと感じたらOFFに戻してください。</div>
+          <div class="settings-note">各手を何ターン先まで擬似対戦して選ぶか。1手=自分のターンのみ（最速）。2手=相手の反撃まで。3手=自分の次のターンまで（倒し返されても取り返せるかを読む＝最高精度・最重）。深いほどCPUの思考時間が増えます。</div>
         </div>
         <div class="settings-section">
           <div class="settings-label">ステップ送り</div>

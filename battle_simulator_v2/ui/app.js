@@ -218,7 +218,7 @@ async function startGame() {
     // 詳細ログ用: 各プレイヤーが「人間 / CPU(先読み or 簡易)」のどれかを記録（どのAIで打ったか後で確認できる）
     for (let i = 0; i < 2; i++) {
       const mode = !aiEnabled(i) ? '人間'
-        : (lookaheadEnabled(i) ? `CPU(先読みAI・${deepLookaheadEnabled() ? '2手' : '1手'})` : 'CPU(簡易AI)');
+        : (lookaheadEnabled(i) ? `CPU(先読みAI・${lookaheadTurns()}手)` : 'CPU(簡易AI)');
       engine.state.detailLogs.push(`[プレイヤー${i + 1}] = ${mode}`);
     }
   } catch (e) {
@@ -1437,9 +1437,10 @@ function lookaheadEnabled(idx) {
   return true;
 }
 
-// 深い先読み（2手・相手の応手まで読む）。重いので既定OFF。設定でON/OFF。
-function deepLookaheadEnabled() {
-  return getSettings().deepLookahead === true;
+// 先読みの深さ（何ターン先まで擬似対戦するか）。1=自分のターンのみ(既定) / 2=相手の応手 / 3=自分の次まで。
+function lookaheadTurns() {
+  const t = Number(getSettings().lookaheadTurns);
+  return t === 2 || t === 3 ? t : 1;
 }
 
 /** AI担当プレイヤーの決定ポイントを少し間を置いて自動で進める */
@@ -1453,7 +1454,7 @@ function handleAI(s) {
     aiTimer = null;
     if (!engine || engine.state.pending !== pendingRef) return;
     // 既定はヒューリスティック。?lookahead=1|2|both で該当プレイヤーを1手先読みAIにする（実験用）。
-    if (!aiAgents[idx]) aiAgents[idx] = lookaheadEnabled(idx) ? new LookaheadAI(idx, { depth: deepLookaheadEnabled() ? 2 : 1 }) : new HeuristicAI(idx);
+    if (!aiAgents[idx]) aiAgents[idx] = lookaheadEnabled(idx) ? new LookaheadAI(idx, { turns: lookaheadTurns() }) : new HeuristicAI(idx);
     try {
       const id = aiAgents[idx].choose(engine);
       if (id != null) engine.apply(id);
@@ -1500,11 +1501,11 @@ function setupSettingsPanel() {
     refreshSettingsUI();
   });
 
-  // 深い先読み（2手）のON/OFF
-  document.getElementById('deep-lookahead-buttons').addEventListener('click', (e) => {
-    const v = e.target.dataset?.deepLookahead;
+  // 先読みの深さ（1手/2手/3手）
+  document.getElementById('lookahead-turns-buttons').addEventListener('click', (e) => {
+    const v = e.target.dataset?.lookaheadTurns;
     if (!v) return;
-    saveSettings({ deepLookahead: v === 'on' });
+    saveSettings({ lookaheadTurns: Number(v) });
     aiAgents[0] = aiAgents[1] = null; // 深さが変わるので次の手番でAIを作り直す（実行中のゲームにも即反映）
     refreshSettingsUI();
   });
@@ -1612,9 +1613,9 @@ function refreshSettingsUI() {
   for (const btn of document.querySelectorAll('#show-eval-buttons button')) {
     btn.classList.toggle('active', (btn.dataset.showEval === 'on') === showEval);
   }
-  const deepLA = getSettings().deepLookahead === true;
-  for (const btn of document.querySelectorAll('#deep-lookahead-buttons button')) {
-    btn.classList.toggle('active', (btn.dataset.deepLookahead === 'on') === deepLA);
+  const laTurns = lookaheadTurns();
+  for (const btn of document.querySelectorAll('#lookahead-turns-buttons button')) {
+    btn.classList.toggle('active', Number(btn.dataset.lookaheadTurns) === laTurns);
   }
   const detailLog = getSettings().detailLog === true;
   for (const btn of document.querySelectorAll('#detail-log-buttons button')) {
@@ -1694,9 +1695,12 @@ async function main() {
   else if (laParam) lookaheadOverride = [laParam === '1' || laParam === 'both', laParam === '2' || laParam === 'both'];
   // 開発・確認用: ?showeval=1 で「評価値を表示」をONにして起動
   if (params.get('showeval')) saveSettings({ showEval: true });
-  // 開発・確認用: ?deep=1|0 で「深い先読み(2手)」のON/OFFを指定して起動
+  // 開発・確認用: ?deep=1|2|3 で「先読みの深さ（手数）」を指定して起動
   const deepParam = params.get('deep');
-  if (deepParam != null) saveSettings({ deepLookahead: deepParam === '1' || deepParam === 'on' });
+  if (deepParam != null) {
+    const t = Number(deepParam);
+    saveSettings({ lookaheadTurns: t === 2 || t === 3 ? t : 1 });
+  }
   if (aiParam) refreshSettingsUI(); // URL上書きをCPUトグル表示にも反映
 
   // 更新検知でリロードした場合は、保存しておいた選択でそのままゲームを自動再開する

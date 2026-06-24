@@ -10,11 +10,13 @@
  * これにより「今ターン削り切れないなら攻めずに育てる」「センターに盛らずコラボ含めた方が良い」等、
  * 単発ヒューリスティックでは捉えにくい“ターンを通した結果”で手を選べる（デッキ非依存）。
  *
- * depth=2（深い先読み）: 自分のターンを終えた後、さらに相手のターンも（公開情報のみで動く HeuristicAI で）
- * 進めてから評価する。これにより「攻めた結果、相手の反撃で不利になる手」を避けられる。
- *   - 公平性: 相手ターンの擬似実行も HeuristicAI が担い、ヒューリスティックは設計上「公開情報のみ」で判断する。
- *     擬似実行のために相手の具体的なカードを内部で動かす必要はあるが、選択は公開情報ベース。
- *   - コスト: 候補ごとに約2ターンぶんを再生・擬似実行するため重い（特に終盤）。UI設定でON/OFF可。
+ * turns（先読みターン数・深さ）: 候補手を適用後、合計 turns ぶんの「プレイヤーのターン」を擬似実行してから評価する。
+ *   - turns=1: 自分のターンを終えた局面で評価（最速。目先の最善）。
+ *   - turns=2: ＋相手の応手まで読む（攻めて倒し返される手を避ける）。
+ *   - turns=3: ＋自分の次のターンまで読む（倒し返されても取り返せるかを見て、消極化を打ち消す＝攻めの精度UP）。
+ *   - 公平性: 各ターンの擬似実行は公開情報のみで判断する HeuristicAI が担う（相手の手札を覗いて選択は変えない）。
+ *     擬似実行のため相手の具体的カードを内部で動かす必要はあるが、選択ロジックは公開情報ベース。
+ *   - コスト: turns を増やすほど重い（候補ごとに turns ターンぶんを再生・擬似実行）。UI設定で 1/2/3 を選択可。
  *
  * 注意: reconstruct は「apply() のみで到達した状態」を前提とする（状態を直接書き換えた局面は再現不可）。
  * 実対戦・CPU対戦は全て apply() 経由なので問題ない。
@@ -28,8 +30,9 @@ export class LookaheadAI {
   constructor(playerIdx, opts = {}) {
     this.playerIdx = playerIdx;
     this.fallback = new HeuristicAI(playerIdx);
-    this.maxRolloutMoves = opts.maxRolloutMoves || 80; // ロールアウトの暴走保険
-    this.depth = opts.depth === 2 ? 2 : 1; // 1=自分のターンのみ / 2=相手の応手まで
+    this.maxRolloutMoves = opts.maxRolloutMoves || 80; // 1ターンあたりのロールアウト暴走保険
+    // 先読みターン数（1以上）。opts.depth は後方互換（2=2手）。
+    this.turns = Math.max(1, opts.turns || opts.depth || 1);
   }
 
   choose(engine) {
@@ -57,34 +60,30 @@ export class LookaheadAI {
     return bestId != null ? bestId : this.fallback.choose(engine);
   }
 
-  /** 候補 candidateId を適用し、自分のターン（depth=2なら相手の応手まで）を進めた後の盤面評価（idx視点） */
+  /** 候補 candidateId を適用し、合計 this.turns ターンぶん擬似実行した後の盤面評価（idx視点） */
   _rolloutValue(engine, candidateId) {
     const idx = this.playerIdx;
     const sim = reconstruct(engine);
     if (!sim.state.pending || !sim.state.pending.options.some((o) => o.id === candidateId)) return -Infinity;
     try { sim.apply(candidateId); } catch { return -Infinity; }
     const ais = [new HeuristicAI(0), new HeuristicAI(1)];
-    // 自分のターンが終わる（turnPlayer が相手に移る）か決着するまで、ヒューリスティックで進める。
-    // 自分のターン中の相手の割り込み（onDown等。pending.player=相手）も解決する。
-    this._advance(sim, ais, (s) => s.turnPlayer === idx);
-    // depth=2: さらに相手のターンを最後まで進める（相手の反撃込みで自分の手を評価）。
-    if (this.depth >= 2 && sim.state.phase !== 'ended') {
-      const opp = 1 - idx;
-      this._advance(sim, ais, (s) => s.turnPlayer === opp);
-    }
-    return evaluateState(sim, idx).total;
-  }
-
-  /** while 条件 cont(state)=true の間、ヒューリスティックで決定ポイントを進める（暴走保険つき） */
-  _advance(sim, ais, cont) {
+    // ターンの切り替わり（turnPlayer の変化）を数え、this.turns ターン進んだら終了。
+    // ターン中の相手割り込み（onDown等。pending.player=相手）も都度ヒューリスティックで解決する。
+    const cap = this.maxRolloutMoves * this.turns;
+    let prev = sim.state.turnPlayer;
+    let transitions = 0;
     let moves = 0;
-    while (sim.state.phase !== 'ended' && sim.state.pending
-      && cont(sim.state) && moves < this.maxRolloutMoves) {
+    while (sim.state.phase !== 'ended' && sim.state.pending && moves < cap) {
+      if (sim.state.turnPlayer !== prev) {
+        prev = sim.state.turnPlayer;
+        if (++transitions >= this.turns) break; // this.turns ターン分を擬似実行し終えた
+      }
       const pd = sim.state.pending;
       const id = pd.player == null ? pd.options[0].id : ais[pd.player].choose(sim);
       if (id == null) break;
       try { sim.apply(id); } catch { break; }
       moves++;
     }
+    return evaluateState(sim, idx).total;
   }
 }
