@@ -2314,6 +2314,24 @@ export async function runTests() {
     assert(lookWins >= games * 0.6, `先読みAIが有意に強くない: ${lookWins}/${games}`);
   });
 
+  await testAsync('深い先読み(2手): クラッシュせず対戦が完了し、合法手を返す', async () => {
+    const r = await fetch('../test_deck/' + encodeURIComponent('FUWAMOCO') + '.json'); const dm = await r.json();
+    const reg = await buildRegistry(lib, dm);
+    const e = new Engine({ decks: [lib.buildGameDeck(dm), lib.buildGameDeck(dm)], seed: 7, names: ['D2', 'H'], registry: reg, cardLibrary: lib });
+    e.start();
+    const ais = [new LookaheadAI(0, { depth: 2 }), new HeuristicAI(1)]; // P0 を2手先読みに
+    let applies = 0;
+    while (e.state.phase !== 'ended' && applies < 2500) {
+      const pd = e.state.pending; if (!pd) break;
+      const id = pd.player == null ? pd.options[0].id : ais[pd.player].choose(e);
+      assert(id == null || pd.options.some((o) => o.id === id), '深い先読みが非合法な手を返した');
+      if (id == null) break;
+      try { e.apply(id); } catch { break; }
+      applies++;
+    }
+    assertEq(e.state.phase, 'ended', '深い先読みを含む対戦が決着しなかった');
+  });
+
   await testAsync('AI: 倒せる相手を優先して攻撃する（リーサル選択）', async () => {
     const e = await setupMainStep(deckMap, 41);
     const s = e.state;

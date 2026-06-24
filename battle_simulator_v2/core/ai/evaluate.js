@@ -45,14 +45,22 @@ export function canActNow(engine, h) {
 
 /**
  * 盤上ホロメン1体の価値（idx 視点・正の値）。
- *   生存力（残りHP）＋ 脅威（最大火力＋実効アーツ修正）＋ 即アタッカー度。
+ *   生存力（残りHP）＋ 脅威（今実際に撃てる火力を重視）＋ 即アタッカー度。
+ * 脅威は「今のエールで撃てる実効火力」を主に評価する。エールが無くて撃てない大型ホロメンは
+ * 火力上限(maxArtDmg)を満額では数えず、潜在ぶんを軽く見るだけ（＝燃料の無い2ndだらけの盤面を過大評価しない）。
  */
 export function holomemBoardValue(engine, h, idx) {
   const top = h.stack[0];
   const hpRemain = Math.max(0, engine.effectiveHp(h) - h.damage);
-  const threat = maxArtDmg(top) + Math.max(0, engine.effects.artsBonus(h, idx));
+  let payableDmg = 0;
+  for (const a of (top.arts || [])) {
+    if (engine._canPayCheers(h.cheers, a.cost)) payableDmg = Math.max(payableDmg, a.dmg || 0);
+  }
+  if (payableDmg > 0) payableDmg += Math.max(0, engine.effects.artsBonus(h, idx));
+  const potential = maxArtDmg(top); // エールを足せば届く火力（将来性）
+  const threat = payableDmg + potential * 0.15; // 今撃てる火力を重く、未燃料の潜在は軽く
   let v = hpRemain * WEIGHTS.hpRemain + threat * WEIGHTS.threat;
-  if (canActNow(engine, h)) v += WEIGHTS.ready;
+  if (payableDmg > 0) v += WEIGHTS.ready; // 今すぐ攻撃に使える
   return v;
 }
 

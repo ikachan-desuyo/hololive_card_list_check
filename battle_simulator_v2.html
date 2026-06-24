@@ -55,6 +55,14 @@
           </div>
         </div>
         <div class="settings-section">
+          <div class="settings-label">深い先読み（CPU・重い）</div>
+          <div class="settings-row" id="deep-lookahead-buttons">
+            <button data-deep-lookahead="on">2手（相手の反撃まで読む）</button>
+            <button data-deep-lookahead="off">1手（自分のターンのみ・既定）</button>
+          </div>
+          <div class="settings-note">ONにすると、各手を「自分のターン→相手の応手まで」進めた結果で選びます。強くなりますが思考が重く（特に終盤）なります。重いと感じたらOFFに戻してください。</div>
+        </div>
+        <div class="settings-section">
           <div class="settings-label">ステップ送り</div>
           <div class="settings-row" id="pause-speed-buttons">
             <button data-speed="fast">速い</button>
