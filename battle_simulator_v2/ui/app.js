@@ -1437,10 +1437,11 @@ function lookaheadEnabled(idx) {
   return true;
 }
 
-// 先読みの深さ（何ターン先まで擬似対戦するか）。1=自分のターンのみ(既定) / 2=相手の応手 / 3=自分の次まで。
+// 先読みの深さ（何ターン先まで擬似対戦するか）。1=自分のターンのみ / 2=相手の応手 / 3=自分の次まで。
+// 既定は3手（自己対戦での実測で最も強い。2手は「攻めると損」で消極化し弱い）。
 function lookaheadTurns() {
   const t = Number(getSettings().lookaheadTurns);
-  return t === 2 || t === 3 ? t : 1;
+  return t === 1 || t === 2 ? t : 3;
 }
 
 /** AI担当プレイヤーの決定ポイントを少し間を置いて自動で進める */
@@ -1699,7 +1700,7 @@ async function main() {
   const deepParam = params.get('deep');
   if (deepParam != null) {
     const t = Number(deepParam);
-    saveSettings({ lookaheadTurns: t === 2 || t === 3 ? t : 1 });
+    saveSettings({ lookaheadTurns: t === 1 || t === 2 ? t : 3 });
   }
   if (aiParam) refreshSettingsUI(); // URL上書きをCPUトグル表示にも反映
 

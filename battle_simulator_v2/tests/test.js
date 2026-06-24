@@ -2350,6 +2350,31 @@ export async function runTests() {
     assert(front > back, `今殴れる前衛の攻撃価値を高く評価すべき (front=${front}, back=${back})`);
   });
 
+  await testAsync('深い先読み(3手)はヒューリスティックより明確に強い（消極化せず攻める）', async () => {
+    const r = await fetch('../test_deck/' + encodeURIComponent('FUWAMOCO') + '.json'); const dm = await r.json();
+    const reg = await buildRegistry(lib, dm);
+    const run = (mk0, mk1, seed) => {
+      const e = new Engine({ decks: [lib.buildGameDeck(dm), lib.buildGameDeck(dm)], seed, names: ['P0', 'P1'], registry: reg, cardLibrary: lib });
+      e.start();
+      const ais = [mk0(0), mk1(1)];
+      let applies = 0;
+      while (e.state.phase !== 'ended' && applies < 3000) {
+        const pd = e.state.pending; if (!pd) break;
+        const id = pd.player == null ? pd.options[0].id : ais[pd.player].choose(e);
+        if (id == null) break; try { e.apply(id); } catch { break; } applies++;
+      }
+      return { winner: e.state.winner, phase: e.state.phase };
+    };
+    let w = 0, g = 0;
+    for (const seed of [11, 22, 33, 44]) { // 先後を入れ替えて両側で測定
+      const a = run((i) => new LookaheadAI(i, { turns: 3 }), (i) => new HeuristicAI(i), seed);
+      if (a.phase === 'ended') { g++; if (a.winner === 0) w++; }
+      const b = run((i) => new HeuristicAI(i), (i) => new LookaheadAI(i, { turns: 3 }), seed);
+      if (b.phase === 'ended') { g++; if (b.winner === 1) w++; }
+    }
+    assert(w >= g * 0.7, `3手先読みが明確に強くない: ${w}/${g}`); // 1手(基準)より高い水準を要求
+  });
+
   await testAsync('AIエール配分: 主力前衛に積んで大型アーツを解放する手を、弱いバックの解放より優先（集約加点）', async () => {
     const e = await setupMainStep(deckMap, 52);
     const p0 = e.state.players[0];
