@@ -25,11 +25,13 @@
 import { HeuristicAI } from './heuristic.js';
 import { evaluateState } from './evaluate.js';
 import { reconstruct } from './rollout.js';
-import { scoreOptions } from './score.js';
+import { scoreOptions, bestOptionId } from './score.js';
+import { createRng } from '../rng.js';
 
 // ロールアウト評価が「ほぼ互角」とみなす差（この範囲内の候補は、ヒューリスティック事前評価で優劣を割る）。
-// 3手ロールアウトは引き/相手手で±数十点ぶれるので、僅差はヒューリスティック（無駄手に負の値）で決める。
 const ROLLOUT_TIE_EPS = 15;
+// モンテカルロ: 各候補のロールアウトを方策に揺らぎを入れて複数回回し平均する（脆い1本の偏りを打ち消す）。
+const ROLLOUT_RANDOM_MARGIN = 12; // 最善スコアからこの範囲内の手を「ほぼ同等」とみなしランダムに選ぶ（質は保つ）
 
 export class LookaheadAI {
   constructor(playerIdx, opts = {}) {
@@ -38,6 +40,8 @@ export class LookaheadAI {
     this.maxRolloutMoves = opts.maxRolloutMoves || 80; // 1ターンあたりのロールアウト暴走保険
     // 先読みターン数（1以上）。opts.depth は後方互換（2=2手）。
     this.turns = Math.max(1, opts.turns || opts.depth || 1);
+    // モンテカルロ標本数。1手は揺れが小さいので1、2手以上は複数回平均して頑健化（既定3）。
+    this.samples = Math.max(1, opts.samples != null ? opts.samples : (this.turns >= 2 ? 3 : 1));
   }
 
   choose(engine) {
@@ -59,11 +63,20 @@ export class LookaheadAI {
     // ヒューリスティックの事前評価（prior）。ロールアウトが僅差の時の「無駄手（負の値）」回避に使う。
     let hscores = {};
     try { hscores = scoreOptions(engine, this.playerIdx, pending) || {}; } catch { hscores = {}; }
-    const scored = cands.map((opt) => ({
-      id: opt.id,
-      roll: this._rolloutValue(engine, opt.id),
-      prior: Number.isFinite(hscores[opt.id]) ? hscores[opt.id] : 0,
-    }));
+    // 各候補を samples 回ロールアウトして平均（方策に揺らぎを入れ、脆い1本の偏りを打ち消す）。
+    // 標本kは全候補で同じ乱数列（common random numbers）を使い、候補間の比較分散を抑える。
+    const scored = cands.map((opt) => {
+      let sum = 0; let n = 0;
+      for (let k = 0; k < this.samples; k++) {
+        const v = this._rolloutValue(engine, opt.id, this.samples > 1 ? createRng(0x9e37 + k * 2654435761) : null);
+        if (Number.isFinite(v)) { sum += v; n++; }
+      }
+      return {
+        id: opt.id,
+        roll: n > 0 ? sum / n : -Infinity,
+        prior: Number.isFinite(hscores[opt.id]) ? hscores[opt.id] : 0,
+      };
+    });
     const maxRoll = Math.max(...scored.map((s) => s.roll));
     if (!Number.isFinite(maxRoll)) return this.fallback.choose(engine);
     // ロールアウトがほぼ最善(差≤EPS)の候補の中で、ヒューリスティック事前評価が最も高い手を選ぶ。
@@ -76,15 +89,14 @@ export class LookaheadAI {
     return best ? best.id : this.fallback.choose(engine);
   }
 
-  /** 候補 candidateId を適用し、合計 this.turns ターンぶん擬似実行した後の盤面評価（idx視点） */
-  _rolloutValue(engine, candidateId) {
+  /** 候補 candidateId を適用し、合計 this.turns ターンぶん擬似実行した後の盤面評価（idx視点）。
+   *  rng を渡すと、ロールアウト中の主要決定(main/performance)を「最善付近からランダム」に選ぶ（モンテカルロ用）。 */
+  _rolloutValue(engine, candidateId, rng = null) {
     const idx = this.playerIdx;
     const sim = reconstruct(engine);
     if (!sim.state.pending || !sim.state.pending.options.some((o) => o.id === candidateId)) return -Infinity;
     try { sim.apply(candidateId); } catch { return -Infinity; }
     const ais = [new HeuristicAI(0), new HeuristicAI(1)];
-    // ターンの切り替わり（turnPlayer の変化）を数え、this.turns ターン進んだら終了。
-    // ターン中の相手割り込み（onDown等。pending.player=相手）も都度ヒューリスティックで解決する。
     const cap = this.maxRolloutMoves * this.turns;
     let prev = sim.state.turnPlayer;
     let transitions = 0;
@@ -95,11 +107,38 @@ export class LookaheadAI {
         if (++transitions >= this.turns) break; // this.turns ターン分を擬似実行し終えた
       }
       const pd = sim.state.pending;
-      const id = pd.player == null ? pd.options[0].id : ais[pd.player].choose(sim);
+      let id;
+      if (pd.player == null) id = pd.options[0].id;
+      else if (rng) id = stochasticChoose(sim, pd.player, rng); // モンテカルロ: 最善付近をランダム
+      else id = ais[pd.player].choose(sim);
       if (id == null) break;
       try { sim.apply(id); } catch { break; }
       moves++;
     }
     return evaluateState(sim, idx).total;
   }
+}
+
+/**
+ * ロールアウト用の確率的方策。主要決定(main/performance)では「最善スコアから ROLLOUT_RANDOM_MARGIN 以内、かつ
+ * パス基準以上」の手をランダムに1つ選ぶ（質は保ちつつ軌跡に揺らぎを与える）。それ以外の決定は決定的に最善。
+ */
+function stochasticChoose(engine, idx, rng) {
+  const pending = engine.state.pending;
+  if (!pending) return null;
+  if (pending.type !== 'main' && pending.type !== 'performance') return bestOptionId(engine, idx);
+  let scores = {};
+  try { scores = scoreOptions(engine, idx, pending) || {}; } catch { return bestOptionId(engine, idx); }
+  const opts = pending.options;
+  const baseline = opts.find((o) => o.kind === 'pass' || o.id === 'done');
+  const baseScore = baseline ? (scores[baseline.id] ?? 0) : -Infinity;
+  let bestScore = -Infinity;
+  for (const o of opts) { const sc = scores[o.id]; if (Number.isFinite(sc) && sc > bestScore) bestScore = sc; }
+  if (!Number.isFinite(bestScore)) return baseline ? baseline.id : opts[0].id;
+  const near = opts.filter((o) => {
+    const sc = scores[o.id] ?? -Infinity;
+    return sc >= bestScore - ROLLOUT_RANDOM_MARGIN && sc >= baseScore; // 最善付近 かつ パス以上（明確に悪い手は選ばない）
+  });
+  if (near.length <= 1) return near.length === 1 ? near[0].id : (baseline ? baseline.id : opts[0].id);
+  return near[Math.floor(rng() * near.length) % near.length].id;
 }
