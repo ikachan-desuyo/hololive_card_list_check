@@ -455,13 +455,19 @@ function scorePerformance(engine, idx, pending, out) {
       const lifeLoss = expectedLifeLoss(engine, target);
       score += 70 + lifeLoss * 25;
       score += (6 - opp.life.length) * 5 * Math.max(1, lifeLoss); // 相手のライフが少ないほど致命的
-      score += threat * 0.05;                                     // 強い相手ほど倒す価値が高い
+      // 倒す＝その相手の火力(脅威)を永久に除去する価値。強い相手（大技持ち2nd等）ほど倒す価値が高い。
+      // 複数を倒せる時に「些末な体より脅威度の高い相手」を選ぶよう、脅威の重みをしっかり持たせる。
+      score += threat * 0.12;
       if (opt.target.zone === 'center') score += 10;              // センター除去は前衛入替を強制（テンポ）
       if (lifeLoss > 0 && oppGainsOnDown(engine, target)) score -= 12; // ダウンで相手が得をするなら控えめ
     } else {
-      // 倒せない時も、既にダメージを負った相手に集中して削り、KOを早める（散らさない）。脅威の高い相手も優先。
-      score += threat * 0.03 + target.damage * 0.05;
+      // 倒せない時は「脅威の高い相手」を優先的に削る（次ターンのKO＝脅威除去に繋げる）。既に負傷した相手に集中（散らさない）。
+      score += threat * 0.07 + target.damage * 0.05;
       if (opt.target.zone === 'center') score += 5;
+      // この一撃で相手が「自軍の到達火力で次に倒せる残HP」まで落ちるなら、脅威除去の布石として加点（高HPの大型脅威を崩す価値）。
+      const fronts = [p.center, p.collab].filter(Boolean);
+      const teamReach = Math.max(0, ...fronts.map((x) => bestPayableEffDmg(engine, x, idx)));
+      if (remain - dmg <= teamReach && remain > dmg) score += threat * 0.05;
     }
     out[opt.id] = score;
   }

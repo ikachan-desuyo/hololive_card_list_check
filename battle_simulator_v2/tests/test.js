@@ -2817,6 +2817,23 @@ export async function runTests() {
     assert(sc.killBuzz > sc.killNormal, `Buzz(ライフ-2)を優先すべき (buzz=${sc.killBuzz}, normal=${sc.killNormal})`);
   });
 
+  await testAsync('AIアタックの質: 同じく倒せるなら「脅威度の高い相手(大技持ち)」を優先して倒す', async () => {
+    const e = await setupMainStep(deckMap, 67);
+    const p0 = e.state.players[0]; const p1 = e.state.players[1];
+    p0.center = e._createHolomem({ number: 'AT', name: 'AT', kind: 'holomen', bloomLevel: '2nd', hp: 200, color: '青', tags: [], arts: [{ name: 'a', dmg: 120, cost: [], tokkou: [] }], keywords: [] }, 1);
+    // 倒せる弱い体（脅威小）と、倒せる大技持ち（脅威大）。どちらもライフ-1・残HP小。
+    const weak = e._createHolomem({ number: 'W', name: 'W', kind: 'holomen', bloomLevel: 'Debut', hp: 110, color: '白', tags: [], arts: [{ name: 'w', dmg: 20, cost: [], tokkou: [] }], keywords: [] }, 1);
+    const bigThreat = e._createHolomem({ number: 'B', name: 'B', kind: 'holomen', bloomLevel: '2nd', hp: 200, color: '白', tags: [], arts: [{ name: 'big', dmg: 200, cost: [], tokkou: [] }], keywords: [] }, 1);
+    weak.damage = e.effectiveHp(weak) - 30;       // 残30（倒せる）
+    bigThreat.damage = e.effectiveHp(bigThreat) - 30; // 残30（倒せる）
+    p1.center = weak; p1.collab = bigThreat; p1.back = [];
+    const sc = scoreOptions(e, 0, { type: 'performance', player: 0, options: [
+      { id: 'killWeak', kind: 'art', zone: 'center', artIndex: 0, target: { zone: 'center', index: 0 } },
+      { id: 'killThreat', kind: 'art', zone: 'center', artIndex: 0, target: { zone: 'collab', index: 0 } },
+    ] });
+    assert(sc.killThreat > sc.killWeak, `脅威度の高い相手を倒すべき (threat=${sc.killThreat}, weak=${sc.killWeak})`);
+  });
+
   await testAsync('AI: エールを撃てるホロメンに過剰投資しない', async () => {
     const e = await setupMainStep(deckMap, 51);
     const s = e.state;
