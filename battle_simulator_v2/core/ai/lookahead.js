@@ -25,6 +25,11 @@
 import { HeuristicAI } from './heuristic.js';
 import { evaluateState } from './evaluate.js';
 import { reconstruct } from './rollout.js';
+import { scoreOptions } from './score.js';
+
+// ロールアウト評価が「ほぼ互角」とみなす差（この範囲内の候補は、ヒューリスティック事前評価で優劣を割る）。
+// 3手ロールアウトは引き/相手手で±数十点ぶれるので、僅差はヒューリスティック（無駄手に負の値）で決める。
+const ROLLOUT_TIE_EPS = 15;
 
 export class LookaheadAI {
   constructor(playerIdx, opts = {}) {
@@ -51,13 +56,24 @@ export class LookaheadAI {
     if (!cands || cands.length === 0) return null;
     if (cands.length === 1) return cands[0].id;
 
-    let bestId = null;
-    let bestVal = -Infinity;
-    for (const opt of cands) {
-      const val = this._rolloutValue(engine, opt.id);
-      if (val > bestVal) { bestVal = val; bestId = opt.id; }
+    // ヒューリスティックの事前評価（prior）。ロールアウトが僅差の時の「無駄手（負の値）」回避に使う。
+    let hscores = {};
+    try { hscores = scoreOptions(engine, this.playerIdx, pending) || {}; } catch { hscores = {}; }
+    const scored = cands.map((opt) => ({
+      id: opt.id,
+      roll: this._rolloutValue(engine, opt.id),
+      prior: Number.isFinite(hscores[opt.id]) ? hscores[opt.id] : 0,
+    }));
+    const maxRoll = Math.max(...scored.map((s) => s.roll));
+    if (!Number.isFinite(maxRoll)) return this.fallback.choose(engine);
+    // ロールアウトがほぼ最善(差≤EPS)の候補の中で、ヒューリスティック事前評価が最も高い手を選ぶ。
+    // → 明確なロールアウト差があればそちらが勝ち（先読みの強み維持）、僅差なら無駄手をヒューリスティックで除外。
+    let best = null;
+    for (const s of scored) {
+      if (s.roll < maxRoll - ROLLOUT_TIE_EPS) continue;
+      if (!best || s.prior > best.prior || (s.prior === best.prior && s.roll > best.roll)) best = s;
     }
-    return bestId != null ? bestId : this.fallback.choose(engine);
+    return best ? best.id : this.fallback.choose(engine);
   }
 
   /** 候補 candidateId を適用し、合計 this.turns ターンぶん擬似実行した後の盤面評価（idx視点） */
