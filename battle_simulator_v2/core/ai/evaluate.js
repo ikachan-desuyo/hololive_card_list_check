@@ -26,6 +26,8 @@ export const WEIGHTS = {
   handCard: 4, // 手札1枚（リソース。中身は見ない＝枚数のみ）
   holoPower: 2, // ホロパワー1枚（推しスキルの燃料）
   archiveCheer: 1, // アーカイブのエール1枚（回収・再利用の見込み）
+  boardCheer: 4, // 盤上ホロメンに付いた「有用な」エール1枚（=将来使える最大アーツのコスト数まで。余剰は数えない）。
+  //               1ターン1枚しか増えない貴重な資源なので、バトンコスト等で捨てると明確な損になる（無駄打ち抑制）。
   lethalThreatToMe: -70, // 次の相手ターンに自センターが倒され得る
   lethalChanceToOpp: 55, // 自分が相手センターを倒し得る
   noBoard: -2000, // ステージにホロメンが居ない（実質敗北）
@@ -75,6 +77,21 @@ export function holomemBoardValue(engine, h, idx, attackSoon = true) {
   let v = hpRemain * WEIGHTS.hpRemain + threat * WEIGHTS.threat;
   if (payableDmg > 0 && attackSoon) v += WEIGHTS.ready; // 今すぐ攻撃に使える
   return v;
+}
+
+/**
+ * 盤上ホロメンに付いた「有用なエール」の総数。各ホロメンで「将来使える最大アーツ（現フォーム＋同名上位フォーム）の
+ * コスト枚数」を上限に数える＝アーツに必要な数までは資源として価値があるが、それを超えた余剰エールは無価値とみなす。
+ * これにより「コスト以上にエールを盛る無駄」を評価せず、「貯めたエールをバトンで捨てる損」を捉える。
+ */
+function usefulBoardCheers(engine, p) {
+  let n = 0;
+  for (const h of engine._stageHolomems(p)) {
+    const arts = [...(h.stack[0].arts || []), ...engine._higherFormArts(h.stack[0])];
+    const cap = Math.max(0, ...arts.map((a) => (a.cost || []).length));
+    n += Math.min((h.cheers || []).length, cap);
+  }
+  return n;
 }
 
 /** プレイヤー p（idx）の盤面総合力 */
@@ -228,6 +245,9 @@ export function evaluateState(engine, idx) {
   parts.holoPower = (me.holoPower.length - opp.holoPower.length) * WEIGHTS.holoPower;
   parts.archiveCheer = (me.archive.filter((c) => c.kind === 'cheer').length
     - opp.archive.filter((c) => c.kind === 'cheer').length) * WEIGHTS.archiveCheer;
+  // 盤上の「有用なエール」差（資源）。盤面に置いたエールはアーカイブの何倍も価値がある＝
+  // バトンコスト等で盤面→アーカイブへ捨てると net で損になる（=無駄なバトンを論理的に避ける）。
+  parts.boardCheer = (usefulBoardCheers(engine, me) - usefulBoardCheers(engine, opp)) * WEIGHTS.boardCheer;
 
   // 4) 盤面崩壊リスク（ホロメン不在＝実質敗北、センター空＝被弾しやすい）
   parts.structure = 0;

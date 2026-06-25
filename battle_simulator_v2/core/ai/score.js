@@ -378,6 +378,14 @@ function scoreMainActions(engine, idx, pending, out) {
           });
           if (!back.rested && backOff >= centerOff + 60 && !centerInvesting) score = 30;
         }
+        // バトンコストで捨てる「有用エール」のぶんを損として差し引く（貯めたエールの無駄捨てを論理的に抑制）。
+        if (score > 0) {
+          const cArts = p.center.stack[0].arts || [];
+          const cap = Math.max(0, ...cArts.map((a) => (a.cost || []).length));
+          const usefulOnCenter = Math.min((p.center.cheers || []).length, cap);
+          const batonCostLen = (p.center.stack[0].batonTouch || []).length;
+          score -= Math.min(batonCostLen, usefulOnCenter) * 8;
+        }
         break;
       }
       case 'oshiSkill': {

@@ -2418,6 +2418,35 @@ export async function runTests() {
     assert(invested > empty, `大技に向けたエール投資が進んだ方を高く評価すべき (empty=${empty}, invested=${invested})`);
   });
 
+  await testAsync('AI評価: 盤面のエールをアーカイブへ捨てると評価が下がる（バトンコストの損を理解）', async () => {
+    const e = await setupMainStep(deckMap, 54);
+    const p0 = e.state.players[0];
+    const purple = () => ({ number: 'p', name: '紫', kind: 'cheer', color: '紫' });
+    const mk = { number: 'AZ', name: 'AZ', kind: 'holomen', bloomLevel: '2nd', hp: 200, color: '紫', tags: [],
+      arts: [{ name: 'big', dmg: 150, cost: ['紫', '紫', '紫'], tokkou: [] }], keywords: [] };
+    p0.center = e._createHolomem(mk, 0); p0.center.cheers = [purple(), purple(), purple()];
+    p0.collab = null; p0.back = []; p0.archive = [];
+    const before = evaluateState(e, 0).total;
+    // バトンコスト相当で盤面の紫3枚をアーカイブへ（資源を捨てた状態）
+    p0.center.cheers = []; p0.archive = [purple(), purple(), purple()];
+    const after = evaluateState(e, 0).total;
+    assert(before > after, `盤面エールをアーカイブへ捨てると評価が下がるべき (before=${before}, after=${after})`);
+  });
+
+  await testAsync('AI評価: アーツのコストを超える余剰エールは資源として価値が無い（必要数までのみ評価）', async () => {
+    const e = await setupMainStep(deckMap, 55);
+    const p0 = e.state.players[0];
+    const purple = () => ({ number: 'p', name: '紫', kind: 'cheer', color: '紫' });
+    const mk = { number: 'AZ2', name: 'AZ2', kind: 'holomen', bloomLevel: '2nd', hp: 200, color: '紫', tags: [],
+      arts: [{ name: 'a', dmg: 100, cost: ['紫', '紫', '紫'], tokkou: [] }], keywords: [] }; // コスト3
+    p0.collab = null; p0.back = []; p0.archive = [];
+    p0.center = e._createHolomem(mk, 0); p0.center.cheers = [purple(), purple(), purple()]; // ちょうど3
+    const exact = evaluateState(e, 0).total;
+    p0.center.cheers = [purple(), purple(), purple(), purple(), purple()]; // 余剰2枚
+    const excess = evaluateState(e, 0).total;
+    assert(excess === exact, `コスト超過の余剰エールは評価に影響しないべき (exact=${exact}, excess=${excess})`);
+  });
+
   await testAsync('深い先読み(2手/3手): クラッシュせず対戦が完了し、合法手を返す', async () => {
     const r = await fetch('../test_deck/' + encodeURIComponent('FUWAMOCO') + '.json'); const dm = await r.json();
     const reg = await buildRegistry(lib, dm);
