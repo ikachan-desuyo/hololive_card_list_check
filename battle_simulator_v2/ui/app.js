@@ -1450,6 +1450,7 @@ const aiAgents = [null, null];
 let aiOverride = null; // URLパラメータによる一時上書き（保存しない）
 let lookaheadOverride = null; // ?lookahead=1|2|both で先読みAIを使うプレイヤー（実験用）
 let aiTimer = null;
+let aiBusy = false; // AI処理中フラグ。apply中の再入render→handleAIが古いpending向けタイマーを予約するのを防ぐ
 const AI_DELAY_MS = 600;
 
 function aiEnabled(idx) {
@@ -1471,34 +1472,43 @@ function lookaheadTurns() {
 }
 
 /** AI担当プレイヤーの決定ポイントを少し間を置いて自動で進める */
+function getAgent(idx) {
+  if (!aiAgents[idx]) aiAgents[idx] = lookaheadEnabled(idx) ? new LookaheadAI(idx, { turns: lookaheadTurns() }) : new HeuristicAI(idx);
+  return aiAgents[idx];
+}
+
 function handleAI(s) {
   if (!s.pending || s.phase === 'ended') return;
   const idx = s.pending.player;
   if (!aiEnabled(idx)) return;
-  if (aiTimer) return;
+  if (aiTimer || aiBusy) return; // 既に予約済み／処理中なら何もしない（再入で古いタイマーを増やさない）
   const pendingRef = s.pending;
   aiTimer = setTimeout(() => {
     aiTimer = null;
-    if (!engine || engine.state.pending !== pendingRef) return;
-    // 既定はヒューリスティック。?lookahead=1|2|both で該当プレイヤーを1手先読みAIにする（実験用）。
-    if (!aiAgents[idx]) aiAgents[idx] = lookaheadEnabled(idx) ? new LookaheadAI(idx, { turns: lookaheadTurns() }) : new HeuristicAI(idx);
+    if (!engine || engine.state.pending !== pendingRef) {
+      // pending が既に進んでいた場合でも、現局面でAIを再起動して停止を防ぐ（タイマー空振りで止まらないように）
+      if (engine && engine.state.pending && engine.state.phase !== 'ended') handleAI(engine.state);
+      return;
+    }
+    aiBusy = true; // この間の apply→render→handleAI 再入はタイマーを予約しない（古いpending向けタイマーを作らない）
     try {
-      const id = aiAgents[idx].choose(engine);
+      const id = getAgent(idx).choose(engine);
       if (id != null) engine.apply(id);
       // 複数選択(chooseCards)はトグル＋確定を一気に解決する（1トグルごとに待つと遅いため）。
-      // トグルは内部操作なので待機を挟まず、選択完了まで同じtick内で進める。
       let guard = 0;
       while (engine.state.pending?.type === 'effectChoice' && engine.state.pending.multiSelect
         && aiEnabled(engine.state.pending.player) && guard++ < 60) {
-        const aiP = engine.state.pending.player;
-        if (!aiAgents[aiP]) aiAgents[aiP] = lookaheadEnabled(aiP) ? new LookaheadAI(aiP, { turns: lookaheadTurns() }) : new HeuristicAI(aiP);
-        const nid = aiAgents[aiP].choose(engine);
+        const nid = getAgent(engine.state.pending.player).choose(engine);
         if (nid == null) break;
         engine.apply(nid);
       }
     } catch (e) {
       console.error('AIの手の適用に失敗:', e);
+    } finally {
+      aiBusy = false;
     }
+    // 最終局面でAIの手番が続くなら、ここで次の1手を予約する（再入renderには予約させない）
+    if (engine && engine.state.pending && engine.state.phase !== 'ended') handleAI(engine.state);
   }, AI_DELAY_MS);
 }
 
