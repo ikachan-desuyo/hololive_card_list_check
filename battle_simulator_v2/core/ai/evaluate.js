@@ -20,8 +20,10 @@ export const WEIGHTS = {
   life: 120, // ライフ1枚差の価値（勝利条件に直結するため最も重い）
   hpRemain: 0.30, // 盤上ホロメンの残りHP1につき（生存力）
   threat: 0.35, // 盤上ホロメンの最大アーツ火力1につき（盤面の脅威）
-  ready: 10, // いま支払えるアーツを持つ（即アタッカーになれる）ホロメン1体につき
-  centerActive: 8, // アクティブなセンターがいる
+  ready: 24, // いま支払えるアーツを持つ（即アタッカーになれる）ホロメン1体につき。
+  //            攻撃機会＝ライフ奪取の機会そのもの。これを高く評価し「燃料の乗った前衛を維持して毎ターン殴る」
+  //            方を、攻撃を捨てる入替（無駄バトン）より優先させる（テンポ＝勝利条件に直結）。
+  centerActive: 14, // アクティブな（＝今ターン殴れる）センターがいる。毎ターンの攻撃役を絶やさない価値。
   collabActive: 6, // アクティブなコラボがいる
   handCard: 4, // 手札1枚（リソース。中身は見ない＝枚数のみ）
   holoPower: 2, // ホロパワー1枚（推しスキルの燃料）
@@ -34,16 +36,7 @@ export const WEIGHTS = {
   lethalChanceToOpp: 55, // 自分が相手センターを倒し得る
   noBoard: -2000, // ステージにホロメンが居ない（実質敗北）
   noCenter: -40, // センターが空（バックから補充が要る／攻撃を受けやすい）
-  deckOut: 2.5, // 山札が薄い時の危険度1につき（デッキ切れ=敗北条件。終盤の引き過ぎ/churnの自滅を抑制）
 };
-
-/** 山札の薄さによるデッキ切れ危険度（12枚未満で二次関数的に増大。0枚≒敗北級）。
- *  ドロー自体は有益（手札上限なし）だが、山が薄い時の引き過ぎはデッキ切れ負けに直結する＝そこだけ抑制する。 */
-function deckOutRisk(deckLen) {
-  if (deckLen >= 12) return 0;
-  const d = 12 - deckLen; // 1..12
-  return d * d;           // 1..144
-}
 
 /** カード（ホロメンカード）の最大アーツ火力（素点。特攻・修正は含まない目安） */
 export function maxArtDmg(card) {
@@ -327,9 +320,6 @@ export function evaluateState(engine, idx) {
   // 6) 継続攻撃力: 最大火力のホロメンがコラボにいると次のリセットで休む＝来ターン殴れない。
   //    大技要員はセンター（持続）に据えるべき、という方向に評価を寄せる（自分は減点・相手は加点）。
   parts.persistence = -collabRestPenalty(engine, me, idx) + collabRestPenalty(engine, opp, 1 - idx);
-
-  // 7) デッキ切れリスク（薄い山札での引き過ぎ＝自滅を抑制。相手が薄ければこちらに有利）。
-  parts.deckOut = (-deckOutRisk(me.deck.length) + deckOutRisk(opp.deck.length)) * WEIGHTS.deckOut;
 
   const total = Object.values(parts).reduce((a, b) => a + b, 0);
   return { total, parts };
