@@ -720,6 +720,10 @@ body.dragging, body.dragging * { cursor: grabbing !important; }
   z-index: 46;
   display: none;
   box-shadow: 0 10px 40px rgba(0, 0, 0, 0.7);
+  /* 設定項目が増えても画面内に収め、はみ出すぶんはスクロールする */
+  max-height: calc(100vh - 72px);
+  overflow-y: auto;
+  overscroll-behavior: contain;
 }
 #settings-panel.open { display: block; }
 .settings-title { font-weight: bold; margin-bottom: 10px; color: #fff; }
@@ -1378,8 +1382,8 @@ body.dragging, body.dragging * { cursor: grabbing !important; }
   }
   #mobile-advance[hidden] { display: none; }
 
-  /* 設定パネルは画面幅に合わせる */
-  #settings-panel { top: 104px; right: 8px; left: 8px; width: auto; }
+  /* 設定パネルは画面幅に合わせる。上端が下がるぶん高さ上限も下げてはみ出さないように */
+  #settings-panel { top: 104px; right: 8px; left: 8px; width: auto; max-height: calc(100vh - 118px); }
 
   /* 右パネル(320px)を見込んだ中央寄せオフセットを全幅用に打ち消す */
   #hand { transform: translateX(-50%); max-width: 96%; gap: 4px; bottom: 6px; padding-top: 6px; }
