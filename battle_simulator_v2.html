@@ -29,7 +29,7 @@
       <button id="start-button">ゲーム開始</button>
       <div id="setup-error"></div>
       <!-- 更新確認用バージョン（コミット時に日時を更新）。ハードリロードで反映されたかの目印 -->
-      <div id="app-version">2026-06-25 19:03</div>
+      <div id="app-version">2026-06-26 06:27</div>
     </div>
 
     <!-- ゲーム画面 -->
@@ -62,8 +62,9 @@
             <button data-lookahead-turns="1">1手</button>
             <button data-lookahead-turns="2">2手</button>
             <button data-lookahead-turns="3">3手</button>
+            <button data-lookahead-turns="5">5手</button>
           </div>
-          <div class="settings-note">各手を何ターン先まで擬似対戦して選ぶか。1手=自分のターンのみ（最速）。2手=相手の反撃まで。3手=自分の次のターンまで（倒し返されても取り返せるかを読む＝最高精度・最重）。深いほどCPUの思考時間が増えます。</div>
+          <div class="settings-note">各手を何ターン先まで擬似対戦して選ぶか。1手=自分のターンのみ（最速）。2手=相手の反撃まで。3手=自分の次のターンまで（既定・推奨）。5手=自分のターン3回ぶん＝「メイン火力を展開して大技を撃てる所」まで読む（最重・じっくり）。深いほど思考時間が増えます。</div>
         </div>
         <div class="settings-section">
           <div class="settings-label">ステップ送り</div>

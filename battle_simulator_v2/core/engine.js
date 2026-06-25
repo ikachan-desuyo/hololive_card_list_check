@@ -300,6 +300,25 @@ export class Engine {
         const need = Number(thr[2].replace(/[０-９]/g, (d) => String('０１２３４５６７８９'.indexOf(d))));
         if (countColor(thr[1]) >= need) dmg += Number(thr[3]);
       }
+      // 自分のステージの「色数」スケール（孔雀の舞: ステージのエール1色につき+N／Spicy Night: 2色以上で+N）。
+      // ステージ全体の異なるエール色数を数える（=色を散らすほど火力が伸びる、をAIが評価できるようにする）。
+      const needsStageColors = /ステージ.*エール.*色/.test(art.text);
+      const stageColorCount = () => {
+        const colors = new Set();
+        for (const sh of this._stageHolomems(this.state.players[ownerIdx])) {
+          for (const c of (sh.cheers || [])) if (c.color) colors.add(c.color);
+        }
+        return colors.size;
+      };
+      if (needsStageColors) {
+        const perColor = art.text.match(/(?:ステージ[^。]*?エール)?\s*1色につき[^。]*?\+\s*(\d+)/);
+        if (perColor) dmg += stageColorCount() * Number(perColor[1]);
+        const multi = art.text.match(/エールが\s*([0-9０-９]+)\s*色以上[^。]*?\+\s*(\d+)/);
+        if (multi) {
+          const need = Number(multi[1].replace(/[０-９]/g, (d) => String('０１２３４５６７８９'.indexOf(d))));
+          if (stageColorCount() >= need) dmg += Number(multi[2]);
+        }
+      }
     }
     dmg += Math.max(0, this.effects.artsBonus(h, ownerIdx));
     const oppCenter = this.state.players[1 - ownerIdx]?.center;

@@ -73,6 +73,24 @@ export function isFreePlaySupport(engine, card) {
   return !hasDownside;
 }
 
+/**
+ * 「デッキからホロメンをステージに出す」発展支援か（ふつうのパソコン等）。
+ * place（手札Debutの展開）と同じく未来のアタッカーの土台を作る無条件の発展手＋デッキ圧縮になるので、
+ * 先読みのノイズで取りこぼさず貪欲に使ってよい。ドロー/サーチ主体（=手札に引く＝デッキ切れの綱引きがある）は
+ * 含めない（それらは先読みに weigh させる）。下振れ語のある支援も除外する。
+ */
+export function isDevelopSupport(engine, card) {
+  const def = engine.registry.get(card.number);
+  if (!def?.support) return false; // 効果未実装は対象外
+  if (card.limited) return false;  // LIMITEDは1ターン1枚の枠を消費する→貪欲化しない（他の重要なLIMITED支援を潰さない）
+  if (def.ai?.developSupport != null) return !!def.ai.developSupport; // カード定義で明示があれば従う
+  const text = card.supportText || '';
+  if (!/(ステージに出す|登場させ)/.test(text)) return false;
+  if (/(引く|ドロー|手札に加える)/.test(text)) return false; // ドロー/サーチ主体は対象外
+  const hasDownside = /(アーカイブ|捨て|ダウン|失う|エール[^。]*取り除|お休み|ホロパワー)/.test(text);
+  return !hasDownside;
+}
+
 /** 効果テキストからおおまかな価値を推定する（ドロー/サーチ/特殊ダメージ/エール/回復/回収など） */
 function estimateEffectText(text, engine, p) {
   if (!text) return 0;
@@ -213,10 +231,14 @@ function scoreCheerTargets(engine, idx, pending, out) {
       const dmgNow = bestEffDmg(h, h.cheers);
       const dmgAfter = bestEffDmg(h, afterCheers);
       const gain = dmgAfter - dmgNow;
+      // オーバーキル抑制: この前衛が「既に」相手センターを倒せるなら、さらに火力を盛ってもライフは増えない（KOは1回ぶん）。
+      // 余剰火力の価値を大きく下げ、エールを2体目のアタッカーや色の前進へ回させる（手数＝継続攻撃を増やす）。
+      const alreadyLethal = !!oppCenter && isActive && oppCenterRemain > 0 && dmgNow >= oppCenterRemain;
       if (gain > 0) {
         // このエールで火力が増える（解放 or 枚数依存で上昇）＝価値。前衛は厚く、バックは攻撃不可なので薄く。
         useful = true;
-        score += isActive ? Math.min(70, 18 + gain * 0.35) : Math.min(20, 6 + gain * 0.08);
+        if (alreadyLethal) score += isActive ? 4 : 2; // 既に倒せる＝オーバーキル。追いエールはほぼ無価値
+        else score += isActive ? Math.min(70, 18 + gain * 0.35) : Math.min(20, 6 + gain * 0.08);
       } else {
         // 火力は増えないが、未解放アーツへ色が前進したか（将来の解放準備）
         let advanced = false;
@@ -236,7 +258,7 @@ function scoreCheerTargets(engine, idx, pending, out) {
       // 集約ボーナス: 1ターンに殴れるのは前衛(センター+コラボ)中心なので、
       // 「弱い体を量産」より「最強の1体を伸ばす」方が正しい。このエールでチーム最強前衛の
       // 実効火力がどれだけ上がるかを重く評価する（既に強い主力＝スケールするアーツに積むほど高い）。
-      if (isActive && dmgAfter > 0) {
+      if (isActive && dmgAfter > 0 && !alreadyLethal) {
         const fronts = [p.center, p.collab].filter(Boolean);
         const teamBestBefore = Math.max(0, ...fronts.map((x) => bestEffDmg(x, x.cheers)));
         const lift = Math.max(0, dmgAfter - teamBestBefore); // h にこのエールを足して最強前衛火力が増えるぶん
@@ -361,37 +383,37 @@ function scoreMainActions(engine, idx, pending, out) {
         const back = p.back[opt.backIndex];
         if (!back) break;
         const backRemain = engine.effectiveHp(back) - back.damage;
-        if (underLethal && backRemain > oppThreat && backRemain > centerRemain) score = 70;
-        // 育てた（エールを積んだ）センターは下げない＝攻撃機会とエール投資を捨てない。
-        // 安易な入替は「センターが瀕死かつ実質エール無し」のときだけ。
-        // ただし「HPが低いだけ」では退かない: 残せば有効な攻撃（特に相手をKO）できる前衛は、退避でエールを捨てて
-        // 攻撃機会を失う方が損なので退かない（＝HP低下のみを理由にしたバトンは論理的でない）。
+        // バトンの「正当な理由」による便益。理由が無ければ benefit=0（＝この後コストを引いて負になる）。
+        let benefit = 0;
+        if (underLethal && backRemain > oppThreat && backRemain > centerRemain) benefit = 70;
+        // 育てた（エールを積んだ）センターは下げない。安易な入替は「センターが瀕死かつ実質エール無し」のときだけ。
+        // ただし「HPが低いだけ」では退かない: 残せば有効な攻撃（特に相手をKO）できる前衛は退かない。
         else if (centerRemain <= 40 && backRemain > centerRemain + 30 && (p.center.cheers || []).length <= 1) {
           const centerOff = bestPayableEffDmg(engine, p.center, idx);
           const canKO = opp.center && centerOff >= (engine.effectiveHp(opp.center) - opp.center.damage);
-          if (centerOff < 30 && !canKO) score = 35; // 攻撃価値の無い置物のときだけ退避
+          if (centerOff < 30 && !canKO) benefit = 35; // 攻撃価値の無い置物のときだけ退避
         }
         else {
-          // 明確に強いアタッカーがアクティブなバックにいるなら、センターへ据えて毎ターン殴る
-          // （コラボは毎リセットで休むため、大技要員はセンターで継続攻撃させたい）。
+          // 明確に強いアタッカーがアクティブなバックにいるなら、センターへ据えて毎ターン殴る。
           const backOff = bestPayableEffDmg(engine, back, idx);
           const centerOff = bestPayableEffDmg(engine, p.center, idx);
-          // ただし「大技に向けてエール投資が進んでいるセンター」はバトンで捨てない（バトンコストでエールを失う＝無駄打ちの原因）。
+          // 「大技に向けてエール投資が進んでいるセンター」はバトンで捨てない。
           const centerInvesting = (p.center.cheers || []).length >= 2 && (p.center.stack[0].arts || []).some((a) => {
             const need = a.cost.length || 0; if (need === 0) return false;
             const unmet = unmetCost(p.center.cheers, a.cost);
-            return unmet > 0 && (need - unmet) / need >= 0.5 && (a.dmg || 0) >= backOff; // 半分以上投資済みで、バック火力以上の大技
+            return unmet > 0 && (need - unmet) / need >= 0.5 && (a.dmg || 0) >= backOff;
           });
-          if (!back.rested && backOff >= centerOff + 60 && !centerInvesting) score = 30;
+          if (!back.rested && backOff >= centerOff + 60 && !centerInvesting) benefit = 30;
         }
-        // バトンコストで捨てる「有用エール」のぶんを損として差し引く（貯めたエールの無駄捨てを論理的に抑制）。
-        if (score > 0) {
-          const cArts = p.center.stack[0].arts || [];
-          const cap = Math.max(0, ...cArts.map((a) => (a.cost || []).length));
-          const usefulOnCenter = Math.min((p.center.cheers || []).length, cap);
-          const batonCostLen = (p.center.stack[0].batonTouch || []).length;
-          score -= Math.min(batonCostLen, usefulOnCenter) * 8;
-        }
+        // バトンは「センターのエールをコスト払い＋攻撃役の入替」。正当な理由が無ければエールを捨てるだけの損。
+        // ① 捨てる有用エールのコストは常に差し引く（理由の有無に関わらず実損）。
+        // ② 理由がゼロのバトン（攻撃もできない/脅威も無いのに入替＝1ターン目の無駄バトン等）は基礎ペナルティで明確に負へ。
+        const cArts = p.center.stack[0].arts || [];
+        const cap = Math.max(0, ...cArts.map((a) => (a.cost || []).length));
+        const usefulOnCenter = Math.min((p.center.cheers || []).length, cap);
+        const batonCostLen = (p.center.stack[0].batonTouch || []).length;
+        const cheerCost = Math.min(batonCostLen, usefulOnCenter) * 10;
+        score = benefit - cheerCost - (benefit > 0 ? 0 : 10);
         break;
       }
       case 'oshiSkill': {
@@ -448,20 +470,29 @@ function scorePerformance(engine, idx, pending, out) {
     for (const tk of art.tokkou || []) if (targetTop.color === tk.color) dmg += tk.value;
     dmg += engine.effects.artsBonus(h, idx);
     const remain = engine.effectiveHp(target) - target.damage;
-    const threat = maxArtDmg(targetTop); // 倒せば消せる相手の脅威
+    // 脅威の即時性: コラボは次の相手ターンにお休み（バックへ移動）＝次ターンは攻撃できない＝即時脅威が低い。
+    // センターは毎ターン攻撃してくる持続的脅威。よって「倒せるなら脅威度の高いセンター」を優先して除去する。
+    const restsNextTurn = opt.target.zone === 'collab';
+    const threat = maxArtDmg(targetTop) * (restsNextTurn ? 0.5 : 1); // 倒せば消せる相手の脅威（即時性で割引）
     let score = dmg * 0.2;
     if (dmg >= remain) {
       // 倒せる: ライフ圧（Buzz=2等）・脅威除去・相手の残ライフ・センター除去を反映
       const lifeLoss = expectedLifeLoss(engine, target);
       score += 70 + lifeLoss * 25;
       score += (6 - opp.life.length) * 5 * Math.max(1, lifeLoss); // 相手のライフが少ないほど致命的
-      score += threat * 0.05;                                     // 強い相手ほど倒す価値が高い
+      // 倒す＝その相手の火力(脅威)を永久に除去する価値。強い相手（1発で倒してくる大技持ち2nd等）ほど倒す価値が高い。
+      // ＝「倒せる強いセンター2nd」を、休むだけのコラボや些末な体より優先して倒す。
+      score += threat * 0.15;
       if (opt.target.zone === 'center') score += 10;              // センター除去は前衛入替を強制（テンポ）
       if (lifeLoss > 0 && oppGainsOnDown(engine, target)) score -= 12; // ダウンで相手が得をするなら控えめ
     } else {
-      // 倒せない時も、既にダメージを負った相手に集中して削り、KOを早める（散らさない）。脅威の高い相手も優先。
-      score += threat * 0.03 + target.damage * 0.05;
+      // 倒せない時は「脅威の高い相手（毎ターン殴ってくるセンター）」を優先的に削る（次ターンのKO＝脅威除去に繋げる）。
+      score += threat * 0.08 + target.damage * 0.05;
       if (opt.target.zone === 'center') score += 5;
+      // この一撃で相手が「自軍の到達火力で次に倒せる残HP」まで落ちるなら、脅威除去の布石として加点（高HPの大型脅威を崩す価値）。
+      const fronts = [p.center, p.collab].filter(Boolean);
+      const teamReach = Math.max(0, ...fronts.map((x) => bestPayableEffDmg(engine, x, idx)));
+      if (remain - dmg <= teamReach && remain > dmg) score += threat * 0.05;
     }
     out[opt.id] = score;
   }
@@ -473,8 +504,30 @@ function cardGainValue(engine, idx, card) {
   const p = engine.state.players[idx];
   if (card.kind === 'holomen') {
     let v = holomenValue(card);
-    // 盤面が薄いときは、すぐ置けるDebutの価値を上げる（展開を優先）
-    if (engine._stageCount(p) < 4 && card.bloomLevel === 'Debut') v += 30;
+    const order = { Debut: 0, Spot: 0, '1st': 1, '2nd': 2 };
+    const lvl = order[card.bloomLevel] ?? 0;
+    const sameName = (a, b) => engine._nameIs(a, b.name) || engine._nameIs(b, a.name);
+    const bodies = engine._stageCount(p);
+    if (lvl === 0) {
+      // Debut/Spot は手札からそのまま盤面に出せる＝土台/壁の確保。
+      // 盤面が薄いほど不足＝価値↑。ほぼ埋まっていれば余剰＝価値↓（足りているDebutをわざわざ持ってこない）。
+      if (bodies < 4) v += 30;
+      else if (bodies >= 5) v *= 0.5;
+    } else {
+      // 1st/2nd は「今ブルームできる同名の土台（より低いBloomレベル）」が盤面に無ければ手札で腐る＝即戦力でない。
+      const hasBase = engine._stageHolomems(p).some((h) => {
+        const t = h.stack[0];
+        return (order[t.bloomLevel] ?? 0) < lvl && sameName(t, card);
+      });
+      if (!hasBase) {
+        v *= 0.3; // 土台が無く今は出せない
+      } else {
+        // 土台あり＝即戦力。ただし同名のブルーム札を既に手札に持っているなら冗長＝価値↓（足りているものは持ってこない）。
+        const dupInHand = p.hand.some((c) => c !== card && c.kind === 'holomen'
+          && (order[c.bloomLevel] ?? 0) >= 1 && sameName(c, card));
+        if (dupInHand) v *= 0.6;
+      }
+    }
     return v;
   }
   if (card.kind === 'support') return supportValue(engine, p, card);

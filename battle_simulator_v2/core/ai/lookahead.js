@@ -14,8 +14,8 @@
  *   - turns=1: 自分のターンを終えた局面で評価（最速。目先の最善）。
  *   - turns=2: ＋相手の応手まで読む（攻めて倒し返される手を避ける）。
  *   - turns=3: ＋自分の次のターンまで読む（倒し返されても取り返せるかを見て、消極化を打ち消す＝攻めの精度UP）。
- *   - 公平性: 各ターンの擬似実行は公開情報のみで判断する HeuristicAI が担う（相手の手札を覗いて選択は変えない）。
- *     擬似実行のため相手の具体的カードを内部で動かす必要はあるが、選択ロジックは公開情報ベース。
+ *   - 情報前提【全情報許可】: 擬似実行は再生(replay)で相手の実際の手札・山札・順序を再現する＝完全情報の前方シミュレーション。
+ *     相手の手は「最善で固定」して読み（最悪ケース想定）、揺らぎ(モンテカルロ)は自分の手だけに入れる。
  *   - コスト: turns を増やすほど重い（候補ごとに turns ターンぶんを再生・擬似実行）。UI設定で 1/2/3 を選択可。
  *
  * 注意: reconstruct は「apply() のみで到達した状態」を前提とする（状態を直接書き換えた局面は再現不可）。
@@ -25,7 +25,7 @@
 import { HeuristicAI } from './heuristic.js';
 import { evaluateState } from './evaluate.js';
 import { reconstruct } from './rollout.js';
-import { scoreOptions, bestOptionId } from './score.js';
+import { scoreOptions, bestOptionId, isDevelopSupport } from './score.js';
 import { createRng } from '../rng.js';
 
 // ロールアウト評価が「ほぼ互角」とみなす差（この範囲内の候補は、ヒューリスティック事前評価で優劣を割る）。
@@ -60,12 +60,34 @@ export class LookaheadAI {
     if (!cands || cands.length === 0) return null;
     if (cands.length === 1) return cands[0].id;
 
+    // 「未来のアタッカーの土台＝盤面を作る発展手」は評価上の上がり幅が小さく、ノイズを含む5手ロールアウトでは
+    // 「パス」と僅差になり取りこぼすことがある。これらは無条件で正しい発展手なので先読みに掛けず貪欲に実行する。
+    //   - Debut/Spotの展開(place)。置いた次ターンからブルーム可能＝早く置くほど良い。
+    //   - デッキからホロメンをステージに出す発展支援(ふつうのパソコン等。placeと同等＋デッキ圧縮)。
+    // ※ドロー/サーチ主体の支援は「デッキ切れの綱引き」があるため貪欲にせず先読みの判断に委ねる。
+    if (pending.type === 'main') {
+      const me = s.players[this.playerIdx];
+      // 発展支援(ふつうのパソコン等)を place より先に（盤面が埋まって canUse を満たせなくなる前に使う）。
+      const devSup = cands.find((o) => o.kind === 'support' && me.hand[o.handIndex] && isDevelopSupport(engine, me.hand[o.handIndex]));
+      if (devSup) return devSup.id;
+      const place = cands.find((o) => o.kind === 'place');
+      if (place) return place.id;
+    }
+
     // ヒューリスティックの事前評価（prior）。ロールアウトが僅差の時の「無駄手（負の値）」回避に使う。
     let hscores = {};
     try { hscores = scoreOptions(engine, this.playerIdx, pending) || {}; } catch { hscores = {}; }
+    // 明確に無駄なバトン（正当な理由＝リーサル回避/置物退避/強アタッカー据えが無く、エールやテンポを捨てるだけ＝
+    // 事前評価が負）は strictly-dominated（パスより悪い）。ロールアウトのノイズで選ばれるのを防ぐため、読みの候補から除外する。
+    // 例: 1ターン目に攻撃もできず脅威も無いのにエールを捨ててDebutを入れ替えるだけのバトン。
+    let pool = cands;
+    if (pending.type === 'main') {
+      const filtered = cands.filter((o) => !(o.kind === 'baton' && (hscores[o.id] ?? 0) < 0));
+      if (filtered.length > 0) pool = filtered;
+    }
     // 各候補を samples 回ロールアウトして平均（方策に揺らぎを入れ、脆い1本の偏りを打ち消す）。
     // 標本kは全候補で同じ乱数列（common random numbers）を使い、候補間の比較分散を抑える。
-    const scored = cands.map((opt) => {
+    const scored = pool.map((opt) => {
       let sum = 0; let n = 0;
       for (let k = 0; k < this.samples; k++) {
         const v = this._rolloutValue(engine, opt.id, this.samples > 1 ? createRng(0x9e37 + k * 2654435761) : null);
@@ -109,7 +131,9 @@ export class LookaheadAI {
       const pd = sim.state.pending;
       let id;
       if (pd.player == null) id = pd.options[0].id;
-      else if (rng) id = stochasticChoose(sim, pd.player, rng); // モンテカルロ: 最善付近をランダム
+      // 【全情報許可】相手の手は「最善で固定」して読む（相手の最善応手を想定＝こちらの楽観バイアスを排除）。
+      // 揺らぎ(モンテカルロ)は自分の手だけに入れる＝「自分の指し回しの不確実性」を平均し、相手は最悪ケースで評価。
+      else if (rng && pd.player === idx) id = stochasticChoose(sim, pd.player, rng);
       else id = ais[pd.player].choose(sim);
       if (id == null) break;
       try { sim.apply(id); } catch { break; }

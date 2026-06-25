@@ -2525,6 +2525,38 @@ export async function runTests() {
     assert((sc.baton0 ?? 0) <= 0, `KOできる低HP前衛をHP理由で退避すべきでない (baton=${sc.baton0})`);
   });
 
+  await testAsync('AI火力見積り: ステージの色数スケール（孔雀の舞型「1色につき+N」）を評価できる', async () => {
+    const e = await setupMainStep(deckMap, 58);
+    const p0 = e.state.players[0];
+    const C = (c) => ({ number: 'c' + c, name: c, kind: 'cheer', color: c });
+    const art = { name: '孔雀風', dmg: 50, cost: [], tokkou: [], text: '自分のステージのエール1色につき、このアーツ+20。' };
+    const mk = { number: 'PEA', name: 'PEA', kind: 'holomen', bloomLevel: '2nd', hp: 200, color: '緑', tags: [], arts: [art], keywords: [] };
+    p0.center = e._createHolomem(mk, 0); p0.collab = null; p0.back = [];
+    p0.center.cheers = [C('緑'), C('緑'), C('緑')];          // 1色（同色を重ねても色数は1）
+    const one = e._artEffectiveDamage(p0.center, art, 0);
+    p0.center.cheers = [C('緑'), C('赤'), C('青')];          // 3色（散らすと色数3）
+    const three = e._artEffectiveDamage(p0.center, art, 0);
+    assert(three > one, `色数が多いほど見積り火力が高いはず＝色を散らす価値を評価できる (1色=${one}, 3色=${three})`);
+    assertEq(one, 70, '1色なら 50+20'); assertEq(three, 110, '3色なら 50+60');
+  });
+
+  await testAsync('AI選択: デッキ→手札では「今出せるDebut」を、土台の無い大型(1st/2nd)より優先する', async () => {
+    const e = await setupMainStep(deckMap, 57);
+    const p0 = e.state.players[0];
+    // 盤面は薄い＝別名のセンターのみ（AZKiの土台は無い）
+    p0.center = e._createHolomem(fakeHolomen({ name: 'ほかのこ' }), 1); p0.collab = null; p0.back = [];
+    const debut = { number: 'AZd', name: 'AZKi', kind: 'holomen', bloomLevel: 'Debut', hp: 100, tags: [], arts: [{ name: 'a', dmg: 30, cost: [], tokkou: [] }], keywords: [] };
+    const second = { number: 'AZs', name: 'AZKi', kind: 'holomen', bloomLevel: '2nd', hp: 220, tags: [], arts: [{ name: 'b', dmg: 180, cost: [], tokkou: [] }], keywords: [] };
+    const mkPending = () => ({ type: 'effectChoice', player: 0, request: { kind: 'chooseCard', intent: 'gain' },
+      options: [{ id: 'cD', card: debut, value: debut }, { id: 'cS', card: second, value: second }] });
+    let sc = scoreOptions(e, 0, mkPending());
+    assert(sc.cD > sc.cS, `土台の無い2ndより、すぐ出せるDebutを優先すべき (Debut=${sc.cD}, 2nd=${sc.cS})`);
+    // 同名Debutが盤面にある（=2ndの土台がある）なら、2ndは腐らないので高評価でよい
+    p0.back = [e._createHolomem({ number: 'AZd2', name: 'AZKi', kind: 'holomen', bloomLevel: 'Debut', hp: 100, tags: [], arts: [], keywords: [] }, 1)];
+    sc = scoreOptions(e, 0, mkPending());
+    assert(sc.cS > sc.cD, `土台がある時は大型(2nd)も即戦力＝高評価のはず (Debut=${sc.cD}, 2nd=${sc.cS})`);
+  });
+
   await testAsync('無色コスト判定: 無色は色指定なし（任意色で充足）／必要数を超えるエールは余剰として数えない', async () => {
     const e = await setupMainStep(deckMap, 56);
     const C = (color) => ({ number: 'c' + color, name: color, kind: 'cheer', color });
@@ -2563,10 +2595,10 @@ export async function runTests() {
     assert(excess === exact, `コスト超過の余剰エールは評価に影響しないべき (exact=${exact}, excess=${excess})`);
   });
 
-  await testAsync('深い先読み(2手/3手): クラッシュせず対戦が完了し、合法手を返す', async () => {
+  await testAsync('深い先読み(2手/3手/5手): クラッシュせず対戦が完了し、合法手を返す', async () => {
     const r = await fetch('../test_deck/' + encodeURIComponent('FUWAMOCO') + '.json'); const dm = await r.json();
     const reg = await buildRegistry(lib, dm);
-    for (const turns of [2, 3]) {
+    for (const turns of [2, 3, 5]) {
       const e = new Engine({ decks: [lib.buildGameDeck(dm), lib.buildGameDeck(dm)], seed: 7, names: ['DEEP', 'H'], registry: reg, cardLibrary: lib });
       e.start();
       const ais = [new LookaheadAI(0, { turns }), new HeuristicAI(1)]; // P0 を深い先読みに
@@ -2783,6 +2815,23 @@ export async function runTests() {
     ] };
     const sc = scoreOptions(e, 0, pending);
     assert(sc.killBuzz > sc.killNormal, `Buzz(ライフ-2)を優先すべき (buzz=${sc.killBuzz}, normal=${sc.killNormal})`);
+  });
+
+  await testAsync('AIアタックの質: 倒せる「強いセンター2nd」を、休むだけのコラボより優先して倒す', async () => {
+    const e = await setupMainStep(deckMap, 67);
+    const p0 = e.state.players[0]; const p1 = e.state.players[1];
+    p0.center = e._createHolomem({ number: 'AT', name: 'AT', kind: 'holomen', bloomLevel: '2nd', hp: 200, color: '青', tags: [], arts: [{ name: 'a', dmg: 120, cost: [], tokkou: [] }], keywords: [] }, 1);
+    // センター=1発で倒してくる強い2nd（倒せる）／コラボ=次ターン休む別個体（倒せる）。どちらもライフ-1・残HP小。
+    const bigCenter = e._createHolomem({ number: 'B', name: 'B', kind: 'holomen', bloomLevel: '2nd', hp: 200, color: '白', tags: [], arts: [{ name: 'big', dmg: 200, cost: [], tokkou: [] }], keywords: [] }, 1);
+    const collab = e._createHolomem({ number: 'C', name: 'C', kind: 'holomen', bloomLevel: 'Debut', hp: 110, color: '白', tags: [], arts: [{ name: 'c', dmg: 30, cost: [], tokkou: [] }], keywords: [] }, 1);
+    bigCenter.damage = e.effectiveHp(bigCenter) - 30; // 残30（倒せる）
+    collab.damage = e.effectiveHp(collab) - 30;       // 残30（倒せる）
+    p1.center = bigCenter; p1.collab = collab; p1.back = [];
+    const sc = scoreOptions(e, 0, { type: 'performance', player: 0, options: [
+      { id: 'killCenter', kind: 'art', zone: 'center', artIndex: 0, target: { zone: 'center', index: 0 } },
+      { id: 'killCollab', kind: 'art', zone: 'center', artIndex: 0, target: { zone: 'collab', index: 0 } },
+    ] });
+    assert(sc.killCenter > sc.killCollab, `毎ターン殴ってくる強いセンター2ndを優先して倒すべき (center=${sc.killCenter}, collab=${sc.killCollab})`);
   });
 
   await testAsync('AI: エールを撃てるホロメンに過剰投資しない', async () => {

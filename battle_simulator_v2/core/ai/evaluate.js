@@ -20,8 +20,10 @@ export const WEIGHTS = {
   life: 120, // ライフ1枚差の価値（勝利条件に直結するため最も重い）
   hpRemain: 0.30, // 盤上ホロメンの残りHP1につき（生存力）
   threat: 0.35, // 盤上ホロメンの最大アーツ火力1につき（盤面の脅威）
-  ready: 10, // いま支払えるアーツを持つ（即アタッカーになれる）ホロメン1体につき
-  centerActive: 8, // アクティブなセンターがいる
+  ready: 24, // いま支払えるアーツを持つ（即アタッカーになれる）ホロメン1体につき。
+  //            攻撃機会＝ライフ奪取の機会そのもの。これを高く評価し「燃料の乗った前衛を維持して毎ターン殴る」
+  //            方を、攻撃を捨てる入替（無駄バトン）より優先させる（テンポ＝勝利条件に直結）。
+  centerActive: 14, // アクティブな（＝今ターン殴れる）センターがいる。毎ターンの攻撃役を絶やさない価値。
   collabActive: 6, // アクティブなコラボがいる
   handCard: 4, // 手札1枚（リソース。中身は見ない＝枚数のみ）
   holoPower: 2, // ホロパワー1枚（推しスキルの燃料）
@@ -53,7 +55,11 @@ export function canActNow(engine, h) {
  * 脅威は「今のエールで撃てる実効火力」を主に評価する。エールが無くて撃てない大型ホロメンは
  * 火力上限(maxArtDmg)を満額では数えず、潜在ぶんを軽く見るだけ（＝燃料の無い2ndだらけの盤面を過大評価しない）。
  */
-export function holomemBoardValue(engine, h, idx, attackSoon = true) {
+export function holomemBoardValue(engine, h, idx, attackWeight = 1) {
+  // attackWeight: 「攻撃に使える度合い」。センター=1.0（毎ターン殴れる持続的アタッカー）/ コラボ=0.7（今ターンは
+  // 殴れるが次の自ターン開始時にお休み＝攻撃は1回限り）/ バック・お休み=0.4（今は殴れない）。
+  // 後方互換: 真偽値も受ける（true=1.0 / false=0.4）。
+  const aw = attackWeight === true ? 1 : attackWeight === false ? 0.4 : attackWeight;
   const top = h.stack[0];
   const hpRemain = Math.max(0, engine.effectiveHp(h) - h.damage);
   // 今払えるアーツの火力（payable）と、まだ払えないが「エール投資が進んでいる大技」の到達度つき価値（reaching）。
@@ -73,11 +79,11 @@ export function holomemBoardValue(engine, h, idx, attackSoon = true) {
   if (payableDmg > 0) payableDmg += Math.max(0, engine.effects.artsBonus(h, idx));
   const potential = maxArtDmg(top); // エールを足せば届く火力上限（薄い将来性）
   let threat = payableDmg + reaching * 0.4 + potential * 0.1;
-  // 1ターンに殴れるのは前衛(センター+コラボ)だけ。バック/お休みのホロメンに火力を盛っても今は使えないので、
-  // 攻撃価値は将来ぶんに割り引く（＝「弱い体に薄く広げる」より「前衛を強くする」方を高く評価する）。
-  if (!attackSoon) threat *= 0.4;
+  // 攻撃に使える度合いで割り引く。コラボ(0.7)はセンター(1.0)より低い＝「次ターンも殴れるセンター」に主力を据える盤面を
+  // 高く評価する（コラボに置きっぱなしの本命は毎ターン休んで手数が落ちるため）。バック/お休み(0.4)は今は使えない。
+  threat *= aw;
   let v = hpRemain * WEIGHTS.hpRemain + threat * WEIGHTS.threat;
-  if (payableDmg > 0 && attackSoon) v += WEIGHTS.ready; // 今すぐ攻撃に使える
+  if (payableDmg > 0 && aw >= 0.7) v += WEIGHTS.ready * (aw >= 1 ? 1 : 0.7); // 今すぐ攻撃に使える（センター優位）
   return v;
 }
 
@@ -127,8 +133,9 @@ export function boardPower(engine, p, idx) {
   const mems = engine._stageHolomems(p);
   let power = 0;
   for (const h of mems) {
-    const attackSoon = (h === p.center || h === p.collab) && !h.rested; // 今ターン攻撃に使える前衛か
-    power += holomemBoardValue(engine, h, idx, attackSoon);
+    // センター=1.0（毎ターン殴れる）／コラボ=0.7（今ターンのみ・次は休む）／バック・お休み=0.4。
+    const aw = h.rested ? 0.4 : h === p.center ? 1 : h === p.collab ? 0.7 : 0.4;
+    power += holomemBoardValue(engine, h, idx, aw);
   }
   if (p.center && !p.center.rested) power += WEIGHTS.centerActive;
   if (p.collab && !p.collab.rested) power += WEIGHTS.collabActive;
@@ -141,9 +148,9 @@ function remainHp(engine, h) {
 }
 
 /**
- * 相手が次ターンに付けられそうな追加エール枚数の見積り（公開情報のみ）。
- * 相手の手札は見ないが、「相手の盤面に見えるエール付与効果（コラボ/ブルーム/ギフト）は使ってくる」という
- * 行動傾向で、基本エール1枚＋効果ぶんを見込む。これにより相手の脅威の過小評価をさらに減らす。
+ * 相手が次ターンに付けられそうな追加エール枚数の見積り。
+ * 【全情報許可】相手のデッキ構成は既知の前提でよい（ユーザー許可）。基本エール1枚＋盤面の付与効果（コラボ/ブルーム/
+ * ギフト）に加え、相手の実際の手札にあるエール付与支援カードぶんも見込む（脅威の過小評価をさらに減らす）。
  */
 export function opponentExtraCheerProjection(engine, oppIdx) {
   const opp = engine.state.players[oppIdx];
@@ -153,7 +160,16 @@ export function opponentExtraCheerProjection(engine, oppIdx) {
       if (/コラボ|ブルーム|ギフト/.test(kw.subtype || '')) effGain = Math.max(effGain, cheerGainFromText(kw.text));
     }
   }
-  return 1 + Math.min(effGain, 3); // 基本1枚＋効果で付けられそうな枚数（上限3）
+  // 相手の手札にある「エール付与」支援カードぶん（全情報許可で参照可）。
+  let handGain = 0;
+  for (const c of opp.hand) {
+    if (c.kind !== 'support') continue;
+    const def = engine.registry.get(c.number);
+    if (!def?.support) continue; // 未実装は数えない
+    handGain += def.ai?.cheerGain != null ? resolveNum(def.ai.cheerGain, { engine, player: opp, card: c })
+      : cheerGainFromText(c.supportText);
+  }
+  return 1 + Math.min(effGain + handGain, 4); // 基本1枚＋効果/手札で付けられそうな枚数（上限4）
 }
 
 /** アーツ a を defColor のセンターに当てた時の火力（特攻・実効修正込み） */
