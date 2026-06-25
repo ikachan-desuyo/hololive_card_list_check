@@ -225,7 +225,10 @@ function scoreCheerTargets(engine, idx, pending, out) {
     let score = 0;
     if (arts.length > 0 && cheer) {
       const afterCheers = [...h.cheers, cheer];
-      const maxCost = Math.max(...arts.map((a) => a.cost.length));
+      // 使い切れるエール上限(cap)＝現フォーム＋同名ブルーム後フォームのアーツの最大コスト枚数。
+      // これを超えるエールは（火力が伸びる/色が前進する等のメリットが無い限り）純粋な過剰付与。
+      const allArts = [...arts, ...engine._higherFormArts(h.stack[0])];
+      const cap = Math.max(0, ...allArts.map((a) => (a.cost || []).length));
       let useful = false;
       // 実効火力の伸び（解放＋枚数依存スケールを一般的に捕捉。カード番号は見ない）
       const dmgNow = bestEffDmg(h, h.cheers);
@@ -247,8 +250,13 @@ function scoreCheerTargets(engine, idx, pending, out) {
           if (unmetCost(afterCheers, a.cost) < unmetCost(h.cheers, a.cost)) { advanced = true; break; }
         }
         if (advanced) { useful = true; score += isActive ? 12 : 5; }
-        else if (h.cheers.length >= maxCost) score -= 30; // どのアーツも伸びず満杯＝過剰投資
-        else score += 2; // 色が噛み合わず前進しない（最小限）
+        else if (h.cheers.length >= cap) {
+          // 過剰付与の禁止: 使い切れる上限(cap)に達した体へ、火力も伸びず色も前進しないエールを足すのは無意味＝強く禁止。
+          // 超過枚数が増えるほど重く罰し、別の体（空きのある前衛/バック）へ回させる。「効果としてメリットがある」場合は
+          // gain>0 や advanced 側に入るのでここには来ない（＝メリットがある余剰だけが許される）。
+          score -= 100 + (h.cheers.length - cap) * 20;
+        }
+        else score += 2 - h.cheers.length * 0.3; // 色が噛み合わず前進しない（最小限。空いてる体を優先＝散らす）
       }
       // 位置ボーナスは「有用なエール」のときだけ＝攻撃できる前衛に集中。無駄な色を位置目的で前衛に置かない。
       if (useful) {
