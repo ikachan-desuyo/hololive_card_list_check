@@ -940,7 +940,7 @@ body.dragging, body.dragging * { cursor: grabbing !important; }
 }
 .archive-grid-card { cursor: pointer; text-align: center; font-size: 0.72em; color: #aab; }
 .archive-grid-card img { width: 100%; border-radius: 6px; display: block; }
-.archive-grid-card:hover img { outline: 2px solid var(--accent); }
+.archive-grid-card:hover img { box-shadow: 0 0 0 2px var(--accent); }
 
 /* 発動可能なアクションを持つカード（推しスキル等）: 金色に光らせる */
 .card.can-act {
@@ -1057,11 +1057,12 @@ body.dragging, body.dragging * { cursor: grabbing !important; }
 }
 #choice-restore.show { display: block; }
 .archive-grid-card.display-only { opacity: 0.45; cursor: default; }
-.archive-grid-card.display-only:hover img { outline: none; }
-/* 選択→確定の2段階: 選択中のカードを強調 */
+.archive-grid-card.display-only:hover img { box-shadow: none; }
+/* 選択→確定の2段階: 選択中のカードを強調。
+   outline は角丸に追従せず四角い枠がずれて見えるため、border-radius に沿う box-shadow のリングで囲う。 */
 .archive-grid-card.selectable.selected img {
-  outline: 4px solid var(--accent);
-  box-shadow: 0 0 18px rgba(110, 195, 255, 0.7);
+  outline: none;
+  box-shadow: 0 0 0 3px var(--accent), 0 0 18px rgba(110, 195, 255, 0.7);
 }
 #choice-confirm {
   background: linear-gradient(135deg, #2a8f4a, #3aaf5f) !important;
