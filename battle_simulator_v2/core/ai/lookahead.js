@@ -77,9 +77,17 @@ export class LookaheadAI {
     // ヒューリスティックの事前評価（prior）。ロールアウトが僅差の時の「無駄手（負の値）」回避に使う。
     let hscores = {};
     try { hscores = scoreOptions(engine, this.playerIdx, pending) || {}; } catch { hscores = {}; }
+    // 明確に無駄なバトン（正当な理由＝リーサル回避/置物退避/強アタッカー据えが無く、エールやテンポを捨てるだけ＝
+    // 事前評価が負）は strictly-dominated（パスより悪い）。ロールアウトのノイズで選ばれるのを防ぐため、読みの候補から除外する。
+    // 例: 1ターン目に攻撃もできず脅威も無いのにエールを捨ててDebutを入れ替えるだけのバトン。
+    let pool = cands;
+    if (pending.type === 'main') {
+      const filtered = cands.filter((o) => !(o.kind === 'baton' && (hscores[o.id] ?? 0) < 0));
+      if (filtered.length > 0) pool = filtered;
+    }
     // 各候補を samples 回ロールアウトして平均（方策に揺らぎを入れ、脆い1本の偏りを打ち消す）。
     // 標本kは全候補で同じ乱数列（common random numbers）を使い、候補間の比較分散を抑える。
-    const scored = cands.map((opt) => {
+    const scored = pool.map((opt) => {
       let sum = 0; let n = 0;
       for (let k = 0; k < this.samples; k++) {
         const v = this._rolloutValue(engine, opt.id, this.samples > 1 ? createRng(0x9e37 + k * 2654435761) : null);

@@ -383,37 +383,37 @@ function scoreMainActions(engine, idx, pending, out) {
         const back = p.back[opt.backIndex];
         if (!back) break;
         const backRemain = engine.effectiveHp(back) - back.damage;
-        if (underLethal && backRemain > oppThreat && backRemain > centerRemain) score = 70;
-        // 育てた（エールを積んだ）センターは下げない＝攻撃機会とエール投資を捨てない。
-        // 安易な入替は「センターが瀕死かつ実質エール無し」のときだけ。
-        // ただし「HPが低いだけ」では退かない: 残せば有効な攻撃（特に相手をKO）できる前衛は、退避でエールを捨てて
-        // 攻撃機会を失う方が損なので退かない（＝HP低下のみを理由にしたバトンは論理的でない）。
+        // バトンの「正当な理由」による便益。理由が無ければ benefit=0（＝この後コストを引いて負になる）。
+        let benefit = 0;
+        if (underLethal && backRemain > oppThreat && backRemain > centerRemain) benefit = 70;
+        // 育てた（エールを積んだ）センターは下げない。安易な入替は「センターが瀕死かつ実質エール無し」のときだけ。
+        // ただし「HPが低いだけ」では退かない: 残せば有効な攻撃（特に相手をKO）できる前衛は退かない。
         else if (centerRemain <= 40 && backRemain > centerRemain + 30 && (p.center.cheers || []).length <= 1) {
           const centerOff = bestPayableEffDmg(engine, p.center, idx);
           const canKO = opp.center && centerOff >= (engine.effectiveHp(opp.center) - opp.center.damage);
-          if (centerOff < 30 && !canKO) score = 35; // 攻撃価値の無い置物のときだけ退避
+          if (centerOff < 30 && !canKO) benefit = 35; // 攻撃価値の無い置物のときだけ退避
         }
         else {
-          // 明確に強いアタッカーがアクティブなバックにいるなら、センターへ据えて毎ターン殴る
-          // （コラボは毎リセットで休むため、大技要員はセンターで継続攻撃させたい）。
+          // 明確に強いアタッカーがアクティブなバックにいるなら、センターへ据えて毎ターン殴る。
           const backOff = bestPayableEffDmg(engine, back, idx);
           const centerOff = bestPayableEffDmg(engine, p.center, idx);
-          // ただし「大技に向けてエール投資が進んでいるセンター」はバトンで捨てない（バトンコストでエールを失う＝無駄打ちの原因）。
+          // 「大技に向けてエール投資が進んでいるセンター」はバトンで捨てない。
           const centerInvesting = (p.center.cheers || []).length >= 2 && (p.center.stack[0].arts || []).some((a) => {
             const need = a.cost.length || 0; if (need === 0) return false;
             const unmet = unmetCost(p.center.cheers, a.cost);
-            return unmet > 0 && (need - unmet) / need >= 0.5 && (a.dmg || 0) >= backOff; // 半分以上投資済みで、バック火力以上の大技
+            return unmet > 0 && (need - unmet) / need >= 0.5 && (a.dmg || 0) >= backOff;
           });
-          if (!back.rested && backOff >= centerOff + 60 && !centerInvesting) score = 30;
+          if (!back.rested && backOff >= centerOff + 60 && !centerInvesting) benefit = 30;
         }
-        // バトンコストで捨てる「有用エール」のぶんを損として差し引く（貯めたエールの無駄捨てを論理的に抑制）。
-        if (score > 0) {
-          const cArts = p.center.stack[0].arts || [];
-          const cap = Math.max(0, ...cArts.map((a) => (a.cost || []).length));
-          const usefulOnCenter = Math.min((p.center.cheers || []).length, cap);
-          const batonCostLen = (p.center.stack[0].batonTouch || []).length;
-          score -= Math.min(batonCostLen, usefulOnCenter) * 8;
-        }
+        // バトンは「センターのエールをコスト払い＋攻撃役の入替」。正当な理由が無ければエールを捨てるだけの損。
+        // ① 捨てる有用エールのコストは常に差し引く（理由の有無に関わらず実損）。
+        // ② 理由がゼロのバトン（攻撃もできない/脅威も無いのに入替＝1ターン目の無駄バトン等）は基礎ペナルティで明確に負へ。
+        const cArts = p.center.stack[0].arts || [];
+        const cap = Math.max(0, ...cArts.map((a) => (a.cost || []).length));
+        const usefulOnCenter = Math.min((p.center.cheers || []).length, cap);
+        const batonCostLen = (p.center.stack[0].batonTouch || []).length;
+        const cheerCost = Math.min(batonCostLen, usefulOnCenter) * 10;
+        score = benefit - cheerCost - (benefit > 0 ? 0 : 10);
         break;
       }
       case 'oshiSkill': {
