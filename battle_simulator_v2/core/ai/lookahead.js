@@ -25,7 +25,7 @@
 import { HeuristicAI } from './heuristic.js';
 import { evaluateState } from './evaluate.js';
 import { reconstruct } from './rollout.js';
-import { scoreOptions, bestOptionId, isDevelopSupport } from './score.js';
+import { scoreOptions, bestOptionId, isDevelopSupport, isFreePlaySupport } from './score.js';
 import { createRng } from '../rng.js';
 
 // ロールアウト評価が「ほぼ互角」とみなす差（この範囲内の候補は、ヒューリスティック事前評価で優劣を割る）。
@@ -67,6 +67,20 @@ export class LookaheadAI {
     // ※ドロー/サーチ主体の支援は「デッキ切れの綱引き」があるため貪欲にせず先読みの判断に委ねる。
     if (pending.type === 'main') {
       const me = s.players[this.playerIdx];
+      // #2/#3: 純粋なドロー/サーチ支援(のどか等=メリットしかない)は「先に」使って手札・情報を増やす（選択肢を増やしてから戦術判断）。
+      // ただし守るべき制約: (a) 山が薄い時(<=8)は引き過ぎ＝デッキ切れを避けるため強制せず先読みに委ねる。
+      //   (b) LIMITEDは1ターン1枚。タイミングが重要なLIMITED(じゃあ敵だね等=フリープレイでないLIMITED)が手札にある時は、
+      //       その枠を貪欲に消費しない（使い時を先読みに委ねる）。＝純粋ドローでも枠を奪わない。
+      const hasTacticalLimited = cands.some((o) => o.kind === 'support' && me.hand[o.handIndex]?.limited
+        && !isFreePlaySupport(engine, me.hand[o.handIndex]));
+      const freeDraw = cands.find((o) => {
+        if (o.kind !== 'support') return false;
+        const c = me.hand[o.handIndex];
+        if (!c || !isFreePlaySupport(engine, c)) return false;
+        if (c.limited && hasTacticalLimited) return false; // LIMITED枠の取り合いは先読みに委ねる
+        return true;
+      });
+      if (freeDraw && me.deck.length > 8) return freeDraw.id;
       // 発展支援(ふつうのパソコン等)を place より先に（盤面が埋まって canUse を満たせなくなる前に使う）。
       const devSup = cands.find((o) => o.kind === 'support' && me.hand[o.handIndex] && isDevelopSupport(engine, me.hand[o.handIndex]));
       if (devSup) return devSup.id;
