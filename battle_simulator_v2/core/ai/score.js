@@ -475,18 +475,27 @@ function cardGainValue(engine, idx, card) {
     let v = holomenValue(card);
     const order = { Debut: 0, Spot: 0, '1st': 1, '2nd': 2 };
     const lvl = order[card.bloomLevel] ?? 0;
+    const sameName = (a, b) => engine._nameIs(a, b.name) || engine._nameIs(b, a.name);
+    const bodies = engine._stageCount(p);
     if (lvl === 0) {
-      // Debut/Spot は手札からそのまま盤面に出せる。盤面が薄いなら展開価値を上げる（最優先で展開）。
-      if (engine._stageCount(p) < 4) v += 30;
+      // Debut/Spot は手札からそのまま盤面に出せる＝土台/壁の確保。
+      // 盤面が薄いほど不足＝価値↑。ほぼ埋まっていれば余剰＝価値↓（足りているDebutをわざわざ持ってこない）。
+      if (bodies < 4) v += 30;
+      else if (bodies >= 5) v *= 0.5;
     } else {
-      // 1st/2nd は「今ブルームできる同名の土台（より低いBloomレベルのホロメン）」が盤面に無ければ
-      // 手札で出せず腐る＝即戦力でない。価値を大きく下げ、出せるDebut等を優先して取らせる。
+      // 1st/2nd は「今ブルームできる同名の土台（より低いBloomレベル）」が盤面に無ければ手札で腐る＝即戦力でない。
       const hasBase = engine._stageHolomems(p).some((h) => {
         const t = h.stack[0];
-        const tl = order[t.bloomLevel] ?? 0;
-        return tl < lvl && (engine._nameIs(t, card.name) || engine._nameIs(card, t.name));
+        return (order[t.bloomLevel] ?? 0) < lvl && sameName(t, card);
       });
-      if (!hasBase) v *= 0.3;
+      if (!hasBase) {
+        v *= 0.3; // 土台が無く今は出せない
+      } else {
+        // 土台あり＝即戦力。ただし同名のブルーム札を既に手札に持っているなら冗長＝価値↓（足りているものは持ってこない）。
+        const dupInHand = p.hand.some((c) => c !== card && c.kind === 'holomen'
+          && (order[c.bloomLevel] ?? 0) >= 1 && sameName(c, card));
+        if (dupInHand) v *= 0.6;
+      }
     }
     return v;
   }

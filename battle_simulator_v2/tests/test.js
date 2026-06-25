@@ -2525,6 +2525,21 @@ export async function runTests() {
     assert((sc.baton0 ?? 0) <= 0, `KOできる低HP前衛をHP理由で退避すべきでない (baton=${sc.baton0})`);
   });
 
+  await testAsync('AI火力見積り: ステージの色数スケール（孔雀の舞型「1色につき+N」）を評価できる', async () => {
+    const e = await setupMainStep(deckMap, 58);
+    const p0 = e.state.players[0];
+    const C = (c) => ({ number: 'c' + c, name: c, kind: 'cheer', color: c });
+    const art = { name: '孔雀風', dmg: 50, cost: [], tokkou: [], text: '自分のステージのエール1色につき、このアーツ+20。' };
+    const mk = { number: 'PEA', name: 'PEA', kind: 'holomen', bloomLevel: '2nd', hp: 200, color: '緑', tags: [], arts: [art], keywords: [] };
+    p0.center = e._createHolomem(mk, 0); p0.collab = null; p0.back = [];
+    p0.center.cheers = [C('緑'), C('緑'), C('緑')];          // 1色（同色を重ねても色数は1）
+    const one = e._artEffectiveDamage(p0.center, art, 0);
+    p0.center.cheers = [C('緑'), C('赤'), C('青')];          // 3色（散らすと色数3）
+    const three = e._artEffectiveDamage(p0.center, art, 0);
+    assert(three > one, `色数が多いほど見積り火力が高いはず＝色を散らす価値を評価できる (1色=${one}, 3色=${three})`);
+    assertEq(one, 70, '1色なら 50+20'); assertEq(three, 110, '3色なら 50+60');
+  });
+
   await testAsync('AI選択: デッキ→手札では「今出せるDebut」を、土台の無い大型(1st/2nd)より優先する', async () => {
     const e = await setupMainStep(deckMap, 57);
     const p0 = e.state.players[0];
