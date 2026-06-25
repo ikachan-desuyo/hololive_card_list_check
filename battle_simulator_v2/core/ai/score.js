@@ -473,8 +473,21 @@ function cardGainValue(engine, idx, card) {
   const p = engine.state.players[idx];
   if (card.kind === 'holomen') {
     let v = holomenValue(card);
-    // 盤面が薄いときは、すぐ置けるDebutの価値を上げる（展開を優先）
-    if (engine._stageCount(p) < 4 && card.bloomLevel === 'Debut') v += 30;
+    const order = { Debut: 0, Spot: 0, '1st': 1, '2nd': 2 };
+    const lvl = order[card.bloomLevel] ?? 0;
+    if (lvl === 0) {
+      // Debut/Spot は手札からそのまま盤面に出せる。盤面が薄いなら展開価値を上げる（最優先で展開）。
+      if (engine._stageCount(p) < 4) v += 30;
+    } else {
+      // 1st/2nd は「今ブルームできる同名の土台（より低いBloomレベルのホロメン）」が盤面に無ければ
+      // 手札で出せず腐る＝即戦力でない。価値を大きく下げ、出せるDebut等を優先して取らせる。
+      const hasBase = engine._stageHolomems(p).some((h) => {
+        const t = h.stack[0];
+        const tl = order[t.bloomLevel] ?? 0;
+        return tl < lvl && (engine._nameIs(t, card.name) || engine._nameIs(card, t.name));
+      });
+      if (!hasBase) v *= 0.3;
+    }
     return v;
   }
   if (card.kind === 'support') return supportValue(engine, p, card);

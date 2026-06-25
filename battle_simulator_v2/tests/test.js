@@ -2525,6 +2525,23 @@ export async function runTests() {
     assert((sc.baton0 ?? 0) <= 0, `KOできる低HP前衛をHP理由で退避すべきでない (baton=${sc.baton0})`);
   });
 
+  await testAsync('AI選択: デッキ→手札では「今出せるDebut」を、土台の無い大型(1st/2nd)より優先する', async () => {
+    const e = await setupMainStep(deckMap, 57);
+    const p0 = e.state.players[0];
+    // 盤面は薄い＝別名のセンターのみ（AZKiの土台は無い）
+    p0.center = e._createHolomem(fakeHolomen({ name: 'ほかのこ' }), 1); p0.collab = null; p0.back = [];
+    const debut = { number: 'AZd', name: 'AZKi', kind: 'holomen', bloomLevel: 'Debut', hp: 100, tags: [], arts: [{ name: 'a', dmg: 30, cost: [], tokkou: [] }], keywords: [] };
+    const second = { number: 'AZs', name: 'AZKi', kind: 'holomen', bloomLevel: '2nd', hp: 220, tags: [], arts: [{ name: 'b', dmg: 180, cost: [], tokkou: [] }], keywords: [] };
+    const mkPending = () => ({ type: 'effectChoice', player: 0, request: { kind: 'chooseCard', intent: 'gain' },
+      options: [{ id: 'cD', card: debut, value: debut }, { id: 'cS', card: second, value: second }] });
+    let sc = scoreOptions(e, 0, mkPending());
+    assert(sc.cD > sc.cS, `土台の無い2ndより、すぐ出せるDebutを優先すべき (Debut=${sc.cD}, 2nd=${sc.cS})`);
+    // 同名Debutが盤面にある（=2ndの土台がある）なら、2ndは腐らないので高評価でよい
+    p0.back = [e._createHolomem({ number: 'AZd2', name: 'AZKi', kind: 'holomen', bloomLevel: 'Debut', hp: 100, tags: [], arts: [], keywords: [] }, 1)];
+    sc = scoreOptions(e, 0, mkPending());
+    assert(sc.cS > sc.cD, `土台がある時は大型(2nd)も即戦力＝高評価のはず (Debut=${sc.cD}, 2nd=${sc.cS})`);
+  });
+
   await testAsync('無色コスト判定: 無色は色指定なし（任意色で充足）／必要数を超えるエールは余剰として数えない', async () => {
     const e = await setupMainStep(deckMap, 56);
     const C = (color) => ({ number: 'c' + color, name: color, kind: 'cheer', color });
