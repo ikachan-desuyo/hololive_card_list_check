@@ -1485,6 +1485,17 @@ function handleAI(s) {
     try {
       const id = aiAgents[idx].choose(engine);
       if (id != null) engine.apply(id);
+      // 複数選択(chooseCards)はトグル＋確定を一気に解決する（1トグルごとに待つと遅いため）。
+      // トグルは内部操作なので待機を挟まず、選択完了まで同じtick内で進める。
+      let guard = 0;
+      while (engine.state.pending?.type === 'effectChoice' && engine.state.pending.multiSelect
+        && aiEnabled(engine.state.pending.player) && guard++ < 60) {
+        const aiP = engine.state.pending.player;
+        if (!aiAgents[aiP]) aiAgents[aiP] = lookaheadEnabled(aiP) ? new LookaheadAI(aiP, { turns: lookaheadTurns() }) : new HeuristicAI(aiP);
+        const nid = aiAgents[aiP].choose(engine);
+        if (nid == null) break;
+        engine.apply(nid);
+      }
     } catch (e) {
       console.error('AIの手の適用に失敗:', e);
     }
