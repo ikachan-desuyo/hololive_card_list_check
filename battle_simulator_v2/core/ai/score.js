@@ -584,8 +584,14 @@ function scoreEffect(engine, idx, pending, out) {
       const val = holomenValue(holomem.stack[0]);
       let score;
       if (opt.side === 'opp' || intent === 'damage') {
-        // 相手を狙う＝倒しやすい個体（残HP小）・センター優先
-        score = 120 - remain * 0.4;
+        // 相手を狙う。今ターン倒せる相手なら「脅威(火力)が最大の個体」を最優先で除去する＝再建しにくい主力2nd等を
+        // 恒久的に奪う（置物を倒すより遥かに有利。じゃあ敵だねで主力2ndを引きずり出して倒す等）。
+        // 倒せないなら従来どおり「最も削りやすい個体（残HP小）」。my火力＝この対象を狙える前衛(センター+コラボ)の今払える実効火力合計。
+        const me = engine.state.players[idx];
+        const myReach = [me.center, me.collab].filter(Boolean)
+          .reduce((s, h) => s + bestPayableEffDmg(engine, h, idx), 0);
+        if (remain > 0 && myReach >= remain) score = 200 + maxArtDmg(holomem.stack[0]) * 0.2; // 倒せる→脅威が大きいほど除去価値↑
+        else score = 120 - remain * 0.4; // 倒せない→削りやすい個体
         if (pos.zone === 'center') score += 10;
       } else if (intent === 'sacrifice' || intent === 'returnToDeck') {
         // 自分を失う系＝価値が低く負傷した個体を差し出し、主力を残す
