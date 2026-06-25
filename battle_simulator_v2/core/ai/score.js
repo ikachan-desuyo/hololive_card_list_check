@@ -364,7 +364,13 @@ function scoreMainActions(engine, idx, pending, out) {
         if (underLethal && backRemain > oppThreat && backRemain > centerRemain) score = 70;
         // 育てた（エールを積んだ）センターは下げない＝攻撃機会とエール投資を捨てない。
         // 安易な入替は「センターが瀕死かつ実質エール無し」のときだけ。
-        else if (centerRemain <= 40 && backRemain > centerRemain + 30 && (p.center.cheers || []).length <= 1) score = 35;
+        // ただし「HPが低いだけ」では退かない: 残せば有効な攻撃（特に相手をKO）できる前衛は、退避でエールを捨てて
+        // 攻撃機会を失う方が損なので退かない（＝HP低下のみを理由にしたバトンは論理的でない）。
+        else if (centerRemain <= 40 && backRemain > centerRemain + 30 && (p.center.cheers || []).length <= 1) {
+          const centerOff = bestPayableEffDmg(engine, p.center, idx);
+          const canKO = opp.center && centerOff >= (engine.effectiveHp(opp.center) - opp.center.damage);
+          if (centerOff < 30 && !canKO) score = 35; // 攻撃価値の無い置物のときだけ退避
+        }
         else {
           // 明確に強いアタッカーがアクティブなバックにいるなら、センターへ据えて毎ターン殴る
           // （コラボは毎リセットで休むため、大技要員はセンターで継続攻撃させたい）。

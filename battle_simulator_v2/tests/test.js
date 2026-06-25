@@ -2433,6 +2433,42 @@ export async function runTests() {
     assert(before > after, `盤面エールをアーカイブへ捨てると評価が下がるべき (before=${before}, after=${after})`);
   });
 
+  await testAsync('AI評価: アーカイブのエール回収手段を持つなら、捨てても損が小さい（回収予測を効果まで適用）', async () => {
+    // 同じ「アーカイブに紫3枚」でも、回収手段(FUWAMOCO推しの青条件＝アーカイブのエールを#Adventへ送る)を持つ側は高評価。
+    const reg = await buildRegistry(lib, deckMap);
+    const mkE = () => new Engine({ decks: [lib.buildGameDeck(deckMap), lib.buildGameDeck(deckMap)], seed: 60, names: ['A', 'B'], registry: reg });
+    const purple = () => ({ number: 'p', name: '紫', kind: 'cheer', color: '紫' });
+    // 回収手段なし
+    const e1 = mkE(); await e1.registry.preload(['hBP08-003'], lib);
+    e1.state.players[0].archive = [purple(), purple(), purple()];
+    const noRecover = evaluateState(e1, 0).parts.archiveCheer;
+    // 回収手段あり（FUWAMOCO推し＝アーカイブのエールを#Adventへ送る推しスキル）
+    const e2 = mkE();
+    e2.state.players[0].oshi = lib.getByNumber('hBP08-003');
+    e2.state.players[0].archive = [purple(), purple(), purple()];
+    const withRecover = evaluateState(e2, 0).parts.archiveCheer;
+    assert(withRecover > noRecover, `回収手段ありの方がアーカイブのエールを高く評価すべき (none=${noRecover}, recover=${withRecover})`);
+  });
+
+  await testAsync('AIバトン: HPが低いだけで、残せばKOできる前衛は退避しない（攻撃機会を捨てない）', async () => {
+    const e = await setupMainStep(deckMap, 61);
+    const p0 = e.state.players[0]; const p1 = e.state.players[1];
+    const blue = () => ({ number: 'b', name: '青', kind: 'cheer', color: '青' });
+    // 自センター: HP低（被ダメ大）だが、青2で40を払えてKOできる。バックに高HPの置物。
+    const atk = { number: 'ATKK', name: 'ATKK', kind: 'holomen', bloomLevel: '1st', hp: 150, color: '青', tags: [], arts: [{ name: 'a', dmg: 40, cost: ['青', '青'], tokkou: [] }], keywords: [] };
+    const wall = { number: 'WALL', name: 'WALL', kind: 'holomen', bloomLevel: '1st', hp: 150, color: '青', tags: [], arts: [{ name: 'w', dmg: 10, cost: ['青'], tokkou: [] }], keywords: [] };
+    p0.center = e._createHolomem(atk, 1); p0.center.cheers = [blue(), blue()]; p0.center.damage = 120; // 残HP30
+    p0.collab = null; p0.back = [e._createHolomem(wall, 1)]; // 高HP置物
+    // 相手センター: 残30（=自センターの40でKOできる）
+    const oppC = { number: 'OPP', name: 'OPP', kind: 'holomen', bloomLevel: '1st', hp: 120, color: '白', tags: [], arts: [], keywords: [] };
+    p1.center = e._createHolomem(oppC, 1); p1.center.damage = 90; p1.collab = null; p1.back = [];
+    const sc = scoreOptions(e, 0, { type: 'main', player: 0, options: [
+      { id: 'pass', kind: 'pass' },
+      { id: 'baton0', kind: 'baton', backIndex: 0 },
+    ] });
+    assert((sc.baton0 ?? 0) <= 0, `KOできる低HP前衛をHP理由で退避すべきでない (baton=${sc.baton0})`);
+  });
+
   await testAsync('AI評価: アーツのコストを超える余剰エールは資源として価値が無い（必要数までのみ評価）', async () => {
     const e = await setupMainStep(deckMap, 55);
     const p0 = e.state.players[0];
