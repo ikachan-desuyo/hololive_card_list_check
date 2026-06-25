@@ -60,13 +60,15 @@ function runGame(lib, dmA, dmB, registry, seed, turns) {
   const ais = [new LookaheadAI(0, { turns }), new LookaheadAI(1, { turns })];
   const m = {
     atk: [0, 0], atkTurns: [0, 0], koTurns: [0, 0], noAtkLate: [0, 0], strandFuel: [0, 0],
-    passedAtk: [0, 0], baton: [0, 0], maxCheers: [0, 0], lifeTaken: [0, 0],
+    passedAtk: [0, 0], baton: [0, 0], skipPlace: [0, 0], maxCheers: [0, 0], lifeTaken: [0, 0],
   };
   // ターンごとのパフォーマンス記録（最初の入場時に確定）
   const perfSeen = new Set();         // `${turn}_${player}` 入場済み
   const turnAttacked = new Set();     // 攻撃した
   const turnHadArt = new Set();       // 攻撃可能だった
   const turnKO = new Set();           // 相手ライフを削った（KO到達）ターン
+  const hadPlace = new Set();         // 盤面に空き(＜6)があり手札Debutを出せた（place選択肢あり）ターン
+  const didPlace = new Set();         // 実際にDebutを展開したターン
 
   let applies = 0; let prev = null; let same = 0; let prevSel = -1;
   const prevLife = [e.state.players[0].life.length, e.state.players[1].life.length];
@@ -95,6 +97,11 @@ function runGame(lib, dmA, dmB, registry, seed, turns) {
       if (chosen && chosen.kind === 'art') { m.atk[player]++; turnAttacked.add(key); }
     }
     if (pd.type === 'main' && player != null && chosen && chosen.kind === 'baton') m.baton[player]++;
+    if (pd.type === 'main' && player != null) {
+      const key = `${e.state.turn}_${player}`;
+      if (pd.options.some((o) => o.kind === 'place')) hadPlace.add(key); // 出せるDebutが手札にあり盤面に空き
+      if (chosen && chosen.kind === 'place') didPlace.add(key);
+    }
 
     // 停滞ガード（chooseCardsの複数applyは進捗とみなす）
     const selLen = pd.multiSelect ? pd.multiSelect.selected.length : -1;
@@ -123,6 +130,8 @@ function runGame(lib, dmA, dmB, registry, seed, turns) {
     else m.passedAtk[pl]++;
   }
   for (const key of turnKO) m.koTurns[Number(key.split('_')[1])]++;
+  // place選択肢があったのに展開しなかったターン（盤面に空きがあるのにDebutを出さない）
+  for (const key of hadPlace) if (!didPlace.has(key)) m.skipPlace[Number(key.split('_')[1])]++;
   for (let pl = 0; pl < 2; pl++) m.lifeTaken[pl] = 5 - e.state.players[1 - pl].life.length;
 
   // エンジンの公式勝者を使う（0/1/'draw'）。未終了は-2。
@@ -155,24 +164,24 @@ export async function runSelfplay() {
 
   console.log(`SP-START| ${nameA} vs ${nameB} / turns=${turns} / seeds=${seeds[0]}..${seeds[seeds.length - 1]}`);
   const agg = { wins: [0, 0], draws: 0, deckOut: 0, turnSum: 0,
-    atk: [0, 0], atkTurns: [0, 0], koTurns: [0, 0], noAtkLate: [0, 0], strandFuel: [0, 0], passedAtk: [0, 0], baton: [0, 0], maxCheers: [0, 0], lifeTaken: [0, 0] };
+    atk: [0, 0], atkTurns: [0, 0], koTurns: [0, 0], noAtkLate: [0, 0], strandFuel: [0, 0], passedAtk: [0, 0], baton: [0, 0], skipPlace: [0, 0], maxCheers: [0, 0], lifeTaken: [0, 0] };
   for (const seed of seeds) {
     const g = runGame(lib, dmA, dmB, registry, seed, turns);
     const m = g.m;
     if (g.winner === 0) agg.wins[0]++; else if (g.winner === 1) agg.wins[1]++; else agg.draws++;
     agg.deckOut += g.deckOut;
     agg.turnSum += g.turn;
-    for (let pl = 0; pl < 2; pl++) for (const k of ['atk', 'atkTurns', 'koTurns', 'noAtkLate', 'strandFuel', 'passedAtk', 'baton', 'lifeTaken']) agg[k][pl] += m[k][pl];
+    for (let pl = 0; pl < 2; pl++) for (const k of ['atk', 'atkTurns', 'koTurns', 'noAtkLate', 'strandFuel', 'passedAtk', 'baton', 'skipPlace', 'lifeTaken']) agg[k][pl] += m[k][pl];
     for (let pl = 0; pl < 2; pl++) agg.maxCheers[pl] = Math.max(agg.maxCheers[pl], m.maxCheers[pl]);
-    const fmt = (pl) => `atkT=${m.atkTurns[pl]} koT=${m.koTurns[pl]} noAtkLate=${m.noAtkLate[pl]} strand=${m.strandFuel[pl]} baton=${m.baton[pl]} maxCh=${m.maxCheers[pl]} life=${m.lifeTaken[pl]}`;
+    const fmt = (pl) => `atkT=${m.atkTurns[pl]} koT=${m.koTurns[pl]} noAtkLate=${m.noAtkLate[pl]} skipPlace=${m.skipPlace[pl]} baton=${m.baton[pl]} maxCh=${m.maxCheers[pl]} life=${m.lifeTaken[pl]}`;
     console.log(`SP-GAME| seed=${seed} win=${g.winner} turn=${g.turn} reason=${g.reason} || A[${fmt(0)}] || B[${fmt(1)}]`);
     if (full && seed === full) for (const line of g.detailLogs) console.log('SP-LOG| ' + line);
   }
   const n = seeds.length;
   const r1 = (x) => (x / n).toFixed(1);
   console.log(`SP-AGG| games=${n} winA=${agg.wins[0]} winB=${agg.wins[1]} draw=${agg.draws} deckOut=${agg.deckOut} avgTurn=${r1(agg.turnSum)}`);
-  console.log(`SP-AGG| A: atkTurns=${r1(agg.atkTurns[0])} koTurns=${r1(agg.koTurns[0])} noAtkLate=${r1(agg.noAtkLate[0])} strand=${r1(agg.strandFuel[0])} baton=${r1(agg.baton[0])} maxCheers=${agg.maxCheers[0]} lifeTaken=${r1(agg.lifeTaken[0])}`);
-  console.log(`SP-AGG| B: atkTurns=${r1(agg.atkTurns[1])} koTurns=${r1(agg.koTurns[1])} noAtkLate=${r1(agg.noAtkLate[1])} strand=${r1(agg.strandFuel[1])} baton=${r1(agg.baton[1])} maxCheers=${agg.maxCheers[1]} lifeTaken=${r1(agg.lifeTaken[1])}`);
+  console.log(`SP-AGG| A: atkTurns=${r1(agg.atkTurns[0])} koTurns=${r1(agg.koTurns[0])} noAtkLate=${r1(agg.noAtkLate[0])} strand=${r1(agg.strandFuel[0])} baton=${r1(agg.baton[0])} skipPlace=${r1(agg.skipPlace[0])} maxCheers=${agg.maxCheers[0]} lifeTaken=${r1(agg.lifeTaken[0])}`);
+  console.log(`SP-AGG| B: atkTurns=${r1(agg.atkTurns[1])} koTurns=${r1(agg.koTurns[1])} noAtkLate=${r1(agg.noAtkLate[1])} strand=${r1(agg.strandFuel[1])} baton=${r1(agg.baton[1])} skipPlace=${r1(agg.skipPlace[1])} maxCheers=${agg.maxCheers[1]} lifeTaken=${r1(agg.lifeTaken[1])}`);
   console.log('SELFPLAY DONE');
   return agg;
 }

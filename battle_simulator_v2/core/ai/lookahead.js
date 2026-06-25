@@ -60,6 +60,15 @@ export class LookaheadAI {
     if (!cands || cands.length === 0) return null;
     if (cands.length === 1) return cands[0].id;
 
+    // Debut/Spotの展開(place)は「未来のアタッカーの土台＝盤面」を作るほぼ無条件で正しい発展手
+    // （置いた次ターンからブルーム可能になる＝早く置くほど良い）。バックの素のDebutは評価上の価値が小さく、
+    // ノイズを含む5手ロールアウトでは「パス」と僅差になり展開を取りこぼすことがある。そこで place 選択肢が
+    // あれば先読みに掛けず貪欲に実行する（毎回の再入場で出せるDebutを全て展開してから戦術判断に入る）。
+    if (pending.type === 'main') {
+      const place = cands.find((o) => o.kind === 'place');
+      if (place) return place.id;
+    }
+
     // ヒューリスティックの事前評価（prior）。ロールアウトが僅差の時の「無駄手（負の値）」回避に使う。
     let hscores = {};
     try { hscores = scoreOptions(engine, this.playerIdx, pending) || {}; } catch { hscores = {}; }
