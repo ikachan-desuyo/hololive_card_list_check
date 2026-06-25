@@ -13,7 +13,7 @@ import { EffectRegistry } from '../core/effects/registry.js';
 import { EffectContext } from '../core/effects/context.js';
 import { compileCard } from '../core/effects/text-compiler.js';
 import { HeuristicAI } from '../core/ai/heuristic.js';
-import { evaluateState, WEIGHTS, incomingDamageToCenter, cheerBudgetThisTurn, opponentExtraCheerProjection, holomemBoardValue } from '../core/ai/evaluate.js';
+import { evaluateState, WEIGHTS, incomingDamageToCenter, cheerBudgetThisTurn, opponentExtraCheerProjection, holomemBoardValue, unmetCost } from '../core/ai/evaluate.js';
 import { scoreOptions, bestOptionId, holomenValue, isFreePlaySupport } from '../core/ai/score.js';
 import { reconstruct, evaluateCandidate } from '../core/ai/rollout.js';
 import { LookaheadAI } from '../core/ai/lookahead.js';
@@ -2523,6 +2523,30 @@ export async function runTests() {
       { id: 'baton0', kind: 'baton', backIndex: 0 },
     ] });
     assert((sc.baton0 ?? 0) <= 0, `KOできる低HP前衛をHP理由で退避すべきでない (baton=${sc.baton0})`);
+  });
+
+  await testAsync('無色コスト判定: 無色は色指定なし（任意色で充足）／必要数を超えるエールは余剰として数えない', async () => {
+    const e = await setupMainStep(deckMap, 56);
+    const C = (color) => ({ number: 'c' + color, name: color, kind: 'cheer', color });
+    // アーツコスト [青, 無色, 無色]（青1＋任意2）
+    const art = { name: 'a', dmg: 50, cost: ['青', '無色', '無色'], tokkou: [] };
+    const mk = () => ({ number: 'AT', name: 'AT', kind: 'holomen', bloomLevel: '1st', hp: 150, color: '青', tags: [], arts: [art], keywords: [] });
+    const h = e._createHolomem(mk(), 0);
+    // 青1のみ → 任意2枠が未充足で払えない（unmet=2）
+    h.cheers = [C('青')];
+    assert(!e._canPayCheers(h.cheers, art.cost), '青1だけで払えてはいけない（無色2枠が空）');
+    assertEq(unmetCost(h.cheers, art.cost), 2, '不足は2のはず');
+    // 青1＋赤1＋緑1 → 赤緑が無色枠を充足して払える（=無色は色指定なし）
+    h.cheers = [C('青'), C('赤'), C('緑')];
+    assert(e._canPayCheers(h.cheers, art.cost), '青赤緑（赤緑が無色枠を充足）で払えるべき');
+    assertEq(unmetCost(h.cheers, art.cost), 0, '充足のはず');
+    // 4枚目（余剰）は資源として数えない（必要数=コスト長3まで）
+    const p0 = e.state.players[0]; p0.center = e._createHolomem(mk(), 0); p0.collab = null; p0.back = [];
+    p0.center.cheers = [C('青'), C('赤'), C('緑')];
+    const exact = evaluateState(e, 0).parts.boardCheer;
+    p0.center.cheers = [C('青'), C('赤'), C('緑'), C('黄')];
+    const excess = evaluateState(e, 0).parts.boardCheer;
+    assertEq(excess, exact, '無色込みコスト長(3)を超える4枚目は余剰＝評価に影響しない');
   });
 
   await testAsync('AI評価: アーツのコストを超える余剰エールは資源として価値が無い（必要数までのみ評価）', async () => {
