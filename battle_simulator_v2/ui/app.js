@@ -1044,21 +1044,31 @@ function renderEffectChoiceModal(s) {
     modal.classList.remove('peek');
     document.getElementById('choice-restore').classList.remove('show');
   }
+  // 複数選択（chooseCards）: トグルで複数選んで確定。選択状態はエンジン側 pending.multiSelect が保持。
+  const ms = s.pending.multiSelect || null;
+  const countHint = ms ? `（${ms.selected.length}/${ms.min === ms.max ? ms.max : `${ms.min}〜${ms.max}`}枚選択）` : '';
   document.getElementById('choice-title').textContent =
-    `${s.players[s.pending.player].name}: ${s.pending.request.title || '選択してください'}`;
+    `${s.players[s.pending.player].name}: ${s.pending.request.title || '選択してください'}${countHint}`;
   const grid = document.getElementById('choice-grid');
   grid.innerHTML = '';
   const footer = document.getElementById('choice-footer');
   footer.innerHTML = '';
 
-  // 確定ボタン（カードをクリック→選択表示→確定、の2段階で誤クリックを防ぐ）
+  // 確定ボタン。単一選択: カードを選んでから確定。複数選択: 枚数条件を満たしたら確定可。
   const confirmBtn = document.createElement('button');
   confirmBtn.id = 'choice-confirm';
-  confirmBtn.textContent = '✔ 確定';
-  confirmBtn.disabled = selectedChoiceId == null;
-  confirmBtn.addEventListener('click', () => {
-    if (selectedChoiceId != null) engine.apply(selectedChoiceId);
-  });
+  if (ms) {
+    const okCount = ms.selected.length >= ms.min && ms.selected.length <= ms.max;
+    confirmBtn.textContent = `✔ 確定 (${ms.selected.length})`;
+    confirmBtn.disabled = !okCount;
+    confirmBtn.addEventListener('click', () => engine.apply('confirm'));
+  } else {
+    confirmBtn.textContent = '✔ 確定';
+    confirmBtn.disabled = selectedChoiceId == null;
+    confirmBtn.addEventListener('click', () => {
+      if (selectedChoiceId != null) engine.apply(selectedChoiceId);
+    });
+  }
 
   const hasCards = s.pending.options.some((o) => o.card);
   const displayCards = s.pending.request.displayCards || [];
@@ -1066,15 +1076,21 @@ function renderEffectChoiceModal(s) {
 
   // --- 上段: 選択可能なカード枠（カード以外の選択肢はフッターのボタンへ） ---
   for (const opt of s.pending.options) {
+    if (opt.confirm) continue; // 複数選択の確定は専用ボタンで出す
     if (opt.card) {
+      const selected = ms ? ms.selected.includes(opt.id) : (selectedChoiceId === opt.id);
       const c = document.createElement('div');
-      c.className = 'archive-grid-card selectable' + (selectedChoiceId === opt.id ? ' selected' : '');
+      c.className = 'archive-grid-card selectable' + (selected ? ' selected' : '');
       c.innerHTML = `<img src="${opt.card.imageUrl || ''}" alt="${escapeText(opt.card.name)}" loading="lazy"><div>${escapeText(opt.card.name)}</div>`;
       c.addEventListener('click', () => {
-        selectedChoiceId = opt.id;
-        for (const el of grid.querySelectorAll('.selected')) el.classList.remove('selected');
-        c.classList.add('selected');
-        confirmBtn.disabled = false;
+        if (ms) {
+          engine.apply(opt.id); // トグル（エンジンが選択状態を保持→再描画）
+        } else {
+          selectedChoiceId = opt.id;
+          for (const el of grid.querySelectorAll('.selected')) el.classList.remove('selected');
+          c.classList.add('selected');
+          confirmBtn.disabled = false;
+        }
       });
       grid.appendChild(c);
     } else {
@@ -1084,7 +1100,7 @@ function renderEffectChoiceModal(s) {
       footer.appendChild(btn);
     }
   }
-  if (hasCards) footer.appendChild(confirmBtn);
+  if (ms || hasCards) footer.appendChild(confirmBtn);
   // デッキサーチで選べる対象が無い場合の注記（デッキ確認のみ）
   if (isDeckSearch && !hasCards) {
     const note = document.createElement('div');

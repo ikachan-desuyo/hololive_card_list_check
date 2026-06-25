@@ -180,6 +180,31 @@ export class EffectContext {
   }
 
   /**
+   * 複数枚を「一度に」選ぶ（UIでトグル選択→確定。1枚ずつ確定を繰り返さない）。返り値は選んだカードの配列。
+   *   count 指定 → ちょうど count 枚（min=max=count）。min/max 指定 → 可変（例 0〜max枚=好きな枚数）。
+   * 使い方: const picked = yield ctx.chooseCards({ cards, count: 2, title: '手札を2枚デッキに戻す' });
+   *         const some  = yield ctx.chooseCards({ cards, min: 0, max: 3, title: '付け替えるエールを選択', intent: 'discard' });
+   * intent は単一選択 chooseCard と同じ（'gain'｜'discard' 等。AIの選別に使う）。
+   */
+  chooseCards({ cards, count = undefined, min = undefined, max = undefined, title, intent = undefined, displayCards = [] }) {
+    const n = cards.length;
+    let lo = count != null ? count : (min != null ? min : 0);
+    let hi = count != null ? count : (max != null ? max : n);
+    lo = Math.max(0, Math.min(lo, n));
+    hi = Math.max(lo, Math.min(hi, n));
+    return {
+      kind: 'chooseCards',
+      player: this.playerIdx,
+      title,
+      intent,
+      min: lo,
+      max: hi,
+      displayCards: displayCards.filter((c) => !cards.includes(c)),
+      buildOptions: () => cards.map((c, i) => ({ id: `card_${i}`, label: c.name, card: c, value: c })),
+    };
+  }
+
+  /**
    * カードの並び順をプレイヤーに決めさせるフロー（「好きな順でデッキの下に戻す」等）。
    * 1枚ずつ「次に置くカード」を選ぶ。「この順のまま」も選べる。
    * 使い方: const ordered = yield* ctx.orderCardsFlow(cards, 'デッキの下に戻す順番');

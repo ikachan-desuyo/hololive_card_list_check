@@ -80,19 +80,15 @@ export default {
         });
         if (!target) return;
 
-        // 好きな枚数（このホロメンの青エールの数まで・0枚で打ち切り可）を1枚ずつ付け替える
-        while (true) {
-          const blueCheers = (self.cheers || []).filter(isBlue);
-          if (blueCheers.length === 0) break;
-          const picked = yield ctx.chooseCard({
-            cards: blueCheers,
-            title: `付け替える青エールを選択（残り${blueCheers.length}枚・任意）`,
-            optional: true,
-            skipLabel: 'ここまでにする',
-          });
-          if (!picked) break;
-          ctx.moveCheer(picked, self, target.holomem);
-        }
+        // 好きな枚数（このホロメンの青エールの数まで・0枚可）を「一度に」選んで付け替える
+        const blueCheers = (self.cheers || []).filter(isBlue);
+        const picked = yield ctx.chooseCards({
+          cards: blueCheers,
+          min: 0,
+          max: blueCheers.length,
+          title: '付け替える青エールを選択（好きな枚数）',
+        });
+        for (const c of (picked || [])) ctx.moveCheer(c, self, target.holomem);
       },
     },
   },

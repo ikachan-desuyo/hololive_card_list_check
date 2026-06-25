@@ -637,6 +637,42 @@ export async function runTests() {
     assert(gd.oshi && gd.oshi.oshiStageText && gd.oshi.oshiStageText.length > 0, 'buildGameDeck の oshi に oshiStageText が無い');
   });
 
+  await testAsync('複数選択 chooseCards: 一度にトグル選択→確定で配列が返る（枚数上限・確定ガード）', async () => {
+    const e = await setupMainStep(deckMap, 80);
+    const pool = [{ number: 'A', name: 'A', kind: 'support' }, { number: 'B', name: 'B', kind: 'support' }, { number: 'C', name: 'C', kind: 'support' }];
+    let result = null;
+    e._runEffect({ run: function* (ctx) { result = yield ctx.chooseCards({ cards: pool, count: 2, title: '2枚選ぶ' }); } }, { playerIdx: 0 }, () => {});
+    assert(e.state.pending?.type === 'effectChoice' && e.state.pending.multiSelect, '複数選択pendingになっていない');
+    assertEq(e.state.pending.multiSelect.max, 2, 'max=2 になっていない');
+    e.apply('confirm'); assertEq(result, null, '0枚では確定できてはいけない');
+    e.apply('card_0'); e.apply('card_2'); // A,C をトグル選択
+    e.apply('card_1'); // 上限2を超える追加は無視される
+    assertEq(e.state.pending.multiSelect.selected.length, 2, '上限2を超えて選べてはいけない');
+    e.apply('card_2'); // 再トグルで C を解除
+    assertEq(e.state.pending.multiSelect.selected.length, 1, '再トグルで解除されるべき');
+    e.apply('card_2'); // もう一度 C を選択
+    e.apply('confirm');
+    assert(Array.isArray(result) && result.length === 2, '2枚が配列で返るべき');
+    assert(result.includes(pool[0]) && result.includes(pool[2]), '選んだ A と C が返るべき');
+  });
+
+  await testAsync('複数選択 chooseCards: AIが価値の高い2枚を選んで確定できる(gain)', async () => {
+    const e = await setupMainStep(deckMap, 81);
+    // 価値差のある候補（ホロメン/サポートの cardGainValue 差で選別される想定）
+    const good = lib.getByNumber('hBP04-043') || { number: 'G', name: 'G', kind: 'holomen', arts: [], tags: [] };
+    const pool = [good, { number: 'X', name: 'X', kind: 'support' }, good];
+    let result = null;
+    e._runEffect({ run: function* (ctx) { result = yield ctx.chooseCards({ cards: pool, min: 0, max: 2, title: '得る', intent: 'gain' }); } }, { playerIdx: 0 }, () => {});
+    let guard = 0;
+    while (e.state.pending?.type === 'effectChoice' && e.state.pending.multiSelect && guard++ < 10) {
+      const id = bestOptionId(e, 0);
+      if (id == null) break;
+      e.apply(id);
+    }
+    assert(Array.isArray(result), 'AIが複数選択を解決して配列を返すべき');
+    assert(result.length <= 2, 'maxを超えて選んでいない');
+  });
+
   await testAsync('hBP08-003 推しスキル: 赤エール(青扱い)で青条件が成立し、アーカイブのエールを#Adventに送れる', async () => {
     const e = await setupMainStep(deckMap, 194);
     await e.registry.preload(['hBP08-003'], lib);
@@ -712,9 +748,9 @@ export async function runTests() {
     assertEq(ctx.artBonus, 60, '付け替え前の青エール3枚で+60が確定していない');
     r = gen.next(true);             // confirm yes → 先(フワワ)選択
     const pick = r.value.buildOptions().find((o) => o.value);
-    r = gen.next(pick.value);       // → 付け替える青エール選択
+    r = gen.next(pick.value);       // → 付け替える青エールを一度に選択(chooseCards)
     const blue = r.value.buildOptions().find((o) => o.value);
-    gen.next(blue.value);           // 青1枚をフワワへ移動
+    gen.next([blue.value]);          // 青1枚をフワワへ移動（chooseCardsは配列で返す）
     assertEq(ctx.artBonus, 60, '付け替え後に+20が減っている（順序バグ）');
     assertEq(mokoko.cheers.filter((c) => c.color === '青').length, 2, '青エールが1枚フワワへ移っていない');
   });
@@ -2236,7 +2272,7 @@ export async function runTests() {
         const e = new Engine({ decks: [lib.buildGameDeck(dm), lib.buildGameDeck(dm)], seed, names: ['A', 'B'], registry: reg });
         e.start();
         const ais = [new HeuristicAI(0), new HeuristicAI(1)];
-        let applies = 0; let prev = null; let sameCount = 0;
+        let applies = 0; let prev = null; let sameCount = 0; let prevSel = -1;
         while (e.state.phase !== 'ended' && applies < 8000) {
           const pending = e.state.pending;
           if (!pending) { issues.push(`${n} seed=${seed}: pending無で未終了`); break; }
@@ -2244,7 +2280,11 @@ export async function runTests() {
           try { id = pending.player == null ? pending.options[0].id : ais[pending.player].choose(e); }
           catch (err) { issues.push(`${n} seed=${seed}: choose例外 type=${pending.type} req=${pending.request?.kind}: ${err.message}`); break; }
           if (id == null) { issues.push(`${n} seed=${seed}: choose=null type=${pending.type} req=${pending.request?.kind} opts=${pending.options?.length}`); break; }
-          if (pending === prev) { if (++sameCount > 5) { issues.push(`${n} seed=${seed}: 同一pending停滞 type=${pending.type} req=${pending.request?.kind} id=${id}`); break; } } else { sameCount = 0; prev = pending; }
+          // 複数選択(chooseCards)は同一pendingで複数回applyするのが正当。選択枚数が変われば進捗とみなす。
+          const selLen = pending.multiSelect ? pending.multiSelect.selected.length : -1;
+          const stalled = pending === prev && !(pending.multiSelect && selLen !== prevSel);
+          if (stalled) { if (++sameCount > 5) { issues.push(`${n} seed=${seed}: 同一pending停滞 type=${pending.type} req=${pending.request?.kind} id=${id}`); break; } } else { sameCount = 0; prev = pending; }
+          prevSel = selLen;
           try { e.apply(id); } catch (err) { issues.push(`${n} seed=${seed}: apply例外 type=${pending.type} id=${id}: ${err.message}`); break; }
           applies++;
         }

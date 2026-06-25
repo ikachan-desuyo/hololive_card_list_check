@@ -492,6 +492,22 @@ export class Engine {
     this._stepEffect(gen, undefined, done);
   }
 
+  /** 複数選択(chooseCards)の決定ポイントへの apply: トグルで選択を出し入れ、confirm で確定して配列で resume。 */
+  _applyMultiSelect(pending, action) {
+    const ms = pending.multiSelect;
+    // 注意: apply() は実行前に state.pending=null 済み。トグル/確定不可では同じ決定ポイントを維持するため pending を戻す。
+    if (action.confirm || action.id === 'confirm') {
+      if (ms.selected.length < ms.min || ms.selected.length > ms.max) { this.state.pending = pending; return; } // 枚数未充足→選択継続
+      const byId = new Map(pending.options.map((o) => [o.id, o.value]));
+      pending.resume(ms.selected.map((id) => byId.get(id))); // 確定→配列で再開（次のpendingはresume側で設定）
+      return;
+    }
+    const i = ms.selected.indexOf(action.id);
+    if (i >= 0) ms.selected.splice(i, 1); // 選択解除
+    else if (ms.selected.length < ms.max) ms.selected.push(action.id); // 上限まで選択追加
+    this.state.pending = pending; // 同じ複数選択の決定ポイントを継続
+  }
+
   _stepEffect(gen, input, after) {
     let r;
     try {
@@ -514,6 +530,23 @@ export class Engine {
       return;
     }
     const options = request.buildOptions();
+    // 複数選択（一度にトグルで選んで確定）: chooseCards。1枚ずつ確定を繰り返さない。
+    if (request.kind === 'chooseCards') {
+      const max = Math.min(request.max, options.length);
+      const min = Math.min(request.min, options.length);
+      if (options.length === 0 || max === 0) { this._stepEffect(gen, [], after); return; } // 選ぶ対象なし
+      if (min === options.length) { this._stepEffect(gen, options.map((o) => o.value), after); return; } // 全部取る以外ない
+      this.state.pending = {
+        type: 'effectChoice',
+        player: request.player,
+        request,
+        options: [...options, { id: 'confirm', label: '✔ 確定', confirm: true }],
+        multiSelect: { min, max, selected: [] }, // selected = 選択したオプションid配列
+        resume: (cards) => this._stepEffect(gen, cards, after),
+      };
+      this.onChange();
+      return;
+    }
     // デッキサーチで確認枠がある場合は、対象が無くても（skipのみ）デッキを見せるためモーダルを表示する
     const showDeckView = request.deckSearch && (request.displayCards || []).length > 0;
     const onlySkip = options.length === 1 && options[0].id === 'skip';
@@ -1406,7 +1439,8 @@ export class Engine {
         pending.next(action.value);
         break;
       case 'effectChoice':
-        pending.resume(action.value);
+        if (pending.multiSelect) this._applyMultiSelect(pending, action);
+        else pending.resume(action.value);
         break;
       case 'main':
         this._executeMainAction(action);

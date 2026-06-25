@@ -491,6 +491,22 @@ function cardGainValue(engine, idx, card) {
 function scoreEffect(engine, idx, pending, out) {
   const req = pending.request || {};
   const kind = req.kind;
+  // 複数選択(chooseCards): 望ましいカードをトグルで選び、枚数条件を満たしたら確定。
+  // intent: gain=価値の高いものを選ぶ / discard・sacrifice・returnToDeck=価値の低い（不要な）ものを選ぶ。
+  if (kind === 'chooseCards') {
+    const ms = pending.multiSelect || { min: 0, max: pending.options.length, selected: [] };
+    const discard = req.intent === 'discard' || req.intent === 'sacrifice' || req.intent === 'returnToDeck';
+    const wantOf = (card) => {
+      const v = cardGainValue(engine, idx, card);
+      return discard ? -v : v; // 捨てる系は不要なカードほど選びたい
+    };
+    for (const opt of pending.options) {
+      if (opt.confirm) { out[opt.id] = ms.selected.length >= ms.min ? 0 : -Infinity; continue; }
+      if (ms.selected.includes(opt.id) || ms.selected.length >= ms.max) { out[opt.id] = -Infinity; continue; }
+      out[opt.id] = wantOf(opt.card); // 正なら確定(0)より優先して選ぶ／満たしたら確定が勝つ
+    }
+    return;
+  }
   if (kind === 'confirm') {
     // カード定義 ai.confirmValue があれば発動価値を計算（負なら見送り）。無ければ既定で発動。
     const cdef = req.sourceNumber ? engine.registry.get(req.sourceNumber) : null;
