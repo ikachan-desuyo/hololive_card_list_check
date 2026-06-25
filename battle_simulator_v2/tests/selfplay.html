@@ -1,0 +1,21 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8">
+  <title>CPU自己対戦ハーネス</title>
+</head>
+<body>
+  <h1>🤖 CPU自己対戦（AI改善ループ計測）</h1>
+  <pre id="out">実行中...</pre>
+  <script type="module">
+    import { runSelfplay } from './selfplay.js';
+    runSelfplay().then(() => {
+      document.getElementById('out').textContent = '完了';
+      document.title = 'SELFPLAY-DONE';
+    }).catch((e) => {
+      console.error('SELFPLAY FAILED', e);
+      document.getElementById('out').textContent = '失敗: ' + e.message;
+    });
+  </script>
+</body>
+</html>

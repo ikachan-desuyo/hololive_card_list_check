@@ -34,7 +34,16 @@ export const WEIGHTS = {
   lethalChanceToOpp: 55, // 自分が相手センターを倒し得る
   noBoard: -2000, // ステージにホロメンが居ない（実質敗北）
   noCenter: -40, // センターが空（バックから補充が要る／攻撃を受けやすい）
+  deckOut: 2.5, // 山札が薄い時の危険度1につき（デッキ切れ=敗北条件。終盤の引き過ぎ/churnの自滅を抑制）
 };
+
+/** 山札の薄さによるデッキ切れ危険度（12枚未満で二次関数的に増大。0枚≒敗北級）。
+ *  ドロー自体は有益（手札上限なし）だが、山が薄い時の引き過ぎはデッキ切れ負けに直結する＝そこだけ抑制する。 */
+function deckOutRisk(deckLen) {
+  if (deckLen >= 12) return 0;
+  const d = 12 - deckLen; // 1..12
+  return d * d;           // 1..144
+}
 
 /** カード（ホロメンカード）の最大アーツ火力（素点。特攻・修正は含まない目安） */
 export function maxArtDmg(card) {
@@ -53,7 +62,11 @@ export function canActNow(engine, h) {
  * 脅威は「今のエールで撃てる実効火力」を主に評価する。エールが無くて撃てない大型ホロメンは
  * 火力上限(maxArtDmg)を満額では数えず、潜在ぶんを軽く見るだけ（＝燃料の無い2ndだらけの盤面を過大評価しない）。
  */
-export function holomemBoardValue(engine, h, idx, attackSoon = true) {
+export function holomemBoardValue(engine, h, idx, attackWeight = 1) {
+  // attackWeight: 「攻撃に使える度合い」。センター=1.0（毎ターン殴れる持続的アタッカー）/ コラボ=0.7（今ターンは
+  // 殴れるが次の自ターン開始時にお休み＝攻撃は1回限り）/ バック・お休み=0.4（今は殴れない）。
+  // 後方互換: 真偽値も受ける（true=1.0 / false=0.4）。
+  const aw = attackWeight === true ? 1 : attackWeight === false ? 0.4 : attackWeight;
   const top = h.stack[0];
   const hpRemain = Math.max(0, engine.effectiveHp(h) - h.damage);
   // 今払えるアーツの火力（payable）と、まだ払えないが「エール投資が進んでいる大技」の到達度つき価値（reaching）。
@@ -73,11 +86,11 @@ export function holomemBoardValue(engine, h, idx, attackSoon = true) {
   if (payableDmg > 0) payableDmg += Math.max(0, engine.effects.artsBonus(h, idx));
   const potential = maxArtDmg(top); // エールを足せば届く火力上限（薄い将来性）
   let threat = payableDmg + reaching * 0.4 + potential * 0.1;
-  // 1ターンに殴れるのは前衛(センター+コラボ)だけ。バック/お休みのホロメンに火力を盛っても今は使えないので、
-  // 攻撃価値は将来ぶんに割り引く（＝「弱い体に薄く広げる」より「前衛を強くする」方を高く評価する）。
-  if (!attackSoon) threat *= 0.4;
+  // 攻撃に使える度合いで割り引く。コラボ(0.7)はセンター(1.0)より低い＝「次ターンも殴れるセンター」に主力を据える盤面を
+  // 高く評価する（コラボに置きっぱなしの本命は毎ターン休んで手数が落ちるため）。バック/お休み(0.4)は今は使えない。
+  threat *= aw;
   let v = hpRemain * WEIGHTS.hpRemain + threat * WEIGHTS.threat;
-  if (payableDmg > 0 && attackSoon) v += WEIGHTS.ready; // 今すぐ攻撃に使える
+  if (payableDmg > 0 && aw >= 0.7) v += WEIGHTS.ready * (aw >= 1 ? 1 : 0.7); // 今すぐ攻撃に使える（センター優位）
   return v;
 }
 
@@ -127,8 +140,9 @@ export function boardPower(engine, p, idx) {
   const mems = engine._stageHolomems(p);
   let power = 0;
   for (const h of mems) {
-    const attackSoon = (h === p.center || h === p.collab) && !h.rested; // 今ターン攻撃に使える前衛か
-    power += holomemBoardValue(engine, h, idx, attackSoon);
+    // センター=1.0（毎ターン殴れる）／コラボ=0.7（今ターンのみ・次は休む）／バック・お休み=0.4。
+    const aw = h.rested ? 0.4 : h === p.center ? 1 : h === p.collab ? 0.7 : 0.4;
+    power += holomemBoardValue(engine, h, idx, aw);
   }
   if (p.center && !p.center.rested) power += WEIGHTS.centerActive;
   if (p.collab && !p.collab.rested) power += WEIGHTS.collabActive;
@@ -313,6 +327,9 @@ export function evaluateState(engine, idx) {
   // 6) 継続攻撃力: 最大火力のホロメンがコラボにいると次のリセットで休む＝来ターン殴れない。
   //    大技要員はセンター（持続）に据えるべき、という方向に評価を寄せる（自分は減点・相手は加点）。
   parts.persistence = -collabRestPenalty(engine, me, idx) + collabRestPenalty(engine, opp, 1 - idx);
+
+  // 7) デッキ切れリスク（薄い山札での引き過ぎ＝自滅を抑制。相手が薄ければこちらに有利）。
+  parts.deckOut = (-deckOutRisk(me.deck.length) + deckOutRisk(opp.deck.length)) * WEIGHTS.deckOut;
 
   const total = Object.values(parts).reduce((a, b) => a + b, 0);
   return { total, parts };

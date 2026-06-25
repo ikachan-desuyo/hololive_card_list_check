@@ -213,10 +213,14 @@ function scoreCheerTargets(engine, idx, pending, out) {
       const dmgNow = bestEffDmg(h, h.cheers);
       const dmgAfter = bestEffDmg(h, afterCheers);
       const gain = dmgAfter - dmgNow;
+      // オーバーキル抑制: この前衛が「既に」相手センターを倒せるなら、さらに火力を盛ってもライフは増えない（KOは1回ぶん）。
+      // 余剰火力の価値を大きく下げ、エールを2体目のアタッカーや色の前進へ回させる（手数＝継続攻撃を増やす）。
+      const alreadyLethal = !!oppCenter && isActive && oppCenterRemain > 0 && dmgNow >= oppCenterRemain;
       if (gain > 0) {
         // このエールで火力が増える（解放 or 枚数依存で上昇）＝価値。前衛は厚く、バックは攻撃不可なので薄く。
         useful = true;
-        score += isActive ? Math.min(70, 18 + gain * 0.35) : Math.min(20, 6 + gain * 0.08);
+        if (alreadyLethal) score += isActive ? 4 : 2; // 既に倒せる＝オーバーキル。追いエールはほぼ無価値
+        else score += isActive ? Math.min(70, 18 + gain * 0.35) : Math.min(20, 6 + gain * 0.08);
       } else {
         // 火力は増えないが、未解放アーツへ色が前進したか（将来の解放準備）
         let advanced = false;
@@ -236,7 +240,7 @@ function scoreCheerTargets(engine, idx, pending, out) {
       // 集約ボーナス: 1ターンに殴れるのは前衛(センター+コラボ)中心なので、
       // 「弱い体を量産」より「最強の1体を伸ばす」方が正しい。このエールでチーム最強前衛の
       // 実効火力がどれだけ上がるかを重く評価する（既に強い主力＝スケールするアーツに積むほど高い）。
-      if (isActive && dmgAfter > 0) {
+      if (isActive && dmgAfter > 0 && !alreadyLethal) {
         const fronts = [p.center, p.collab].filter(Boolean);
         const teamBestBefore = Math.max(0, ...fronts.map((x) => bestEffDmg(x, x.cheers)));
         const lift = Math.max(0, dmgAfter - teamBestBefore); // h にこのエールを足して最強前衛火力が増えるぶん
