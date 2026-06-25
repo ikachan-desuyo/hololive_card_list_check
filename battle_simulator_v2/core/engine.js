@@ -2044,7 +2044,12 @@ export class Engine {
     if (artDef?.run) {
       this._runEffect(artDef, { ...ctxOpts, ctx: runCtx }, resolveDamage);
     } else {
-      if (art.text) this.log(`TODO(効果未実装) アーツ効果: ${art.text}`);
+      // run を持たなくても dmgBonus 等のハンドラで実装しているアーツは多い（それらはダメージ計算で適用される）。
+      // 「実装ハンドラが一つも無い時だけ」未実装ログを出す（run だけ見て誤TODOを出さない）。
+      const implemented = !!(artDef && (artDef.dmgBonus || artDef.damageNotReduced
+        || artDef.canUse || artDef.onDamageDealt || artDef.extraTargetZones
+        || artDef.targetZones || artDef.artTargetExtraTargets));
+      if (art.text && !implemented) this.log(`TODO(効果未実装) アーツ効果: ${art.text}`);
       resolveDamage();
     }
   }
