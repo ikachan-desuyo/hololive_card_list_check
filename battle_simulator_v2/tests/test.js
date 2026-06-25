@@ -2595,10 +2595,10 @@ export async function runTests() {
     assert(excess === exact, `コスト超過の余剰エールは評価に影響しないべき (exact=${exact}, excess=${excess})`);
   });
 
-  await testAsync('深い先読み(2手/3手): クラッシュせず対戦が完了し、合法手を返す', async () => {
+  await testAsync('深い先読み(2手/3手/5手): クラッシュせず対戦が完了し、合法手を返す', async () => {
     const r = await fetch('../test_deck/' + encodeURIComponent('FUWAMOCO') + '.json'); const dm = await r.json();
     const reg = await buildRegistry(lib, dm);
-    for (const turns of [2, 3]) {
+    for (const turns of [2, 3, 5]) {
       const e = new Engine({ decks: [lib.buildGameDeck(dm), lib.buildGameDeck(dm)], seed: 7, names: ['DEEP', 'H'], registry: reg, cardLibrary: lib });
       e.start();
       const ais = [new LookaheadAI(0, { turns }), new HeuristicAI(1)]; // P0 を深い先読みに
