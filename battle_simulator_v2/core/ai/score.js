@@ -73,6 +73,24 @@ export function isFreePlaySupport(engine, card) {
   return !hasDownside;
 }
 
+/**
+ * 「デッキからホロメンをステージに出す」発展支援か（ふつうのパソコン等）。
+ * place（手札Debutの展開）と同じく未来のアタッカーの土台を作る無条件の発展手＋デッキ圧縮になるので、
+ * 先読みのノイズで取りこぼさず貪欲に使ってよい。ドロー/サーチ主体（=手札に引く＝デッキ切れの綱引きがある）は
+ * 含めない（それらは先読みに weigh させる）。下振れ語のある支援も除外する。
+ */
+export function isDevelopSupport(engine, card) {
+  const def = engine.registry.get(card.number);
+  if (!def?.support) return false; // 効果未実装は対象外
+  if (card.limited) return false;  // LIMITEDは1ターン1枚の枠を消費する→貪欲化しない（他の重要なLIMITED支援を潰さない）
+  if (def.ai?.developSupport != null) return !!def.ai.developSupport; // カード定義で明示があれば従う
+  const text = card.supportText || '';
+  if (!/(ステージに出す|登場させ)/.test(text)) return false;
+  if (/(引く|ドロー|手札に加える)/.test(text)) return false; // ドロー/サーチ主体は対象外
+  const hasDownside = /(アーカイブ|捨て|ダウン|失う|エール[^。]*取り除|お休み|ホロパワー)/.test(text);
+  return !hasDownside;
+}
+
 /** 効果テキストからおおまかな価値を推定する（ドロー/サーチ/特殊ダメージ/エール/回復/回収など） */
 function estimateEffectText(text, engine, p) {
   if (!text) return 0;

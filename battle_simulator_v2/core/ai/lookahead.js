@@ -25,7 +25,7 @@
 import { HeuristicAI } from './heuristic.js';
 import { evaluateState } from './evaluate.js';
 import { reconstruct } from './rollout.js';
-import { scoreOptions, bestOptionId } from './score.js';
+import { scoreOptions, bestOptionId, isDevelopSupport } from './score.js';
 import { createRng } from '../rng.js';
 
 // ロールアウト評価が「ほぼ互角」とみなす差（この範囲内の候補は、ヒューリスティック事前評価で優劣を割る）。
@@ -60,11 +60,16 @@ export class LookaheadAI {
     if (!cands || cands.length === 0) return null;
     if (cands.length === 1) return cands[0].id;
 
-    // Debut/Spotの展開(place)は「未来のアタッカーの土台＝盤面」を作るほぼ無条件で正しい発展手
-    // （置いた次ターンからブルーム可能になる＝早く置くほど良い）。バックの素のDebutは評価上の価値が小さく、
-    // ノイズを含む5手ロールアウトでは「パス」と僅差になり展開を取りこぼすことがある。そこで place 選択肢が
-    // あれば先読みに掛けず貪欲に実行する（毎回の再入場で出せるDebutを全て展開してから戦術判断に入る）。
+    // 「未来のアタッカーの土台＝盤面を作る発展手」は評価上の上がり幅が小さく、ノイズを含む5手ロールアウトでは
+    // 「パス」と僅差になり取りこぼすことがある。これらは無条件で正しい発展手なので先読みに掛けず貪欲に実行する。
+    //   - Debut/Spotの展開(place)。置いた次ターンからブルーム可能＝早く置くほど良い。
+    //   - デッキからホロメンをステージに出す発展支援(ふつうのパソコン等。placeと同等＋デッキ圧縮)。
+    // ※ドロー/サーチ主体の支援は「デッキ切れの綱引き」があるため貪欲にせず先読みの判断に委ねる。
     if (pending.type === 'main') {
+      const me = s.players[this.playerIdx];
+      // 発展支援(ふつうのパソコン等)を place より先に（盤面が埋まって canUse を満たせなくなる前に使う）。
+      const devSup = cands.find((o) => o.kind === 'support' && me.hand[o.handIndex] && isDevelopSupport(engine, me.hand[o.handIndex]));
+      if (devSup) return devSup.id;
       const place = cands.find((o) => o.kind === 'place');
       if (place) return place.id;
     }
