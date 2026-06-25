@@ -41,16 +41,12 @@ export default {
       // デッキの上から6枚を見る
       const looked = ctx.lookTopDeck(6);
       // その中からカード3枚を手札に加える（枚数が足りなければある分だけ）
-      const taken = [];
-      const maxTake = Math.min(3, looked.length);
-      for (let i = 0; i < maxTake; i++) {
-        const pool = looked.filter((c) => !taken.includes(c));
-        const picked = yield ctx.chooseCard({
-          cards: pool,
-          title: `手札に加えるカードを選択（${i + 1}/${maxTake}枚目）`,
-        });
-        if (!picked) break;
-        taken.push(picked);
+      const taken = yield ctx.chooseCards({
+        cards: looked,
+        count: 3,
+        title: '手札に加えるカードを選択（3枚）',
+      });
+      for (const picked of taken) {
         ctx.addToHand(picked, { reveal: true });
       }
       // 残ったカードを好きな順でデッキの上に戻す

@@ -17,21 +17,18 @@ export default {
     // アーカイブにホロメンが無くても使用可（その後デッキを2枚引く＝必ず状態が変化する。Q606/Q607）。
     // 戻すホロメンが無ければ0枚戻し、そのまま2枚引く。
     *run(ctx) {
-      // 1枚目は必須、2・3枚目は任意
-      for (let i = 0; i < 3; i++) {
-        const cand = ctx.player.archive.filter((c) => c.kind === 'holomen');
-        if (cand.length === 0) break;
-        const optional = i >= 1;
-        const picked = yield ctx.chooseCard({
-          cards: cand,
-          title: `デッキに戻すアーカイブのホロメンを選択（${i + 1}/3${optional ? '・任意' : ''}）`,
-          optional,
-          skipLabel: 'これ以上戻さない',
-        });
-        if (!picked) break;
-        ctx.removeFromArchive(picked);
-        ctx.deckToBottom([picked]); // この後シャッフルするので位置は問わない
-        ctx.log(`${picked.name} をデッキに戻した`);
+      // アーカイブのホロメン1～3枚をデッキに戻す（あれば最低1枚、最大3枚）。一括選択
+      const cand = ctx.player.archive.filter((c) => c.kind === 'holomen');
+      const picked = yield ctx.chooseCards({
+        cards: cand,
+        min: 1,
+        max: 3,
+        title: 'デッキに戻すアーカイブのホロメンを選択（1～3枚）',
+      });
+      for (const c of picked) {
+        ctx.removeFromArchive(c);
+        ctx.deckToBottom([c]); // この後シャッフルするので位置は問わない
+        ctx.log(`${c.name} をデッキに戻した`);
       }
       ctx.shuffleDeck();
       ctx.draw(2);

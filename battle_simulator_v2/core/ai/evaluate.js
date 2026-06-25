@@ -27,7 +27,9 @@ export const WEIGHTS = {
   holoPower: 2, // ホロパワー1枚（推しスキルの燃料）
   archiveCheer: 1, // アーカイブのエール1枚（回収・再利用の見込み）
   boardCheer: 4, // 盤上ホロメンに付いた「有用な」エール1枚（=将来使える最大アーツのコスト数まで。余剰は数えない）。
-  //               1ターン1枚しか増えない貴重な資源なので、バトンコスト等で捨てると明確な損になる（無駄打ち抑制）。
+  //               1ターン1枚しか増えない貴重な資源。バトンコスト等で捨てると損になる（無駄打ち抑制）。
+  archiveCheerRecoverable: 4, // アーカイブのエールでも「回収手段を持つ」プレイヤーにとっては盤面同等に価値がある
+  //                            （=回収前提なら捨てても実損が小さい→回収できるデッキの正当なバトンを萎縮させない）
   lethalThreatToMe: -70, // 次の相手ターンに自センターが倒され得る
   lethalChanceToOpp: 55, // 自分が相手センターを倒し得る
   noBoard: -2000, // ステージにホロメンが居ない（実質敗北）
@@ -92,6 +94,32 @@ function usefulBoardCheers(engine, p) {
     n += Math.min((h.cheers || []).length, cap);
   }
   return n;
+}
+
+// 「アーカイブのエールを盤面ホロメンに戻す/送る」効果テキストの予測パターン（FUWAMOCO推し・フロンティアスピリット等）。
+// 「アーカイブ…エール…送る/付け」の順（=回収）にマッチ。「エールをアーカイブ(へ)」（=捨てる）には誤マッチしない。
+const RECOVER_CHEER_RE = /アーカイブ[^。]*エール[^。]*(送|付|つけ)/;
+
+/**
+ * プレイヤー idx が「アーカイブのエールを盤面に戻す手段」を持っていそうか（公開情報からの予測）。
+ * 手札の支援カード・自分の推しスキル/推しステージ・盤上ホロメンのキーワード効果テキストから推定する。
+ * 持っているなら、アーカイブのエールは回収できる前提＝価値が高い（捨てても実損が小さい）。
+ */
+function canRecoverArchiveCheers(engine, idx) {
+  const p = engine.state.players[idx];
+  const hit = (t) => !!t && RECOVER_CHEER_RE.test(t);
+  for (const c of p.hand) {
+    if (c.kind === 'support' && engine.registry.get(c.number)?.support && hit(c.supportText)) return true;
+  }
+  const oshi = p.oshi;
+  if (oshi) {
+    if (hit(oshi.oshiStageText)) return true;
+    if ((oshi.oshiSkills || []).some((s) => hit(s.text))) return true;
+  }
+  for (const h of engine._stageHolomems(p)) {
+    if ((h.stack[0].keywords || []).some((kw) => hit(kw.text))) return true;
+  }
+  return false;
 }
 
 /** プレイヤー p（idx）の盤面総合力 */
@@ -243,8 +271,13 @@ export function evaluateState(engine, idx) {
   // 3) リソース（手札枚数差・ホロパワー差・アーカイブのエール）
   parts.hand = (me.hand.length - opp.hand.length) * WEIGHTS.handCard;
   parts.holoPower = (me.holoPower.length - opp.holoPower.length) * WEIGHTS.holoPower;
-  parts.archiveCheer = (me.archive.filter((c) => c.kind === 'cheer').length
-    - opp.archive.filter((c) => c.kind === 'cheer').length) * WEIGHTS.archiveCheer;
+  // アーカイブのエール: 「回収手段を持つ」プレイヤーにとっては盤面同等の価値（回収できる前提）。
+  // 持たないなら従来どおり薄い価値（=盤面から捨てると実損）。回収予測を効果まで適用する。
+  const meArch = me.archive.filter((c) => c.kind === 'cheer').length;
+  const oppArch = opp.archive.filter((c) => c.kind === 'cheer').length;
+  const meArchW = canRecoverArchiveCheers(engine, idx) ? WEIGHTS.archiveCheerRecoverable : WEIGHTS.archiveCheer;
+  const oppArchW = canRecoverArchiveCheers(engine, 1 - idx) ? WEIGHTS.archiveCheerRecoverable : WEIGHTS.archiveCheer;
+  parts.archiveCheer = meArch * meArchW - oppArch * oppArchW;
   // 盤上の「有用なエール」差（資源）。盤面に置いたエールはアーカイブの何倍も価値がある＝
   // バトンコスト等で盤面→アーカイブへ捨てると net で損になる（=無駄なバトンを論理的に避ける）。
   parts.boardCheer = (usefulBoardCheers(engine, me) - usefulBoardCheers(engine, opp)) * WEIGHTS.boardCheer;

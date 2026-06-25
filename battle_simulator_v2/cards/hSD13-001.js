@@ -72,17 +72,15 @@ export default {
       const target = yield* ctx.putToBackWithTrigger(picked);
       if (!target) return; // 上限などで出せなければ終了
 
-      // その後、アーカイブのエール1～5枚をそのホロメンに送る（最低1枚・最大5枚）
-      for (let i = 0; i < 5; i++) {
-        const cheers = ctx.player.archive.filter((c) => c.kind === 'cheer');
-        if (cheers.length === 0) break;
-        const cheer = yield ctx.chooseCard({
-          cards: cheers,
-          title: `${picked.name} に送るエールをアーカイブから選択 (${i + 1}/5枚目)`,
-          optional: i > 0, // 1枚目は必須、2枚目以降は任意
-          skipLabel: 'ここまでにする',
-        });
-        if (!cheer) break;
+      // その後、アーカイブのエール1～5枚をそのホロメンに送る（最低1枚・最大5枚）。一括選択
+      const cheers = ctx.player.archive.filter((c) => c.kind === 'cheer');
+      const pickedCheers = yield ctx.chooseCards({
+        cards: cheers,
+        min: 1,
+        max: 5,
+        title: `${picked.name} に送るエールをアーカイブから選択（1～5枚）`,
+      });
+      for (const cheer of pickedCheers) {
         ctx.removeFromArchive(cheer);
         ctx.attachCheer(cheer, target);
       }

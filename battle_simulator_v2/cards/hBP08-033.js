@@ -64,19 +64,17 @@ export default {
           title: 'アーカイブのエールを送る〈パヴォリア・レイネ〉を選択',
         });
         if (!dest) return;
-        // アーカイブのエールを1～2枚送る（1枚目は必須、2枚目は任意）
-        for (let i = 0; i < 2; i++) {
-          const cheers = ctx.player.archive.filter((c) => c.kind === 'cheer');
-          if (cheers.length === 0) break;
-          const picked = yield ctx.chooseCard({
-            cards: cheers,
-            title: `アーカイブから送るエールを選択（${i + 1}/2枚目）`,
-            optional: i > 0,
-            skipLabel: '送るのをやめる',
-          });
-          if (!picked) break;
-          ctx.removeFromArchive(picked);
-          ctx.attachCheer(picked, dest.holomem);
+        // アーカイブのエールを1～2枚まとめて送る（最低1枚・最大2枚）
+        const cheers = ctx.player.archive.filter((c) => c.kind === 'cheer');
+        const picked = yield ctx.chooseCards({
+          cards: cheers,
+          min: 1,
+          max: 2,
+          title: 'アーカイブから送るエールを選択（1～2枚）',
+        });
+        for (const cheer of picked) {
+          ctx.removeFromArchive(cheer);
+          ctx.attachCheer(cheer, dest.holomem);
         }
       },
     },

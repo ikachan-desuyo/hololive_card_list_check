@@ -22,9 +22,8 @@ export default {
         if (dishes.length === 0) return;
         const ok = yield ctx.confirm('手札2枚をアーカイブして、アーカイブの#料理ホロメンを手札に戻しますか？');
         if (!ok) return;
-        for (let i = 0; i < 2; i++) {
-          const card = yield ctx.chooseCard({ cards: [...ctx.player.hand], title: `コスト: アーカイブする手札を選択（${i + 1}/2）` });
-          if (!card) return;
+        const cost = yield ctx.chooseCards({ cards: [...ctx.player.hand], count: 2, title: 'コスト: アーカイブする手札を選択' });
+        for (const card of cost) {
           ctx.removeFromHand(card);
           ctx.player.archive.push(card);
         }

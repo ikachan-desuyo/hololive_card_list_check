@@ -18,20 +18,11 @@ export default {
           ctx.addArtBonus(holomemInArchive.length * 10, 'アーカイブのホロメン枚数');
         }
         // アーカイブのホロメン6枚（未満なら全て）をデッキに戻してシャッフル
-        const returned = [];
-        const max = Math.min(6, holomemInArchive.length);
-        for (let i = 0; i < max; i++) {
-          const remaining = ctx.player.archive.filter(
-            (c) => c.kind === 'holomen' && !returned.includes(c),
-          );
-          if (remaining.length === 0) break;
-          const picked = yield ctx.chooseCard({
-            cards: remaining,
-            title: `デッキに戻すアーカイブのホロメンを選択（残り${max - i}枚）`,
-          });
-          if (!picked) break;
-          returned.push(picked);
-        }
+        const returned = yield ctx.chooseCards({
+          cards: holomemInArchive,
+          count: 6, // 6枚（候補が6枚未満なら全て）
+          title: 'デッキに戻すアーカイブのホロメンを選択（6枚）',
+        });
         if (returned.length > 0) {
           for (const c of returned) ctx.removeFromArchive(c);
           ctx.deckToBottom(returned);

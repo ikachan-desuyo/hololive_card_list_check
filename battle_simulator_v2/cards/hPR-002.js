@@ -25,20 +25,17 @@ export default {
       const looked = ctx.lookTopDeck(4);
       const remaining = [...looked];
       const isReglossHolomem = (c) => c.kind === 'holomen' && ctx.hasTag(c, 'ReGLOSS');
-      // 「好きな枚数」#ReGLOSS ホロメンを公開して手札に加える（0枚も可）
-      while (true) {
-        const candidates = remaining.filter(isReglossHolomem);
-        if (candidates.length === 0) break;
-        const picked = yield ctx.chooseCard({
-          cards: candidates,
-          title: '手札に加える #ReGLOSS ホロメンを選択（任意・好きな枚数）',
-          optional: true,
-          skipLabel: 'これ以上加えない',
-          displayCards: looked, // 見た4枚は対象外のカードも表示する
-        });
-        if (!picked) break;
-        remaining.splice(remaining.indexOf(picked), 1);
-        ctx.addToHand(picked); // 公開して手札に加える
+      // 「好きな枚数」#ReGLOSS ホロメンを一度に公開して手札に加える（0枚も可）
+      const candidates = remaining.filter(isReglossHolomem);
+      const picked = yield ctx.chooseCards({
+        cards: candidates,
+        min: 0,
+        title: '手札に加える #ReGLOSS ホロメンを選択（任意・好きな枚数）',
+        displayCards: looked, // 見た4枚は対象外のカードも表示する
+      });
+      for (const c of picked) {
+        remaining.splice(remaining.indexOf(c), 1);
+        ctx.addToHand(c); // 公開して手札に加える
       }
       // 残ったカードを好きな順でデッキの下に戻す
       if (remaining.length > 0) {

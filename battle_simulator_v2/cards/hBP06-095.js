@@ -22,18 +22,15 @@ export default {
       return all.length > 0 && all.every((e) => ctx.hasTag(e.top, 'ID1期生'));
     },
     *run(ctx) {
-      for (let i = 0; i < 2; i++) {
-        const cand = ctx.deckCards((c) => c.kind === 'holomen' && ctx.hasTag(c, 'ID1期生'));
-        if (cand.length === 0) break;
-        const picked = yield ctx.chooseCard({
-          cards: cand,
-          title: `手札に加える #ID1期生 のホロメンを選択（${i + 1}/2・任意）`,
-          optional: true,
-          skipLabel: 'これ以上加えない',
-        });
-        if (!picked) break;
-        ctx.removeFromDeck(picked);
-        ctx.addToHand(picked, { reveal: true });
+      const cand = ctx.deckCards((c) => c.kind === 'holomen' && ctx.hasTag(c, 'ID1期生'));
+      const picked = yield ctx.chooseCards({
+        cards: cand,
+        min: 0, max: 2,
+        title: '手札に加える #ID1期生 のホロメンを選択（最大2枚・任意）',
+      });
+      for (const c of picked) {
+        ctx.removeFromDeck(c);
+        ctx.addToHand(c, { reveal: true });
       }
       ctx.shuffleDeck();
       // その後、自分のエールデッキが0枚なら、このターンの間、

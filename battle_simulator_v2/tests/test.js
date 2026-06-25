@@ -457,12 +457,20 @@ export async function runTests() {
     return e;
   }
 
-  /** 効果の選択が出ている間、最初の選択肢を選び続けてメインに戻す */
+  /** 効果の選択が出ている間、最初の選択肢を選び続けてメインに戻す（複数選択chooseCardsにも対応） */
   function resolveChoices(e, pick = () => 0) {
     let guard = 0;
-    while (e.state.pending && e.state.pending.type === 'effectChoice' && guard++ < 50) {
-      const options = e.state.pending.options;
-      e.apply(options[Math.min(pick(options), options.length - 1)].id);
+    while (e.state.pending && e.state.pending.type === 'effectChoice' && guard++ < 80) {
+      const pend = e.state.pending;
+      if (pend.multiSelect) {
+        const ms = pend.multiSelect;
+        const cardOpts = pend.options.filter((o) => o.card && !ms.selected.includes(o.id));
+        if (ms.selected.length < ms.min && cardOpts.length) e.apply(cardOpts[0].id); // 必要数までトグル
+        else e.apply('confirm'); // 条件を満たしたら確定
+      } else {
+        const options = pend.options;
+        e.apply(options[Math.min(pick(options), options.length - 1)].id);
+      }
     }
   }
 
@@ -637,6 +645,42 @@ export async function runTests() {
     assert(gd.oshi && gd.oshi.oshiStageText && gd.oshi.oshiStageText.length > 0, 'buildGameDeck の oshi に oshiStageText が無い');
   });
 
+  await testAsync('複数選択 chooseCards: 一度にトグル選択→確定で配列が返る（枚数上限・確定ガード）', async () => {
+    const e = await setupMainStep(deckMap, 80);
+    const pool = [{ number: 'A', name: 'A', kind: 'support' }, { number: 'B', name: 'B', kind: 'support' }, { number: 'C', name: 'C', kind: 'support' }];
+    let result = null;
+    e._runEffect({ run: function* (ctx) { result = yield ctx.chooseCards({ cards: pool, count: 2, title: '2枚選ぶ' }); } }, { playerIdx: 0 }, () => {});
+    assert(e.state.pending?.type === 'effectChoice' && e.state.pending.multiSelect, '複数選択pendingになっていない');
+    assertEq(e.state.pending.multiSelect.max, 2, 'max=2 になっていない');
+    e.apply('confirm'); assertEq(result, null, '0枚では確定できてはいけない');
+    e.apply('card_0'); e.apply('card_2'); // A,C をトグル選択
+    e.apply('card_1'); // 上限2を超える追加は無視される
+    assertEq(e.state.pending.multiSelect.selected.length, 2, '上限2を超えて選べてはいけない');
+    e.apply('card_2'); // 再トグルで C を解除
+    assertEq(e.state.pending.multiSelect.selected.length, 1, '再トグルで解除されるべき');
+    e.apply('card_2'); // もう一度 C を選択
+    e.apply('confirm');
+    assert(Array.isArray(result) && result.length === 2, '2枚が配列で返るべき');
+    assert(result.includes(pool[0]) && result.includes(pool[2]), '選んだ A と C が返るべき');
+  });
+
+  await testAsync('複数選択 chooseCards: AIが価値の高い2枚を選んで確定できる(gain)', async () => {
+    const e = await setupMainStep(deckMap, 81);
+    // 価値差のある候補（ホロメン/サポートの cardGainValue 差で選別される想定）
+    const good = lib.getByNumber('hBP04-043') || { number: 'G', name: 'G', kind: 'holomen', arts: [], tags: [] };
+    const pool = [good, { number: 'X', name: 'X', kind: 'support' }, good];
+    let result = null;
+    e._runEffect({ run: function* (ctx) { result = yield ctx.chooseCards({ cards: pool, min: 0, max: 2, title: '得る', intent: 'gain' }); } }, { playerIdx: 0 }, () => {});
+    let guard = 0;
+    while (e.state.pending?.type === 'effectChoice' && e.state.pending.multiSelect && guard++ < 10) {
+      const id = bestOptionId(e, 0);
+      if (id == null) break;
+      e.apply(id);
+    }
+    assert(Array.isArray(result), 'AIが複数選択を解決して配列を返すべき');
+    assert(result.length <= 2, 'maxを超えて選んでいない');
+  });
+
   await testAsync('hBP08-003 推しスキル: 赤エール(青扱い)で青条件が成立し、アーカイブのエールを#Adventに送れる', async () => {
     const e = await setupMainStep(deckMap, 194);
     await e.registry.preload(['hBP08-003'], lib);
@@ -712,9 +756,9 @@ export async function runTests() {
     assertEq(ctx.artBonus, 60, '付け替え前の青エール3枚で+60が確定していない');
     r = gen.next(true);             // confirm yes → 先(フワワ)選択
     const pick = r.value.buildOptions().find((o) => o.value);
-    r = gen.next(pick.value);       // → 付け替える青エール選択
+    r = gen.next(pick.value);       // → 付け替える青エールを一度に選択(chooseCards)
     const blue = r.value.buildOptions().find((o) => o.value);
-    gen.next(blue.value);           // 青1枚をフワワへ移動
+    gen.next([blue.value]);          // 青1枚をフワワへ移動（chooseCardsは配列で返す）
     assertEq(ctx.artBonus, 60, '付け替え後に+20が減っている（順序バグ）');
     assertEq(mokoko.cheers.filter((c) => c.color === '青').length, 2, '青エールが1枚フワワへ移っていない');
   });
@@ -944,8 +988,16 @@ export async function runTests() {
     // 駆動: 送り先〈AZKi〉(chooseHolomem)の出現回数を数える。各選択は options[0] を選ぶ
     let holomemPrompts = 0, guard = 0;
     while (e.state.pending && e.state.pending.type === 'effectChoice' && guard++ < 30) {
-      if (e.state.pending.request?.kind === 'chooseHolomem') holomemPrompts++;
-      e.apply(e.state.pending.options[0].id);
+      const pend = e.state.pending;
+      if (pend.request?.kind === 'chooseHolomem') holomemPrompts++;
+      if (pend.multiSelect) {
+        const ms = pend.multiSelect;
+        const cardOpts = pend.options.filter((o) => o.card && !ms.selected.includes(o.id));
+        if (ms.selected.length < ms.min && cardOpts.length) e.apply(cardOpts[0].id);
+        else e.apply('confirm');
+      } else {
+        e.apply(pend.options[0].id);
+      }
     }
     assertEq(holomemPrompts, 1, '送り先〈AZKi〉の選択が複数回出た（複数人に分けて送れてしまう）');
     assertEq(azki1.cheers.length, 2, '〈AZKi〉1人にエール2枚（FS2枚ぶん）が送られていない');
@@ -2236,7 +2288,7 @@ export async function runTests() {
         const e = new Engine({ decks: [lib.buildGameDeck(dm), lib.buildGameDeck(dm)], seed, names: ['A', 'B'], registry: reg });
         e.start();
         const ais = [new HeuristicAI(0), new HeuristicAI(1)];
-        let applies = 0; let prev = null; let sameCount = 0;
+        let applies = 0; let prev = null; let sameCount = 0; let prevSel = -1;
         while (e.state.phase !== 'ended' && applies < 8000) {
           const pending = e.state.pending;
           if (!pending) { issues.push(`${n} seed=${seed}: pending無で未終了`); break; }
@@ -2244,7 +2296,11 @@ export async function runTests() {
           try { id = pending.player == null ? pending.options[0].id : ais[pending.player].choose(e); }
           catch (err) { issues.push(`${n} seed=${seed}: choose例外 type=${pending.type} req=${pending.request?.kind}: ${err.message}`); break; }
           if (id == null) { issues.push(`${n} seed=${seed}: choose=null type=${pending.type} req=${pending.request?.kind} opts=${pending.options?.length}`); break; }
-          if (pending === prev) { if (++sameCount > 5) { issues.push(`${n} seed=${seed}: 同一pending停滞 type=${pending.type} req=${pending.request?.kind} id=${id}`); break; } } else { sameCount = 0; prev = pending; }
+          // 複数選択(chooseCards)は同一pendingで複数回applyするのが正当。選択枚数が変われば進捗とみなす。
+          const selLen = pending.multiSelect ? pending.multiSelect.selected.length : -1;
+          const stalled = pending === prev && !(pending.multiSelect && selLen !== prevSel);
+          if (stalled) { if (++sameCount > 5) { issues.push(`${n} seed=${seed}: 同一pending停滞 type=${pending.type} req=${pending.request?.kind} id=${id}`); break; } } else { sameCount = 0; prev = pending; }
+          prevSel = selLen;
           try { e.apply(id); } catch (err) { issues.push(`${n} seed=${seed}: apply例外 type=${pending.type} id=${id}: ${err.message}`); break; }
           applies++;
         }
@@ -2431,6 +2487,42 @@ export async function runTests() {
     p0.center.cheers = []; p0.archive = [purple(), purple(), purple()];
     const after = evaluateState(e, 0).total;
     assert(before > after, `盤面エールをアーカイブへ捨てると評価が下がるべき (before=${before}, after=${after})`);
+  });
+
+  await testAsync('AI評価: アーカイブのエール回収手段を持つなら、捨てても損が小さい（回収予測を効果まで適用）', async () => {
+    // 同じ「アーカイブに紫3枚」でも、回収手段(FUWAMOCO推しの青条件＝アーカイブのエールを#Adventへ送る)を持つ側は高評価。
+    const reg = await buildRegistry(lib, deckMap);
+    const mkE = () => new Engine({ decks: [lib.buildGameDeck(deckMap), lib.buildGameDeck(deckMap)], seed: 60, names: ['A', 'B'], registry: reg });
+    const purple = () => ({ number: 'p', name: '紫', kind: 'cheer', color: '紫' });
+    // 回収手段なし
+    const e1 = mkE(); await e1.registry.preload(['hBP08-003'], lib);
+    e1.state.players[0].archive = [purple(), purple(), purple()];
+    const noRecover = evaluateState(e1, 0).parts.archiveCheer;
+    // 回収手段あり（FUWAMOCO推し＝アーカイブのエールを#Adventへ送る推しスキル）
+    const e2 = mkE();
+    e2.state.players[0].oshi = lib.getByNumber('hBP08-003');
+    e2.state.players[0].archive = [purple(), purple(), purple()];
+    const withRecover = evaluateState(e2, 0).parts.archiveCheer;
+    assert(withRecover > noRecover, `回収手段ありの方がアーカイブのエールを高く評価すべき (none=${noRecover}, recover=${withRecover})`);
+  });
+
+  await testAsync('AIバトン: HPが低いだけで、残せばKOできる前衛は退避しない（攻撃機会を捨てない）', async () => {
+    const e = await setupMainStep(deckMap, 61);
+    const p0 = e.state.players[0]; const p1 = e.state.players[1];
+    const blue = () => ({ number: 'b', name: '青', kind: 'cheer', color: '青' });
+    // 自センター: HP低（被ダメ大）だが、青2で40を払えてKOできる。バックに高HPの置物。
+    const atk = { number: 'ATKK', name: 'ATKK', kind: 'holomen', bloomLevel: '1st', hp: 150, color: '青', tags: [], arts: [{ name: 'a', dmg: 40, cost: ['青', '青'], tokkou: [] }], keywords: [] };
+    const wall = { number: 'WALL', name: 'WALL', kind: 'holomen', bloomLevel: '1st', hp: 150, color: '青', tags: [], arts: [{ name: 'w', dmg: 10, cost: ['青'], tokkou: [] }], keywords: [] };
+    p0.center = e._createHolomem(atk, 1); p0.center.cheers = [blue(), blue()]; p0.center.damage = 120; // 残HP30
+    p0.collab = null; p0.back = [e._createHolomem(wall, 1)]; // 高HP置物
+    // 相手センター: 残30（=自センターの40でKOできる）
+    const oppC = { number: 'OPP', name: 'OPP', kind: 'holomen', bloomLevel: '1st', hp: 120, color: '白', tags: [], arts: [], keywords: [] };
+    p1.center = e._createHolomem(oppC, 1); p1.center.damage = 90; p1.collab = null; p1.back = [];
+    const sc = scoreOptions(e, 0, { type: 'main', player: 0, options: [
+      { id: 'pass', kind: 'pass' },
+      { id: 'baton0', kind: 'baton', backIndex: 0 },
+    ] });
+    assert((sc.baton0 ?? 0) <= 0, `KOできる低HP前衛をHP理由で退避すべきでない (baton=${sc.baton0})`);
   });
 
   await testAsync('AI評価: アーツのコストを超える余剰エールは資源として価値が無い（必要数までのみ評価）', async () => {

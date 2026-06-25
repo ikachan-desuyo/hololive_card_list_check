@@ -91,17 +91,13 @@ export default {
           'このホロメンのエール3枚をアーカイブして、デッキを3枚引きますか？');
         if (!ok) return;
 
-        // このホロメンのエールを3枚アーカイブ（1枚ずつ任意で選ぶ）
-        for (let i = 0; i < 3; i++) {
-          const cheers = [...(self.cheers || [])];
-          if (cheers.length === 0) break;
-          const cheer = yield ctx.chooseCard({
-            cards: cheers,
-            title: `アーカイブするエールを選択（${i + 1}/3枚目）`,
-          });
-          if (!cheer) break;
-          yield* ctx.archiveCheer(self, cheer);
-        }
+        // このホロメンのエールを3枚アーカイブ（一度に3枚選ぶ）
+        const picked = yield ctx.chooseCards({
+          cards: [...(self.cheers || [])],
+          count: 3,
+          title: 'アーカイブするエールを選択（3枚）',
+        });
+        for (const cheer of picked) yield* ctx.archiveCheer(self, cheer);
 
         ctx.draw(3);
       },

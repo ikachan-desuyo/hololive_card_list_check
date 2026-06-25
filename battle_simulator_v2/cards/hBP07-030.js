@@ -30,12 +30,13 @@ export default {
         if (ctx.sourceHolomem.cheers.length < 2) return; // コスト（エール2枚）を払えない
         const ok = yield ctx.confirm('このホロメンのエール2枚をアーカイブしてデッキを2枚引きますか？');
         if (!ok) return;
-        for (let i = 0; i < 2; i++) {
-          const cheer = yield ctx.chooseCard({
-            cards: ctx.sourceHolomem.cheers,
-            title: `コスト: アーカイブするエールを選択（${i + 1}/2）`,
-          });
-          if (!cheer) return;
+        const picked = yield ctx.chooseCards({
+          cards: [...ctx.sourceHolomem.cheers],
+          count: 2,
+          title: 'コスト: アーカイブするエールを選択（2枚）',
+        });
+        if (picked.length < 2) return;
+        for (const cheer of picked) {
           yield* ctx.archiveCheer(ctx.sourceHolomem, cheer);
         }
         ctx.draw(2);

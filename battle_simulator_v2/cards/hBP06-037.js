@@ -14,19 +14,18 @@ export default {
     name: 'お参りデート',
     *run(ctx) {
       // 赤エールを最大2枚、好きな順でエールデッキの下に戻す（任意）
-      for (let i = 0; i < 2; i++) {
-        const cheers = ctx.player.archive.filter((c) => c.kind === 'cheer' && c.color === '赤');
-        if (cheers.length === 0) break;
-        const picked = yield ctx.chooseCard({
-          cards: cheers,
-          title: `エールデッキの下に戻す赤エールを選択（${i + 1}/2・任意）`,
-          optional: true,
-          skipLabel: '戻さない',
-        });
-        if (!picked) break;
-        ctx.removeFromArchive(picked);
-        ctx.player.cheerDeck.push(picked); // 下に戻す。選んだ順がそのまま「好きな順」
-        ctx.log(`${ctx.player.name}: ${picked.name} をエールデッキの下に戻した`);
+      // 選択順 = 戻す順（picked は選択順を保持）でそのまま「好きな順」を再現
+      const cheers = ctx.player.archive.filter((c) => c.kind === 'cheer' && c.color === '赤');
+      const picked = yield ctx.chooseCards({
+        cards: cheers,
+        min: 0,
+        max: 2,
+        title: 'エールデッキの下に戻す赤エールを選択（最大2枚・任意）',
+      });
+      for (const c of picked) {
+        ctx.removeFromArchive(c);
+        ctx.player.cheerDeck.push(c); // 下に戻す。選んだ順がそのまま「好きな順」
+        ctx.log(`${ctx.player.name}: ${c.name} をエールデッキの下に戻した`);
       }
     },
   },

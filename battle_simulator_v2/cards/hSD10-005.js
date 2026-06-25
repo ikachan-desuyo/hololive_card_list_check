@@ -22,20 +22,13 @@ export default {
       // 1～3枚を選ぶ（「まで」ではなく「1～3枚を…戻せる」=任意効果。0枚も可）
       const ok = yield ctx.confirm('アーカイブの#FLOW GLOWホロメンをデッキの下に戻しますか？');
       if (!ok) return;
-      const picked = [];
-      const max = Math.min(3, candidates.length);
-      for (let i = 0; i < max; i++) {
-        const remaining = candidates.filter((c) => !picked.includes(c));
-        if (remaining.length === 0) break;
-        const sel = yield ctx.chooseCard({
-          cards: remaining,
-          title: `デッキの下に戻す#FLOW GLOWホロメンを選択（${picked.length + 1}枚目／最大3枚）`,
-          optional: picked.length >= 1, // 1枚目は必須（戻すと決めたため）、2枚目以降は任意
-          skipLabel: 'これ以上戻さない',
-        });
-        if (!sel) break;
-        picked.push(sel);
-      }
+      // 1～3枚を一度に選ぶ（1枚目は必須＝戻すと決めたため、最大3枚）
+      const picked = yield ctx.chooseCards({
+        cards: candidates.slice(),
+        min: 1,
+        max: 3,
+        title: 'デッキの下に戻す#FLOW GLOWホロメンを選択（1～3枚）',
+      });
       if (picked.length === 0) return;
       // 好きな順でデッキの下に戻す
       const ordered = yield* ctx.orderCardsFlow(picked, 'デッキの下に戻す順番');

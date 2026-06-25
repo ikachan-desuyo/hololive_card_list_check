@@ -13,26 +13,23 @@ export default {
     name: 'ハッピータイム',
     *run(ctx) {
       // デッキ内の〈小鳥遊キアラ〉が無ければ何もしない
-      if (ctx.deckCards((c) => c.name === '小鳥遊キアラ').length === 0) return;
-      let archived = 0;
-      while (archived < 4) {
-        const candidates = ctx.deckCards((c) => c.name === '小鳥遊キアラ');
-        if (candidates.length === 0) break;
-        const picked = yield ctx.chooseCard({
-          cards: candidates,
-          title: `アーカイブする〈小鳥遊キアラ〉を選択（${archived}/4）`,
-          optional: true,
-          skipLabel: archived === 0 ? 'アーカイブしない' : 'これ以上アーカイブしない',
-        });
-        if (!picked) break;
-        ctx.removeFromDeck(picked);
-        ctx.player.archive.push(picked);
-        ctx.flashReveal(picked);
-        ctx.log(`${ctx.player.name}: ${picked.name} を公開してアーカイブ`);
-        archived++;
+      const candidates = ctx.deckCards((c) => c.name === '小鳥遊キアラ');
+      if (candidates.length === 0) return;
+      // 「1～4枚」だが「できる」=0枚（アーカイブしない）も可。最大4枚。
+      const picked = yield ctx.chooseCards({
+        cards: candidates,
+        min: 0,
+        max: 4,
+        title: 'アーカイブする〈小鳥遊キアラ〉を選択（最大4枚・任意）',
+      });
+      for (const c of picked) {
+        ctx.removeFromDeck(c);
+        ctx.player.archive.push(c);
+        ctx.flashReveal(c);
+        ctx.log(`${ctx.player.name}: ${c.name} を公開してアーカイブ`);
       }
       // 公開・アーカイブを行ったらデッキをシャッフルする
-      if (archived > 0) ctx.shuffleDeck();
+      if (picked.length > 0) ctx.shuffleDeck();
     },
   },
 };

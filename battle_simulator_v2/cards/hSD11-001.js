@@ -44,18 +44,13 @@ export default {
         title: 'エールを送る#FLOW GLOWホロメン1人を選択（エールが付いていない）',
       });
       if (!target) return;
-      // アーカイブのエール1～2枚を、その1人へ送る
-      for (let i = 0; i < 2; i++) {
-        const cheers = ctx.player.archive.filter((c) => c.kind === 'cheer');
-        if (cheers.length === 0) break;
-        const cheer = yield ctx.chooseCard({
-          cards: cheers,
-          title: `${target.holomem.stack[0].name} に送るエールをアーカイブから選択 (${i + 1}/2枚目)`,
-          // 1枚目は必須、2枚目は任意（「1～2枚」のため最低1枚）
-          optional: i > 0,
-          skipLabel: 'ここまでにする',
-        });
-        if (!cheer) break;
+      // アーカイブのエール1～2枚を、その1人へ送る（最低1枚・最大2枚）
+      const picked = yield ctx.chooseCards({
+        cards: ctx.player.archive.filter((c) => c.kind === 'cheer'),
+        min: 1, max: 2,
+        title: `${target.holomem.stack[0].name} に送るエールをアーカイブから選択（1～2枚）`,
+      });
+      for (const cheer of picked) {
         ctx.removeFromArchive(cheer);
         ctx.attachCheer(cheer, target.holomem);
       }

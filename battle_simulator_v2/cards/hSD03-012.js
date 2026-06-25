@@ -18,19 +18,16 @@ export default {
     *run(ctx) {
       const looked = ctx.lookTopDeck(4);
       const pool = [...looked];
-      while (true) {
-        const candidates = pool.filter((c) => c.kind === 'holomen' && TARGET_NAMES.includes(c.name));
-        if (candidates.length === 0) break;
-        const picked = yield ctx.chooseCard({
-          cards: candidates,
-          title: '手札に加えるホロメンを選択（任意）',
-          optional: true,
-          skipLabel: 'これ以上加えない',
-          displayCards: pool, // 見た4枚は対象外のカードも表示する
-        });
-        if (!picked) break;
-        pool.splice(pool.indexOf(picked), 1);
-        ctx.addToHand(picked);
+      const candidates = pool.filter((c) => c.kind === 'holomen' && TARGET_NAMES.includes(c.name));
+      const picked = yield ctx.chooseCards({
+        cards: candidates,
+        min: 0,
+        title: '手札に加えるホロメンを選択（任意）',
+        displayCards: looked, // 見た4枚は対象外のカードも表示する
+      });
+      for (const c of picked) {
+        pool.splice(pool.indexOf(c), 1);
+        ctx.addToHand(c);
       }
       // 残りは好きな順でデッキの下へ
       const ordered = yield* ctx.orderCardsFlow(pool, 'デッキの下に戻す順番');

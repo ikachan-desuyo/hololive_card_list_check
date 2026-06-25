@@ -43,19 +43,18 @@ export default {
       return p.hand.length >= 1;
     },
     *run(ctx) {
-      // 自分の手札2枚をアーカイブする
-      let archived = 0;
-      for (let i = 0; i < 2 && ctx.player.hand.length > 0; i++) {
-        const card = yield ctx.chooseCard({
-          cards: ctx.player.hand,
-          title: `アーカイブする手札を選択（${i + 1}/2）`,
-        });
-        if (!card) break;
+      // 自分の手札2枚をアーカイブする（一括選択。手札が足りなければある分だけ）
+      const archivedCards = yield ctx.chooseCards({
+        cards: [...ctx.player.hand],
+        count: 2,
+        title: 'アーカイブする手札を選択（2枚）',
+      });
+      for (const card of archivedCards) {
         ctx.removeFromHand(card);
         ctx.player.archive.push(card);
         ctx.log(`${ctx.player.name}: ${card.name} をアーカイブ`);
-        archived++;
       }
+      const archived = archivedCards.length;
 
       // この能力で2枚アーカイブしたなら、相手のDebut以外のセンター・コラボに特殊ダメージ50
       if (archived < 2) {

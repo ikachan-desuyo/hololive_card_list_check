@@ -20,20 +20,23 @@ export default {
       if (!ctx.isFirstTurnGoingSecond()) return; // 後攻で最初のターンのみ
       // デッキから Debut の〈赤井はあと〉を2枚、公開してステージに出す。
       // どの〈赤井はあと〉を出すかはプレイヤーが選ぶ（候補が複数あり得るため、勝手に出さない）。
-      // 「2枚」は必須だが、候補やステージの空きが足りなければ出せる分だけ。
-      for (let i = 0; i < 2; i++) {
-        if (ctx.engine._stageCount(ctx.player) >= 6) break; // ステージ上限
-        const candidates = ctx.deckCards((c) =>
-          c.kind === 'holomen' && c.bloomLevel === 'Debut' && c.name === '赤井はあと');
-        if (candidates.length === 0) break;
-        const picked = yield ctx.chooseCard({
+      // 「2枚」は必須だが、候補やステージの空きが足りなければ出せる分だけ。一括選択
+      const candidates = ctx.deckCards((c) =>
+        c.kind === 'holomen' && c.bloomLevel === 'Debut' && c.name === '赤井はあと');
+      // ステージの空き（上限6）と「2枚」のうち少ない方まで
+      const space = Math.max(0, 6 - ctx.engine._stageCount(ctx.player));
+      const count = Math.min(2, space);
+      if (count > 0 && candidates.length > 0) {
+        const picked = yield ctx.chooseCards({
           cards: candidates,
-          title: `ステージに出すDebut〈赤井はあと〉を選択（${i + 1}枚目／2枚）`,
+          count,
+          title: 'ステージに出すDebut〈赤井はあと〉を選択（2枚）',
         });
-        if (!picked) break;
-        ctx.removeFromDeck(picked);
-        ctx.log(`${ctx.player.name}: ${picked.name} を公開`);
-        ctx.putToBack(picked);
+        for (const c of picked) {
+          ctx.removeFromDeck(c);
+          ctx.log(`${ctx.player.name}: ${c.name} を公開`);
+          ctx.putToBack(c);
+        }
       }
       ctx.shuffleDeck(); // 効果が発動した（後攻最初のターン）なら必ずシャッフルする
     },

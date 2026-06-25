@@ -10,17 +10,15 @@ export default {
   bloomEffect: {
     name: '友達がいっぱい増えたよ',
     *run(ctx) {
-      for (let i = 0; i < 2; i++) {
-        const cand = ctx.deckCards((c) =>
-          c.kind === 'holomen' && c.bloomLevel === '1st' && !c.buzz && ctx.hasTag(c, '歌'));
-        if (cand.length === 0) break;
-        const picked = yield ctx.chooseCard({
-          cards: cand, title: `手札に加える #歌 のBuzz以外1stホロメンを選択（${i + 1}/2・任意）`,
-          optional: true, skipLabel: 'これ以上加えない',
-        });
-        if (!picked) break;
-        ctx.removeFromDeck(picked);
-        ctx.addToHand(picked);
+      const cand = ctx.deckCards((c) =>
+        c.kind === 'holomen' && c.bloomLevel === '1st' && !c.buzz && ctx.hasTag(c, '歌'));
+      const picked = yield ctx.chooseCards({
+        cards: cand, min: 0, max: 2,
+        title: '手札に加える #歌 のBuzz以外1stホロメンを選択（最大2枚・任意）',
+      });
+      for (const c of picked) {
+        ctx.removeFromDeck(c);
+        ctx.addToHand(c);
       }
       ctx.shuffleDeck();
     },

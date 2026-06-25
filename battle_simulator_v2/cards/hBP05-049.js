@@ -31,11 +31,10 @@ export default {
         if (ctx.sourceHolomem.cheers.length < 2) return;
         const ok = yield ctx.confirm('エール2枚をアーカイブして相手バック全員に特殊ダメージ30を与えますか？');
         if (!ok) return;
-        for (let i = 0; i < 2; i++) {
-          const cheer = yield ctx.chooseCard({
-            cards: [...ctx.sourceHolomem.cheers], title: `コスト: アーカイブするエールを選択（${i + 1}/2）`,
-          });
-          if (!cheer) return;
+        const cost = yield ctx.chooseCards({
+          cards: [...ctx.sourceHolomem.cheers], count: 2, title: 'コスト: アーカイブするエールを選択',
+        });
+        for (const cheer of cost) {
           yield* ctx.archiveCheer(ctx.sourceHolomem, cheer);
         }
         for (const e of ctx.holomems('opp', (x) => x.pos.zone === 'back')) {

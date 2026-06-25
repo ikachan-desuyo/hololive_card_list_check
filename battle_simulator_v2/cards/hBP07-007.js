@@ -61,22 +61,21 @@ export default {
     },
     *run(ctx) {
       // デッキから Debut〈桃鈴ねね〉を1～4枚、ステージ（バック）に出す
-      for (let i = 0; i < 4; i++) {
-        if (ctx.engine._stageCount(ctx.player) >= 6) break;
-        const cand = ctx.deckCards((c) =>
-          c.kind === 'holomen' && c.bloomLevel === 'Debut' && c.name === '桃鈴ねね');
-        if (cand.length === 0) break;
-        const picked = yield ctx.chooseCard({
-          cards: cand,
-          title: `デッキから Debut〈桃鈴ねね〉をステージに出す（${i + 1}枚目・最大4枚）`,
-          // 1枚目は必須（最低1枚）、2枚目以降は任意
-          optional: i > 0,
-          skipLabel: 'これ以上出さない',
-        });
-        if (!picked) break;
-        ctx.removeFromDeck(picked);
-        ctx.flashReveal(picked);
-        ctx.putToBack(picked);
+      const cand = ctx.deckCards((c) =>
+        c.kind === 'holomen' && c.bloomLevel === 'Debut' && c.name === '桃鈴ねね');
+      // ステージの空き枠（最大6）とカード枚数の範囲で1～4枚
+      const space = Math.max(0, 6 - ctx.engine._stageCount(ctx.player));
+      const max = Math.min(4, space);
+      const picked = yield ctx.chooseCards({
+        cards: cand,
+        min: Math.min(1, max),
+        max,
+        title: 'デッキから Debut〈桃鈴ねね〉をステージに出す（1～4枚）',
+      });
+      for (const card of picked) {
+        ctx.removeFromDeck(card);
+        ctx.flashReveal(card);
+        ctx.putToBack(card);
       }
       ctx.shuffleDeck();
     },

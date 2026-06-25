@@ -20,27 +20,23 @@ export default {
 
   support: {
     *run(ctx) {
-      // アーカイブの[マスコットとファン]を合計1～3枚、1枚ずつデッキに戻す
-      let returned = 0;
-      for (let i = 0; i < 3; i++) {
-        const candidates = ctx.player.archive.filter(
-          (c) => c.supportType === 'マスコット' || c.supportType === 'ファン');
-        if (candidates.length === 0) break;
-        const picked = yield ctx.chooseCard({
-          cards: candidates,
-          title: `デッキに戻すマスコット/ファンを選択 (${i + 1}/3枚目)`,
-          optional: i > 0, // 1枚目は必須、2・3枚目は任意（「1～3枚」）
-          skipLabel: 'ここまでにする',
-        });
-        if (!picked) break;
-        ctx.removeFromArchive(picked);
-        ctx.player.deck.push(picked);
-        ctx.log(`${ctx.player.name}: ${picked.name} をアーカイブからデッキに戻した`);
-        returned++;
+      // アーカイブの[マスコットとファン]を合計1～3枚、一度に選んでデッキに戻す
+      const candidates = ctx.player.archive.filter(
+        (c) => c.supportType === 'マスコット' || c.supportType === 'ファン');
+      const picked = yield ctx.chooseCards({
+        cards: candidates,
+        min: 1, // 「1～3枚」: 最低1枚（候補が1枚未満なら全部）
+        max: 3,
+        title: 'デッキに戻すマスコット/ファンを選択（1～3枚）',
+      });
+      for (const c of picked) {
+        ctx.removeFromArchive(c);
+        ctx.player.deck.push(c);
+        ctx.log(`${ctx.player.name}: ${c.name} をアーカイブからデッキに戻した`);
       }
 
       // 1枚でも戻したならデッキをシャッフルする
-      if (returned > 0) ctx.shuffleDeck();
+      if (picked.length > 0) ctx.shuffleDeck();
 
       // その後、自分のデッキを2枚引く
       ctx.draw(2);

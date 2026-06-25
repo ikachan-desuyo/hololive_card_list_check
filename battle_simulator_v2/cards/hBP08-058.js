@@ -67,16 +67,14 @@ export default {
           'エール2枚をアーカイブして発動', '発動しない');
         if (!use) return;
 
-        // コスト: このホロメンのエール2枚をアーカイブ（払うエールをプレイヤーが選ぶ）
+        // コスト: このホロメンのエール2枚を一度に選んでアーカイブ（払うエールをプレイヤーが選ぶ）
         const src = ctx.sourceHolomem;
-        for (let i = 0; i < 2; i++) {
-          const cheers = src.cheers || [];
-          if (cheers.length === 0) return; // 念のため（canUseで2枚以上は保証済み）
-          const cheer = yield ctx.chooseCard({
-            cards: cheers,
-            title: `アーカイブするエールを選択 (${i + 1}/2枚)`,
-          });
-          if (!cheer) return;
+        const cost = yield ctx.chooseCards({
+          cards: [...(src.cheers || [])],
+          count: 2,
+          title: 'アーカイブするエールを選択（2枚）',
+        });
+        for (const cheer of cost) {
           yield* ctx.archiveCheer(src, cheer);
         }
 

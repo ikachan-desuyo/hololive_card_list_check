@@ -21,17 +21,16 @@ export default {
       return all.length > 0 && all.every((e) => ctx.hasTag(e.top, 'Promise'));
     },
     *run(ctx) {
-      // デッキから #Promise ホロメン2枚を公開して手札に加える（固定枚数。候補が尽きたら打ち切り）
-      for (let i = 0; i < 2; i++) {
-        const cand = ctx.deckCards((c) => c.kind === 'holomen' && ctx.hasTag(c, 'Promise'));
-        if (cand.length === 0) break;
-        const picked = yield ctx.chooseCard({
-          cards: cand,
-          title: `手札に加える #Promise のホロメンを選択（${i + 1}/2）`,
-        });
-        if (!picked) break;
-        ctx.removeFromDeck(picked);
-        ctx.addToHand(picked, { reveal: true });
+      // デッキから #Promise ホロメン2枚を公開して手札に加える（固定枚数。候補が尽きたら有る分だけ）
+      const cand = ctx.deckCards((c) => c.kind === 'holomen' && ctx.hasTag(c, 'Promise'));
+      const picked = yield ctx.chooseCards({
+        cards: cand,
+        count: 2,
+        title: '手札に加える #Promise のホロメンを選択（2枚）',
+      });
+      for (const c of picked) {
+        ctx.removeFromDeck(c);
+        ctx.addToHand(c, { reveal: true });
       }
       ctx.shuffleDeck();
 

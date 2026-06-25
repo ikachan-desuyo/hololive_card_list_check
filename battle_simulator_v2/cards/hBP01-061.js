@@ -14,21 +14,18 @@ export default {
   bloomEffect: {
     name: '組織の司令塔',
     *run(ctx) {
-      // 1枚ずつ最大2枚まで、アーカイブの#秘密結社holoXホロメンを手札へ戻す（任意・0可）
-      for (let i = 0; i < 2; i++) {
-        const cand = ctx.player.archive.filter(
-          (c) => c.kind === 'holomen' && ctx.hasTag(c, '秘密結社holoX'));
-        if (cand.length === 0) break;
-        const picked = yield ctx.chooseCard({
-          cards: cand,
-          title: `アーカイブの#秘密結社holoXホロメンを手札に戻す（${i + 1}/2・任意）`,
-          optional: true,
-          skipLabel: 'これ以上戻さない',
-        });
-        if (!picked) break;
-        ctx.removeFromArchive(picked);
-        ctx.addToHand(picked, { reveal: true });
-        ctx.log(`${picked.name} を手札に戻した`);
+      // 最大2枚まで、アーカイブの#秘密結社holoXホロメンを手札へ戻す（任意・0可）
+      const cand = ctx.player.archive.filter(
+        (c) => c.kind === 'holomen' && ctx.hasTag(c, '秘密結社holoX'));
+      const picked = yield ctx.chooseCards({
+        cards: cand,
+        min: 0, max: 2,
+        title: 'アーカイブの#秘密結社holoXホロメンを手札に戻す（最大2枚・任意）',
+      });
+      for (const c of picked) {
+        ctx.removeFromArchive(c);
+        ctx.addToHand(c, { reveal: true });
+        ctx.log(`${c.name} を手札に戻した`);
       }
     },
   },
@@ -41,16 +38,14 @@ export default {
           '手札を1～5枚アーカイブして、アーカイブ枚数×特殊ダメージ20を与えますか？');
         if (!ok) return;
         const max = Math.min(5, ctx.player.hand.length);
+        // 手札1～5枚をアーカイブ（最初の1枚は必須＝min:1）
+        const picked = yield ctx.chooseCards({
+          cards: [...ctx.player.hand],
+          min: 1, max,
+          title: 'コスト: アーカイブする手札を選択（1～5枚）',
+        });
         let count = 0;
-        for (let i = 0; i < max; i++) {
-          const card = yield ctx.chooseCard({
-            cards: [...ctx.player.hand],
-            title: `コスト: アーカイブする手札を選択（${i + 1}/${max}）` +
-              (i === 0 ? '' : '・これ以上アーカイブしないなら見送り'),
-            optional: i > 0, // 最初の1枚は必須（「1～5枚」の最小は1）
-            skipLabel: 'これ以上アーカイブしない',
-          });
-          if (!card) break;
+        for (const card of picked) {
           // 「ホロメンの能力で手札をアーカイブ」共通プリミティブ（推し「女幹部の采配」のコスト置換にも対応）
           yield* ctx.archiveHandCard(card);
           count++;

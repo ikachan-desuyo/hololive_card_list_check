@@ -35,14 +35,13 @@ export default {
     *run(ctx) {
       const value = (yield* ctx.rollDice());
       const count = Math.min(value, ctx.player.hand.length);
-      for (let i = 0; i < count; i++) {
-        // 残り手札から1枚選んでアーカイブ（手札が尽きたら終了）
-        if (ctx.player.hand.length === 0) break;
-        const card = yield ctx.chooseCard({
-          cards: [...ctx.player.hand],
-          title: `アーカイブする手札を選択（残り ${count - i} 枚）`,
-        });
-        if (!card) break;
+      // 出た目の数だけ手札を一括選択してアーカイブ
+      const picked = yield ctx.chooseCards({
+        cards: [...ctx.player.hand],
+        count,
+        title: `アーカイブする手札を ${count} 枚選択`,
+      });
+      for (const card of picked) {
         ctx.removeFromHand(card);
         ctx.player.archive.push(card);
         ctx.log(`${ctx.player.name}: ${card.name} をアーカイブ`);

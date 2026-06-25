@@ -36,19 +36,16 @@ export default {
         // 推しが〈アーニャ・メルフィッサ〉で、このターンに通常推しスキル（=神秘の儀式）を使っていること
         if (!oshi || oshi.name !== 'アーニャ・メルフィッサ' || !ctx.player.usedOshiSkillThisTurn) return;
 
-        // 最大3枚まで、アーカイブの〈アーニャ・メルフィッサ〉を1枚ずつ手札に戻す（0枚可）
-        for (let i = 0; i < 3; i++) {
-          const candidates = ctx.player.archive.filter((c) => c.name === 'アーニャ・メルフィッサ');
-          if (candidates.length === 0) break;
-          const picked = yield ctx.chooseCard({
-            cards: candidates,
-            title: `アーカイブの〈アーニャ・メルフィッサ〉を手札に戻す（${i + 1}/3・任意）`,
-            optional: true,
-            skipLabel: 'これ以上戻さない',
-          });
-          if (!picked) break;
-          ctx.removeFromArchive(picked);
-          ctx.addToHand(picked);
+        // 最大3枚まで、アーカイブの〈アーニャ・メルフィッサ〉を手札に戻す（0枚可）
+        const candidates = ctx.player.archive.filter((c) => c.name === 'アーニャ・メルフィッサ');
+        const picked = yield ctx.chooseCards({
+          cards: candidates,
+          min: 0, max: 3,
+          title: 'アーカイブの〈アーニャ・メルフィッサ〉を手札に戻す（最大3枚・任意）',
+        });
+        for (const c of picked) {
+          ctx.removeFromArchive(c);
+          ctx.addToHand(c);
         }
       },
     },

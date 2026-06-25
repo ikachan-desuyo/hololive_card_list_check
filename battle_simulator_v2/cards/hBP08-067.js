@@ -46,12 +46,13 @@ export default {
       if (!ok) return;
 
       // コスト支払い: 手札から2枚を選んでアーカイブ
-      for (let i = 0; i < 2; i++) {
-        const picked = yield ctx.chooseCard({
-          cards: [...ctx.player.hand],
-          title: `コスト: アーカイブする手札を選択（${i + 1}/2）`,
-        });
-        if (!picked) return; // 念のため（候補があるので通常は来ない）
+      const paid = yield ctx.chooseCards({
+        cards: [...ctx.player.hand],
+        count: 2,
+        title: 'コスト: アーカイブする手札を選択（2枚）',
+      });
+      if (paid.length < 2) return; // 念のため（候補があるので通常は来ない）
+      for (const picked of paid) {
         ctx.removeFromHand(picked);
         ctx.player.archive.push(picked);
         ctx.log(`${ctx.player.name}: ${picked.name} をアーカイブ`);

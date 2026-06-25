@@ -34,21 +34,15 @@ export default {
   arts: {
     '虎嘯風生': {
       *run(ctx) {
-        let archived = 0;
-        // 「好きな枚数」=0枚も可。1枚ずつ選んでアーカイブし、やめるまで繰り返す。
-        while (ctx.sourceHolomem.cheers.length > 0) {
-          const cheer = yield ctx.chooseCard({
-            cards: [...ctx.sourceHolomem.cheers],
-            title: `このアーツ+40するためアーカイブするエールを選択（任意・現在${archived * 40}）`,
-            optional: true,
-            skipLabel: 'これ以上アーカイブしない',
-          });
-          if (!cheer) break;
-          yield* ctx.archiveCheer(ctx.sourceHolomem, cheer);
-          archived++;
-        }
-        if (archived > 0) {
-          ctx.addArtBonus(archived * 40, `エール${archived}枚をアーカイブ`);
+        // 「好きな枚数」=0枚も可。このホロメンのエールを一度に選んでアーカイブし、枚数×40を加算。
+        const archived = yield ctx.chooseCards({
+          cards: [...ctx.sourceHolomem.cheers],
+          min: 0,
+          title: 'このアーツ+40するためアーカイブするエールを選択（好きな枚数）',
+        });
+        for (const cheer of archived) yield* ctx.archiveCheer(ctx.sourceHolomem, cheer);
+        if (archived.length > 0) {
+          ctx.addArtBonus(archived.length * 40, `エール${archived.length}枚をアーカイブ`);
         }
       },
     },

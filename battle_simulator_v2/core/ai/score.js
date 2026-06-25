@@ -364,7 +364,13 @@ function scoreMainActions(engine, idx, pending, out) {
         if (underLethal && backRemain > oppThreat && backRemain > centerRemain) score = 70;
         // 育てた（エールを積んだ）センターは下げない＝攻撃機会とエール投資を捨てない。
         // 安易な入替は「センターが瀕死かつ実質エール無し」のときだけ。
-        else if (centerRemain <= 40 && backRemain > centerRemain + 30 && (p.center.cheers || []).length <= 1) score = 35;
+        // ただし「HPが低いだけ」では退かない: 残せば有効な攻撃（特に相手をKO）できる前衛は、退避でエールを捨てて
+        // 攻撃機会を失う方が損なので退かない（＝HP低下のみを理由にしたバトンは論理的でない）。
+        else if (centerRemain <= 40 && backRemain > centerRemain + 30 && (p.center.cheers || []).length <= 1) {
+          const centerOff = bestPayableEffDmg(engine, p.center, idx);
+          const canKO = opp.center && centerOff >= (engine.effectiveHp(opp.center) - opp.center.damage);
+          if (centerOff < 30 && !canKO) score = 35; // 攻撃価値の無い置物のときだけ退避
+        }
         else {
           // 明確に強いアタッカーがアクティブなバックにいるなら、センターへ据えて毎ターン殴る
           // （コラボは毎リセットで休むため、大技要員はセンターで継続攻撃させたい）。
@@ -485,6 +491,22 @@ function cardGainValue(engine, idx, card) {
 function scoreEffect(engine, idx, pending, out) {
   const req = pending.request || {};
   const kind = req.kind;
+  // 複数選択(chooseCards): 望ましいカードをトグルで選び、枚数条件を満たしたら確定。
+  // intent: gain=価値の高いものを選ぶ / discard・sacrifice・returnToDeck=価値の低い（不要な）ものを選ぶ。
+  if (kind === 'chooseCards') {
+    const ms = pending.multiSelect || { min: 0, max: pending.options.length, selected: [] };
+    const discard = req.intent === 'discard' || req.intent === 'sacrifice' || req.intent === 'returnToDeck';
+    const wantOf = (card) => {
+      const v = cardGainValue(engine, idx, card);
+      return discard ? -v : v; // 捨てる系は不要なカードほど選びたい
+    };
+    for (const opt of pending.options) {
+      if (opt.confirm) { out[opt.id] = ms.selected.length >= ms.min ? 0 : -Infinity; continue; }
+      if (ms.selected.includes(opt.id) || ms.selected.length >= ms.max) { out[opt.id] = -Infinity; continue; }
+      out[opt.id] = wantOf(opt.card); // 正なら確定(0)より優先して選ぶ／満たしたら確定が勝つ
+    }
+    return;
+  }
   if (kind === 'confirm') {
     // カード定義 ai.confirmValue があれば発動価値を計算（負なら見送り）。無ければ既定で発動。
     const cdef = req.sourceNumber ? engine.registry.get(req.sourceNumber) : null;

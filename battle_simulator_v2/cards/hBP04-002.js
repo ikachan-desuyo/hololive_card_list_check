@@ -56,23 +56,19 @@ export default {
       return p.archive.some(isKinokoEvent);
     },
     *run(ctx) {
-      // アーカイブの#きのこイベント1～4枚を手札に戻す
-      let returned = 0;
-      for (let i = 0; i < 4; i++) {
-        const events = ctx.player.archive.filter(isKinokoEvent);
-        if (events.length === 0) break;
-        const picked = yield ctx.chooseCard({
-          cards: events,
-          title: `手札に戻す#きのこイベントをアーカイブから選択 (${i + 1}/4枚目)`,
-          // 1枚目は必須、2枚目以降は任意（「1～4枚」のため最低1枚）
-          optional: i > 0,
-          skipLabel: 'ここまでにする',
-        });
-        if (!picked) break;
-        ctx.removeFromArchive(picked);
-        ctx.addToHand(picked);
-        returned++;
+      // アーカイブの#きのこイベント1～4枚を手札に戻す（「1～4枚」=最低1枚・最大4枚）
+      const events = ctx.player.archive.filter(isKinokoEvent);
+      const picked = yield ctx.chooseCards({
+        cards: events,
+        min: 1,
+        max: 4,
+        title: '手札に戻す#きのこイベントをアーカイブから選択（1～4枚）',
+      });
+      for (const c of picked) {
+        ctx.removeFromArchive(c);
+        ctx.addToHand(c);
       }
+      const returned = picked.length;
       // 手札に戻したカード2枚につき1枚引く（端数切り捨て）
       const drawCount = Math.floor(returned / 2);
       if (drawCount > 0) {

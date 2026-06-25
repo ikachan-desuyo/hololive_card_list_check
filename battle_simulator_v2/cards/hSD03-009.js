@@ -16,16 +16,13 @@ export default {
         const ok = yield ctx.confirm('青エール2枚をアーカイブして特殊ダメージ30を与えますか？');
         if (!ok) return;
         // コスト: 青エール2枚をアーカイブ
-        for (let i = 0; i < 2; i++) {
-          const remaining = ctx.sourceHolomem.cheers.filter((c) => c.color === '青');
-          if (remaining.length === 0) break;
-          const cheer = yield ctx.chooseCard({
-            cards: remaining,
-            title: `コスト: アーカイブする青エールを選択（${i + 1}/2）`,
-          });
-          if (!cheer) return; // 途中キャンセル（保存則のため既に払った分は戻せないが、選択必須）
-          yield* ctx.archiveCheer(ctx.sourceHolomem, cheer);
-        }
+        const picked = yield ctx.chooseCards({
+          cards: blueCheers.slice(),
+          count: 2,
+          title: 'コスト: アーカイブする青エールを選択（2枚）',
+        });
+        if (picked.length < 2) return; // 選択必須
+        for (const cheer of picked) yield* ctx.archiveCheer(ctx.sourceHolomem, cheer);
         // 相手センターへ特殊ダメージ30
         const center = ctx.holomems('opp', (e) => e.pos.zone === 'center')[0];
         if (center) yield* ctx.dealSpecialDamage(center, 30);

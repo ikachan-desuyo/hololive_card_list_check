@@ -34,30 +34,29 @@ export default {
         (c) => c.kind === 'holomen' && (c.tags || []).includes('EN'));
     },
     *run(ctx) {
-      // コスト: 手札2枚をアーカイブ
-      for (let i = 0; i < 2 && ctx.player.hand.length > 0; i++) {
-        const card = yield ctx.chooseCard({
-          cards: ctx.player.hand,
-          title: `アーカイブする手札を選択（${i + 1}/2）`,
-        });
-        if (!card) break;
+      // コスト: 手札2枚をアーカイブ（一括選択。手札が2枚未満なら有る分だけ）
+      const costCards = yield ctx.chooseCards({
+        cards: [...ctx.player.hand],
+        count: 2,
+        title: 'アーカイブする手札を選択（2枚）',
+      });
+      for (const card of costCards) {
         ctx.removeFromHand(card);
         ctx.player.archive.push(card);
         ctx.log(`${card.name} をアーカイブした`);
       }
-      // 効果: アーカイブの #EN ホロメン2枚を手札に戻す
-      for (let i = 0; i < 2; i++) {
-        const enHolomems = ctx.player.archive.filter(
-          (c) => c.kind === 'holomen' && ctx.hasTag(c, 'EN'),
-        );
-        if (enHolomems.length === 0) break;
-        const picked = yield ctx.chooseCard({
-          cards: enHolomems,
-          title: `手札に戻す#ENホロメンを選択（${i + 1}/2）`,
-        });
-        if (!picked) break;
-        ctx.removeFromArchive(picked);
-        ctx.addToHand(picked);
+      // 効果: アーカイブの #EN ホロメン2枚を手札に戻す（一括選択。居る分だけ）
+      const enHolomems = ctx.player.archive.filter(
+        (c) => c.kind === 'holomen' && ctx.hasTag(c, 'EN'),
+      );
+      const picked = yield ctx.chooseCards({
+        cards: enHolomems,
+        count: 2,
+        title: '手札に戻す#ENホロメンを選択（2枚）',
+      });
+      for (const c of picked) {
+        ctx.removeFromArchive(c);
+        ctx.addToHand(c);
       }
     },
   },

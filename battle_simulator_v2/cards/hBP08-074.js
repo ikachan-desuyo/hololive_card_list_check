@@ -48,19 +48,16 @@ export default {
   arts: {
     'ネクロ・エリミネーション!!': {
       *run(ctx) {
-        // 「自分の手札1～3枚をアーカイブできる」: 最大3枚まで任意で1枚ずつ選ぶ（0枚も可＝「できる」）
-        const archived = [];
-        while (archived.length < 3 && ctx.player.hand.length > 0) {
-          const card = yield ctx.chooseCard({
-            cards: ctx.player.hand.slice(),
-            title: `ネクロ・エリミネーション!!: アーカイブする手札を選択（${archived.length}/3）`,
-            optional: true,
-            skipLabel: archived.length === 0 ? 'アーカイブしない' : 'これでアーカイブを終える',
-          });
-          if (!card) break;
+        // 「自分の手札1～3枚をアーカイブできる」: 0～3枚を一度に選ぶ（0枚も可＝「できる」）
+        const archived = yield ctx.chooseCards({
+          cards: ctx.player.hand.slice(),
+          min: 0,
+          max: 3,
+          title: 'ネクロ・エリミネーション!!: アーカイブする手札を選択（0〜3枚）',
+        });
+        for (const card of archived) {
           ctx.removeFromHand(card);
           ctx.player.archive.push(card);
-          archived.push(card);
           ctx.log(`ネクロ・エリミネーション!!: ${card.name} をアーカイブ`);
         }
         if (archived.length === 0) return;

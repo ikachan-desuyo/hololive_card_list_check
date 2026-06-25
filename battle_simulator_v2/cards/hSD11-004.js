@@ -29,19 +29,16 @@ export default {
       if (!ok) return;
 
       // エール2枚を選んでアーカイブ（別々のホロメンからでも同じホロメンからでも可）
-      let pool = allCheers;
-      const picked = [];
-      for (let i = 0; i < 2; i++) {
-        const sel = yield ctx.chooseCard({
-          cards: pool.map((p) => p.cheer),
-          title: `アーカイブするエールを選択（${i + 1}/2）`,
-        });
-        if (!sel) return; // 途中で選べなければコスト不成立（何もしない）
-        const entry = pool.find((p) => p.cheer === sel);
-        picked.push(entry);
-        pool = pool.filter((p) => p.cheer !== sel);
+      const selected = yield ctx.chooseCards({
+        cards: allCheers.map((p) => p.cheer),
+        count: 2,
+        title: 'アーカイブするエールを選択（2枚）',
+      });
+      if (selected.length < 2) return; // 選べなければコスト不成立（何もしない）
+      for (const cheer of selected) {
+        const entry = allCheers.find((p) => p.cheer === cheer);
+        yield* ctx.archiveCheer(entry.holomem, cheer);
       }
-      for (const { cheer, holomem } of picked) yield* ctx.archiveCheer(holomem, cheer);
 
       // アーカイブの〈虎金妃笑虎〉1枚を手札に戻す
       const ret = yield ctx.chooseCard({

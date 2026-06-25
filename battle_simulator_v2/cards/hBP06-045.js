@@ -20,19 +20,13 @@ export default {
       *run(ctx) {
         const holomems = ctx.player.archive.filter((c) => c.kind === 'holomen');
         if (holomems.length === 0) return; // アーカイブにホロメンが無ければ何もしない
-        const picked = [];
         const max = Math.min(5, holomems.length); // 1～5枚
-        for (let i = 0; i < max; i++) {
-          const remaining = holomems.filter((c) => !picked.includes(c));
-          const choice = yield ctx.chooseCard({
-            cards: remaining,
-            title: `デッキの下に戻すアーカイブのホロメンを選択（${picked.length + 1}枚目 / 最大${max}枚, 1枚目以降は任意）`,
-            optional: picked.length >= 1, // 最低1枚は戻す（0枚不可）
-            skipLabel: 'これ以上戻さない',
-          });
-          if (!choice) break;
-          picked.push(choice);
-        }
+        const picked = yield ctx.chooseCards({
+          cards: holomems,
+          min: 1,
+          max,
+          title: 'デッキの下に戻すアーカイブのホロメンを選択（1～5枚）',
+        });
         if (picked.length === 0) return;
         // 好きな順でデッキの下に戻す
         const ordered = yield* ctx.orderCardsFlow(picked, 'デッキの下に戻す順番');

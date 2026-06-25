@@ -33,12 +33,12 @@ export default {
           g['hBP01-110'] = true;
           const center = ctx.holomems('opp', (e) => e.pos.zone === 'center')[0];
           if (!center) { ctx.log('相手のセンターがいないため効果なし'); return; }
-          for (let k = 0; k < 2; k++) {
-            const cheers = [...center.holomem.cheers];
-            if (cheers.length === 0) break;
-            const cheer = cheers.length === 1 ? cheers[0]
-              : yield ctx.chooseCard({ cards: cheers, title: `アーカイブする相手センターのエールを選択（${k + 1}/2）` });
-            if (!cheer) break;
+          const picked = yield ctx.chooseCards({
+            cards: [...center.holomem.cheers],
+            count: 2,
+            title: 'アーカイブする相手センターのエールを選択（2枚）',
+          });
+          for (const cheer of picked) {
             const idx = center.holomem.cheers.indexOf(cheer);
             if (idx !== -1) { center.holomem.cheers.splice(idx, 1); ctx.opponent.archive.push(cheer); ctx.log(`相手センターの ${cheer.name} をアーカイブ`); }
           }

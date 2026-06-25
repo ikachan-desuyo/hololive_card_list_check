@@ -16,19 +16,16 @@ export default {
       const looked = ctx.lookTopDeck(4);
       const pool = [...looked];
       // #ID2期生 を持つホロメンを好きな枚数（0枚も可）公開して手札に加える
-      while (true) {
-        const candidates = pool.filter((c) => c.kind === 'holomen' && ctx.hasTag(c, 'ID2期生'));
-        if (candidates.length === 0) break;
-        const picked = yield ctx.chooseCard({
-          cards: candidates,
-          title: '手札に加える #ID2期生 のホロメンを選択（任意）',
-          optional: true,
-          skipLabel: 'これ以上加えない',
-          displayCards: pool, // 見た4枚は対象外のカードも表示する
-        });
-        if (!picked) break;
-        pool.splice(pool.indexOf(picked), 1);
-        ctx.addToHand(picked);
+      const candidates = pool.filter((c) => c.kind === 'holomen' && ctx.hasTag(c, 'ID2期生'));
+      const picked = yield ctx.chooseCards({
+        cards: candidates,
+        min: 0,
+        title: '手札に加える #ID2期生 のホロメンを選択（任意・好きな枚数）',
+        displayCards: pool, // 見た4枚は対象外のカードも表示する
+      });
+      for (const c of picked) {
+        pool.splice(pool.indexOf(c), 1);
+        ctx.addToHand(c);
       }
       // 残りは好きな順でデッキの下へ戻す
       const ordered = yield* ctx.orderCardsFlow(pool, 'デッキの下に戻す順番');

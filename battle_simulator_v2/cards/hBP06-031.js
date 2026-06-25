@@ -28,26 +28,24 @@ export default {
         return list;
       };
 
-      let available = collect();
+      const available = collect();
       if (available.length === 0) return; // 付いている〈ルーナイト〉が無ければ何もしない
 
       // 任意発動: 最大2枚までアーカイブできる
       const ok = yield ctx.confirm('ステージの〈ルーナイト〉をアーカイブしてエールを送りますか？');
       if (!ok) return;
 
+      // 最大2枚を一括選択してアーカイブ（任意）。候補は付いている〈ルーナイト〉一覧
+      const entries = available;
+      const pickedCards = yield ctx.chooseCards({
+        cards: entries.map((x) => x.card),
+        min: 0,
+        max: 2,
+        title: 'アーカイブする〈ルーナイト〉を選択（最大2枚・任意）',
+      });
       let archived = 0;
-      const maxCount = 2;
-      for (let i = 0; i < maxCount; i++) {
-        available = collect();
-        if (available.length === 0) break;
-        const picked = yield ctx.chooseCard({
-          cards: available.map((x) => x.card),
-          title: `アーカイブする〈ルーナイト〉を選択（${i + 1}枚目／最大2枚・任意）`,
-          optional: true,
-          skipLabel: i === 0 ? 'やめる' : 'ここまでにする',
-        });
-        if (!picked) break;
-        const entry = available.find((x) => x.card === picked);
+      for (const picked of pickedCards) {
+        const entry = entries.find((x) => x.card === picked);
         const idx = entry.holomem.attachments.indexOf(picked);
         if (idx !== -1) entry.holomem.attachments.splice(idx, 1);
         ctx.player.archive.push(picked);

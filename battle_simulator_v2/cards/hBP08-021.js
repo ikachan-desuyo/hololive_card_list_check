@@ -26,17 +26,15 @@ export default {
         return;
       }
 
-      // デッキから〈Otomo〉を最大2枚、1枚ずつ公開して手札に加える
-      for (let i = 0; i < 2; i++) {
-        const cand = ctx.deckCards((c) => c.name === 'Otomo');
-        if (cand.length === 0) break;
-        const target = yield ctx.chooseCard({
-          cards: cand,
-          title: `手札に加える〈Otomo〉を選択（${i + 1}枚目／最大2枚）`,
-          optional: true,
-          skipLabel: '見つからなかったことにする',
-        });
-        if (!target) break;
+      // デッキから〈Otomo〉を最大2枚、まとめて公開して手札に加える
+      const cand = ctx.deckCards((c) => c.name === 'Otomo');
+      const targets = yield ctx.chooseCards({
+        cards: cand,
+        min: 0,
+        max: 2,
+        title: '手札に加える〈Otomo〉を選択（最大2枚・見つからなかったことにも可）',
+      });
+      for (const target of targets) {
         ctx.removeFromDeck(target);
         ctx.addToHand(target, { reveal: true });
       }

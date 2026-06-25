@@ -69,14 +69,14 @@ export default {
       });
       if (!target) return;
 
-      for (let i = 0; i < fsCount; i++) {
-        const cheers = ctx.player.archive.filter((c) => c.kind === 'cheer');
-        if (cheers.length === 0) break;
-        const cheer = yield ctx.chooseCard({
-          cards: cheers,
-          title: `〈${target.top.name}〉に送るエールを選択（アーカイブ・${i + 1}/${fsCount}）`,
-        });
-        if (!cheer) break;
+      // 〈フロンティアスピリット〉の枚数ぶんのエールを一度に選ぶ（アーカイブのエールが足りなければある分だけ）
+      const cheers = ctx.player.archive.filter((c) => c.kind === 'cheer');
+      const picked = yield ctx.chooseCards({
+        cards: cheers,
+        count: fsCount,
+        title: `〈${target.top.name}〉に送るエールを選択（アーカイブ・最大${fsCount}枚）`,
+      });
+      for (const cheer of picked) {
         ctx.removeFromArchive(cheer);
         ctx.attachCheer(cheer, target.holomem);
       }

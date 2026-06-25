@@ -21,19 +21,17 @@ export default {
         optional: true,
       });
       if (!target) return;
-      // アーカイブのエールを最大2枚（別々の枚）選んで送る
-      for (let i = 0; i < 2; i++) {
-        const remaining = ctx.player.archive.filter((c) => c.kind === 'cheer');
-        if (remaining.length === 0) break;
-        const picked = yield ctx.chooseCard({
-          cards: remaining,
-          title: `アーカイブから送るエールを選択（${i + 1}枚目／任意）`,
-          optional: true,
-          skipLabel: '送らない',
-        });
-        if (!picked) break;
-        ctx.removeFromArchive(picked);
-        ctx.attachCheer(picked, target.holomem);
+      // アーカイブのエールを最大2枚（別々の枚）まとめて選んで送る
+      const remaining = ctx.player.archive.filter((c) => c.kind === 'cheer');
+      const picked = yield ctx.chooseCards({
+        cards: remaining,
+        min: 0,
+        max: 2,
+        title: 'アーカイブから送るエールを選択（最大2枚・任意）',
+      });
+      for (const cheer of picked) {
+        ctx.removeFromArchive(cheer);
+        ctx.attachCheer(cheer, target.holomem);
       }
     },
   },

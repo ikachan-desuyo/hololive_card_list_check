@@ -19,17 +19,14 @@ export default {
       const ok = yield ctx.confirm('手札1～2枚をアーカイブして、その枚数だけアーカイブの〈ろぼさー〉を手札に戻しますか？');
       if (!ok) return;
 
-      // 手札1～2枚をアーカイブ（1枚目は必須、2枚目は任意）
-      const maxCost = Math.min(2, ctx.player.hand.length);
+      // 手札1～2枚をアーカイブ（1枚目は必須、2枚目は任意＝min:1,max:2）
+      const picked = yield ctx.chooseCards({
+        cards: [...ctx.player.hand],
+        min: 1, max: 2,
+        title: 'コスト: アーカイブする手札を選択（1～2枚）',
+      });
       let archived = 0;
-      for (let i = 0; i < maxCost; i++) {
-        const card = yield ctx.chooseCard({
-          cards: [...ctx.player.hand],
-          title: `コスト: アーカイブする手札を選択（${i + 1}/${maxCost}）`,
-          optional: i >= 1, // 1枚目は必須、2枚目以降は任意
-          skipLabel: 'ここまでにする',
-        });
-        if (!card) break;
+      for (const card of picked) {
         ctx.removeFromHand(card);
         ctx.player.archive.push(card);
         archived++;
