@@ -58,20 +58,17 @@ export default {
       return !engine.state.players[ownerIdx].archive.some(isFoodEvent);
     },
     *run(ctx) {
-      // アーカイブの#食べ物イベント1～4枚を手札に戻す
-      for (let i = 0; i < 4; i++) {
-        const events = ctx.player.archive.filter(isFoodEvent);
-        if (events.length === 0) break;
-        const picked = yield ctx.chooseCard({
-          cards: events,
-          title: `手札に戻す#食べ物イベントをアーカイブから選択 (${i + 1}/4枚目)`,
-          // 1枚目は必須、2枚目以降は任意（「1～4枚」のため最低1枚）
-          optional: i > 0,
-          skipLabel: 'ここまでにする',
-        });
-        if (!picked) break;
-        ctx.removeFromArchive(picked);
-        ctx.addToHand(picked);
+      // アーカイブの#食べ物イベント1～4枚を手札に戻す（最低1枚・最大4枚）。一括選択
+      const events = ctx.player.archive.filter(isFoodEvent);
+      const picked = yield ctx.chooseCards({
+        cards: events,
+        min: 1,
+        max: 4,
+        title: '手札に戻す#食べ物イベントをアーカイブから選択（1～4枚）',
+      });
+      for (const c of picked) {
+        ctx.removeFromArchive(c);
+        ctx.addToHand(c);
       }
       // その後、このターンの間、自分のステージの#料理ホロメン全員のアーツ+40
       ctx.addTurnModifier({

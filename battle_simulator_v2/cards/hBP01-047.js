@@ -22,17 +22,15 @@ export default {
       const dice = (yield* ctx.rollDice());
       if (dice % 2 === 0) return; // 偶数なら何も起きない
 
-      // 奇数: アーカイブの緑エール1～3枚をこのホロメンに送れる（任意）
-      for (let i = 0; i < 3; i++) {
-        const greenCheers = ctx.player.archive.filter((c) => c.kind === 'cheer' && c.color === '緑');
-        if (greenCheers.length === 0) break;
-        const cheer = yield ctx.chooseCard({
-          cards: greenCheers,
-          title: `このホロメンに送る緑エールを選択（${i + 1}/3・任意）`,
-          optional: true,
-          skipLabel: i === 0 ? '送らない' : '終了',
-        });
-        if (!cheer) break;
+      // 奇数: アーカイブの緑エール1～3枚をこのホロメンに送れる（任意・0可）
+      const greenCheers = ctx.player.archive.filter((c) => c.kind === 'cheer' && c.color === '緑');
+      const picked = yield ctx.chooseCards({
+        cards: greenCheers,
+        min: 0, // 「1～3枚を…送れる」=任意なので0可
+        max: 3,
+        title: 'このホロメンに送る緑エールを選択（0～3枚）',
+      });
+      for (const cheer of picked) {
         ctx.removeFromArchive(cheer);
         ctx.attachCheer(cheer, ctx.sourceHolomem);
       }

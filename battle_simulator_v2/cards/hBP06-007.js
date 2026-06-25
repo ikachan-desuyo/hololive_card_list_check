@@ -51,12 +51,12 @@ export default {
       ctx.draw(2);
       // その後、手札2枚をアーカイブする
       const archiveCount = Math.min(2, ctx.player.hand.length);
-      for (let i = 0; i < archiveCount; i++) {
-        const card = yield ctx.chooseCard({
-          cards: [...ctx.player.hand],
-          title: `SP推しスキル: アーカイブする手札を選択（${i + 1}/${archiveCount}）`,
-        });
-        if (!card) break;
+      const toArchive = yield ctx.chooseCards({
+        cards: [...ctx.player.hand],
+        count: archiveCount,
+        title: 'SP推しスキル: アーカイブする手札を選択（2枚）',
+      });
+      for (const card of toArchive) {
         ctx.removeFromHand(card);
         ctx.player.archive.push(card);
       }

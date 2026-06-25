@@ -13,16 +13,16 @@ export default {
       return all.length > 0 && all.every((e) => ctx.hasTag(e.top, '秘密結社holoX'));
     },
     *run(ctx) {
-      for (let i = 0; i < 2; i++) {
-        const cand = ctx.deckCards((c) => c.kind === 'holomen' && ctx.hasTag(c, '秘密結社holoX'));
-        if (cand.length === 0) break;
-        const picked = yield ctx.chooseCard({
-          cards: cand, title: `手札に加える #秘密結社holoX のホロメンを選択（${i + 1}/2・任意）`,
-          optional: true, skipLabel: 'これ以上加えない',
-        });
-        if (!picked) break;
-        ctx.removeFromDeck(picked);
-        ctx.addToHand(picked);
+      const cand = ctx.deckCards((c) => c.kind === 'holomen' && ctx.hasTag(c, '秘密結社holoX'));
+      const picked = yield ctx.chooseCards({
+        cards: cand,
+        min: 0,
+        max: 2,
+        title: '手札に加える #秘密結社holoX のホロメンを選択（最大2枚・任意）',
+      });
+      for (const c of picked) {
+        ctx.removeFromDeck(c);
+        ctx.addToHand(c);
       }
       ctx.shuffleDeck();
       // ステージのエールが相手より少ないなら、エールデッキ上から1枚をホロメンに

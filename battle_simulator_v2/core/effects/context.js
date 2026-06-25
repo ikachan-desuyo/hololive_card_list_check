@@ -186,17 +186,28 @@ export class EffectContext {
    *         const some  = yield ctx.chooseCards({ cards, min: 0, max: 3, title: '付け替えるエールを選択', intent: 'discard' });
    * intent は単一選択 chooseCard と同じ（'gain'｜'discard' 等。AIの選別に使う）。
    */
-  chooseCards({ cards, count = undefined, min = undefined, max = undefined, title, intent = undefined, displayCards = [] }) {
+  chooseCards({ cards, count = undefined, min = undefined, max = undefined, title, intent = undefined, deckSearch = undefined, displayCards = [] }) {
     const n = cards.length;
     let lo = count != null ? count : (min != null ? min : 0);
     let hi = count != null ? count : (max != null ? max : n);
     lo = Math.max(0, Math.min(lo, n));
     hi = Math.max(lo, Math.min(hi, n));
+    // デッキサーチ（候補がデッキ由来）なら、単一選択 chooseCard と同様にデッキ全体を確認用に見せ、
+    // 確認後シャッフルを保証する（複数選択でもデッキサーチのUX・ルールを維持する）。
+    const deck = this.player.deck;
+    const isDeckSearch = deckSearch === true
+      || (cards && cards._fromDeck === true)
+      || (cards.length > 0 && cards.every((c) => deck.includes(c)));
+    if (isDeckSearch && displayCards.length === 0) {
+      displayCards = [...deck];
+      this.player._deckViewedNeedsShuffle = true;
+    }
     return {
       kind: 'chooseCards',
       player: this.playerIdx,
       title,
       intent,
+      deckSearch: isDeckSearch,
       min: lo,
       max: hi,
       displayCards: displayCards.filter((c) => !cards.includes(c)),

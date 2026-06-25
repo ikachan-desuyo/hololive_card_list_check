@@ -51,20 +51,18 @@ export default {
       return p.deck.some((c) => c.kind === 'support' && c.supportType === 'マスコット');
     },
     *run(ctx) {
-      // デッキ内のマスコットを1～2枚、手札に加える（1枚目は必須、2枚目は任意）
-      for (let i = 0; i < 2; i++) {
-        const cand = ctx.deckCards((c) => c.kind === 'support' && c.supportType === 'マスコット');
-        if (cand.length === 0) break;
-        const picked = yield ctx.chooseCard({
-          cards: cand,
-          title: `手札に加えるマスコットを選択 (${i + 1}/2枚目)`,
-          optional: i > 0, // 1枚目は必須、2枚目は任意（「1～2枚」）
-          skipLabel: 'ここまでにする',
-        });
-        if (!picked) break;
-        ctx.removeFromDeck(picked);
-        ctx.flashReveal(picked); // 公開
-        ctx.addToHand(picked);
+      // デッキ内のマスコットを1～2枚、一度に選んで手札に加える（1枚目は必須、2枚目は任意）
+      const cand = ctx.deckCards((c) => c.kind === 'support' && c.supportType === 'マスコット');
+      const picked = yield ctx.chooseCards({
+        cards: cand,
+        min: 1,
+        max: 2,
+        title: '手札に加えるマスコットを選択（1〜2枚）',
+      });
+      for (const c of picked) {
+        ctx.removeFromDeck(c);
+        ctx.flashReveal(c); // 公開
+        ctx.addToHand(c);
       }
       // そしてデッキをシャッフルする
       ctx.shuffleDeck();

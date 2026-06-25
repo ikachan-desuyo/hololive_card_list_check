@@ -14,21 +14,18 @@ export default {
         if (ctx.player.hand.length === 0) return; // コスト（手札）を払えない
         const ok = yield ctx.confirm('手札1～3枚をアーカイブして、1枚につき特殊ダメージ40を与えますか？');
         if (!ok) return;
-        const max = Math.min(3, ctx.player.hand.length);
-        let archived = 0;
-        for (let i = 0; i < max; i++) {
-          const optional = i >= 1; // 1枚目は必須（コスト最小1枚）、2枚目以降は任意
-          const card = yield ctx.chooseCard({
-            cards: [...ctx.player.hand],
-            title: `コスト: アーカイブする手札を選択（${i + 1}枚目${optional ? '・任意' : ''}）`,
-            optional,
-            skipLabel: 'ここでやめる',
-          });
-          if (!card) break;
+        // 手札1～3枚をアーカイブ（1枚目は必須・最大3枚）。一度に選んで確定する。
+        const picked = yield ctx.chooseCards({
+          cards: [...ctx.player.hand],
+          min: 1,
+          max: 3,
+          title: 'コスト: アーカイブする手札を選択（1～3枚）',
+        });
+        for (const card of picked) {
           ctx.removeFromHand(card);
           ctx.player.archive.push(card);
-          archived++;
         }
+        const archived = picked.length;
         if (archived === 0) return;
         ctx.log(`手札${archived}枚をアーカイブした`);
         const target = yield ctx.chooseHolomem({

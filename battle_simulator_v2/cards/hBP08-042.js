@@ -25,21 +25,17 @@ export default {
         '手札1～3枚をアーカイブして、選んだホロメンのアーツを強化しますか？');
       if (!ok) return;
 
-      // コスト: 手札を1～3枚アーカイブ（1枚目は必須、2・3枚目は「やめる」可）
-      const archived = [];
-      while (archived.length < 3 && ctx.player.hand.length > 0) {
-        const optional = archived.length >= 1;
-        const cost = yield ctx.chooseCard({
-          cards: [...ctx.player.hand],
-          title: `コスト: アーカイブする手札を選択（${archived.length + 1}枚目／最大3枚）`,
-          optional,
-          skipLabel: 'これ以上アーカイブしない',
-        });
-        if (!cost) break;
+      // コスト: 手札を1～3枚アーカイブ（最低1枚・最大3枚）
+      const archived = yield ctx.chooseCards({
+        cards: [...ctx.player.hand],
+        min: 1,
+        max: 3,
+        title: 'コスト: アーカイブする手札を選択（1～3枚）',
+      });
+      for (const cost of archived) {
         ctx.removeFromHand(cost);
         ctx.player.archive.push(cost);
         ctx.log(`${ctx.player.name}: ${cost.name} をアーカイブした`);
-        archived.push(cost);
       }
       if (archived.length === 0) return;
 

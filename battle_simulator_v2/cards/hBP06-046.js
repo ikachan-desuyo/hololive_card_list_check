@@ -23,12 +23,13 @@ export default {
         if (ctx.player.hand.length < 2) return; // コスト（手札2枚）を払えない
         const ok = yield ctx.confirm('手札2枚をアーカイブして特殊ダメージ50を与えますか？');
         if (!ok) return;
-        for (let i = 0; i < 2; i++) {
-          const card = yield ctx.chooseCard({
-            cards: [...ctx.player.hand],
-            title: `コスト: アーカイブする手札を選択（${i + 1}/2）`,
-          });
-          if (!card) return;
+        const picked = yield ctx.chooseCards({
+          cards: [...ctx.player.hand],
+          count: 2,
+          title: 'コスト: アーカイブする手札を選択（2枚）',
+        });
+        if (picked.length < 2) return;
+        for (const card of picked) {
           ctx.removeFromHand(card);
           ctx.player.archive.push(card);
         }

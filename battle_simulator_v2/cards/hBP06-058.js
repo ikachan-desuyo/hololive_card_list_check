@@ -12,13 +12,13 @@ export default {
     name: 'Yes, Chef.',
     *run(ctx) {
       ctx.draw(3);
-      // 手札2枚をアーカイブ（強制。手札が足りなければある分だけ）
-      for (let i = 0; i < 2 && ctx.player.hand.length > 0; i++) {
-        const card = yield ctx.chooseCard({
-          cards: ctx.player.hand,
-          title: `アーカイブする手札を選択（${i + 1}/2）`,
-        });
-        if (!card) break;
+      // 手札2枚をアーカイブ（強制。手札が足りなければある分だけ）。一括選択
+      const picked = yield ctx.chooseCards({
+        cards: [...ctx.player.hand],
+        count: 2,
+        title: 'アーカイブする手札を選択（2枚）',
+      });
+      for (const card of picked) {
         ctx.removeFromHand(card);
         ctx.player.archive.push(card);
         ctx.log(`${card.name} をアーカイブした`);

@@ -21,19 +21,16 @@ export default {
       const looked = ctx.lookTopDeck(4);
       // 「好きな枚数」#ID1期生ホロメンを手札に加える（0枚も可。"好きな枚数"=0可）
       const remaining = [...looked];
-      while (true) {
-        const candidates = remaining.filter(
-          (c) => c.kind === 'holomen' && ctx.hasTag(c, 'ID1期生'));
-        if (candidates.length === 0) break;
-        const picked = yield ctx.chooseCard({
-          cards: candidates,
-          title: '手札に加える #ID1期生 ホロメンを選択（任意・好きな枚数）',
-          optional: true,
-          skipLabel: 'これ以上加えない',
-        });
-        if (!picked) break;
-        remaining.splice(remaining.indexOf(picked), 1);
-        ctx.addToHand(picked); // 公開して手札に加える
+      const candidates = remaining.filter(
+        (c) => c.kind === 'holomen' && ctx.hasTag(c, 'ID1期生'));
+      const picked = yield ctx.chooseCards({
+        cards: candidates,
+        min: 0,
+        title: '手札に加える #ID1期生 ホロメンを選択（任意・好きな枚数）',
+      });
+      for (const c of picked) {
+        remaining.splice(remaining.indexOf(c), 1);
+        ctx.addToHand(c); // 公開して手札に加える
       }
       // 残ったカードを好きな順でデッキの下に戻す
       if (remaining.length > 0) {

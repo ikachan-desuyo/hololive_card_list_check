@@ -11,23 +11,20 @@ export default {
   collabEffect: {
     name: 'ソウル収穫',
     *run(ctx) {
-      const moved = [];
-      for (let i = 0; i < 3; i++) {
-        const cheers = ctx.player.archive.filter((c) => c.kind === 'cheer' && !moved.includes(c));
-        if (cheers.length === 0) break;
-        const picked = yield ctx.chooseCard({
-          cards: cheers,
-          title: `エールデッキに戻すエールを選択（${moved.length}/3）`,
-          optional: true,
-          skipLabel: moved.length === 0 ? '戻さない' : '戻すのをやめる',
-        });
-        if (!picked) break;
-        ctx.removeFromArchive(picked);
-        ctx.player.cheerDeck.push(picked);
-        ctx.log(`${ctx.player.name}: ${picked.name} をエールデッキに戻した`);
-        moved.push(picked);
+      const cheers = ctx.player.archive.filter((c) => c.kind === 'cheer');
+      // 「1～3枚を戻せる」=任意（0可）、最大3枚（候補が少なければその枚数まで）
+      const picked = yield ctx.chooseCards({
+        cards: cheers,
+        min: 0,
+        max: 3,
+        title: 'エールデッキに戻すエールを選択（0～3枚）',
+      });
+      for (const c of picked) {
+        ctx.removeFromArchive(c);
+        ctx.player.cheerDeck.push(c);
+        ctx.log(`${ctx.player.name}: ${c.name} をエールデッキに戻した`);
       }
-      if (moved.length > 0) ctx.shuffleCheerDeck();
+      if (picked.length > 0) ctx.shuffleCheerDeck();
     },
   },
 };

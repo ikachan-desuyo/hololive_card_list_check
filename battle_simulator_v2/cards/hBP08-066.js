@@ -41,20 +41,18 @@ export default {
   arts: {
     '酔い、覚ましていこ？': {
       *run(ctx) {
-        // 手札を1枚ずつ最大2枚までアーカイブできる（任意）。アーカイブ1枚につきこのアーツ+20。
-        let archived = 0;
-        while (archived < 2 && ctx.player.hand.length > 0) {
-          const card = yield ctx.chooseCard({
-            cards: ctx.player.hand,
-            title: `アーカイブする手札を選択（このアーツ+20／最大2枚・現在${archived}枚）`,
-            optional: true,
-            skipLabel: archived === 0 ? 'アーカイブしない' : 'これ以上アーカイブしない',
-          });
-          if (!card) break;
+        // 手札を最大2枚までアーカイブできる（任意・0枚可）。アーカイブ1枚につきこのアーツ+20。
+        const picked = yield ctx.chooseCards({
+          cards: ctx.player.hand.slice(),
+          min: 0,
+          max: 2,
+          title: 'アーカイブする手札を選択（このアーツ+20／0～2枚）',
+        });
+        for (const card of picked) {
           ctx.removeFromHand(card);
           ctx.player.archive.push(card);
-          archived++;
         }
+        const archived = picked.length;
         if (archived > 0) ctx.addArtBonus(archived * 20, `手札${archived}枚をアーカイブ`);
       },
     },

@@ -12,16 +12,14 @@ export default {
         const colors = new Set(ctx.sourceHolomem.cheers.map((c) => c.color));
         const hasRed = colors.has('赤'), hasBlue = colors.has('青');
         const max = (hasRed && hasBlue) ? 2 : (hasRed || hasBlue) ? 1 : 0;
-        for (let i = 0; i < max; i++) {
-          const cheers = ctx.player.archive.filter((c) => c.kind === 'cheer');
-          if (cheers.length === 0) break;
-          const picked = yield ctx.chooseCard({
-            cards: cheers, title: `このホロメンに送るエールを選択（${i + 1}/${max}・任意）`,
-            optional: true, skipLabel: '送らない',
-          });
-          if (!picked) break;
-          ctx.removeFromArchive(picked);
-          ctx.attachCheer(picked, ctx.sourceHolomem);
+        const cheers = ctx.player.archive.filter((c) => c.kind === 'cheer');
+        const picked = yield ctx.chooseCards({
+          cards: cheers, min: 0, max,
+          title: `このホロメンに送るエールを選択（最大${max}枚・任意）`,
+        });
+        for (const c of picked) {
+          ctx.removeFromArchive(c);
+          ctx.attachCheer(c, ctx.sourceHolomem);
         }
       },
     },

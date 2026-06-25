@@ -34,18 +34,15 @@ export default {
         title: 'エールを送る緑ホロメンを選択',
       });
       if (!entry) return;
-      while (true) {
-        const cheers = ctx.player.archive.filter((c) => c.kind === 'cheer');
-        if (cheers.length === 0) break;
-        const picked = yield ctx.chooseCard({
-          cards: cheers,
-          title: 'アーカイブから送るエールを選択（好きな枚数）',
-          optional: true,
-          skipLabel: '終了する',
-        });
-        if (!picked) break;
-        ctx.removeFromArchive(picked);
-        ctx.attachCheer(picked, entry.holomem);
+      // アーカイブのエールを好きな枚数（0枚可）選んで送る
+      const picked = yield ctx.chooseCards({
+        cards: ctx.player.archive.filter((c) => c.kind === 'cheer'),
+        min: 0,
+        title: 'アーカイブから送るエールを選択（好きな枚数）',
+      });
+      for (const cheer of picked) {
+        ctx.removeFromArchive(cheer);
+        ctx.attachCheer(cheer, entry.holomem);
       }
     },
   },

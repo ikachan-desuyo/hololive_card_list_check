@@ -44,16 +44,15 @@ export default {
       // その中から2枚（デッキ残りが少なければその枚数）を手札に加える
       const toAdd = Math.min(2, seen.length);
       const remaining = [...seen];
-      for (let i = 0; i < toAdd; i++) {
-        if (remaining.length === 0) break;
-        const picked = yield ctx.chooseCard({
-          cards: remaining,
-          title: `手札に加えるカードを選択（${i + 1}/${toAdd}）`,
-          displayCards: seen,
-        });
-        if (!picked) break;
-        remaining.splice(remaining.indexOf(picked), 1);
-        ctx.addToHand(picked);
+      const picked = yield ctx.chooseCards({
+        cards: [...seen],
+        count: toAdd,
+        title: '手札に加えるカードを選択（2枚）',
+        displayCards: seen,
+      });
+      for (const c of picked) {
+        remaining.splice(remaining.indexOf(c), 1);
+        ctx.addToHand(c);
       }
 
       // 残ったカードをアーカイブする

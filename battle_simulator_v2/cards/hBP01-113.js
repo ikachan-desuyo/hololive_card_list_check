@@ -29,19 +29,16 @@ export default {
 
       // #Promise を持つホロメンを好きな枚数（0可）選んで手札に加える
       const remaining = [...looked];
-      while (true) {
-        const candidates = remaining.filter(
-          (c) => c.kind === 'holomen' && ctx.hasTag(c, 'Promise'));
-        if (candidates.length === 0) break;
-        const picked = yield ctx.chooseCard({
-          cards: candidates,
-          title: '手札に加える #Promise のホロメンを選択（好きな枚数）',
-          optional: true,
-          skipLabel: 'これ以上加えない',
-        });
-        if (!picked) break;
-        remaining.splice(remaining.indexOf(picked), 1);
-        ctx.addToHand(picked); // 公開して手札に加える
+      const candidates = remaining.filter(
+        (c) => c.kind === 'holomen' && ctx.hasTag(c, 'Promise'));
+      const picked = yield ctx.chooseCards({
+        cards: candidates,
+        min: 0, // 好きな枚数（0可）
+        title: '手札に加える #Promise のホロメンを選択（好きな枚数）',
+      });
+      for (const c of picked) {
+        remaining.splice(remaining.indexOf(c), 1);
+        ctx.addToHand(c); // 公開して手札に加える
       }
 
       // 残ったカードを好きな順でデッキの下に戻す

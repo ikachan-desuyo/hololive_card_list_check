@@ -457,12 +457,20 @@ export async function runTests() {
     return e;
   }
 
-  /** 効果の選択が出ている間、最初の選択肢を選び続けてメインに戻す */
+  /** 効果の選択が出ている間、最初の選択肢を選び続けてメインに戻す（複数選択chooseCardsにも対応） */
   function resolveChoices(e, pick = () => 0) {
     let guard = 0;
-    while (e.state.pending && e.state.pending.type === 'effectChoice' && guard++ < 50) {
-      const options = e.state.pending.options;
-      e.apply(options[Math.min(pick(options), options.length - 1)].id);
+    while (e.state.pending && e.state.pending.type === 'effectChoice' && guard++ < 80) {
+      const pend = e.state.pending;
+      if (pend.multiSelect) {
+        const ms = pend.multiSelect;
+        const cardOpts = pend.options.filter((o) => o.card && !ms.selected.includes(o.id));
+        if (ms.selected.length < ms.min && cardOpts.length) e.apply(cardOpts[0].id); // 必要数までトグル
+        else e.apply('confirm'); // 条件を満たしたら確定
+      } else {
+        const options = pend.options;
+        e.apply(options[Math.min(pick(options), options.length - 1)].id);
+      }
     }
   }
 
@@ -980,8 +988,16 @@ export async function runTests() {
     // 駆動: 送り先〈AZKi〉(chooseHolomem)の出現回数を数える。各選択は options[0] を選ぶ
     let holomemPrompts = 0, guard = 0;
     while (e.state.pending && e.state.pending.type === 'effectChoice' && guard++ < 30) {
-      if (e.state.pending.request?.kind === 'chooseHolomem') holomemPrompts++;
-      e.apply(e.state.pending.options[0].id);
+      const pend = e.state.pending;
+      if (pend.request?.kind === 'chooseHolomem') holomemPrompts++;
+      if (pend.multiSelect) {
+        const ms = pend.multiSelect;
+        const cardOpts = pend.options.filter((o) => o.card && !ms.selected.includes(o.id));
+        if (ms.selected.length < ms.min && cardOpts.length) e.apply(cardOpts[0].id);
+        else e.apply('confirm');
+      } else {
+        e.apply(pend.options[0].id);
+      }
     }
     assertEq(holomemPrompts, 1, '送り先〈AZKi〉の選択が複数回出た（複数人に分けて送れてしまう）');
     assertEq(azki1.cheers.length, 2, '〈AZKi〉1人にエール2枚（FS2枚ぶん）が送られていない');

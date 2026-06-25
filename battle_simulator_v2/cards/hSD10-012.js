@@ -26,19 +26,16 @@ export default {
       const isFlowGlowHolomem = (c) =>
         c.kind === 'holomen' && ctx.hasTag(c, 'FLOW') && ctx.hasTag(c, 'GLOW');
       // 「好きな枚数」#FLOW GLOW ホロメンを公開して手札に加える（0枚も可）
-      while (true) {
-        const candidates = remaining.filter(isFlowGlowHolomem);
-        if (candidates.length === 0) break;
-        const picked = yield ctx.chooseCard({
-          cards: candidates,
-          title: '手札に加える #FLOW GLOW ホロメンを選択（任意・好きな枚数）',
-          optional: true,
-          skipLabel: 'これ以上加えない',
-          displayCards: looked, // 見た4枚は対象外のカードも表示する
-        });
-        if (!picked) break;
-        remaining.splice(remaining.indexOf(picked), 1);
-        ctx.addToHand(picked); // 公開して手札に加える
+      const candidates = remaining.filter(isFlowGlowHolomem);
+      const picked = yield ctx.chooseCards({
+        cards: candidates,
+        min: 0,
+        title: '手札に加える #FLOW GLOW ホロメンを選択（任意・好きな枚数）',
+        displayCards: looked, // 見た4枚は対象外のカードも表示する
+      });
+      for (const c of picked) {
+        remaining.splice(remaining.indexOf(c), 1);
+        ctx.addToHand(c); // 公開して手札に加える
       }
       // 残ったカードを好きな順でデッキの下に戻す
       if (remaining.length > 0) {

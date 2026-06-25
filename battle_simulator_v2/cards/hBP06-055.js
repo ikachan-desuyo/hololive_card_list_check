@@ -18,17 +18,16 @@ export default {
       // 相手のアーカイブのエール最大3枚を、相手のセンターホロメンに送る
       const oppCenter = ctx.holomems('opp', (e) => e.pos.zone === 'center')[0];
       if (oppCenter) {
-        for (let i = 0; i < 3; i++) {
-          const cheers = ctx.opponent.archive.filter((c) => c.kind === 'cheer');
-          if (cheers.length === 0) break;
-          const picked = yield ctx.chooseCard({
-            cards: cheers,
-            title: `相手のセンターに送るエールを選択（相手のアーカイブから・残り${3 - i}枚）`,
-          });
-          if (!picked) break;
-          const idx = ctx.opponent.archive.indexOf(picked);
+        const cheers = ctx.opponent.archive.filter((c) => c.kind === 'cheer');
+        const picked = yield ctx.chooseCards({
+          cards: cheers,
+          count: 3,
+          title: '相手のセンターに送るエールを選択（相手のアーカイブから・最大3枚）',
+        });
+        for (const cheer of picked) {
+          const idx = ctx.opponent.archive.indexOf(cheer);
           if (idx !== -1) ctx.opponent.archive.splice(idx, 1);
-          ctx.attachCheer(picked, oppCenter.holomem);
+          ctx.attachCheer(cheer, oppCenter.holomem);
         }
       }
 

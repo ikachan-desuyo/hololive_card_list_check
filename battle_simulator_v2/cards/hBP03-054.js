@@ -31,13 +31,12 @@ export default {
         const ok = yield ctx.confirm('このホロメンの紫エール4枚をアーカイブして、相手のステージのエール1枚をエールデッキの下に戻しますか？');
         if (!ok) return;
         // コスト支払い: 紫エール4枚を選んでアーカイブ
-        for (let i = 0; i < 4; i++) {
-          const remaining = ctx.sourceHolomem.cheers.filter((c) => c.color === '紫');
-          const cheer = yield ctx.chooseCard({
-            cards: remaining,
-            title: `コスト: アーカイブする紫エールを選択（${i + 1}/4）`,
-          });
-          if (!cheer) return;
+        const cheers = yield ctx.chooseCards({
+          cards: ctx.sourceHolomem.cheers.filter((c) => c.color === '紫'),
+          count: 4,
+          title: 'コスト: アーカイブする紫エールを選択（4枚）',
+        });
+        for (const cheer of cheers) {
           yield* ctx.archiveCheer(ctx.sourceHolomem, cheer);
         }
         // 効果: 相手のステージのエール1枚を相手のエールデッキの下に戻す

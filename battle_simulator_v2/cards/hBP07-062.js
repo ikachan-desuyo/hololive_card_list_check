@@ -18,16 +18,13 @@ export default {
       if (supports.length < 2) return;
       const ok = yield ctx.confirm('手札のサポートカード2枚をアーカイブしてホロメン1人のアーツ+50しますか？');
       if (!ok) return;
-      const picked = [];
-      for (let i = 0; i < 2; i++) {
-        const candidates = ctx.player.hand.filter((c) => c.kind === 'support' && !picked.includes(c));
-        const sel = yield ctx.chooseCard({
-          cards: candidates,
-          title: `アーカイブするサポートカードを選択 (${i + 1}/2)`,
-        });
-        if (!sel) return; // 途中で選べなければコスト未成立。何も起こさない
-        picked.push(sel);
-      }
+      const candidates = ctx.player.hand.filter((c) => c.kind === 'support');
+      const picked = yield ctx.chooseCards({
+        cards: candidates,
+        count: 2,
+        title: 'アーカイブするサポートカードを選択（2枚）',
+      });
+      if (picked.length < 2) return; // コスト未成立。何も起こさない
       for (const c of picked) {
         ctx.removeFromHand(c);
         ctx.player.archive.push(c);

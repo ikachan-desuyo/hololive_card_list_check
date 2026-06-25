@@ -44,16 +44,15 @@ export default {
           'このホロメンのエール2枚をアーカイブして、相手のセンターに「相手バック全員の被ダメージ合計」の特殊ダメージを与えますか？'
         );
         if (!ok) return;
-        // エール2枚を順に選んでアーカイブ
-        let pool = ctx.sourceHolomem.cheers.slice();
-        for (let i = 0; i < 2; i++) {
-          const picked = yield ctx.chooseCard({
-            cards: pool,
-            title: `アーカイブするエールを選択（${i + 1}/2）`,
-          });
-          if (!picked) return; // 2枚支払えなければ効果は発生しない（コスト未充足）
-          yield* ctx.archiveCheer(ctx.sourceHolomem, picked);
-          pool = pool.filter((c) => c !== picked);
+        // エール2枚を選んでアーカイブ（エールは2枚以上を確認済み）
+        const picked = yield ctx.chooseCards({
+          cards: ctx.sourceHolomem.cheers.slice(),
+          count: 2,
+          title: 'アーカイブするエールを選択（2枚）',
+        });
+        if (picked.length < 2) return; // 2枚支払えなければ効果は発生しない（コスト未充足）
+        for (const c of picked) {
+          yield* ctx.archiveCheer(ctx.sourceHolomem, c);
         }
         const backs = ctx.holomems('opponent', (e) => e.pos.zone === 'back');
         const total = backs.reduce((s, e) => s + (e.holomem.damage || 0), 0);

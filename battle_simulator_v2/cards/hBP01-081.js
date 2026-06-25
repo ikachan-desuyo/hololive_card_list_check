@@ -40,13 +40,13 @@ export default {
         const ok = yield ctx.confirm(
           `青エール2枚をアーカイブしてこのアーツ+${stacked * 60}しますか？`);
         if (!ok) return;
-        for (let i = 0; i < 2; i++) {
-          const remaining = (ctx.sourceHolomem.cheers || []).filter((c) => c.color === '青');
-          const cheer = yield ctx.chooseCard({
-            cards: remaining,
-            title: `コスト: アーカイブする青エールを選択（${i + 1}/2）`,
-          });
-          if (!cheer) return;
+        const picked = yield ctx.chooseCards({
+          cards: blueCheers,
+          count: 2,
+          title: 'コスト: アーカイブする青エールを選択（2枚）',
+        });
+        if (picked.length < 2) return;
+        for (const cheer of picked) {
           yield* ctx.archiveCheer(ctx.sourceHolomem, cheer);
         }
         // 重なっているホロメン1枚につき +60

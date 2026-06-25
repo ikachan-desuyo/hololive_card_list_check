@@ -14,12 +14,12 @@ export default {
         if (ctx.player.hand.length < 2) return; // コスト（手札2枚）を払えない
         const ok = yield ctx.confirm('手札2枚をアーカイブしてデッキを3枚引きますか？');
         if (!ok) return;
-        for (let i = 0; i < 2; i++) {
-          const card = yield ctx.chooseCard({
-            cards: [...ctx.player.hand],
-            title: `コスト: アーカイブする手札を選択（${i + 1}/2）`,
-          });
-          if (!card) return;
+        const cards = yield ctx.chooseCards({
+          cards: [...ctx.player.hand],
+          count: 2,
+          title: 'コスト: アーカイブする手札を選択（2枚）',
+        });
+        for (const card of cards) {
           ctx.removeFromHand(card);
           ctx.player.archive.push(card);
         }

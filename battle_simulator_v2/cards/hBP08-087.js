@@ -24,17 +24,16 @@ export default {
       // 送り先はセンターのみ。〈不知火フレア〉か #EN を持つホロメンであること
       const eligible = ctx.nameIs(centerTop, '不知火フレア') || ctx.hasTag(centerTop, '#EN');
       if (!eligible) return;
-      // アーカイブのエール1～2枚を、1枚ずつセンターへ送る（任意・最大2枚）
-      for (let i = 0; i < 2; i++) {
-        const cheers = ctx.player.archive.filter((c) => c.kind === 'cheer');
-        if (cheers.length === 0) break;
-        const cheer = yield ctx.chooseCard({
-          cards: cheers,
-          title: `センターホロメンに送るエールをアーカイブから選択 (${i + 1}/2枚目・任意)`,
-          optional: true,
-          skipLabel: i === 0 ? '送らない' : 'ここまでにする',
-        });
-        if (!cheer) break;
+      // アーカイブのエール1～2枚を、まとめてセンターへ送る（任意・最大2枚）
+      const cheers = ctx.player.archive.filter((c) => c.kind === 'cheer');
+      if (cheers.length === 0) return;
+      const picked = yield ctx.chooseCards({
+        cards: cheers,
+        min: 0,
+        max: 2,
+        title: 'センターホロメンに送るエールをアーカイブから選択（最大2枚・任意）',
+      });
+      for (const cheer of picked) {
         ctx.removeFromArchive(cheer);
         ctx.attachCheer(cheer, center);
       }

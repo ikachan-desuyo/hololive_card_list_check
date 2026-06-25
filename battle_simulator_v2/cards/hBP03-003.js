@@ -29,16 +29,15 @@ export default {
       if (!go) return;
       const roll = (yield* ctx.rollDice());
       const count = (roll === 3 || roll === 5) ? 2 : 1; // 3か5で2枚、それ以外(1/2/4/6)で1枚
-      for (let i = 0; i < count; i++) {
-        const cards = ctx.player.archive.filter(is35P);
-        if (cards.length === 0) break;
-        const picked = yield ctx.chooseCard({
-          cards,
-          title: `アーカイブから手札に戻す〈35P〉を選択（${i + 1}/${count}）`,
-        });
-        if (!picked) break;
-        ctx.removeFromArchive(picked);
-        ctx.addToHand(picked);
+      const cards = ctx.player.archive.filter(is35P);
+      const picked = yield ctx.chooseCards({
+        cards,
+        count, // 目に応じた枚数（アーカイブの〈35P〉が足りなければある分だけ）
+        title: `アーカイブから手札に戻す〈35P〉を選択（${count}枚）`,
+      });
+      for (const c of picked) {
+        ctx.removeFromArchive(c);
+        ctx.addToHand(c);
       }
     },
   },
@@ -50,19 +49,13 @@ export default {
       return !!p.center && engine._hasColor(p.center, '赤');
     },
     *run(ctx) {
-      // 手札を好きな枚数選んでデッキの下に戻す（「好きな枚数」=0枚も可）
-      const toReturn = [];
-      while (ctx.player.hand.length > 0) {
-        const picked = yield ctx.chooseCard({
-          cards: ctx.player.hand,
-          title: 'デッキの下に戻す手札を選択（好きな枚数）',
-          optional: true,
-          skipLabel: '選び終わる',
-        });
-        if (!picked) break;
-        ctx.removeFromHand(picked);
-        toReturn.push(picked);
-      }
+      // 手札を好きな枚数（0枚可）一度に選ぶ → 好きな順でデッキの下に戻す
+      const toReturn = yield ctx.chooseCards({
+        cards: [...ctx.player.hand],
+        min: 0,
+        title: 'デッキの下に戻す手札を選択（好きな枚数）',
+      });
+      for (const c of toReturn) ctx.removeFromHand(c);
       if (toReturn.length > 0) {
         // 好きな順でデッキの下に戻す
         const ordered = yield* ctx.orderCardsFlow(toReturn, 'デッキの下に戻す順番');

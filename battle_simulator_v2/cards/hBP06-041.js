@@ -11,13 +11,13 @@ export default {
     *run(ctx) {
       if (!ctx.isFirstTurnGoingSecond()) return;
       ctx.draw(3);
-      // 手札2枚をアーカイブ（選択）
-      for (let i = 0; i < 2 && ctx.player.hand.length > 0; i++) {
-        const card = yield ctx.chooseCard({
-          cards: ctx.player.hand,
-          title: `アーカイブする手札を選択（${i + 1}/2）`,
-        });
-        if (!card) break;
+      // 手札2枚をアーカイブ（選択。候補がそれ未満なら全部）
+      const archived = yield ctx.chooseCards({
+        cards: [...ctx.player.hand],
+        count: 2,
+        title: 'アーカイブする手札を選択',
+      });
+      for (const card of archived) {
         ctx.removeFromHand(card);
         ctx.player.archive.push(card);
         ctx.log(`${card.name} をアーカイブした`);

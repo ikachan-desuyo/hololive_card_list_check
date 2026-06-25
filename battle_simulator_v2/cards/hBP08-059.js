@@ -67,18 +67,15 @@ export default {
         });
         if (!target) return;
 
-        // 好きな枚数（このホロメンの赤エールの数まで・0枚で打ち切り可）を1枚ずつ付け替える
-        while (true) {
-          const redCheers = (self.cheers || []).filter((c) => c.color === '赤');
-          if (redCheers.length === 0) break;
-          const picked = yield ctx.chooseCard({
-            cards: redCheers,
-            title: `付け替える赤エールを選択（残り${redCheers.length}枚・任意）`,
-            optional: true,
-            skipLabel: 'ここまでにする',
-          });
-          if (!picked) break;
-          ctx.moveCheer(picked, self, target.holomem);
+        // 好きな枚数（このホロメンの赤エールの数まで・0枚可）をまとめて付け替える
+        const redCheers = (self.cheers || []).filter((c) => c.color === '赤');
+        const picked = yield ctx.chooseCards({
+          cards: redCheers,
+          min: 0,
+          title: '付け替える赤エールを選択（好きな枚数・任意）',
+        });
+        for (const cheer of picked) {
+          ctx.moveCheer(cheer, self, target.holomem);
         }
       },
     },

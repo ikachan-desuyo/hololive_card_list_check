@@ -18,29 +18,23 @@ export default {
       const looked = ctx.lookTopDeck(4);
       if (looked.length === 0) return;
 
-      const taken = [];
       // 残り（手札に取らなかったカード）= 公開しなかった非Debut/未選択カード
       let remaining = [...looked];
 
       // Debut ホロメンを好きな枚数だけ手札に加える（0枚可）
-      while (true) {
-        const candidates = remaining.filter(
-          (c) => c.kind === 'holomen' && c.bloomLevel === 'Debut');
-        if (candidates.length === 0) break;
-        const picked = yield ctx.chooseCard({
-          cards: candidates,
-          // 選択対象外のカードも見えるように表示
-          displayCards: remaining,
-          title: '手札に加える Debut ホロメンを選択（選ばないと残りはデッキの下へ）',
-          optional: true,
-          skipLabel: 'これ以上加えない',
-        });
-        if (!picked) break;
-        taken.push(picked);
-        remaining = remaining.filter((c) => c !== picked);
+      const candidates = remaining.filter(
+        (c) => c.kind === 'holomen' && c.bloomLevel === 'Debut');
+      const taken = yield ctx.chooseCards({
+        cards: candidates,
+        min: 0,
+        // 選択対象外のカードも見えるように表示
+        displayCards: remaining,
+        title: '手札に加える Debut ホロメンを選択（選ばないと残りはデッキの下へ）',
+      });
+      for (const c of taken) {
+        remaining = remaining.filter((x) => x !== c);
+        ctx.addToHand(c, { reveal: true });
       }
-
-      for (const c of taken) ctx.addToHand(c, { reveal: true });
 
       // 残ったカードを好きな順でデッキの下に戻す
       if (remaining.length > 0) {

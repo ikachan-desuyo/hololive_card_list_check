@@ -31,17 +31,15 @@ export default {
         if (ctx.player.hand.length < 2) return;
         const ok = yield ctx.confirm('手札2枚をアーカイブしてこのアーツ+20しますか？');
         if (!ok) return;
-        const archived = [];
-        for (let i = 0; i < 2; i++) {
-          const card = yield ctx.chooseCard({
-            cards: ctx.player.hand,
-            title: `アーカイブする手札を選択（${i + 1}/2）`,
-          });
-          if (!card) break;
+        const archived = yield ctx.chooseCards({
+          cards: [...ctx.player.hand],
+          count: 2,
+          title: 'アーカイブする手札を選択',
+        });
+        for (const card of archived) {
           ctx.removeFromHand(card);
           ctx.player.archive.push(card);
           ctx.log(`${card.name} をアーカイブした`);
-          archived.push(card);
         }
         // 2枚揃った場合のみ+20（コストが揃わなければ加算しない）
         if (archived.length === 2) ctx.addArtBonus(20, '手札2枚をアーカイブ');

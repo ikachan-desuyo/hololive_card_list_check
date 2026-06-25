@@ -15,15 +15,16 @@ export default {
       const ok = yield ctx.confirm('手札2枚をアーカイブして、このターンの間このホロメンのアーツ+40しますか？');
       if (!ok) return;
       const self = ctx.sourceHolomem;
-      for (let i = 0; i < 2; i++) {
-        const picked = yield ctx.chooseCard({
-          cards: [...ctx.player.hand],
-          title: `アーカイブする手札を選択（${i + 1}/2）`,
-        });
-        if (!picked) return; // 2枚揃わなければ支払い不成立
-        ctx.removeFromHand(picked);
-        ctx.player.archive.push(picked);
-        ctx.log(`${ctx.player.name}: ${picked.name} をアーカイブした`);
+      const picked = yield ctx.chooseCards({
+        cards: [...ctx.player.hand],
+        count: 2, // 手札2枚をアーカイブ（手札は2枚以上を確認済み）
+        title: 'アーカイブする手札を選択（2枚）',
+      });
+      if (picked.length < 2) return; // 2枚揃わなければ支払い不成立
+      for (const c of picked) {
+        ctx.removeFromHand(c);
+        ctx.player.archive.push(c);
+        ctx.log(`${ctx.player.name}: ${c.name} をアーカイブした`);
       }
       ctx.addTurnModifier({
         kind: 'artsPlus', amount: 40, ownerIdx: ctx.playerIdx,

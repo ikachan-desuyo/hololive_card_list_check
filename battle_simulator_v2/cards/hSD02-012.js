@@ -17,22 +17,18 @@ export default {
     *run(ctx) {
       const looked = ctx.lookTopDeck(4);
       const pool = looked.slice();
-      // 〈白上フブキ〉〈大神ミオ〉〈百鬼あやめ〉を「好きな枚数」公開して手札に加える。
-      // 該当ホロメンが無くなるか、プレイヤーが「これ以上加えない」を選ぶまで繰り返す。
-      while (true) {
-        const candidates = pool.filter(
-          (c) => c.kind === 'holomen' && TARGET_NAMES.includes(c.name));
-        if (candidates.length === 0) break;
-        const picked = yield ctx.chooseCard({
-          cards: candidates,
-          title: '手札に加えるホロメンを選択（〈白上フブキ〉/〈大神ミオ〉/〈百鬼あやめ〉・任意）',
-          optional: true,
-          skipLabel: 'これ以上加えない',
-          displayCards: pool,
-        });
-        if (!picked) break;
-        pool.splice(pool.indexOf(picked), 1);
-        ctx.addToHand(picked);
+      // 〈白上フブキ〉〈大神ミオ〉〈百鬼あやめ〉を「好きな枚数」公開して手札に加える（0枚も可）。
+      const candidates = pool.filter(
+        (c) => c.kind === 'holomen' && TARGET_NAMES.includes(c.name));
+      const picked = yield ctx.chooseCards({
+        cards: candidates,
+        min: 0,
+        title: '手札に加えるホロメンを選択（〈白上フブキ〉/〈大神ミオ〉/〈百鬼あやめ〉・任意）',
+        displayCards: looked,
+      });
+      for (const c of picked) {
+        pool.splice(pool.indexOf(c), 1);
+        ctx.addToHand(c);
       }
       // 残ったカードを好きな順でデッキの下に戻す
       const ordered = yield* ctx.orderCardsFlow(pool, 'デッキの下に戻す順番');
