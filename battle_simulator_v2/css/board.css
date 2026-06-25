@@ -67,6 +67,8 @@ html, body {
 }
 #setup-screen button:hover { filter: brightness(1.15); }
 #setup-error { color: #ff7b7b; margin-top: 10px; white-space: pre-line; }
+/* 更新確認用バージョン（控えめに右下） */
+#app-version { margin-top: 14px; text-align: right; font-size: 0.72em; color: #565a86; user-select: text; }
 
 /* ===== ゲーム画面 ===== */
 #game-screen { display: none; height: 100%; position: relative; }
