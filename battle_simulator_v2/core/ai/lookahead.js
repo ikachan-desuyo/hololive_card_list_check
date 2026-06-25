@@ -14,8 +14,8 @@
  *   - turns=1: 自分のターンを終えた局面で評価（最速。目先の最善）。
  *   - turns=2: ＋相手の応手まで読む（攻めて倒し返される手を避ける）。
  *   - turns=3: ＋自分の次のターンまで読む（倒し返されても取り返せるかを見て、消極化を打ち消す＝攻めの精度UP）。
- *   - 公平性: 各ターンの擬似実行は公開情報のみで判断する HeuristicAI が担う（相手の手札を覗いて選択は変えない）。
- *     擬似実行のため相手の具体的カードを内部で動かす必要はあるが、選択ロジックは公開情報ベース。
+ *   - 情報前提【全情報許可】: 擬似実行は再生(replay)で相手の実際の手札・山札・順序を再現する＝完全情報の前方シミュレーション。
+ *     相手の手は「最善で固定」して読み（最悪ケース想定）、揺らぎ(モンテカルロ)は自分の手だけに入れる。
  *   - コスト: turns を増やすほど重い（候補ごとに turns ターンぶんを再生・擬似実行）。UI設定で 1/2/3 を選択可。
  *
  * 注意: reconstruct は「apply() のみで到達した状態」を前提とする（状態を直接書き換えた局面は再現不可）。
@@ -109,7 +109,9 @@ export class LookaheadAI {
       const pd = sim.state.pending;
       let id;
       if (pd.player == null) id = pd.options[0].id;
-      else if (rng) id = stochasticChoose(sim, pd.player, rng); // モンテカルロ: 最善付近をランダム
+      // 【全情報許可】相手の手は「最善で固定」して読む（相手の最善応手を想定＝こちらの楽観バイアスを排除）。
+      // 揺らぎ(モンテカルロ)は自分の手だけに入れる＝「自分の指し回しの不確実性」を平均し、相手は最悪ケースで評価。
+      else if (rng && pd.player === idx) id = stochasticChoose(sim, pd.player, rng);
       else id = ais[pd.player].choose(sim);
       if (id == null) break;
       try { sim.apply(id); } catch { break; }

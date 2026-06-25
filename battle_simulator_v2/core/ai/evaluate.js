@@ -141,9 +141,9 @@ function remainHp(engine, h) {
 }
 
 /**
- * 相手が次ターンに付けられそうな追加エール枚数の見積り（公開情報のみ）。
- * 相手の手札は見ないが、「相手の盤面に見えるエール付与効果（コラボ/ブルーム/ギフト）は使ってくる」という
- * 行動傾向で、基本エール1枚＋効果ぶんを見込む。これにより相手の脅威の過小評価をさらに減らす。
+ * 相手が次ターンに付けられそうな追加エール枚数の見積り。
+ * 【全情報許可】相手のデッキ構成は既知の前提でよい（ユーザー許可）。基本エール1枚＋盤面の付与効果（コラボ/ブルーム/
+ * ギフト）に加え、相手の実際の手札にあるエール付与支援カードぶんも見込む（脅威の過小評価をさらに減らす）。
  */
 export function opponentExtraCheerProjection(engine, oppIdx) {
   const opp = engine.state.players[oppIdx];
@@ -153,7 +153,16 @@ export function opponentExtraCheerProjection(engine, oppIdx) {
       if (/コラボ|ブルーム|ギフト/.test(kw.subtype || '')) effGain = Math.max(effGain, cheerGainFromText(kw.text));
     }
   }
-  return 1 + Math.min(effGain, 3); // 基本1枚＋効果で付けられそうな枚数（上限3）
+  // 相手の手札にある「エール付与」支援カードぶん（全情報許可で参照可）。
+  let handGain = 0;
+  for (const c of opp.hand) {
+    if (c.kind !== 'support') continue;
+    const def = engine.registry.get(c.number);
+    if (!def?.support) continue; // 未実装は数えない
+    handGain += def.ai?.cheerGain != null ? resolveNum(def.ai.cheerGain, { engine, player: opp, card: c })
+      : cheerGainFromText(c.supportText);
+  }
+  return 1 + Math.min(effGain + handGain, 4); // 基本1枚＋効果/手札で付けられそうな枚数（上限4）
 }
 
 /** アーツ a を defColor のセンターに当てた時の火力（特攻・実効修正込み） */
