@@ -2834,6 +2834,24 @@ export async function runTests() {
     assert(sc.killCenter > sc.killCollab, `毎ターン殴ってくる強いセンター2ndを優先して倒すべき (center=${sc.killCenter}, collab=${sc.killCollab})`);
   });
 
+  await testAsync('AI効果選択: 相手狙いは「倒せる脅威の大きい主力2nd」を優先除去する（じゃあ敵だね等で引き出して倒す）', async () => {
+    const e = await setupMainStep(deckMap, 71);
+    const p0 = e.state.players[0]; const p1 = e.state.players[1];
+    // 自分: 200火力のアタッカー（コスト無し＝今払える）。相手バックの200HPまで倒せる。
+    p0.center = e._createHolomem({ number: 'ME', name: 'ME', kind: 'holomen', bloomLevel: '2nd', hp: 200, color: '青', tags: [], arts: [{ name: 'k', dmg: 200, cost: [], tokkou: [] }], keywords: [] }, 1);
+    p0.collab = null; p0.back = [];
+    // 相手バック: 燃料満タンの脅威2nd(残200・大技250)と、低HPの置物Debut(残100・小技30)。両方とも自分の火力で倒せる。
+    const threat2nd = e._createHolomem({ number: 'T2', name: 'T2', kind: 'holomen', bloomLevel: '2nd', hp: 200, color: '白', tags: [], arts: [{ name: 'big', dmg: 250, cost: [], tokkou: [] }], keywords: [] }, 1);
+    const weak = e._createHolomem({ number: 'WK', name: 'WK', kind: 'holomen', bloomLevel: 'Debut', hp: 100, color: '白', tags: [], arts: [{ name: 's', dmg: 30, cost: [], tokkou: [] }], keywords: [] }, 1);
+    p1.center = e._createHolomem({ number: 'PC', name: 'PC', kind: 'holomen', bloomLevel: 'Debut', hp: 120, color: '白', tags: [], arts: [], keywords: [] }, 1);
+    p1.collab = null; p1.back = [threat2nd, weak];
+    const sc = scoreOptions(e, 0, { type: 'effectChoice', player: 0, request: { kind: 'chooseHolomem' }, options: [
+      { id: 'pickThreat', side: 'opp', value: { holomem: threat2nd, pos: { zone: 'back', index: 0 } } },
+      { id: 'pickWeak', side: 'opp', value: { holomem: weak, pos: { zone: 'back', index: 1 } } },
+    ] });
+    assert(sc.pickThreat > sc.pickWeak, `倒せるなら脅威の大きい主力2ndを優先除去すべき (threat=${sc.pickThreat}, weak=${sc.pickWeak})`);
+  });
+
   await testAsync('AI: エールを撃てるホロメンに過剰投資しない', async () => {
     const e = await setupMainStep(deckMap, 51);
     const s = e.state;
