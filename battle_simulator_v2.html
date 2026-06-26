@@ -43,7 +43,7 @@
       </div>
 
       <!-- 更新確認用バージョン（コミット時に日時を更新）。ハードリロードで反映されたかの目印 -->
-      <div id="app-version">2026-06-26 20:45 リプレイ機能（URL残留バグ修正）</div>
+      <div id="app-version">2026-06-26 21:00 CPU進行速度を設定連動</div>
     </div>
 
     <!-- ゲーム画面 -->
@@ -81,13 +81,14 @@
           <div class="settings-note">各手を何ターン先まで擬似対戦して選ぶか。1手=自分のターンのみ（最速）。2手=相手の反撃まで。3手=自分の次のターンまで（既定・推奨）。5手=自分のターン3回ぶん＝「メイン火力を展開して大技を撃てる所」まで読む（最重・じっくり）。深いほど思考時間が増えます。</div>
         </div>
         <div class="settings-section">
-          <div class="settings-label">ステップ送り</div>
+          <div class="settings-label">進行速度（CPUの指す速さ・ステップ送り）</div>
           <div class="settings-row" id="pause-speed-buttons">
             <button data-speed="fast">速い</button>
             <button data-speed="normal">普通</button>
             <button data-speed="slow">ゆっくり</button>
             <button data-speed="manual">手動</button>
           </div>
+          <div class="settings-note">速い/普通/ゆっくり＝CPUが指す速さとステップ境界の自動送りが連動。手動＝ステップ境界は▶で手動送り（CPU自身は自動で進みます）。</div>
         </div>
         <div class="settings-section">
           <div class="settings-label">任意効果の発動確認</div>
