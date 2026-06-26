@@ -268,6 +268,12 @@ let myOnlineIdx = null;   // オンラインでの自分のプレイヤー番号
 let onlineRealApply = null; // オンライン用エンジンの素のapply（手ログ適用用）
 let onlineDriveTimer = null; // ステップ自動送り（責任者）用タイマー
 let onlineRenderTimer = null; // 連続適用（途中入室の追いつき等）で描画を間引くためのタイマー
+let boardViewIdx = 0; // 盤面で「手前(下=side-player)」に描くプレイヤー番号。オンラインP2は1（自分の盤面を手前に）。
+
+/** プレイヤー番号 → 盤面のDOM要素（視点 boardViewIdx に応じて手前/奥を割り当て）。 */
+function sideElFor(playerIdx) {
+  return document.getElementById(playerIdx === boardViewIdx ? 'side-player' : 'side-opponent');
+}
 // 再生スピード（1手の間隔）。進行速度設定(stepSpeed)に連動させる＝再生中は「進行速度」が再生スピードとして効く。
 const REPLAY_DELAYS = { fast: 350, normal: 1100, slow: 2200, manual: 1100 };
 function replayDelayMs() { return REPLAY_DELAYS[getSettings().stepSpeed] ?? 1100; }
@@ -1314,7 +1320,7 @@ function fxCellElement(side, zone, index) {
   // まず該当ホロメンのセル。倒れて消えていればゾーン枠にフォールバック
   const cell = document.querySelector(`[data-src="${side}:${zone}:${index}"]`);
   if (cell) return cell;
-  const sideEl = document.getElementById(side === 0 ? 'side-player' : 'side-opponent');
+  const sideEl = sideElFor(side);
   return sideEl ? sideEl.querySelector('.' + (zone === 'back' ? 'backs' : zone)) : null;
 }
 
@@ -1387,9 +1393,8 @@ function renderStepBar(s) {
 
 /** ターンが切り替わったら中央に大きく通知 + ターン側の盤面を発光 */
 function notifyTurnChange(s) {
-  const sides = [document.getElementById('side-player'), document.getElementById('side-opponent')];
-  sides[s.turnPlayer]?.classList.add('turn-active');
-  sides[1 - s.turnPlayer]?.classList.remove('turn-active');
+  sideElFor(s.turnPlayer)?.classList.add('turn-active');
+  sideElFor(1 - s.turnPlayer)?.classList.remove('turn-active');
 
   if (s.phase !== 'playing') return;
   const key = `${s.turn}:${s.turnPlayer}`;
@@ -1408,8 +1413,10 @@ function render() {
   if (!engine) return;
   const s = engine.state;
 
-  renderSide(document.getElementById('side-player'), s.players[0], 0, hooks);
-  renderSide(document.getElementById('side-opponent'), s.players[1], 1, hooks);
+  // 視点: オンライン対戦者は自分の盤面を手前(下)にする。観戦/ソロはP1が手前。
+  boardViewIdx = (isOnline && !isSpectator && myOnlineIdx != null) ? myOnlineIdx : 0;
+  renderSide(document.getElementById('side-player'), s.players[boardViewIdx], boardViewIdx, hooks);
+  renderSide(document.getElementById('side-opponent'), s.players[1 - boardViewIdx], 1 - boardViewIdx, hooks);
   notifyTurnChange(s);
   renderStepBar(s);
   enqueueStepToasts(s);
