@@ -624,11 +624,15 @@ function scheduleOnlineAutoDrive() {
   const st = engine.state;
   const pd = st.pending;
   if (!pd) return;
-  if (responsibleIdx(st) !== myOnlineIdx) return;       // 自分が責任者の時だけ
-  if (pd.player != null) return;                         // 対話的な決定はUIクリックで（自動化しない）
+  if (responsibleIdx(st) !== myOnlineIdx) return; // 自分が責任者の時だけ
+  // 自動で進める対象 = ステップ境界(stepPause)。※stepPauseには player(turnPlayer) が付くので、
+  //   「player!=null なら対話的」と判定すると毎回「▶次へ」待ちになる（このバグを修正）。
+  //   手番非依存(player==null)の自動決定があればそれも進める。対話的決定(main/performance/attachCheer/効果選択)はUIクリック。
+  const isAuto = pd.type === 'stepPause' || pd.player == null;
+  if (!isAuto) return;
   const id = pd.type === 'stepPause' ? 'ok' : pd.options[0]?.id;
   if (id == null) return;
-  onlineDriveTimer = setTimeout(() => { onlineDriveTimer = null; if (engine && engine.state.pending === pd) onlineSession?.writeMove(id); }, 650);
+  onlineDriveTimer = setTimeout(() => { onlineDriveTimer = null; if (engine && engine.state.pending === pd) onlineSession?.writeMove(id); }, 400);
 }
 
 /** OnlineSession を作って hooks を配線する（Firebase/loopback 共通）。 */

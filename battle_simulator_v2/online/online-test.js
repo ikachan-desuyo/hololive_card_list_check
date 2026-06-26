@@ -86,13 +86,13 @@ export async function runOnlineSyncTest() {
     const ridx = responsibleIdx(st);
     const sess = sessByIdx[ridx];
     const pd = st.pending;
+    // app.js と同じ分岐: stepPause/手番非依存は自動('ok'/options[0])、対話的決定はAIが判断。
     let id;
-    if (pd.player != null) {
-      // 責任者は自分のエンジンで判断する（=ホスト or ゲストのエンジン。両者一致のはず）
+    if (pd.type === 'stepPause' || pd.player == null) {
+      id = autoId(pd); // 責任者(turnPlayer)が自動送り
+    } else {
       const e = ridx === 0 ? engines.host : engines.guest;
       try { id = ais[ridx === 0 ? 'host' : 'guest'][ridx].choose(e); } catch { id = autoId(pd); }
-    } else {
-      id = autoId(pd);
     }
     if (id == null) break;
     await sess.writeMove(id);
