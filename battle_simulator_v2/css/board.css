@@ -90,8 +90,10 @@ html, body {
   top: 50%;
   width: 1060px;
   height: 800px;
-  /* --board-scale はウィンドウサイズから app.js が設定（盤面全体が必ず画面内に収まる） */
-  transform: translate(-50%, -53%) rotateX(34deg) scale(var(--board-scale, 1));
+  /* --board-scale はウィンドウサイズから app.js が設定（盤面全体が必ず画面内に収まる）。
+     先頭の translateY(--board-lift) は「拡大の外側」に効く固定pxの持ち上げ＝盤面全体を少し上へ寄せ、
+     下部の手札との重なりを解消する（上側に余白があるPC向け。スマホは --board-lift:0 で従来位置）。 */
+  transform: translateY(var(--board-lift, -60px)) translate(-50%, -53%) rotateX(34deg) scale(var(--board-scale, 1));
   transform-style: preserve-3d;
   background:
     linear-gradient(180deg, rgba(120, 130, 255, 0.10), rgba(40, 40, 90, 0.18) 50%, rgba(120, 130, 255, 0.10)),
@@ -1327,7 +1329,7 @@ body.dragging, body.dragging * { cursor: grabbing !important; }
   /* 盤面の拡大: 横長レイアウトを縦画面向けに詰めて、テーブル自体を縮める。
      ゾーンを左右の死スペースを削って再配置し、テーブル幅を 1060→760 に縮小する。
      これにより updateBoardScale の拡大率が上がり、盤面が大きく見える。 */
-  .table { width: 664px; height: 720px; }
+  .table { width: 664px; height: 720px; --board-lift: 0px; } /* スマホは盤面の持ち上げなし（従来位置） */
   .zone.life      { left: 4px;   top: 40px;  min-width: 92px;  min-height: 150px; }
   .zone.cheerdeck { left: 4px;   top: 214px; }
   .zone.collab    { left: 104px; top: 18px; }
