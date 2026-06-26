@@ -21,6 +21,7 @@ import {
   loadCacheReplays, loadFileReplays, saveReplayToCache, deleteCacheReplay,
   exportCacheReplaysText, importReplaysText, replayLabel, buildReplayFromEngine,
 } from './replays.js';
+import { isFirebaseConfigured } from '../online/firebase-config.js';
 
 // test_deck/ にあるデッキ一覧の取得に失敗した時のフォールバック（通常は manifest.json を読む）
 const TEST_DECKS_FALLBACK = ['ラミィデッキ', 'あの青空のせいだ', 'ジジ', 'FUWAMOCO'];
@@ -200,7 +201,7 @@ async function startGame(opts = {}) {
     }
     // 最新コードの反映: 主要スクリプト＋このデッキで使うカード定義が更新されていたら、
     // リロードして最新コードで自動再開する（autostart・リプレイ再生・リロード後の再開中はスキップ）。
-    const isAutostart = opts.isReplay || new URLSearchParams(location.search).has('autostart')
+    const isAutostart = opts.isReplay || opts.online || new URLSearchParams(location.search).has('autostart')
       || new URLSearchParams(location.search).has('replay') || new URLSearchParams(location.search).has('applied');
     if (!isAutostart && !resumingStart) {
       const deckNumbers = [...Object.keys(map1), ...Object.keys(map2)]
@@ -216,7 +217,7 @@ async function startGame(opts = {}) {
       }
     }
     // 正常に組めたデッキを「前回使用」として記憶（次回の初期選択に使う）。リプレイ再生では記憶しない（設定を汚さない）。
-    if (!opts.isReplay && key1 && key2) saveSettings({ lastDeckP1: key1, lastDeckP2: key2 });
+    if (!opts.isReplay && !opts.online && key1 && key2) saveSettings({ lastDeckP1: key1, lastDeckP2: key2 });
     currentDeckMaps = [map1, map2];
     currentDeckKeys = [key1 || null, key2 || null];
     const seedInput = document.getElementById('seed-input').value;
@@ -242,7 +243,8 @@ async function startGame(opts = {}) {
     document.getElementById('setup-screen').style.display = 'none';
     document.getElementById('game-screen').classList.add('active');
     isReplaying = !!opts.isReplay;
-    updateReplayUI(isReplaying); // 観戦再生中は不要な設定（先読み/AI/任意効果/評価値/投了）を隠す
+    isOnline = !!opts.online;
+    updateModeUI(); // モード（ソロ/観戦再生/オンライン）に応じて設定UIを出し分ける
     engine.start();
     // 詳細ログ用: 各プレイヤーが「人間 / CPU(先読み or 簡易)」のどれかを記録（どのAIで打ったか後で確認できる）
     for (let i = 0; i < 2; i++) {
@@ -259,25 +261,41 @@ async function startGame(opts = {}) {
 
 let replayTimer = null; // 再生中のタイマー（中断用）
 let isReplaying = false; // 観戦再生中か（設定UIの出し分けに使う）
+let isOnline = false;     // オンライン対戦中か
+let isSpectator = false;  // オンラインで観戦者か
+let onlineSession = null; // OnlineSession インスタンス
+let myOnlineIdx = null;   // オンラインでの自分のプレイヤー番号(0/1)。観戦はnull
+let onlineRealApply = null; // オンライン用エンジンの素のapply（手ログ適用用）
+let onlineDriveTimer = null; // ステップ自動送り（責任者）用タイマー
 // 再生スピード（1手の間隔）。進行速度設定(stepSpeed)に連動させる＝再生中は「進行速度」が再生スピードとして効く。
 const REPLAY_DELAYS = { fast: 350, normal: 1100, slow: 2200, manual: 1100 };
 function replayDelayMs() { return REPLAY_DELAYS[getSettings().stepSpeed] ?? 1100; }
 
-/** 観戦再生中は再生に無関係な設定（AI適用・先読み・任意効果確認・評価値・投了）を隠す。 */
-function updateReplayUI(replaying) {
-  for (const id of ['ai-buttons', 'lookahead-turns-buttons', 'confirm-optional-buttons', 'show-eval-buttons']) {
-    const sec = document.getElementById(id)?.closest('.settings-section');
-    if (sec) sec.style.display = replaying ? 'none' : '';
-  }
-  // 投了（再生中は無意味）＋ リザルトの「リプレイを保存」（観戦中の保存は無意味）を隠す
-  for (const id of ['concede-p1-button', 'concede-p2-button', 'save-replay-button']) {
-    const b = document.getElementById(id);
-    if (b) b.style.display = replaying ? 'none' : '';
-  }
-  // 進行速度ラベルを再生時は「再生速度」と分かるようにする
-  const speedSec = document.getElementById('pause-speed-buttons')?.closest('.settings-section');
-  const label = speedSec?.querySelector('.settings-label');
-  if (label) label.textContent = replaying ? '再生速度（観戦）' : '進行速度（CPUの指す速さ・ステップ送り）';
+/**
+ * モード（ソロ/観戦再生/オンライン対戦）に応じて設定UIを出し分ける。
+ *   - 観戦再生: AI/先読み/任意効果/評価値/投了/保存 を隠す（残すは 再生速度・リセット）。進行速度を「再生速度」に。
+ *   - オンライン: AI/先読み/進行速度/評価値/リセット/保存 を隠す（残すは 任意効果確認・投了・退室）。
+ *   - ソロ: 全部表示。
+ */
+function updateModeUI() {
+  const mode = isOnline ? 'online' : isReplaying ? 'replay' : 'solo';
+  const setSec = (id, show) => { const sec = document.getElementById(id)?.closest('.settings-section'); if (sec) sec.style.display = show ? '' : 'none'; };
+  const setBtn = (id, show) => { const b = document.getElementById(id); if (b) b.style.display = show ? '' : 'none'; };
+  // セクション可視性
+  setSec('ai-buttons', mode === 'solo');
+  setSec('lookahead-turns-buttons', mode === 'solo');
+  setSec('show-eval-buttons', mode === 'solo');
+  setSec('confirm-optional-buttons', mode !== 'replay');       // ソロ・オンラインは表示、再生は隠す
+  setSec('pause-speed-buttons', mode !== 'online');            // ソロ・再生は表示、オンラインは隠す
+  // ボタン可視性
+  setBtn('save-replay-button', mode === 'solo');
+  setBtn('reset-game-button', mode !== 'online');             // オンラインは「退室」を使う
+  setBtn('concede-p1-button', mode === 'solo' || (mode === 'online' && myOnlineIdx === 0));
+  setBtn('concede-p2-button', mode === 'solo' || (mode === 'online' && myOnlineIdx === 1));
+  setBtn('online-leave-button', mode === 'online');
+  // 進行速度ラベル
+  const label = document.getElementById('pause-speed-buttons')?.closest('.settings-section')?.querySelector('.settings-label');
+  if (label) label.textContent = mode === 'replay' ? '再生速度（観戦）' : '進行速度（CPUの指す速さ・ステップ送り）';
 }
 
 /**
@@ -438,7 +456,7 @@ function updateUndoButton(s) {
   // 観戦再生中・完全CPU対戦・対局前(セットアップ)・対局終了後は隠す。
   // = 人間が操作する対局の本編(playing)中だけ出す。
   const anyHuman = !aiEnabled(0) || !aiEnabled(1);
-  const show = !isReplaying && anyHuman && s.phase === 'playing';
+  const show = !isReplaying && !isOnline && anyHuman && s.phase === 'playing'; // オンラインは戻せない（同期状態）
   // CSS既定が display:none のため、表示時は空文字('')ではなく明示的に 'block' を入れる
   // （'' だとインライン指定が消えてCSSの none に戻り、見えなくなる）。
   btn.style.display = show ? 'block' : 'none';
@@ -527,6 +545,149 @@ function setupReplayUI() {
     btn.textContent = id ? '✅ 保存しました' : '⚠ 保存失敗';
     setTimeout(() => { btn.textContent = '💾 リプレイを保存'; }, 1800);
   });
+}
+
+// ============ オンライン対戦 ============
+
+/** デッキ選択画面のオンライン対戦UI（ルーム作成/参加/観戦）を配線する。 */
+function setupOnlineUI() {
+  const panel = document.getElementById('online-panel');
+  if (!panel) return;
+  if (!isFirebaseConfigured()) {
+    document.getElementById('online-status').textContent = '⚠ 未設定: online/firebase-config.js に Firebase の設定を入れると有効になります';
+    for (const id of ['online-create', 'online-join', 'online-spectate']) {
+      const b = document.getElementById(id); if (b) b.disabled = true;
+    }
+  }
+  document.getElementById('online-create')?.addEventListener('click', () => onlineCreateRoom());
+  document.getElementById('online-join')?.addEventListener('click', () => onlineJoinRoom());
+  document.getElementById('online-spectate')?.addEventListener('click', () => onlineSpectate());
+}
+
+/** 現在の決定ポイントを「手ログに書く責任者」のプレイヤー番号。online-test と同じ規則。 */
+function responsibleIdx(state) {
+  const pd = state.pending;
+  if (!pd) return null;
+  if (pd.player != null) return pd.player;
+  return state.turnPlayer != null ? state.turnPlayer : 0; // stepPause等は手番側、未確定はホスト
+}
+
+/** OnlineSession から status=playing 通知が来たら、設定どおりにエンジンを構築して対局開始。 */
+async function startOnline(config) {
+  isOnline = true;
+  isSpectator = !!config.spectator;
+  myOnlineIdx = config.myIdx;
+  aiOverride = [false, false]; // オンラインはAIを動かさない（手ログだけ適用）
+  aiAgents[0] = aiAgents[1] = null;
+  await startGame({
+    map1: config.deckA || undefined, map2: config.deckB || undefined,
+    key1: config.a, key2: config.b,
+    seed: config.seed, first: config.first,
+    online: true, // AI/自動送りを止める＋ビルド更新リロード/前回デッキ保存をスキップ
+  });
+  if (!engine) { document.getElementById('setup-error').textContent = 'オンライン対局の開始に失敗しました'; return; }
+  // エンジンの apply をネット経由に差し替える（UIの全クリックが手ログ追記になる）。
+  onlineRealApply = engine.apply.bind(engine);
+  engine.apply = (id) => {
+    if (isSpectator) return; // 観戦者は操作しない
+    if (responsibleIdx(engine.state) === myOnlineIdx) onlineSession?.writeMove(id);
+    // 自分の決定でない手（相手の番）は無視。実際の適用は手ログ受信時(onlineRealApply)に行う。
+  };
+  render();
+  scheduleOnlineAutoDrive();
+}
+
+/** 手ログから受信した手を実際に適用する（素のapplyを使う＝再書き込みしない）。 */
+function applyOnlineMove(id) {
+  if (!engine || !onlineRealApply) return;
+  try {
+    if (typeof id === 'string' && id.startsWith('__concede:')) engine.concede(Number(id.split(':')[1]));
+    else onlineRealApply(id);
+  } catch (e) { console.warn('オンライン手の適用に失敗', id, e.message); }
+  render();
+  scheduleOnlineAutoDrive();
+}
+
+/** ステップ境界(stepPause)など「自動で進める手」を、責任者だけが少し間を置いて手ログに書く。 */
+function scheduleOnlineAutoDrive() {
+  if (onlineDriveTimer) { clearTimeout(onlineDriveTimer); onlineDriveTimer = null; }
+  if (!isOnline || isSpectator || !engine || engine.state.phase === 'ended') return;
+  const st = engine.state;
+  const pd = st.pending;
+  if (!pd) return;
+  if (responsibleIdx(st) !== myOnlineIdx) return;       // 自分が責任者の時だけ
+  if (pd.player != null) return;                         // 対話的な決定はUIクリックで（自動化しない）
+  const id = pd.type === 'stepPause' ? 'ok' : pd.options[0]?.id;
+  if (id == null) return;
+  onlineDriveTimer = setTimeout(() => { onlineDriveTimer = null; if (engine && engine.state.pending === pd) onlineSession?.writeMove(id); }, 650);
+}
+
+/** OnlineSession を作って hooks を配線する（Firebase/loopback 共通）。 */
+async function makeOnlineSession() {
+  const { createNet } = await import('../online/net.js');
+  const { OnlineSession } = await import('../online/online.js');
+  const net = await createNet('firebase');
+  const setStatus = (t) => { const el = document.getElementById('online-status'); if (el) el.textContent = t; };
+  const sess = new OnlineSession(net, {
+    onStart: (cfg) => startOnline(cfg),
+    onMove: (seq, id) => applyOnlineMove(id),
+    onMeta: (meta) => {
+      if (meta.status === 'waiting') setStatus(`ルーム ${onlineSession?.code}：相手の参加を待っています…`);
+      else if (meta.status === 'playing') setStatus('対局中');
+    },
+    onStatus: setStatus,
+    onError: (m) => setStatus('⚠ ' + m),
+  });
+  onlineSession = sess;
+  return sess;
+}
+
+function selectedOnlineDeck() {
+  // デッキ選択画面のプレイヤー1のドロップダウンを「自分のデッキ」として使う
+  const key = document.getElementById('deck-p1').value;
+  return key;
+}
+
+/** ロビー操作: ルーム作成 / 参加 / 観戦。 */
+async function onlineCreateRoom() {
+  if (!ensureFirebaseReady()) return;
+  const name = document.getElementById('online-name').value || 'プレイヤー';
+  const key = selectedOnlineDeck();
+  if (!key) { document.getElementById('online-status').textContent = '自分のデッキ（プレイヤー1）を選んでください'; return; }
+  const map = CardLibrary.normalizeDeckMap(await resolveDeckMap(key));
+  const sess = await makeOnlineSession();
+  const code = await sess.host({ name, deckKey: key, deckMap: map });
+  document.getElementById('online-code-display').textContent = `あなたのルームコード: ${code}（相手に伝えてください）`;
+}
+async function onlineJoinRoom() {
+  if (!ensureFirebaseReady()) return;
+  const name = document.getElementById('online-name').value || 'プレイヤー';
+  const code = document.getElementById('online-join-code').value;
+  const key = selectedOnlineDeck();
+  if (!key) { document.getElementById('online-status').textContent = '自分のデッキ（プレイヤー1）を選んでください'; return; }
+  const map = CardLibrary.normalizeDeckMap(await resolveDeckMap(key));
+  const sess = await makeOnlineSession();
+  await sess.join(code, { name, deckKey: key, deckMap: map });
+}
+async function onlineSpectate() {
+  if (!ensureFirebaseReady()) return;
+  const name = document.getElementById('online-name').value || '観戦者';
+  const code = document.getElementById('online-join-code').value;
+  const sess = await makeOnlineSession();
+  await sess.spectate(code, { name });
+}
+function ensureFirebaseReady() {
+  if (!isFirebaseConfigured()) {
+    document.getElementById('online-status').textContent = '⚠ オンライン対戦は未設定です（online/firebase-config.js に Firebase 設定を入れてください）';
+    return false;
+  }
+  return true;
+}
+
+/** オンライン退室＝デッキ選択画面へ戻る（リロードで状態を完全リセット）。 */
+function leaveOnline() {
+  try { onlineSession?.leave(); } catch { /* noop */ }
+  location.reload();
 }
 
 // ============ ドラッグ&ドロップのマッピング ============
@@ -1007,9 +1168,8 @@ function saveSettings(patch) {
 }
 
 function handleStepPause(s) {
-  // 観戦再生中は自動送りしない。再生ドライバが記録どおり('ok')に送るため、ここで先に送ると記録列とズレて止まる
-  // （特に stepPause→複数選択 への移行で、自動送りが先行すると以降の手が全部1つずつズレる）。
-  if (isReplaying) return;
+  // 観戦再生・オンラインでは自動送りしない（再生ドライバ／責任者の手ログ駆動が送るため、ここで先に送ると競合）。
+  if (isReplaying || isOnline) return;
   if (s.pending?.type !== 'stepPause') return;
   if (pauseTimer) return; // この pending 用に予約済み
   const ms = PAUSE_SPEEDS[getSettings().stepSpeed] ?? 700;
@@ -1238,13 +1398,16 @@ function render() {
   handleCardReveal(s);
   handleAttack(s);
 
-  // 手札表示: 人間が1人だけなら常にその人の手札を固定表示（AIの手札は見せない）
+  // 手札表示。
+  //   オンライン対戦者: 常に自分の手札を下に、相手は裏向き。
+  //   観戦者: 下＝手番側の手札、上＝相手の手札も表向き（両方見える＝CPU対戦の観戦と同じ）。
+  //   ソロ: 人間が1人ならその人、ホットシートは手番側。
   const humans = [0, 1].filter((i) => !aiEnabled(i));
-  const handPlayer = humans.length === 1
-    ? humans[0]
-    : (s.pending && s.pending.player != null ? s.pending.player : s.turnPlayer);
+  const handPlayer = (isOnline && !isSpectator && myOnlineIdx != null)
+    ? myOnlineIdx
+    : (humans.length === 1 ? humans[0] : (s.pending && s.pending.player != null ? s.pending.player : s.turnPlayer));
   renderHand(document.getElementById('hand'), s.players[handPlayer].hand, handPlayer, hooks);
-  renderOppHand(document.getElementById('opp-hand'), s.players[1 - handPlayer].hand.length);
+  renderOppHand(document.getElementById('opp-hand'), s.players[1 - handPlayer].hand, isSpectator);
 
   // ホットシート: 下の手札が誰のものかを明示する（切り替わりに気づけるように）
   const ownerTag = document.getElementById('hand-owner');
@@ -1524,6 +1687,8 @@ function renderPregameModal(s) {
   // 引き直しがAIの手番なら自動処理（handleAI）に任せ、モーダルは出さない
   if (isPregame && pending.type === 'redraw' && aiEnabled(pending.player)) { modal.classList.remove('active'); return; }
   if (!isPregame) { modal.classList.remove('active'); return; }
+  // オンライン: 自分の引き直しでない（相手の番/観戦）ならモーダルを出さず待機する
+  if (isOnline && (isSpectator || pending.player !== myOnlineIdx)) { modal.classList.remove('active'); return; }
 
   const title = document.getElementById('pregame-title');
   const body = document.getElementById('pregame-body');
@@ -1659,6 +1824,15 @@ function renderActions(s) {
   const box = document.getElementById('actions');
   box.innerHTML = '';
   if (!s.pending) return;
+  // オンライン: 自分の決定でない局面では操作を出さず待機表示（観戦者は常に操作不可）。
+  // ※安全のためエンジンのapplyも非責任者のクリックを無視するが、UI上も明示する。
+  if (isOnline && (isSpectator || responsibleIdx(s) !== myOnlineIdx)) {
+    const w = document.createElement('div');
+    w.className = 'actions-title';
+    w.textContent = isSpectator ? '👀 観戦中（両者の手札が見えます）' : '⏳ 相手の番です（待機中）';
+    box.appendChild(w);
+    return;
+  }
   // 先攻後攻の決定・引き直しは専用モーダル(renderPregameModal)で扱うため右パネルには出さない
   if (s.pending.type === 'chooseFirstPlayer' || s.pending.type === 'redraw') return;
 
@@ -1804,7 +1978,7 @@ function getAgent(idx) {
 }
 
 function handleAI(s) {
-  if (isReplaying) return; // 観戦再生中はAIを動かさない（記録列だけを再生ドライバが適用）
+  if (isReplaying || isOnline) return; // 観戦再生・オンラインはAIを動かさない（手ログだけ適用）
   if (!s.pending || s.phase === 'ended') return;
   const idx = s.pending.player;
   if (!aiEnabled(idx)) return;
@@ -1907,18 +2081,16 @@ function setupSettingsPanel() {
   });
 
   // 投了
-  document.getElementById('concede-p1-button').addEventListener('click', () => {
-    if (engine && confirm('プレイヤー1が投了します。よろしいですか？')) {
-      engine.concede(0);
-      document.getElementById('settings-panel').classList.remove('open');
-    }
-  });
-  document.getElementById('concede-p2-button').addEventListener('click', () => {
-    if (engine && confirm('プレイヤー2が投了します。よろしいですか？')) {
-      engine.concede(1);
-      document.getElementById('settings-panel').classList.remove('open');
-    }
-  });
+  const doConcede = (idx) => {
+    if (!engine) return;
+    if (!confirm(`プレイヤー${idx + 1}が投了します。よろしいですか？`)) return;
+    if (isOnline) onlineSession?.concede(); // オンラインは手ログ経由で全員に同期
+    else engine.concede(idx);
+    document.getElementById('settings-panel').classList.remove('open');
+  };
+  document.getElementById('concede-p1-button').addEventListener('click', () => doConcede(0));
+  document.getElementById('concede-p2-button').addEventListener('click', () => doConcede(1));
+  document.getElementById('online-leave-button')?.addEventListener('click', leaveOnline);
 
   // ゲームリセット
   document.getElementById('reset-game-button').addEventListener('click', () => {
@@ -2020,6 +2192,7 @@ async function main() {
   setupMobileControls();
   setupReplayUI();
   renderReplayList();
+  setupOnlineUI();
   updateBoardScale();
   window.addEventListener('resize', updateBoardScale);
   MOBILE_MQ.addEventListener?.('change', updateBoardScale);

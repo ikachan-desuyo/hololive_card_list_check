@@ -1549,3 +1549,16 @@ body.dragging, body.dragging * { cursor: grabbing !important; }
 #replay-panel .settings-row button { flex: 1; background: #2a2e5a; }
 .replay-empty { color: #889; font-size: 0.8em; line-height: 1.5; }
 #replay-msg { color: #8fd; font-size: 0.8em; min-height: 1.2em; margin-top: 6px; }
+
+/* ===== オンライン対戦パネル（デッキ選択画面） ===== */
+#online-panel { margin-top: 22px; padding-top: 16px; border-top: 1px solid #3a3f77; }
+#online-panel input[type="text"] { width: 100%; padding: 8px; margin: 4px 0; background: #1d1f3d; color: #eee; border: 1px solid #44488a; border-radius: 6px; box-sizing: border-box; }
+#online-panel .settings-row { margin-top: 8px; gap: 6px; }
+#online-panel .settings-row button { margin-top: 0; width: auto; flex: 1; padding: 9px; font-size: 0.95em; background: #2a2e5a; }
+#online-panel #online-create { background: linear-gradient(135deg, #4a7cff, #9a4aff); }
+#online-panel button:disabled { opacity: 0.5; cursor: not-allowed; }
+#online-code-display { color: #8fd; font-size: 0.9em; margin: 6px 0; font-weight: bold; }
+#online-status { color: #aab; min-height: 1.2em; }
+
+/* 観戦時に相手の手札を表向きで見せるミニカード */
+.mini-face { width: 30px; height: 42px; background-size: cover; background-position: center; border-radius: 3px; border: 1px solid #556; box-shadow: 0 1px 3px rgba(0,0,0,0.4); }
