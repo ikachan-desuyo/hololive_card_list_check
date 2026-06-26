@@ -1948,13 +1948,17 @@ async function main() {
   // 観戦再生: ?applied=ID1,ID2,...&a=FUWAMOCO&b=ござる&seed=1&first=0&delay=1100
   //   記録した「全適用手の列(appliedIds)」を本物の盤面でそのまま順に再生する（決定的＝完全再現）。
   if (params.get('applied') != null) {
-    await startReplay({
+    const opts = {
       a: params.get('a'), b: params.get('b'),
       seed: params.get('seed') != null ? Number(params.get('seed')) : undefined,
       first: params.get('first') != null ? Number(params.get('first')) : 0,
       applied: params.get('applied'),
       delay: Number(params.get('delay') || 1100),
-    });
+    };
+    // 重要: アドレスバーから観戦パラメータを除去する。これをしないと「観戦URLのまま」になり、
+    // リロードや「もう一度」のたびに勝手に再生が走る（＝トラップ）。除去後はリロードでデッキ選択へ戻る。
+    try { history.replaceState(null, '', location.pathname); } catch { /* 非対応環境は無視 */ }
+    await startReplay(opts);
   }
 
   // 開発用: ?fillbacks=1 で両者のバックを5体にする（レイアウト確認用）
