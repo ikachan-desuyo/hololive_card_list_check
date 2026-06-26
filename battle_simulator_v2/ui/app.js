@@ -439,7 +439,9 @@ function updateUndoButton(s) {
   // = 人間が操作する対局の本編(playing)中だけ出す。
   const anyHuman = !aiEnabled(0) || !aiEnabled(1);
   const show = !isReplaying && anyHuman && s.phase === 'playing';
-  btn.style.display = show ? '' : 'none';
+  // CSS既定が display:none のため、表示時は空文字('')ではなく明示的に 'block' を入れる
+  // （'' だとインライン指定が消えてCSSの none に戻り、見えなくなる）。
+  btn.style.display = show ? 'block' : 'none';
   if (!show) return;
   // 活性判定は軽量に: 1手以上適用済みなら押せる扱い（厳密な戻り先探索=再構築は
   // クリック時にだけ行う。毎描画で再構築すると終盤で重くなるため）。
