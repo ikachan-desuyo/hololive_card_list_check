@@ -241,6 +241,8 @@ async function startGame(opts = {}) {
     });
     document.getElementById('setup-screen').style.display = 'none';
     document.getElementById('game-screen').classList.add('active');
+    isReplaying = !!opts.isReplay;
+    updateReplayUI(isReplaying); // 観戦再生中は不要な設定（先読み/AI/任意効果/評価値/投了）を隠す
     engine.start();
     // 詳細ログ用: 各プレイヤーが「人間 / CPU(先読み or 簡易)」のどれかを記録（どのAIで打ったか後で確認できる）
     for (let i = 0; i < 2; i++) {
@@ -256,6 +258,26 @@ async function startGame(opts = {}) {
 // ============ リプレイ（観戦再生） ============
 
 let replayTimer = null; // 再生中のタイマー（中断用）
+let isReplaying = false; // 観戦再生中か（設定UIの出し分けに使う）
+// 再生スピード（1手の間隔）。進行速度設定(stepSpeed)に連動させる＝再生中は「進行速度」が再生スピードとして効く。
+const REPLAY_DELAYS = { fast: 350, normal: 1100, slow: 2200, manual: 1100 };
+function replayDelayMs() { return REPLAY_DELAYS[getSettings().stepSpeed] ?? 1100; }
+
+/** 観戦再生中は再生に無関係な設定（AI適用・先読み・任意効果確認・評価値・投了）を隠す。 */
+function updateReplayUI(replaying) {
+  for (const id of ['ai-buttons', 'lookahead-turns-buttons', 'confirm-optional-buttons', 'show-eval-buttons']) {
+    const sec = document.getElementById(id)?.closest('.settings-section');
+    if (sec) sec.style.display = replaying ? 'none' : '';
+  }
+  for (const id of ['concede-p1-button', 'concede-p2-button']) {
+    const b = document.getElementById(id);
+    if (b) b.style.display = replaying ? 'none' : '';
+  }
+  // 進行速度ラベルを再生時は「再生速度」と分かるようにする
+  const speedSec = document.getElementById('pause-speed-buttons')?.closest('.settings-section');
+  const label = speedSec?.querySelector('.settings-label');
+  if (label) label.textContent = replaying ? '再生速度（観戦）' : '進行速度（CPUの指す速さ・ステップ送り）';
+}
 
 /**
  * リプレイ(applied列)を本物の盤面で再生する。エンジンは記録と同条件で構築し、AIは動かさず記録手だけを順に適用。
@@ -263,7 +285,7 @@ let replayTimer = null; // 再生中のタイマー（中断用）
  * 重要: デッキはドロップダウンの選択ではなく「リプレイのデッキ構成(deckA/deckB)」を最優先で使う＝
  *       現在選択中のデッキや、登録されていないデッキに影響されず、必ず記録どおりのデッキで再生する。
  */
-async function startReplay({ a, b, deckA, deckB, seed, first, applied, delay = 1100 }) {
+async function startReplay({ a, b, deckA, deckB, seed, first, applied, delay = undefined }) {
   if (replayTimer) { clearTimeout(replayTimer); replayTimer = null; }
   aiOverride = [false, false]; // 再生中はAIを動かさない（記録列だけ適用）
   aiAgents[0] = aiAgents[1] = null;
@@ -282,6 +304,8 @@ async function startReplay({ a, b, deckA, deckB, seed, first, applied, delay = 1
   }
   const seq = Array.isArray(applied) ? applied : String(applied || '').split(',').map((x) => x.trim()).filter(Boolean);
   let idx = 0;
+  // 1手の間隔: URL等で明示指定(delay)があればそれ、無ければ「進行速度」設定に連動（再生中に変更が即効く）。
+  const stepDelay = () => (delay != null ? delay : replayDelayMs());
   const applyOne = () => {
     const pd = engine.state.pending;
     const id = seq[idx++];
@@ -305,12 +329,12 @@ async function startReplay({ a, b, deckA, deckB, seed, first, applied, delay = 1
         pd = engine.state.pending;
         if (wasConfirm) break; // 確定で複数選択は終了
       }
-      replayTimer = setTimeout(drive, delay);
+      replayTimer = setTimeout(drive, stepDelay());
       return;
     }
     const trivial = pd.type === 'stepPause' || pd.options.length === 1;
     applyOne();
-    replayTimer = setTimeout(drive, trivial ? 220 : delay);
+    replayTimer = setTimeout(drive, trivial ? 220 : stepDelay());
   };
   replayTimer = setTimeout(drive, 900);
   console.log('▶ 観戦再生モード開始（記録手数=' + seq.length + '）');
@@ -1945,7 +1969,7 @@ async function main() {
       seed: params.get('seed') != null ? Number(params.get('seed')) : undefined,
       first: params.get('first') != null ? Number(params.get('first')) : 0,
       applied: params.get('applied'),
-      delay: Number(params.get('delay') || 1100),
+      delay: params.get('delay') != null ? Number(params.get('delay')) : undefined, // 無指定なら進行速度設定に連動
     };
     // 重要: アドレスバーから観戦パラメータを除去する。これをしないと「観戦URLのまま」になり、
     // リロードや「もう一度」のたびに勝手に再生が走る（＝トラップ）。除去後はリロードでデッキ選択へ戻る。
@@ -1962,7 +1986,7 @@ async function main() {
       const files = await loadFileReplays();
       const r = files.find((x) => x.file === fname);
       if (r) {
-        await startReplay({ a: r.a, b: r.b, deckA: r.deckA, deckB: r.deckB, seed: r.seed, first: r.first, applied: r.applied, delay: Number(params.get('delay') || 1100) });
+        await startReplay({ a: r.a, b: r.b, deckA: r.deckA, deckB: r.deckB, seed: r.seed, first: r.first, applied: r.applied, delay: params.get('delay') != null ? Number(params.get('delay')) : undefined });
       } else { document.getElementById('setup-error').textContent = `リプレイが見つかりません: ${fname}`; }
     } catch (e) { document.getElementById('setup-error').textContent = 'リプレイ読み込み失敗: ' + e.message; }
   }
