@@ -26,11 +26,14 @@
  */
 
 export const FIREBASE_CONFIG = {
-  apiKey: 'PASTE_YOUR_API_KEY',
-  authDomain: 'PASTE.firebaseapp.com',
-  databaseURL: 'https://PASTE-default-rtdb.firebaseio.com',
-  projectId: 'PASTE',
-  appId: 'PASTE',
+  apiKey: "AIzaSyDaOUZ8l-oszW2HyIKwa1q0wDkEb2ls2KU",
+  authDomain: "holocaonline.firebaseapp.com",
+  databaseURL: "https://holocaonline-default-rtdb.asia-southeast1.firebasedatabase.app",
+  projectId: "holocaonline",
+  storageBucket: "holocaonline.firebasestorage.app",
+  messagingSenderId: "997186661707",
+  appId: "1:997186661707:web:92a25ea8200770f4b84cce",
+  measurementId: "G-94H4YWE2SF",
 };
 
 /** 設定が実値に置き換えられているか（プレースホルダのままなら false）。 */
