@@ -55,7 +55,7 @@ export class LookaheadAI {
     // 単発のヒューリスティック（score.js の貪欲評価）では1体に盛り過ぎる/前進の機会を逃す等が起きやすい。
     // 先読み（候補ごとに自ターンを擬似実行して評価）に載せると、これらをターン結果で正せる。
     // それ以外（効果選択・配置センター等）はヒューリスティックに委ねる。
-    const isLookaheadStep = (pending.type === 'main' || pending.type === 'performance' || pending.type === 'attachCheer')
+    const isLookaheadStep = (pending.type === 'main' || pending.type === 'performance')
       && pending.player === this.playerIdx;
     if (!isLookaheadStep) {
       return this.fallback.choose(engine);
