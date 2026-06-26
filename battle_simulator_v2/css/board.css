@@ -1371,8 +1371,8 @@ body.dragging, body.dragging * { cursor: grabbing !important; }
 
   /* スマホ用ボタン群（右上に縦並び） */
   #settings-button { top: 8px; right: 8px; }
-  /* 1手戻すは左上（設定⚙とは反対側）に置く。手札と被らない上部 */
-  #undo-button { top: 8px; right: auto; left: 8px; height: 36px; padding: 0 10px; font-size: 0.85em; }
+  /* 1手戻すはホーム🏠(top:10,left:10)の真下に置く。重ねるとホームのタップを奪うため離す */
+  #undo-button { top: 58px; right: auto; left: 8px; height: 36px; padding: 0 12px; font-size: 0.85em; z-index: 48; }
   #panel-toggle-button {
     position: absolute;
     top: 56px; right: 8px;
