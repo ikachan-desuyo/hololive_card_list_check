@@ -461,6 +461,10 @@ body.dragging, body.dragging * { cursor: grabbing !important; }
 /* 手札: カード本体（ヒット判定）は動かさず、絵柄(img)だけ持ち上げる
    （カードごと動かすとカーソル下から逃げて hover が点滅するため） */
 #hand .card { width: 104px; height: 145px; background: transparent; border: none; }
+/* スマホ: 手札カードは横スワイプを「ブラウザの横スクロール」に渡し、
+   縦方向のドラッグだけを自前のカードプレイ判定に使う（上方向へドラッグ＝場に出す）。
+   .can-drag の touch-action:none をこの specificity で上書きする。 */
+#hand .card.can-drag { touch-action: pan-x; }
 #hand .card img { transition: transform 0.15s ease; }
 #hand .card:hover img { transform: translateY(-26px) scale(1.12); }
 #hand .card::after { display: none; }

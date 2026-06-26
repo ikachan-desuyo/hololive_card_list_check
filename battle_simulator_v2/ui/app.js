@@ -593,6 +593,11 @@ function setupDnDListeners() {
       const dx = e.clientX - dragState.startX;
       const dy = e.clientY - dragState.startY;
       if (dx * dx + dy * dy < 36) return; // 6px動くまではクリック扱い
+      // タッチの手札カードは、横優位のスワイプをドラッグにせずブラウザの横スクロール
+      // に委ねる（手札の play は上方向ドラッグ。pointercancel 取りこぼし対策）。
+      // 盤面の駒（touch-action:none で横スクロールが無い）は全方向ドラッグのまま。
+      if (e.pointerType === 'touch' && dragState.src.includes(':hand:')
+          && Math.abs(dx) > Math.abs(dy)) return;
       startDrag(e);
     } else {
       moveDrag(e);
@@ -608,6 +613,15 @@ function setupDnDListeners() {
       dragEndedAt = Date.now();
       endDrag(st, e);
     }
+  });
+
+  // スマホで手札を横スワイプすると、ブラウザが横スクロールのためにポインタを
+  // 奪い pointercancel を送ってくる（touch-action: pan-x）。掴みかけの状態を破棄する。
+  document.addEventListener('pointercancel', () => {
+    if (!dragState) return;
+    const st = dragState;
+    dragState = null;
+    if (st.started) cleanupDrag(st);
   });
 
   // ドラッグ直後の click はインスペクタ等を開かない（capture で握りつぶす）
