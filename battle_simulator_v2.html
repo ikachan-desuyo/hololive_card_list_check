@@ -42,8 +42,25 @@
         <div id="replay-msg"></div>
       </div>
 
+      <!-- オンライン対戦（フレンド対戦） -->
+      <div id="online-panel">
+        <div class="settings-label">🌐 オンライン対戦（フレンド対戦）</div>
+        <input id="online-name" type="text" placeholder="あなたの名前">
+        <div class="settings-row">
+          <button id="online-create">🏠 ルームを作る</button>
+        </div>
+        <div id="online-code-display"></div>
+        <div class="settings-row">
+          <input id="online-join-code" type="text" placeholder="ルームコード（例: ABCDE）" maxlength="8" style="text-transform:uppercase">
+          <button id="online-join">⚔ 参加</button>
+          <button id="online-spectate">👀 観戦</button>
+        </div>
+        <div id="online-status" class="settings-note"></div>
+        <div class="settings-note">自分のデッキは上の「プレイヤー1 のデッキ」を使います。観戦は両者の手札が見えます。</div>
+      </div>
+
       <!-- 更新確認用バージョン（コミット時に日時を更新）。ハードリロードで反映されたかの目印 -->
-      <div id="app-version">2026-06-27c 「↩ 1手戻す」が表示されないバグを修正（display制御の不具合）</div>
+      <div id="app-version">2026-06-27 オンライン対戦(β)</div>
     </div>
 
     <!-- ゲーム画面 -->
@@ -113,6 +130,7 @@
           <button id="concede-p1-button" class="settings-action">🏳 プレイヤー1が投了</button>
           <button id="concede-p2-button" class="settings-action">🏳 プレイヤー2が投了</button>
           <button id="reset-game-button" class="settings-action danger">🔄 ゲームをリセット</button>
+          <button id="online-leave-button" class="settings-action danger" style="display:none">🚪 退室（デッキ選択へ戻る）</button>
         </div>
         <div class="settings-section">
           <div class="settings-note" id="seed-display"></div>

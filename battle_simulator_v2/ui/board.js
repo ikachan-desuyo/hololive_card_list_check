@@ -289,9 +289,18 @@ export function renderHand(container, hand, sideIdx, hooks) {
   });
 }
 
-/** 相手の手札（裏向きミニカード） */
-export function renderOppHand(container, count) {
+/** 相手の手札。通常は裏向きミニカード（枚数のみ）。showFaces=true（観戦時）は表向きで中身を見せる。 */
+export function renderOppHand(container, handOrCount, showFaces = false) {
   container.innerHTML = '';
+  if (showFaces && Array.isArray(handOrCount)) {
+    for (const card of handOrCount) {
+      const c = el('div', 'mini-face', container);
+      c.style.backgroundImage = `url(${card.imageUrl || card.image_url || ''})`;
+      c.title = card.name || '';
+    }
+    return;
+  }
+  const count = Array.isArray(handOrCount) ? handOrCount.length : handOrCount;
   for (let i = 0; i < count; i++) {
     const c = el('div', 'mini-back', container);
     c.style.backgroundImage = `url(${SLEEVE})`;
