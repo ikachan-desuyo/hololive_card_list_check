@@ -369,6 +369,18 @@ function scoreMainActions(engine, idx, pending, out) {
             score = Math.min(score, 6); // 先にBloomさせる（このコラボは後回し）
           }
         }
+        // コラボの諸刃: コラボは前衛をもう1枚さらす＝相手はセンターとこのコラボの2枚を倒し得る（コラボも攻撃対象）。
+        // 不利（相手が次ターンに自センターをKOし得る＝underLethal）な時、攻撃の上積みも無いのに脆い体をコラボに出すと、
+        // 相手に2枚目のKO（ライフもう1枚）を献上する損になる。
+        //   ・コラボした体が今ターンKO/有効打を出すなら攻撃価値で相殺→減点しない。
+        //   ・有利・互角（underLethalでない）なら減点しない。
+        // ＝「KOに繋がるコラボ」「攻めるべき時のコラボ」は普通に打ち、不利時に“的だけ増やす脆いコラボ”だけ抑制（消極化を避ける）。
+        if (score > 0 && underLethal) {
+          const collabRemain = engine.effectiveHp(h) - h.damage;
+          const collabAtk = bestPayableEffDmg(engine, h, idx);
+          const koSomething = opp.center && collabAtk >= (engine.effectiveHp(opp.center) - opp.center.damage);
+          if (collabRemain <= oppThreat && !koSomething) score -= 35;
+        }
         break;
       }
       case 'support': {
