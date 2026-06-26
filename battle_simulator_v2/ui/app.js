@@ -269,7 +269,8 @@ function updateReplayUI(replaying) {
     const sec = document.getElementById(id)?.closest('.settings-section');
     if (sec) sec.style.display = replaying ? 'none' : '';
   }
-  for (const id of ['concede-p1-button', 'concede-p2-button']) {
+  // 投了（再生中は無意味）＋ リザルトの「リプレイを保存」（観戦中の保存は無意味）を隠す
+  for (const id of ['concede-p1-button', 'concede-p2-button', 'save-replay-button']) {
     const b = document.getElementById(id);
     if (b) b.style.display = replaying ? 'none' : '';
   }
