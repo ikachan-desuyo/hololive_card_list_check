@@ -282,17 +282,34 @@ async function startReplay({ a, b, deckA, deckB, seed, first, applied, delay = 1
   }
   const seq = Array.isArray(applied) ? applied : String(applied || '').split(',').map((x) => x.trim()).filter(Boolean);
   let idx = 0;
-  const drive = () => {
-    replayTimer = null;
-    if (!engine || engine.state.phase === 'ended' || idx >= seq.length) { console.log('▶ 観戦再生 終了'); return; }
+  const applyOne = () => {
     const pd = engine.state.pending;
-    if (!pd) return;
     const id = seq[idx++];
     const valid = pd.options.some((o) => o.id === id) || (pd.multiSelect && id === 'confirm');
-    const trivial = pd.type === 'stepPause' || pd.options.length === 1;
     try { engine.apply(valid ? id : pd.options[0].id); }
     catch (e) { console.warn('観戦再生: 適用失敗', id, e.message); }
     if (!valid) console.warn('観戦再生: 記録とズレ', id, '→ 自動', pd.options[0]?.id);
+  };
+  const drive = () => {
+    replayTimer = null;
+    if (!engine || engine.state.phase === 'ended' || idx >= seq.length) { console.log('▶ 観戦再生 終了'); return; }
+    let pd = engine.state.pending;
+    if (!pd) return;
+    // 複数選択(chooseCards)は「トグル列＋確定」を1ステップで一気に適用する。
+    // 1枚ずつ遅延を挟むとモーダルが毎回再描画され、選択枚数表示がチラついて「1→2→1のループ」に見えるため。
+    if (pd.multiSelect) {
+      let guard = 0;
+      while (pd && pd.multiSelect && idx < seq.length && guard++ < 200) {
+        const wasConfirm = seq[idx] === 'confirm';
+        applyOne();
+        pd = engine.state.pending;
+        if (wasConfirm) break; // 確定で複数選択は終了
+      }
+      replayTimer = setTimeout(drive, delay);
+      return;
+    }
+    const trivial = pd.type === 'stepPause' || pd.options.length === 1;
+    applyOne();
     replayTimer = setTimeout(drive, trivial ? 220 : delay);
   };
   replayTimer = setTimeout(drive, 900);
