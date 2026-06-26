@@ -9,7 +9,7 @@
  */
 
 import { CardLibrary } from '../core/cards.js';
-import { Engine } from '../core/engine.js';
+import { Engine, cloneGameDeck } from '../core/engine.js';
 import { EffectRegistry } from '../core/effects/registry.js';
 import { HeuristicAI } from '../core/ai/heuristic.js';
 import { LookaheadAI } from '../core/ai/lookahead.js';
@@ -340,6 +340,110 @@ async function startReplay({ a, b, deckA, deckB, seed, first, applied, delay = u
   };
   replayTimer = setTimeout(drive, 900);
   console.log('▶ 観戦再生モード開始（記録手数=' + seq.length + '）');
+}
+
+// ============ 1手戻す（手動プレイ専用のアンドゥ） ============
+//
+// エンジンは完全に決定的（乱数=シード付きRNGのみ）なので、現在状態は
+// (初期デッキ構成 + シード + 適用した決定列 appliedIds) から一意に再現できる
+// （先読みAIの rollout.js / リプレイ機能と同じ原理）。
+// よって「1手戻す」= appliedIds を末尾から削って最初から再生し直すだけでよい。
+// スナップショットもクローンも不要（ターン修正のクロージャも再生時に正しく張り直される）。
+
+/**
+ * いまの局面が「人間の入力待ち」で止まる地点か。
+ * = ドライバ(handleAI / handleStepPause)が自動で先へ進めない状態。
+ * 戻り先はここに限定する（AIや自動ステップ送りの途中に戻すと、すぐ前へ進んでしまうため）。
+ */
+function isHumanWaiting(s) {
+  if (!s.pending || s.phase === 'ended') return false;
+  if (s.pending.player != null && aiEnabled(s.pending.player)) return false; // AIが自動で指す
+  // ステップ境界(stepPause)は「手動」以外では自動送りされる→入力待ちとは見なさない
+  if (s.pending.type === 'stepPause' && (PAUSE_SPEEDS[getSettings().stepSpeed] ?? 700) !== 0) return false;
+  return true;
+}
+
+/**
+ * 現在の engine と同じ初期条件で新エンジンを作り、appliedIds の先頭 count 手だけを再生する。
+ * 描画フックは付けずに静かに作る（呼び出し側で swap 後に render する）。
+ */
+function rebuildEngineTo(count) {
+  const ri = engine._replayInfo;
+  const fresh = new Engine({
+    decks: ri.decks.map(cloneGameDeck), // 独立コピー（汚染防止）
+    seed: ri.seed,
+    firstPlayer: ri.firstPlayer,
+    names: ri.names,
+    onChange: () => {},                 // 再生中は描画しない
+    registry: engine.registry,          // 効果定義は不変なので共有してよい
+    confirmOptionalEffects: engine.confirmOptionalEffects,
+    detailLog: engine.detailLog,
+    cardLibrary: engine.cardLibrary,
+  });
+  fresh.start();
+  const ids = engine.state.appliedIds;
+  for (let i = 0; i < count; i++) {
+    if (fresh.state.phase === 'ended' || !fresh.state.pending) break;
+    try { fresh.apply(ids[i]); } catch { break; }
+  }
+  return fresh;
+}
+
+/** 戻れる地点（直前の人間入力待ち）の applied 手数を返す。無ければ null。 */
+function findUndoTarget() {
+  if (!engine || isReplaying) return null;
+  const n = (engine.state.appliedIds || []).length;
+  // 現局面(=n手適用)より手前で、最大の「人間入力待ち」になる手数を探す。
+  // 戻り先は対局本編(playing)に限定する（セットアップ=引き直し/配置までは戻さない）。
+  for (let m = n - 1; m >= 0; m--) {
+    const sim = rebuildEngineTo(m);
+    if (sim.state.phase === 'playing' && isHumanWaiting(sim.state)) return m;
+  }
+  return null;
+}
+
+/** 進行中の自動送りタイマーをすべて解除（戻した先で古いタイマーが暴発しないように） */
+function clearDriveTimers() {
+  if (aiTimer) { clearTimeout(aiTimer); aiTimer = null; }
+  if (pauseTimer) { clearTimeout(pauseTimer); pauseTimer = null; }
+  if (diceDelayTimer) { clearTimeout(diceDelayTimer); diceDelayTimer = null; }
+  aiBusy = false;
+}
+
+/** 1手戻す。押すたびに直前の「自分（人間）の決定」をやり直せる地点へ戻る。 */
+function undoOneMove() {
+  const target = findUndoTarget();
+  if (target == null) return false;
+  clearDriveTimers();
+  const fresh = rebuildEngineTo(target);
+  fresh.onChange = render; // 以降の操作で通常どおり再描画する
+  engine = fresh;
+  // 再生で作り直した盤面に対し、演出系の「表示済み」マーカーを現局面に合わせる
+  // （古い大型表示=サイコロ/公開/ターン通知/ステップトーストを再生し直さないため）。
+  lastRevealSeq = fresh.state.lastReveal ? fresh.state.lastReveal.seq : 0;
+  lastAttackSeq = fresh.state.lastAttack ? fresh.state.lastAttack.seq : 0;
+  lastLogLen = fresh.state.logs.length;
+  lastTurnKey = `${fresh.state.turn}:${fresh.state.turnPlayer}`;
+  lastChoicePending = null;
+  selectedChoiceId = null;
+  stepToastQueue.length = 0;
+  render();
+  return true;
+}
+
+/** 1手戻すボタンの表示/活性を更新（手動プレイ中だけ表示）。render から呼ぶ。 */
+function updateUndoButton(s) {
+  const btn = document.getElementById('undo-button');
+  if (!btn) return;
+  // 観戦再生中・完全CPU対戦・対局前(セットアップ)・対局終了後は隠す。
+  // = 人間が操作する対局の本編(playing)中だけ出す。
+  const anyHuman = !aiEnabled(0) || !aiEnabled(1);
+  const show = !isReplaying && anyHuman && s.phase === 'playing';
+  btn.style.display = show ? '' : 'none';
+  if (!show) return;
+  // 活性判定は軽量に: 1手以上適用済みなら押せる扱い（厳密な戻り先探索=再構築は
+  // クリック時にだけ行う。毎描画で再構築すると終盤で重くなるため）。
+  btn.disabled = (s.appliedIds || []).length === 0;
 }
 
 /** デッキ選択画面のリプレイ一覧を再描画（キャッシュ＋replay_data/ ファイル）。 */
@@ -1154,6 +1258,7 @@ function render() {
   renderEffectChoiceModal(s);
   renderLog(s);
   renderResult(s);
+  updateUndoButton(s);
   handleStepPause(s);
   handleAI(s);
 }
@@ -1906,6 +2011,9 @@ async function main() {
   setupPreview();
   setupModals();
   setupDnDListeners();
+  document.getElementById('undo-button').addEventListener('click', () => {
+    if (!undoOneMove()) console.log('↩ これ以上は戻せません');
+  });
   setupSettingsPanel();
   setupMobileControls();
   setupReplayUI();

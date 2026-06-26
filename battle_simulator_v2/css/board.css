@@ -712,6 +712,25 @@ body.dragging, body.dragging * { cursor: grabbing !important; }
 }
 #settings-button:hover { border-color: var(--accent); color: #fff; }
 
+/* 1手戻す（設定ボタンの左隣）。手動プレイ専用なので JS が表示/非表示を制御する */
+#undo-button {
+  position: absolute;
+  top: 10px;
+  right: 380px; /* 設定ボタン(right:332px,幅40px)のさらに左 */
+  height: 40px;
+  padding: 0 14px;
+  font-size: 0.95em;
+  background: rgba(14, 16, 38, 0.9);
+  border: 1px solid #34386b;
+  border-radius: 20px;
+  color: #cdd4ff;
+  cursor: pointer;
+  z-index: 45;
+  display: none; /* 既定は隠す。手動プレイ中だけ JS が出す */
+}
+#undo-button:hover:not(:disabled) { border-color: var(--accent); color: #fff; }
+#undo-button:disabled { opacity: 0.4; cursor: default; }
+
 #settings-panel {
   position: absolute;
   top: 58px;
@@ -1352,6 +1371,8 @@ body.dragging, body.dragging * { cursor: grabbing !important; }
 
   /* スマホ用ボタン群（右上に縦並び） */
   #settings-button { top: 8px; right: 8px; }
+  /* 1手戻すは左上（設定⚙とは反対側）に置く。手札と被らない上部 */
+  #undo-button { top: 8px; right: auto; left: 8px; height: 36px; padding: 0 10px; font-size: 0.85em; }
   #panel-toggle-button {
     position: absolute;
     top: 56px; right: 8px;
