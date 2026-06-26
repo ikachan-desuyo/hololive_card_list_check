@@ -48,14 +48,10 @@ export class LookaheadAI {
     const s = engine.state;
     const pending = s.pending;
     if (!pending) return null;
-    // 自分の「メイン行動」「パフォーマンス(攻撃)」「エール配置」を先読み対象にする。
-    // （メイン＝配置/ブルーム/コラボ/バトン等の戦術、パフォーマンス＝どの攻撃をどの順で・どこへ、
-    //   attachCheer＝毎ターン1枚のエールをどのホロメンに付けるか＝資源配分の最重要決定。）
-    // エール配置は「ターンを通した結果（火力解放・倒し切り・過剰集中の回避・被弾耐性）」で選ぶべきもので、
-    // 単発のヒューリスティック（score.js の貪欲評価）では1体に盛り過ぎる/前進の機会を逃す等が起きやすい。
-    // 先読み（候補ごとに自ターンを擬似実行して評価）に載せると、これらをターン結果で正せる。
-    // それ以外（効果選択・配置センター等）はヒューリスティックに委ねる。
-    const isLookaheadStep = (pending.type === 'main' || pending.type === 'performance' || pending.type === 'attachCheer')
+    // 自分の「メイン行動」と「パフォーマンス(攻撃)」を先読み対象にする。
+    // （メイン＝配置/ブルーム/コラボ/バトン等の戦術、パフォーマンス＝どの攻撃をどの順で・どこへ。）
+    // それ以外（エール送付・効果選択等）はヒューリスティックに委ねる。
+    const isLookaheadStep = (pending.type === 'main' || pending.type === 'performance')
       && pending.player === this.playerIdx;
     if (!isLookaheadStep) {
       return this.fallback.choose(engine);

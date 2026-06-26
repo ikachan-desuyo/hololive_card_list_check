@@ -2,13 +2,13 @@
 <html lang="ja">
 <head>
   <meta charset="UTF-8">
-  <title>CPU自己対戦ハーネス</title>
+  <title>AI A/Bテスト（NEW vs OLD）</title>
 </head>
 <body>
-  <h1>🤖 CPU自己対戦（AI改善ループ計測）</h1>
+  <h1>⚔️ AI A/Bテスト（現行 vs 凍結ベースライン）</h1>
   <pre id="out"></pre>
   <script>
-    // ヘッドレスEdge(--dump-dom)で確実に回収するため、console出力をDOMにも反映する（計測ハーネス専用）。
+    // ヘッドレスEdge(--dump-dom)で確実に回収するため、console出力をDOMにも反映する。
     (function mirrorConsole() {
       const out = document.getElementById('out');
       const orig = { log: console.log.bind(console), error: console.error.bind(console) };
@@ -18,13 +18,13 @@
     })();
   </script>
   <script type="module">
-    import { runSelfplay } from './selfplay.js';
-    runSelfplay().then(() => {
-      console.log('SELFPLAY-DONE-MARKER');
-      document.title = 'SELFPLAY-DONE';
+    import { runAbtest } from './abtest.js';
+    runAbtest().then(() => {
+      console.log('ABTEST-DONE-MARKER');
+      document.title = 'ABTEST-DONE';
     }).catch((e) => {
-      console.error('SELFPLAY FAILED', e.message);
-      document.title = 'SELFPLAY-FAILED';
+      console.error('ABTEST FAILED', e.message);
+      document.title = 'ABTEST-FAILED';
     });
   </script>
 </body>

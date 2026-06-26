@@ -2273,6 +2273,30 @@ export async function runTests() {
     }
   });
 
+  await testAsync('AI先読み: エール配置(attachCheer)を先読み経路で解決し合法手＋保存則を守る', async () => {
+    // 改善: LookaheadAI が main/performance に加えて attachCheer（毎ターンのエール1枚をどこへ付けるか）も
+    //       先読み対象に含める（lookahead.js の isLookaheadStep）。この経路が合法手を返し、適用後も保存則を守ることを保証する。
+    const registry = await buildRegistry(lib, deckMap);
+    const e = new Engine({ decks: [lib.buildGameDeck(deckMap), lib.buildGameDeck(deckMap)], seed: 7, firstPlayer: 0, names: ['P1', 'P2'], registry });
+    e.start();
+    const fb = [new HeuristicAI(0), new HeuristicAI(1)];
+    // 実手(apply)で「player0の、選択肢が2つ以上あるエール配置」決定ポイントまで進める（先読みの再生前提＝apply経由必須）。
+    let applies = 0; let reached = null;
+    while (e.state.phase !== 'ended' && applies < 3000) {
+      const pd = e.state.pending;
+      if (!pd) break;
+      if (pd.type === 'attachCheer' && pd.player === 0 && pd.options.length > 1) { reached = pd; break; }
+      const id = pd.player == null ? pd.options[0].id : fb[pd.player].choose(e);
+      e.apply(id); applies++;
+    }
+    assert(reached, 'player0のエール配置(選択肢2つ以上)決定に到達しなかった');
+    const id = new LookaheadAI(0, { turns: 1 }).choose(e);
+    assert(reached.options.some((o) => o.id === id), `先読みが非合法なエール配置IDを返した: ${id}`);
+    const before = totalCards(e.state.players[0]);
+    e.apply(id);
+    assertEq(totalCards(e.state.players[0]), before, 'エール配置後に player0 のカード総数が崩れた（保存則違反）');
+  });
+
   await testAsync('AI: 全テストデッキのミラー対戦でCPUが停止/クラッシュしない', async () => {
     const names = ['Azki単', 'FUWAMOCO', 'あの青空のせいだ', 'ござる', 'さかまた', 'すぅ', 'はあと',
       'るい', 'わため', 'イナ', 'クロニ―', 'ジジ', 'セシジジ', 'ネリッサ単', 'ラミィデッキ', '塩ルイ', '月ルイ'];
