@@ -17,6 +17,7 @@ import { evaluateState, WEIGHTS, incomingDamageToCenter, cheerBudgetThisTurn, op
 import { scoreOptions, bestOptionId, holomenValue, isFreePlaySupport } from '../core/ai/score.js';
 import { reconstruct, evaluateCandidate } from '../core/ai/rollout.js';
 import { LookaheadAI } from '../core/ai/lookahead.js';
+import { analyzeDeckFirepower } from '../core/ai/firepower.js';
 import { createRng } from '../core/rng.js';
 
 const results = [];
@@ -2832,6 +2833,19 @@ export async function runTests() {
       { id: 'killCollab', kind: 'art', zone: 'center', artIndex: 0, target: { zone: 'collab', index: 0 } },
     ] });
     assert(sc.killCenter > sc.killCollab, `毎ターン殴ってくる強いセンター2ndを優先して倒すべき (center=${sc.killCenter}, collab=${sc.killCollab})`);
+  });
+
+  await testAsync('デッキ火力解析: 効果込みの実効火力で主力火力カードを上位抽出する', async () => {
+    const reg = await buildRegistry(lib, deckMap);
+    const { topCards, allArts } = analyzeDeckFirepower(lib, deckMap, reg, { topN: 4 });
+    assert(topCards.length > 0 && topCards.length <= 4, `上位カード数が不正 (${topCards.length})`);
+    assert(allArts.length > 0, 'アーツ一覧が空');
+    // 実効火力は素火力以上（効果は加算方向のみ）
+    for (const r of allArts) assert(r.effective >= r.base, `実効<素 (${r.name}/${r.art}: ${r.effective}<${r.base})`);
+    // 主力カードは実効火力の降順
+    for (let i = 1; i < topCards.length; i++) {
+      assert(topCards[i - 1].effective >= topCards[i].effective, '主力カードが降順でない');
+    }
   });
 
   await testAsync('AIブルーム: 撃てないバックをHPを下げてまで2ndに無駄ブルームしない（前衛なら有用）', async () => {
