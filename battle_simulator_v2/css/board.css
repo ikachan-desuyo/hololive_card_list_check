@@ -1304,7 +1304,22 @@ body.dragging, body.dragging * { cursor: grabbing !important; }
      （バック5体 = 5×84 + gap が archive と重ならない幅に収める） */
   :root { --card-w: 84px; --card-h: 117px; }
 
-  #setup-screen { min-width: 0; width: min(92vw, 420px); padding: 22px 20px; }
+  /* 項目（リプレイ/オンライン等）が増えて縦にはみ出すため、setup-screen 自体をスクロール領域にする。
+     - 100dvh = 動的ビューポート高さ（モバイルのブラウザ上下バーが出ても可視範囲に収まる）。未対応ブラウザ向けに 100vh をフォールバック。
+     - margin を上寄せにして（中央寄せだと溢れた時に上が切れる）、下部はセーフエリア(ホームインジケータ)＋ブラウザ下部バー分の余白を確保。 */
+  #setup-screen {
+    min-width: 0;
+    min-height: 0; /* flexアイテムの自動最小高さでmax-heightが無効化されるのを防ぐ */
+    width: min(92vw, 420px);
+    margin: 0 auto;
+    max-height: 100vh;
+    max-height: 100dvh;
+    overflow-y: auto;
+    -webkit-overflow-scrolling: touch;
+    box-sizing: border-box;
+    padding: 16px 18px;
+    padding-bottom: calc(env(safe-area-inset-bottom, 0px) + 72px);
+  }
 
   /* 盤面シーンを全幅に（右パネル分の余白を無くす） */
   .scene { right: 0; perspective-origin: 50% 38%; }
