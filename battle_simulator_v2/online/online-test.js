@@ -77,6 +77,23 @@ export async function runOnlineSyncTest() {
   check(!!engines.host && !!engines.guest, '両クライアントでエンジンが構築された（status=playing で同期開始）');
   if (!engines.host || !engines.guest) { console.log(`ONLINE-TEST: ${pass} passed / ${fail} failed`); return; }
 
+  // 保護検証: app.js と同じ「責任者だけが書ける」ガード。相手の番に対戦相手が操作しても無視される。
+  const sessByIdxG = { 0: sHost, 1: sGuest };
+  const guardedApply = async (myIdx, id) => { // app.js の差し替えapplyと同じ規則
+    if (responsibleIdx(engines.host.state) === myIdx) await sessByIdxG[myIdx].writeMove(id);
+  };
+  {
+    const before = engines.host.state.appliedIds.length;
+    const owner = responsibleIdx(engines.host.state); // この決定の責任者
+    const other = 1 - owner;                          // 相手（操作してはいけない側）
+    const pd = engines.host.state.pending;
+    const id = pd.type === 'stepPause' ? 'ok' : (pd.options[0]?.id);
+    await guardedApply(other, id);   // 相手が操作 → ガードで無視されるべき
+    check(engines.host.state.appliedIds.length === before, `相手の番に対戦相手(P${other + 1})が操作しても無視される（手が進まない）`);
+    await guardedApply(owner, id);   // 責任者が操作 → 進む
+    check(engines.host.state.appliedIds.length === before + 1 && engines.guest.state.appliedIds.length === before + 1, `責任者(P${owner + 1})の操作は両者に反映される`);
+  }
+
   // 対局を進める: ホストのエンジンを基準に、責任者セッションが手を書く（Loopbackは同期発火で両者適用）
   const sessByIdx = { 0: sHost, 1: sGuest };
   let applies = 0;
