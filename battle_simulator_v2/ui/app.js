@@ -287,6 +287,7 @@ function updateReplayUI(replaying) {
  */
 async function startReplay({ a, b, deckA, deckB, seed, first, applied, delay = undefined }) {
   if (replayTimer) { clearTimeout(replayTimer); replayTimer = null; }
+  if (pauseTimer) { clearTimeout(pauseTimer); pauseTimer = null; } // ステップ自動送りの予約を解除（競合防止）
   aiOverride = [false, false]; // 再生中はAIを動かさない（記録列だけ適用）
   aiAgents[0] = aiAgents[1] = null;
   await startGame({
@@ -885,6 +886,9 @@ function saveSettings(patch) {
 }
 
 function handleStepPause(s) {
+  // 観戦再生中は自動送りしない。再生ドライバが記録どおり('ok')に送るため、ここで先に送ると記録列とズレて止まる
+  // （特に stepPause→複数選択 への移行で、自動送りが先行すると以降の手が全部1つずつズレる）。
+  if (isReplaying) return;
   if (s.pending?.type !== 'stepPause') return;
   if (pauseTimer) return; // この pending 用に予約済み
   const ms = PAUSE_SPEEDS[getSettings().stepSpeed] ?? 700;
@@ -1678,6 +1682,7 @@ function getAgent(idx) {
 }
 
 function handleAI(s) {
+  if (isReplaying) return; // 観戦再生中はAIを動かさない（記録列だけを再生ドライバが適用）
   if (!s.pending || s.phase === 'ended') return;
   const idx = s.pending.player;
   if (!aiEnabled(idx)) return;
