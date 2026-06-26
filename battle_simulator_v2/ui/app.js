@@ -17,6 +17,10 @@ import { scoreOptions, bestOptionId } from '../core/ai/score.js';
 import { STEP_NAMES } from '../core/constants.js';
 import { renderSide, renderHand, renderOppHand } from './board.js';
 import { IMPLEMENTED } from '../cards/index.js';
+import {
+  loadCacheReplays, loadFileReplays, saveReplayToCache, deleteCacheReplay,
+  exportCacheReplaysText, importReplaysText, replayLabel, buildReplayFromEngine,
+} from './replays.js';
 
 // test_deck/ にあるデッキ一覧の取得に失敗した時のフォールバック（通常は manifest.json を読む）
 const TEST_DECKS_FALLBACK = ['ラミィデッキ', 'あの青空のせいだ', 'ジジ', 'FUWAMOCO'];
@@ -177,7 +181,7 @@ async function startGame() {
     }
     // 最新コードの反映: 主要スクリプト＋このデッキで使うカード定義が更新されていたら、
     // リロードして最新コードで自動再開する（autostart と、リロード後の再開中はスキップ）。
-    const isAutostart = new URLSearchParams(location.search).has('autostart');
+    const isAutostart = new URLSearchParams(location.search).has('autostart') || new URLSearchParams(location.search).has('replay') || new URLSearchParams(location.search).has('applied');
     if (!isAutostart && !resumingStart) {
       const deckNumbers = [...Object.keys(map1), ...Object.keys(map2)]
         .map((id) => lib.get(id)?.number)
@@ -205,6 +209,7 @@ async function startGame() {
     engine = new Engine({
       decks: [deck1, deck2],
       seed,
+      firstPlayer: forcedFirstPlayer != null ? forcedFirstPlayer : undefined, // 観戦再生(?replay)で先攻を固定
       names: ['プレイヤー1', 'プレイヤー2'],
       onChange: render,
       registry,
@@ -224,6 +229,128 @@ async function startGame() {
   } catch (e) {
     errBox.textContent = e.message;
   }
+}
+
+// ============ リプレイ（観戦再生） ============
+
+let replayTimer = null; // 再生中のタイマー（中断用）
+
+/**
+ * リプレイ(applied列)を本物の盤面で再生する。エンジンは記録と同条件で構築し、AIは動かさず記録手だけを順に適用。
+ * URL(?applied=) からも、デッキ選択画面の一覧からも、この関数を呼ぶ。
+ */
+async function startReplay({ a, b, seed, first, applied, delay = 1100 }) {
+  if (replayTimer) { clearTimeout(replayTimer); replayTimer = null; }
+  const setDeck = (id, name) => {
+    const sel = document.getElementById(id);
+    const o = [...sel.options].find((x) => x.value === name) || [...sel.options].find((x) => x.textContent === name);
+    if (o) sel.value = o.value;
+  };
+  if (a) setDeck('deck-p1', a);
+  if (b) setDeck('deck-p2', b);
+  if (seed != null) document.getElementById('seed-input').value = seed;
+  forcedFirstPlayer = first != null ? Number(first) : 0;
+  aiOverride = [false, false]; // 再生中はAIを動かさない（記録列だけ適用）
+  aiAgents[0] = aiAgents[1] = null;
+  await startGame();
+  forcedFirstPlayer = null; // 後続の通常対戦に影響しないよう戻す
+  const seq = Array.isArray(applied) ? applied : String(applied || '').split(',').map((x) => x.trim()).filter(Boolean);
+  let idx = 0;
+  const drive = () => {
+    replayTimer = null;
+    if (!engine || engine.state.phase === 'ended' || idx >= seq.length) { console.log('▶ 観戦再生 終了'); return; }
+    const pd = engine.state.pending;
+    if (!pd) return;
+    const id = seq[idx++];
+    const valid = pd.options.some((o) => o.id === id) || (pd.multiSelect && id === 'confirm');
+    const trivial = pd.type === 'stepPause' || pd.options.length === 1;
+    try { engine.apply(valid ? id : pd.options[0].id); }
+    catch (e) { console.warn('観戦再生: 適用失敗', id, e.message); }
+    if (!valid) console.warn('観戦再生: 記録とズレ', id, '→ 自動', pd.options[0]?.id);
+    replayTimer = setTimeout(drive, trivial ? 220 : delay);
+  };
+  replayTimer = setTimeout(drive, 900);
+  console.log('▶ 観戦再生モード開始（記録手数=' + seq.length + '）');
+}
+
+/** デッキ選択画面のリプレイ一覧を再描画（キャッシュ＋replay_data/ ファイル）。 */
+async function renderReplayList() {
+  const box = document.getElementById('replay-list');
+  if (!box) return;
+  box.textContent = '読み込み中…';
+  let cache = [];
+  let files = [];
+  try { cache = loadCacheReplays(); } catch { /* 無視 */ }
+  try { files = await loadFileReplays(); } catch { /* 無視 */ }
+  const all = [...cache, ...files];
+  if (all.length === 0) { box.innerHTML = '<div class="replay-empty">保存済みリプレイはありません（対戦後にリザルトの「リプレイを保存」、または replay_data/ にJSONを置く）</div>'; return; }
+  box.innerHTML = '';
+  for (const r of all) {
+    const row = document.createElement('div');
+    row.className = 'replay-row';
+    const tag = r.source === 'file' ? '📁' : '💾';
+    const label = document.createElement('span');
+    label.className = 'replay-label';
+    label.textContent = `${tag} ${replayLabel(r)}`;
+    const play = document.createElement('button');
+    play.className = 'replay-play';
+    play.textContent = '▶ 再生';
+    play.addEventListener('click', () => {
+      startReplay({ a: r.a, b: r.b, seed: r.seed, first: r.first, applied: r.applied });
+    });
+    row.appendChild(label);
+    row.appendChild(play);
+    if (r.source === 'cache') {
+      const del = document.createElement('button');
+      del.className = 'replay-del';
+      del.textContent = '🗑';
+      del.title = '削除';
+      del.addEventListener('click', () => {
+        if (deleteCacheReplay(r.id)) renderReplayList();
+      });
+      row.appendChild(del);
+    }
+    box.appendChild(row);
+  }
+}
+
+/** リプレイUIのボタン群を一度だけ配線する。 */
+function setupReplayUI() {
+  const msg = (t) => { const m = document.getElementById('replay-msg'); if (m) { m.textContent = t; setTimeout(() => { if (m.textContent === t) m.textContent = ''; }, 2500); } };
+  document.getElementById('replay-refresh')?.addEventListener('click', renderReplayList);
+  document.getElementById('replay-export')?.addEventListener('click', () => {
+    const text = exportCacheReplaysText();
+    const blob = new Blob([text], { type: 'application/json' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url; a.download = 'bsv2-replays.json';
+    document.body.appendChild(a); a.click(); a.remove();
+    setTimeout(() => URL.revokeObjectURL(url), 1000);
+    msg('エクスポートしました');
+  });
+  const fileInput = document.getElementById('replay-import-file');
+  document.getElementById('replay-import')?.addEventListener('click', () => fileInput?.click());
+  fileInput?.addEventListener('change', async () => {
+    const f = fileInput.files?.[0];
+    if (!f) return;
+    try {
+      const text = await f.text();
+      const n = importReplaysText(text);
+      msg(`${n}件インポートしました`);
+      renderReplayList();
+    } catch (e) { msg('インポート失敗: ' + e.message); }
+    fileInput.value = '';
+  });
+  // リザルトの「リプレイを保存」ボタン
+  document.getElementById('save-replay-button')?.addEventListener('click', () => {
+    const btn = document.getElementById('save-replay-button');
+    if (!engine) return;
+    const s = getSettings();
+    const replay = buildReplayFromEngine(engine, s.lastDeckP1, s.lastDeckP2, currentSeed);
+    const id = saveReplayToCache(replay);
+    btn.textContent = id ? '✅ 保存しました' : '⚠ 保存失敗';
+    setTimeout(() => { btn.textContent = '💾 リプレイを保存'; }, 1800);
+  });
 }
 
 // ============ ドラッグ&ドロップのマッピング ============
@@ -1448,6 +1575,7 @@ function setupPreview() {
 
 const aiAgents = [null, null];
 let aiOverride = null; // URLパラメータによる一時上書き（保存しない）
+let forcedFirstPlayer = null; // 観戦再生(?replay)で先攻を固定する（通常はnull）
 let lookaheadOverride = null; // ?lookahead=1|2|both で先読みAIを使うプレイヤー（実験用）
 let aiTimer = null;
 let aiBusy = false; // AI処理中フラグ。apply中の再入render→handleAIが古いpending向けタイマーを予約するのを防ぐ
@@ -1602,6 +1730,35 @@ function setupSettingsPanel() {
     } catch { /* クリップボード不可の環境は無視 */ }
   });
 
+  // リプレイをコピー: この対局を最初から再現できる「リプレイURL」を作ってコピーする。
+  //   そのURLを開くと観戦再生モード(?applied=...)で本物の盤面に自動再生される。
+  document.getElementById('copy-replay-button').addEventListener('click', async () => {
+    const btn = document.getElementById('copy-replay-button');
+    if (!engine || !engine.state.appliedIds?.length) {
+      btn.textContent = '⚠ まだ手がありません';
+      setTimeout(() => { btn.textContent = '🎬 リプレイをコピー'; }, 1500);
+      return;
+    }
+    const s = getSettings();
+    const a = s.lastDeckP1; const b = s.lastDeckP2;
+    const first = engine.state.firstPlayer ?? 0;
+    const qs = `applied=${engine.state.appliedIds.join(',')}`
+      + (a ? `&a=${encodeURIComponent(a)}` : '')
+      + (b ? `&b=${encodeURIComponent(b)}` : '')
+      + `&seed=${currentSeed}&first=${first}`;
+    const url = `${location.origin}${location.pathname}?${qs}`;
+    try {
+      await navigator.clipboard.writeText(url);
+      btn.textContent = `✅ コピー（${engine.state.appliedIds.length}手）`;
+      setTimeout(() => { btn.textContent = '🎬 リプレイをコピー'; }, 1800);
+    } catch {
+      // クリップボード不可環境: ログにURLを出して手動コピーできるようにする
+      console.log('REPLAY-URL:', url);
+      btn.textContent = '📋 ログにURL出力';
+      setTimeout(() => { btn.textContent = '🎬 リプレイをコピー'; }, 1800);
+    }
+  });
+
   // 投了
   document.getElementById('concede-p1-button').addEventListener('click', () => {
     if (engine && confirm('プレイヤー1が投了します。よろしいですか？')) {
@@ -1715,6 +1872,8 @@ async function main() {
   setupDnDListeners();
   setupSettingsPanel();
   setupMobileControls();
+  setupReplayUI();
+  renderReplayList();
   updateBoardScale();
   window.addEventListener('resize', updateBoardScale);
   MOBILE_MQ.addEventListener?.('change', updateBoardScale);
@@ -1754,7 +1913,8 @@ async function main() {
   // 更新検知でリロードした場合は、保存しておいた選択でそのままゲームを自動再開する
   let pendingStart = null;
   try { pendingStart = JSON.parse(sessionStorage.getItem('bsv2_pendingStart') || 'null'); } catch { /* 無視 */ }
-  if (pendingStart && !params.get('autostart')) {
+  // 観戦再生(?applied / ?replay)・autostart 時は、過去の自動再開予約があっても無視する（観戦の起動を妨げない）。
+  if (pendingStart && !params.get('autostart') && !params.get('applied') && !params.get('replay')) {
     sessionStorage.removeItem('bsv2_pendingStart');
     const sel1 = document.getElementById('deck-p1');
     const sel2 = document.getElementById('deck-p2');
@@ -1783,6 +1943,18 @@ async function main() {
       engine.apply((active[0] || actions[0]).id);
     }
     console.log('✅ autostart 完了');
+  }
+
+  // 観戦再生: ?applied=ID1,ID2,...&a=FUWAMOCO&b=ござる&seed=1&first=0&delay=1100
+  //   記録した「全適用手の列(appliedIds)」を本物の盤面でそのまま順に再生する（決定的＝完全再現）。
+  if (params.get('applied') != null) {
+    await startReplay({
+      a: params.get('a'), b: params.get('b'),
+      seed: params.get('seed') != null ? Number(params.get('seed')) : undefined,
+      first: params.get('first') != null ? Number(params.get('first')) : 0,
+      applied: params.get('applied'),
+      delay: Number(params.get('delay') || 1100),
+    });
   }
 
   // 開発用: ?fillbacks=1 で両者のバックを5体にする（レイアウト確認用）
