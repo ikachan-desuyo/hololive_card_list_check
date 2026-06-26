@@ -214,7 +214,7 @@ async function startGame() {
       onChange: render,
       registry,
       confirmOptionalEffects: getSettings().confirmOptionalEffects !== false, // 任意効果の発動確認（既定ON）
-      detailLog: true, // 実対戦は常に詳細ログを記録（コピーは設定「詳細ログ」ON時に詳細版を出力）
+      detailLog: true, // 詳細ログを常に記録（自己対戦ハーネス ?full= 等が使用。UIのコピー機能はリプレイ保存に置き換えたため廃止）
       cardLibrary: lib, // AIの相手ブルーム脅威見積り用（公開のカードプール参照）
     });
     document.getElementById('setup-screen').style.display = 'none';
@@ -1699,14 +1699,6 @@ function setupSettingsPanel() {
     if (engine) render(); // 即反映
   });
 
-  // 詳細ログ（コピー出力を詳細版にするか）
-  document.getElementById('detail-log-buttons').addEventListener('click', (e) => {
-    const v = e.target.dataset?.detailLog;
-    if (!v) return;
-    saveSettings({ detailLog: v === 'on' });
-    refreshSettingsUI();
-  });
-
   // AI適用（CPUが操作するプレイヤーの切り替え）
   document.getElementById('ai-buttons').addEventListener('click', (e) => {
     const idx = e.target.dataset?.ai;
@@ -1717,50 +1709,6 @@ function setupSettingsPanel() {
     saveSettings({ aiPlayers: current });
     refreshSettingsUI();
     if (engine) render(); // AIループを起動
-  });
-
-  // ログコピー（設定「詳細ログ」ONなら全情報スナップショット付きの詳細版を出力）
-  document.getElementById('copy-log-button').addEventListener('click', async () => {
-    if (!engine) return;
-    const detail = getSettings().detailLog === true && engine.state.detailLogs?.length;
-    const lines = detail ? engine.state.detailLogs : engine.state.logs;
-    const text = `[seed=${currentSeed}]${detail ? '（詳細ログ）' : ''}\n` + lines.join('\n');
-    try {
-      await navigator.clipboard.writeText(text);
-      document.getElementById('copy-log-button').textContent = '✅ コピーしました';
-      setTimeout(() => {
-        document.getElementById('copy-log-button').textContent = '📋 ログをコピー';
-      }, 1500);
-    } catch { /* クリップボード不可の環境は無視 */ }
-  });
-
-  // リプレイをコピー: この対局を最初から再現できる「リプレイURL」を作ってコピーする。
-  //   そのURLを開くと観戦再生モード(?applied=...)で本物の盤面に自動再生される。
-  document.getElementById('copy-replay-button').addEventListener('click', async () => {
-    const btn = document.getElementById('copy-replay-button');
-    if (!engine || !engine.state.appliedIds?.length) {
-      btn.textContent = '⚠ まだ手がありません';
-      setTimeout(() => { btn.textContent = '🎬 リプレイをコピー'; }, 1500);
-      return;
-    }
-    const s = getSettings();
-    const a = s.lastDeckP1; const b = s.lastDeckP2;
-    const first = engine.state.firstPlayer ?? 0;
-    const qs = `applied=${engine.state.appliedIds.join(',')}`
-      + (a ? `&a=${encodeURIComponent(a)}` : '')
-      + (b ? `&b=${encodeURIComponent(b)}` : '')
-      + `&seed=${currentSeed}&first=${first}`;
-    const url = `${location.origin}${location.pathname}?${qs}`;
-    try {
-      await navigator.clipboard.writeText(url);
-      btn.textContent = `✅ コピー（${engine.state.appliedIds.length}手）`;
-      setTimeout(() => { btn.textContent = '🎬 リプレイをコピー'; }, 1800);
-    } catch {
-      // クリップボード不可環境: ログにURLを出して手動コピーできるようにする
-      console.log('REPLAY-URL:', url);
-      btn.textContent = '📋 ログにURL出力';
-      setTimeout(() => { btn.textContent = '🎬 リプレイをコピー'; }, 1800);
-    }
   });
 
   // 投了
@@ -1825,10 +1773,6 @@ function refreshSettingsUI() {
   const laTurns = lookaheadTurns();
   for (const btn of document.querySelectorAll('#lookahead-turns-buttons button')) {
     btn.classList.toggle('active', Number(btn.dataset.lookaheadTurns) === laTurns);
-  }
-  const detailLog = getSettings().detailLog === true;
-  for (const btn of document.querySelectorAll('#detail-log-buttons button')) {
-    btn.classList.toggle('active', (btn.dataset.detailLog === 'on') === detailLog);
   }
   document.getElementById('seed-display').textContent = `シード値: ${currentSeed ?? '-'}`;
 }
