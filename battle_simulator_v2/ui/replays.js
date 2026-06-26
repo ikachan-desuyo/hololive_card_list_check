@@ -61,7 +61,8 @@ export function importReplaysText(text) {
   else if (data && Array.isArray(data.replays)) incoming = data.replays;
   else if (data && Array.isArray(data.applied)) incoming = [data]; // 単一リプレイ
   else throw new Error('リプレイデータの形式ではありません');
-  const valid = incoming.filter((r) => r && Array.isArray(r.applied) && r.a && r.b);
+  // 有効＝適用手があり、デッキを特定できる（自己完結のdeckA/deckB、またはデッキ名a/b）。
+  const valid = incoming.filter((r) => r && Array.isArray(r.applied) && (r.deckA || (r.a && r.b)));
   if (valid.length === 0) throw new Error('有効なリプレイがありません');
   const list = readCacheRaw();
   let n = 0;
@@ -105,8 +106,8 @@ export async function loadFileReplays() {
       const res = await fetch(`${FILE_DIR}/${encodeURIComponent(name)}`, { cache: 'no-store' });
       if (!res.ok) continue;
       const r = await res.json();
-      if (r && Array.isArray(r.applied) && r.a && r.b) {
-        out.push({ v: 1, ...r, id: 'file:' + name, file: name, source: 'file' });
+      if (r && Array.isArray(r.applied) && (r.deckA || (r.a && r.b))) {
+        out.push({ ...r, id: 'file:' + name, file: name, source: 'file' });
       }
     } catch { /* 壊れたファイルは飛ばす */ }
   }
@@ -121,14 +122,17 @@ export function replayLabel(r) {
   return `${r.name || `${r.a} vs ${r.b}`}${who}${t}${d}`;
 }
 
-/** 完了した engine の状態からリプレイデータを作る。 */
-export function buildReplayFromEngine(engine, a, b, seed) {
+/** 完了した engine の状態からリプレイデータを作る。
+ *  deckA/deckB（デッキ構成 {id:枚数}）を含めると自己完結リプレイになり、再生時にドロップダウンや
+ *  デッキ登録に依存せず必ず記録どおりのデッキで再生できる（デッキ名 a/b は表示用）。 */
+export function buildReplayFromEngine(engine, a, b, seed, deckA, deckB) {
   const s = engine.state;
   const winner = s.phase === 'ended' ? (s.winner === 'draw' ? null : s.winner) : null;
   return {
-    v: 1,
-    name: `${a} vs ${b}`,
-    a, b,
+    v: 2,
+    name: `${a || 'P1'} vs ${b || 'P2'}`,
+    a: a || null, b: b || null,
+    deckA: deckA || undefined, deckB: deckB || undefined,
     seed,
     first: s.firstPlayer ?? 0,
     applied: [...(s.appliedIds || [])],

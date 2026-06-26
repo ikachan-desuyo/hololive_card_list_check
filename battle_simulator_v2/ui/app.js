@@ -27,6 +27,8 @@ const TEST_DECKS_FALLBACK = ['ラミィデッキ', 'あの青空のせいだ', '
 
 let lib = null;
 let engine = null;
+let currentDeckMaps = null; // 直近に開始した対局の [map1, map2]（デッキ構成）。リプレイ保存で自己完結データにする。
+let currentDeckKeys = null; // 直近の [key1, key2]（デッキ名・表示用）
 let showAllActions = false;
 let resumingStart = false; // リロード後の自動再開中はビルド更新チェックを行わない
 
@@ -103,15 +105,18 @@ async function loadDeckSources() {
 }
 
 async function resolveDeckMap(key) {
-  const kind = key.slice(0, key.indexOf(':'));
-  const name = key.slice(key.indexOf(':') + 1);
-  if (kind === 'test') {
+  const i = key.indexOf(':');
+  const kind = i >= 0 ? key.slice(0, i) : null; // 'test' / 'saved' / null(接頭辞なし)
+  const name = i >= 0 ? key.slice(i + 1) : key;
+  // 接頭辞 test: または接頭辞なし（リプレイの素のデッキ名等）→ まずテストデッキを試す。
+  if (kind === 'test' || kind === null) {
     const res = await fetch(`battle_simulator_v2/test_deck/${encodeURIComponent(name)}.json`);
-    if (!res.ok) throw new Error(`テストデッキの読み込みに失敗: ${name}`);
-    return res.json();
+    if (res.ok) return res.json();
+    if (kind === 'test') throw new Error(`テストデッキの読み込みに失敗: ${name}`);
+    // 接頭辞なしはテストに無ければ保存デッキへフォールバック
   }
   const saved = JSON.parse(localStorage.getItem('deckData') || '{}');
-  if (!saved[name]) throw new Error(`保存デッキが見つかりません: ${name}`);
+  if (!saved[name]) throw new Error(`デッキが見つかりません: ${name}`);
   return saved[name];
 }
 
@@ -156,19 +161,33 @@ async function initSetupScreen() {
   refreshSettingsUI(); // 現在の設定をボタンに反映
 }
 
-async function startGame() {
+/**
+ * 対局を開始する。
+ * @param {object} opts 省略時はデッキ選択画面の入力から開始。リプレイ再生では以下で「ドロップダウン非依存」に開始する:
+ *   - map1/map2 … デッキ構成({id:枚数})を直接指定（リプレイの自己完結データ。最優先）
+ *   - key1/key2 … デッキ名から解決（登録デッキ）。map が無い時のフォールバック＋表示名
+ *   - seed/first … シードと先攻
+ *   - isReplay … 再生用フラグ（前回デッキの保存・ビルド更新リロードをスキップ）
+ */
+async function startGame(opts = {}) {
   const errBox = document.getElementById('setup-error');
   errBox.textContent = '';
   try {
-    const key1 = document.getElementById('deck-p1').value;
-    const key2 = document.getElementById('deck-p2').value;
-    if (!key1 || !key2) {
-      errBox.textContent = 'デッキを選択してください';
+    const key1 = opts.key1 != null ? opts.key1 : document.getElementById('deck-p1').value;
+    const key2 = opts.key2 != null ? opts.key2 : document.getElementById('deck-p2').value;
+    // デッキ構成: 明示マップ(リプレイの自己完結データ)を最優先。無ければデッキ名から解決。
+    //   → これにより「ドロップダウンに無い/登録されていないデッキ」でもリプレイを正しく再生できる。
+    let map1; let map2;
+    try {
+      const src1 = opts.map1 != null ? opts.map1 : (key1 ? await resolveDeckMap(key1) : null);
+      const src2 = opts.map2 != null ? opts.map2 : (key2 ? await resolveDeckMap(key2) : null);
+      if (!src1 || !src2) { errBox.textContent = 'デッキを選択してください'; return; }
+      map1 = CardLibrary.normalizeDeckMap(src1);
+      map2 = CardLibrary.normalizeDeckMap(src2);
+    } catch (e) {
+      errBox.textContent = (opts.isReplay ? 'リプレイのデッキ読み込みに失敗しました: ' : 'デッキの読み込みに失敗しました: ') + e.message;
       return;
     }
-    // デッキ定義は {id:枚数} / カードID配列 / 構造化形式 のいずれもあり得るので正規化してから使う
-    const map1 = CardLibrary.normalizeDeckMap(await resolveDeckMap(key1));
-    const map2 = CardLibrary.normalizeDeckMap(await resolveDeckMap(key2));
     const deck1 = lib.buildGameDeck(map1);
     const deck2 = lib.buildGameDeck(map2);
     const errors = [
@@ -180,8 +199,9 @@ async function startGame() {
       return;
     }
     // 最新コードの反映: 主要スクリプト＋このデッキで使うカード定義が更新されていたら、
-    // リロードして最新コードで自動再開する（autostart と、リロード後の再開中はスキップ）。
-    const isAutostart = new URLSearchParams(location.search).has('autostart') || new URLSearchParams(location.search).has('replay') || new URLSearchParams(location.search).has('applied');
+    // リロードして最新コードで自動再開する（autostart・リプレイ再生・リロード後の再開中はスキップ）。
+    const isAutostart = opts.isReplay || new URLSearchParams(location.search).has('autostart')
+      || new URLSearchParams(location.search).has('replay') || new URLSearchParams(location.search).has('applied');
     if (!isAutostart && !resumingStart) {
       const deckNumbers = [...Object.keys(map1), ...Object.keys(map2)]
         .map((id) => lib.get(id)?.number)
@@ -195,10 +215,12 @@ async function startGame() {
         return;
       }
     }
-    // 正常に組めたデッキを「前回使用」として記憶（次回の初期選択に使う）
-    saveSettings({ lastDeckP1: key1, lastDeckP2: key2 });
+    // 正常に組めたデッキを「前回使用」として記憶（次回の初期選択に使う）。リプレイ再生では記憶しない（設定を汚さない）。
+    if (!opts.isReplay && key1 && key2) saveSettings({ lastDeckP1: key1, lastDeckP2: key2 });
+    currentDeckMaps = [map1, map2];
+    currentDeckKeys = [key1 || null, key2 || null];
     const seedInput = document.getElementById('seed-input').value;
-    const seed = seedInput ? Number(seedInput) : Math.floor(Math.random() * 1e9);
+    const seed = opts.seed != null ? opts.seed : (seedInput ? Number(seedInput) : Math.floor(Math.random() * 1e9));
     currentSeed = seed;
     // カード効果定義の事前読み込み（手書き定義 > テキスト自動コンパイル）
     const registry = new EffectRegistry();
@@ -209,7 +231,7 @@ async function startGame() {
     engine = new Engine({
       decks: [deck1, deck2],
       seed,
-      firstPlayer: forcedFirstPlayer != null ? forcedFirstPlayer : undefined, // 観戦再生(?replay)で先攻を固定
+      firstPlayer: opts.first != null ? opts.first : (forcedFirstPlayer != null ? forcedFirstPlayer : undefined), // リプレイ/観戦で先攻を固定
       names: ['プレイヤー1', 'プレイヤー2'],
       onChange: render,
       registry,
@@ -238,22 +260,26 @@ let replayTimer = null; // 再生中のタイマー（中断用）
 /**
  * リプレイ(applied列)を本物の盤面で再生する。エンジンは記録と同条件で構築し、AIは動かさず記録手だけを順に適用。
  * URL(?applied=) からも、デッキ選択画面の一覧からも、この関数を呼ぶ。
+ * 重要: デッキはドロップダウンの選択ではなく「リプレイのデッキ構成(deckA/deckB)」を最優先で使う＝
+ *       現在選択中のデッキや、登録されていないデッキに影響されず、必ず記録どおりのデッキで再生する。
  */
-async function startReplay({ a, b, seed, first, applied, delay = 1100 }) {
+async function startReplay({ a, b, deckA, deckB, seed, first, applied, delay = 1100 }) {
   if (replayTimer) { clearTimeout(replayTimer); replayTimer = null; }
-  const setDeck = (id, name) => {
-    const sel = document.getElementById(id);
-    const o = [...sel.options].find((x) => x.value === name) || [...sel.options].find((x) => x.textContent === name);
-    if (o) sel.value = o.value;
-  };
-  if (a) setDeck('deck-p1', a);
-  if (b) setDeck('deck-p2', b);
-  if (seed != null) document.getElementById('seed-input').value = seed;
-  forcedFirstPlayer = first != null ? Number(first) : 0;
   aiOverride = [false, false]; // 再生中はAIを動かさない（記録列だけ適用）
   aiAgents[0] = aiAgents[1] = null;
-  await startGame();
-  forcedFirstPlayer = null; // 後続の通常対戦に影響しないよう戻す
+  await startGame({
+    map1: deckA || undefined, // 自己完結データ（最優先）
+    map2: deckB || undefined,
+    key1: a, key2: b,          // 無い時のフォールバック＋表示名
+    seed,
+    first: first != null ? Number(first) : 0,
+    isReplay: true,
+  });
+  if (!engine || engine.state.phase === 'ended' || !engine.state.pending) {
+    // デッキ解決に失敗（登録外＆自己完結データ無し等）。startGame が setup-error に理由を表示済み。
+    console.warn('リプレイ再生: 対局を開始できませんでした');
+    return;
+  }
   const seq = Array.isArray(applied) ? applied : String(applied || '').split(',').map((x) => x.trim()).filter(Boolean);
   let idx = 0;
   const drive = () => {
@@ -296,7 +322,7 @@ async function renderReplayList() {
     play.className = 'replay-play';
     play.textContent = '▶ 再生';
     play.addEventListener('click', () => {
-      startReplay({ a: r.a, b: r.b, seed: r.seed, first: r.first, applied: r.applied });
+      startReplay({ a: r.a, b: r.b, deckA: r.deckA, deckB: r.deckB, seed: r.seed, first: r.first, applied: r.applied });
     });
     row.appendChild(label);
     row.appendChild(play);
@@ -345,8 +371,9 @@ function setupReplayUI() {
   document.getElementById('save-replay-button')?.addEventListener('click', () => {
     const btn = document.getElementById('save-replay-button');
     if (!engine) return;
-    const s = getSettings();
-    const replay = buildReplayFromEngine(engine, s.lastDeckP1, s.lastDeckP2, currentSeed);
+    // デッキ名(表示用)＋デッキ構成(自己完結データ)をリプレイに含める＝再生時にドロップダウンに依存しない。
+    const a = currentDeckKeys?.[0]; const b = currentDeckKeys?.[1];
+    const replay = buildReplayFromEngine(engine, a, b, currentSeed, currentDeckMaps?.[0], currentDeckMaps?.[1]);
     const id = saveReplayToCache(replay);
     btn.textContent = id ? '✅ 保存しました' : '⚠ 保存失敗';
     setTimeout(() => { btn.textContent = '💾 リプレイを保存'; }, 1800);
@@ -1907,6 +1934,20 @@ async function main() {
     // リロードや「もう一度」のたびに勝手に再生が走る（＝トラップ）。除去後はリロードでデッキ選択へ戻る。
     try { history.replaceState(null, '', location.pathname); } catch { /* 非対応環境は無視 */ }
     await startReplay(opts);
+  }
+
+  // 観戦再生（ファイル直接指定）: ?replayfile=claude_vs_gozaru.json
+  //   replay_data/ のリプレイ（デッキ構成同梱）をそのまま再生。ドロップダウン非依存で必ず記録どおりのデッキになる。
+  if (params.get('replayfile')) {
+    const fname = params.get('replayfile');
+    try { history.replaceState(null, '', location.pathname); } catch { /* 無視 */ }
+    try {
+      const files = await loadFileReplays();
+      const r = files.find((x) => x.file === fname);
+      if (r) {
+        await startReplay({ a: r.a, b: r.b, deckA: r.deckA, deckB: r.deckB, seed: r.seed, first: r.first, applied: r.applied, delay: Number(params.get('delay') || 1100) });
+      } else { document.getElementById('setup-error').textContent = `リプレイが見つかりません: ${fname}`; }
+    } catch (e) { document.getElementById('setup-error').textContent = 'リプレイ読み込み失敗: ' + e.message; }
   }
 
   // 開発用: ?fillbacks=1 で両者のバックを5体にする（レイアウト確認用）
