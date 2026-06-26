@@ -267,6 +267,7 @@ let onlineSession = null; // OnlineSession インスタンス
 let myOnlineIdx = null;   // オンラインでの自分のプレイヤー番号(0/1)。観戦はnull
 let onlineRealApply = null; // オンライン用エンジンの素のapply（手ログ適用用）
 let onlineDriveTimer = null; // ステップ自動送り（責任者）用タイマー
+let onlineRenderTimer = null; // 連続適用（途中入室の追いつき等）で描画を間引くためのタイマー
 // 再生スピード（1手の間隔）。進行速度設定(stepSpeed)に連動させる＝再生中は「進行速度」が再生スピードとして効く。
 const REPLAY_DELAYS = { fast: 350, normal: 1100, slow: 2200, manual: 1100 };
 function replayDelayMs() { return REPLAY_DELAYS[getSettings().stepSpeed] ?? 1100; }
@@ -570,7 +571,9 @@ function setupOnlineUI() {
  * 観戦者は全情報可視なので対象外（隠さない）。
  */
 function hideOpponentChoice(s) {
-  return isOnline && !isSpectator && !!s.pending && s.pending.player != null && s.pending.player !== myOnlineIdx;
+  if (!isOnline || !s.pending) return false;
+  if (isSpectator) return true; // 観戦者は対話的な選択UI（効果選択・カード選択・エール送り）を出さない＝盤面と両手札・結果だけ見る
+  return s.pending.player != null && s.pending.player !== myOnlineIdx;
 }
 
 /** 現在の決定ポイントを「手ログに書く責任者」のプレイヤー番号。online-test と同じ規則。 */
@@ -613,8 +616,10 @@ function applyOnlineMove(id) {
     if (typeof id === 'string' && id.startsWith('__concede:')) engine.concede(Number(id.split(':')[1]));
     else onlineRealApply(id);
   } catch (e) { console.warn('オンライン手の適用に失敗', id, e.message); }
-  render();
-  scheduleOnlineAutoDrive();
+  // 連続適用（途中入室の追いつきで過去手を一気に適用する等）では描画・自動送りを1tickにまとめて間引く。
+  // 通常のライブ進行は手と手の間が空くので、実質1手ごとに描画される。
+  if (onlineRenderTimer) clearTimeout(onlineRenderTimer);
+  onlineRenderTimer = setTimeout(() => { onlineRenderTimer = null; render(); scheduleOnlineAutoDrive(); }, 0);
 }
 
 /** ステップ境界(stepPause)など「自動で進める手」を、責任者だけが少し間を置いて手ログに書く。 */
@@ -1413,12 +1418,14 @@ function render() {
 
   // 手札表示。
   //   オンライン対戦者: 常に自分の手札を下に、相手は裏向き。
-  //   観戦者: 下＝手番側の手札、上＝相手の手札も表向き（両方見える＝CPU対戦の観戦と同じ）。
+  //   観戦者: 常にP1を下・P2を上に固定し、両方とも表向き（手番で入れ替わらず見やすい）。
   //   ソロ: 人間が1人ならその人、ホットシートは手番側。
   const humans = [0, 1].filter((i) => !aiEnabled(i));
-  const handPlayer = (isOnline && !isSpectator && myOnlineIdx != null)
-    ? myOnlineIdx
-    : (humans.length === 1 ? humans[0] : (s.pending && s.pending.player != null ? s.pending.player : s.turnPlayer));
+  const handPlayer = (isOnline && isSpectator)
+    ? 0
+    : (isOnline && !isSpectator && myOnlineIdx != null)
+      ? myOnlineIdx
+      : (humans.length === 1 ? humans[0] : (s.pending && s.pending.player != null ? s.pending.player : s.turnPlayer));
   renderHand(document.getElementById('hand'), s.players[handPlayer].hand, handPlayer, hooks);
   renderOppHand(document.getElementById('opp-hand'), s.players[1 - handPlayer].hand, isSpectator);
 
