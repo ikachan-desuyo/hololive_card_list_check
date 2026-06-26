@@ -1301,6 +1301,9 @@ body.dragging, body.dragging * { cursor: grabbing !important; }
  * ========================================================================= */
 @media (max-width: 768px) {
   .mobile-only { display: block; }
+  /* hidden 属性での非表示を効かせる（.mobile-only{display:block} が [hidden] のUA既定を上書きしてしまうため）。
+     これが無いと「▶次へ」ボタンが不要な場面でも消えずに残る。 */
+  .mobile-only[hidden] { display: none !important; }
 
   /* 盤面カードを少し小さくして、バック5体でも横に収まるようにする
      （バック5体 = 5×84 + gap が archive と重ならない幅に収める） */
@@ -1579,3 +1582,10 @@ body.dragging, body.dragging * { cursor: grabbing !important; }
 
 /* 観戦時に相手の手札を表向きで見せるミニカード */
 .mini-face { width: 30px; height: 42px; background-size: cover; background-position: center; border-radius: 3px; border: 1px solid #556; box-shadow: 0 1px 3px rgba(0,0,0,0.4); }
+
+/* 先攻/後攻の常時バッジ（手札オーナー表示の横） */
+.fp-badge { display: inline-block; padding: 1px 8px; border-radius: 10px; font-size: 0.82em; font-weight: bold; background: #2a2e5a; border: 1px solid #5a5fae; color: #cdd; vertical-align: middle; }
+#hand-owner.p1 .fp-badge { background: #20407a; border-color: #4a7cff; }
+#hand-owner.p2 .fp-badge { background: #5a2740; border-color: #ff6b9a; }
+/* 対戦開始時の先攻/後攻アナウンス（ターン通知を少し強調） */
+#turn-toast.start-banner { background: linear-gradient(135deg, #4a7cff, #9a4aff); color: #fff; font-size: 1.15em; border: 2px solid #fff6; }
