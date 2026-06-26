@@ -28,8 +28,22 @@
       </div>
       <button id="start-button">ゲーム開始</button>
       <div id="setup-error"></div>
+
+      <!-- リプレイ（観戦再生） -->
+      <div id="replay-panel">
+        <div class="settings-label">🎬 リプレイ観戦</div>
+        <div id="replay-list">読み込み中…</div>
+        <div class="settings-row">
+          <button id="replay-refresh">🔄 一覧更新</button>
+          <button id="replay-export">⬆ エクスポート</button>
+          <button id="replay-import">⬇ インポート</button>
+          <input id="replay-import-file" type="file" accept="application/json,.json" style="display:none">
+        </div>
+        <div id="replay-msg"></div>
+      </div>
+
       <!-- 更新確認用バージョン（コミット時に日時を更新）。ハードリロードで反映されたかの目印 -->
-      <div id="app-version">2026-06-26 08:33</div>
+      <div id="app-version">2026-06-26 20:30 リプレイ機能</div>
     </div>
 
     <!-- ゲーム画面 -->
@@ -101,6 +115,8 @@
         </div>
         <div class="settings-section">
           <button id="copy-log-button" class="settings-action">📋 ログをコピー</button>
+          <button id="copy-replay-button" class="settings-action">🎬 リプレイをコピー</button>
+          <div class="settings-note">この対局を再現できる「リプレイURL」をコピーします。そのURLを開くと、本物の盤面でこの対局を最初から自動再生（観戦）できます。</div>
           <button id="concede-p1-button" class="settings-action">🏳 プレイヤー1が投了</button>
           <button id="concede-p2-button" class="settings-action">🏳 プレイヤー2が投了</button>
           <button id="reset-game-button" class="settings-action danger">🔄 ゲームをリセット</button>
@@ -190,6 +206,7 @@
       <div id="result-overlay">
         <div id="result-message"></div>
         <div id="result-buttons">
+          <button id="save-replay-button">💾 リプレイを保存</button>
           <button id="view-board-button">盤面を確認</button>
           <button id="restart-button">もう一度</button>
         </div>

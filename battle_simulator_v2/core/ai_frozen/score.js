@@ -191,15 +191,6 @@ function scoreCheerTargets(engine, idx, pending, out) {
   const oppCenter = opp.center;
   const oppCenterRemain = oppCenter ? Math.max(0, engine.effectiveHp(oppCenter) - oppCenter.damage) : 0;
   const oppColor = oppCenter ? oppCenter.stack[0].color : null;
-  // 自センターが次の相手ターンに倒され得るか（蓄積の正味価値判定用）。倒される体に大技用エールを貯めても
-  // ダウンで全て失う＝大損。脅威下では「貯め投資」を抑え、即火力/別の体へ回す（死ぬ体に注がない）。
-  const myCenter = p.center;
-  const myCenterRemain = myCenter ? Math.max(0, engine.effectiveHp(myCenter) - myCenter.damage) : 0;
-  const oppThreatToMyCenter = myCenter
-    ? incomingDamageToCenter(engine, opp, 1 - idx, myCenter,
-      { extraCheers: opponentExtraCheerProjection(engine, 1 - idx), includeBackAttackers: true })
-    : 0;
-  const myCenterDoomed = !!myCenter && oppThreatToMyCenter > 0 && oppThreatToMyCenter >= myCenterRemain;
   const artDmgVs = (h, a) => {
     let v = (a.dmg || 0) + Math.max(0, engine.effects.artsBonus(h, idx));
     for (const tk of a.tokkou || []) if (oppColor === tk.color) v += tk.value;
@@ -268,30 +259,18 @@ function scoreCheerTargets(engine, idx, pending, out) {
         else score += 2 - h.cheers.length * 0.3; // 色が噛み合わず前進しない（最小限。空いてる体を優先＝散らす）
       }
       // 位置ボーナスは「有用なエール」のときだけ＝攻撃できる前衛に集中。無駄な色を位置目的で前衛に置かない。
-      // センターは「毎ターン居座る唯一の持続アタッカー」＝エールを貯める先として最優先。コラボは次の自ターン開始時に
-      // お休み（バックへ移動）＝積んでも1回しか使えず持続しないので、蓄積先としては低く評価する（即リーサルは別途加点）。
       if (useful) {
-        // センターが脅威下（次ターン倒され得る）なら集約先としての優先度を下げる（死ぬ体に貯めない）。
-        if (opt.pos.zone === 'center') score += myCenterDoomed ? 8 : 20;
-        else if (opt.pos.zone === 'collab') score += 6;
+        if (opt.pos.zone === 'center') score += 12;
+        else if (opt.pos.zone === 'collab') score += 8;
       }
       // 集約ボーナス: 1ターンに殴れるのは前衛(センター+コラボ)中心なので、
       // 「弱い体を量産」より「最強の1体を伸ばす」方が正しい。このエールでチーム最強前衛の
       // 実効火力がどれだけ上がるかを重く評価する（既に強い主力＝スケールするアーツに積むほど高い）。
-      // 持続性で重み付け: センター=満額（毎ターン殴れる）／コラボ=半減（次ターンお休みで1回限り）。
       if (isActive && dmgAfter > 0 && !alreadyLethal) {
         const fronts = [p.center, p.collab].filter(Boolean);
         const teamBestBefore = Math.max(0, ...fronts.map((x) => bestEffDmg(x, x.cheers)));
         const lift = Math.max(0, dmgAfter - teamBestBefore); // h にこのエールを足して最強前衛火力が増えるぶん
-        const sustainW = opt.pos.zone === 'center' ? 1 : 0.5;
-        if (lift > 0) score += Math.min(50, lift * 0.5) * sustainW;
-      }
-      // センター継続蓄積: センターの「最大火力アーツ（=貯め大技）」へエールを近づける置き方を、
-      // 後で必ず使える投資として加点する。1枚/ターンしか増えない細い供給を、循環して下がる体に散らさず
-      // 持続アタッカー(センター)へ貯め続けて大技を解放する方向に寄せる（FUWAMOCO等の貯め大技・継続火力に必須）。
-      if (opt.pos.zone === 'center' && afterCheers.length <= cap && !alreadyLethal && !myCenterDoomed) {
-        const big = allArts.reduce((m, a) => ((a.dmg || 0) > ((m && m.dmg) || 0) ? a : m), null);
-        if (big && unmetCost(afterCheers, big.cost) < unmetCost(h.cheers, big.cost)) score += 12;
+        if (lift > 0) score += Math.min(50, lift * 0.5);
       }
       // リーサル到達（前衛のみ）。センター＋コラボの「合算」実効火力で判定する＝
       // 1体に盛るより両前衛に振った方が合計火力が高く倒し切れる、というケースも拾う。

@@ -1505,3 +1505,22 @@ body.dragging, body.dragging * { cursor: grabbing !important; }
 }
 #setup-ai-buttons button.active::after { content: '：CPU'; font-weight: 700; opacity: 1; }
 #setup-ai-buttons button:hover { filter: brightness(1.12); }
+
+/* ===== リプレイ観戦パネル（デッキ選択画面） ===== */
+#replay-panel { margin-top: 22px; padding-top: 16px; border-top: 1px solid #3a3f77; }
+#replay-list { max-height: 220px; overflow-y: auto; margin: 6px 0; }
+.replay-row {
+  display: flex; align-items: center; gap: 8px;
+  padding: 6px 8px; margin-bottom: 4px;
+  background: #1d1f3d; border: 1px solid #34386e; border-radius: 6px;
+}
+.replay-label { flex: 1; color: #cdd; font-size: 0.84em; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+/* #setup-screen button の全幅指定を打ち消して小さなインラインボタンにする */
+#replay-panel .replay-play, #replay-panel .replay-del, #replay-panel .settings-row button {
+  margin-top: 0; width: auto; padding: 5px 10px; font-size: 0.82em; border-radius: 6px;
+}
+#replay-panel .replay-del { background: #5a2740; }
+#replay-panel .settings-row { margin-top: 8px; }
+#replay-panel .settings-row button { flex: 1; background: #2a2e5a; }
+.replay-empty { color: #889; font-size: 0.8em; line-height: 1.5; }
+#replay-msg { color: #8fd; font-size: 0.8em; min-height: 1.2em; margin-top: 6px; }

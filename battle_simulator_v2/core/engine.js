@@ -158,7 +158,14 @@ export class Engine {
     const out = this.state.detailLogs;
     out.push(`──── 詳細状態（ターン${s.turn} / 手番:${s.players[s.turnPlayer]?.name}） ────`);
     for (const p of s.players) {
-      const hand = p.hand.map((c) => c.name).join(', ') || '-';
+      // 手札は種別/ブルームレベルも併記する（AI分析用: Debut=置ける / 1st・2nd=ブルーム専用 / サポは温存可否の判断に必要）。
+      const handTag = (c) => {
+        if (c.kind === CardKind.HOLOMEN) return `${c.name}〔${c.bloomLevel}〕`;
+        if (c.kind === CardKind.SUPPORT) return `${c.name}〔${c.supportType || 'サポート'}${c.limited ? '/LIMITED' : ''}〕`;
+        if (c.kind === CardKind.CHEER) return `${c.name}〔エール〕`;
+        return `${c.name}〔${c.kind}〕`;
+      };
+      const hand = p.hand.map(handTag).join(', ') || '-';
       out.push(`[${p.name}] ライフ${p.life.length} 手札${p.hand.length}[${hand}] 山${p.deck.length} アーカイブ${p.archive.length} ホロパワー${p.holoPower.length} エール山${p.cheerDeck.length} 推し:${p.oshi?.name || '-'}`);
       for (const pos of this._stagePositions(p)) {
         const h = this._holomemAt(p, pos);
@@ -278,7 +285,7 @@ export class Engine {
    * dmgBonus は見積り用途で1回だけ呼ぶ（純粋な実装を想定。失敗・対象未確定時は基本値にフォールバック）。
    * これにより「エールを足すと火力が伸びるか（枚数依存アーツ等）」をカード番号を見ずに一般的に判定できる。
    */
-  _artEffectiveDamage(h, art, ownerIdx) {
+  _artEffectiveDamage(h, art, ownerIdx, defenderColor = null) {
     const card = topCard(h);
     let dmg = art.dmg || 0;
     const artDef = this.registry.getArt(card.number, art.name);
@@ -321,9 +328,10 @@ export class Engine {
       }
     }
     dmg += Math.max(0, this.effects.artsBonus(h, ownerIdx));
-    const oppCenter = this.state.players[1 - ownerIdx]?.center;
-    if (oppCenter) {
-      const oc = oppCenter.stack[0].color;
+    // 特攻(tokkou): 既定は相手センターの色で判定するが、defenderColor 指定時はその対象色で判定する
+    // （コラボ/バック狙いの実効火力見積りに使う）。
+    const oc = defenderColor != null ? defenderColor : this.state.players[1 - ownerIdx]?.center?.stack[0].color;
+    if (oc != null) {
       for (const tk of art.tokkou || []) if (oc === tk.color) dmg += tk.value;
     }
     return dmg;

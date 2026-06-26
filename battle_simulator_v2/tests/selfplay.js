@@ -203,8 +203,9 @@ export async function runSelfplay() {
   const n = seeds.length;
   const r1 = (x) => (x / n).toFixed(1);
   console.log(`SP-AGG| games=${n} winA=${agg.wins[0]} winB=${agg.wins[1]} draw=${agg.draws} deckOut=${agg.deckOut} avgTurn=${r1(agg.turnSum)}`);
-  console.log(`SP-AGG| A: atkTurns=${r1(agg.atkTurns[0])} koTurns=${r1(agg.koTurns[0])} missedKO=${r1(agg.missedKO[0])} noAtkLate=${r1(agg.noAtkLate[0])} baton=${r1(agg.baton[0])} skipPlace=${r1(agg.skipPlace[0])} skipDev=${r1(agg.skipDev[0])} maxCheers=${agg.maxCheers[0]} lifeTaken=${r1(agg.lifeTaken[0])}`);
-  console.log(`SP-AGG| B: atkTurns=${r1(agg.atkTurns[1])} koTurns=${r1(agg.koTurns[1])} missedKO=${r1(agg.missedKO[1])} noAtkLate=${r1(agg.noAtkLate[1])} baton=${r1(agg.baton[1])} skipPlace=${r1(agg.skipPlace[1])} skipDev=${r1(agg.skipDev[1])} maxCheers=${agg.maxCheers[1]} lifeTaken=${r1(agg.lifeTaken[1])}`);
+  const aggLine = (pl) => `SP-AGG| ${pl === 0 ? 'A' : 'B'}: atkTurns=${r1(agg.atkTurns[pl])} koTurns=${r1(agg.koTurns[pl])} missedKO=${r1(agg.missedKO[pl])} passedAtk=${r1(agg.passedAtk[pl])} noAtkLate=${r1(agg.noAtkLate[pl])} strandFuel=${r1(agg.strandFuel[pl])} baton=${r1(agg.baton[pl])} batonNoAtk=${r1(agg.batonNoAtk[pl])} skipPlace=${r1(agg.skipPlace[pl])} skipDev=${r1(agg.skipDev[pl])} maxCheers=${agg.maxCheers[pl]} lifeTaken=${r1(agg.lifeTaken[pl])}`;
+  console.log(aggLine(0));
+  console.log(aggLine(1));
   console.log('SELFPLAY DONE');
   return agg;
 }

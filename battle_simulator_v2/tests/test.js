@@ -17,6 +17,7 @@ import { evaluateState, WEIGHTS, incomingDamageToCenter, cheerBudgetThisTurn, op
 import { scoreOptions, bestOptionId, holomenValue, isFreePlaySupport } from '../core/ai/score.js';
 import { reconstruct, evaluateCandidate } from '../core/ai/rollout.js';
 import { LookaheadAI } from '../core/ai/lookahead.js';
+import { analyzeDeckFirepower } from '../core/ai/firepower.js';
 import { createRng } from '../core/rng.js';
 
 const results = [];
@@ -2272,6 +2273,30 @@ export async function runTests() {
     }
   });
 
+  await testAsync('AI先読み: エール配置(attachCheer)を先読み経路で解決し合法手＋保存則を守る', async () => {
+    // 改善: LookaheadAI が main/performance に加えて attachCheer（毎ターンのエール1枚をどこへ付けるか）も
+    //       先読み対象に含める（lookahead.js の isLookaheadStep）。この経路が合法手を返し、適用後も保存則を守ることを保証する。
+    const registry = await buildRegistry(lib, deckMap);
+    const e = new Engine({ decks: [lib.buildGameDeck(deckMap), lib.buildGameDeck(deckMap)], seed: 7, firstPlayer: 0, names: ['P1', 'P2'], registry });
+    e.start();
+    const fb = [new HeuristicAI(0), new HeuristicAI(1)];
+    // 実手(apply)で「player0の、選択肢が2つ以上あるエール配置」決定ポイントまで進める（先読みの再生前提＝apply経由必須）。
+    let applies = 0; let reached = null;
+    while (e.state.phase !== 'ended' && applies < 3000) {
+      const pd = e.state.pending;
+      if (!pd) break;
+      if (pd.type === 'attachCheer' && pd.player === 0 && pd.options.length > 1) { reached = pd; break; }
+      const id = pd.player == null ? pd.options[0].id : fb[pd.player].choose(e);
+      e.apply(id); applies++;
+    }
+    assert(reached, 'player0のエール配置(選択肢2つ以上)決定に到達しなかった');
+    const id = new LookaheadAI(0, { turns: 1 }).choose(e);
+    assert(reached.options.some((o) => o.id === id), `先読みが非合法なエール配置IDを返した: ${id}`);
+    const before = totalCards(e.state.players[0]);
+    e.apply(id);
+    assertEq(totalCards(e.state.players[0]), before, 'エール配置後に player0 のカード総数が崩れた（保存則違反）');
+  });
+
   await testAsync('AI: 全テストデッキのミラー対戦でCPUが停止/クラッシュしない', async () => {
     const names = ['Azki単', 'FUWAMOCO', 'あの青空のせいだ', 'ござる', 'さかまた', 'すぅ', 'はあと',
       'るい', 'わため', 'イナ', 'クロニ―', 'ジジ', 'セシジジ', 'ネリッサ単', 'ラミィデッキ', '塩ルイ', '月ルイ'];
@@ -2832,6 +2857,42 @@ export async function runTests() {
       { id: 'killCollab', kind: 'art', zone: 'center', artIndex: 0, target: { zone: 'collab', index: 0 } },
     ] });
     assert(sc.killCenter > sc.killCollab, `毎ターン殴ってくる強いセンター2ndを優先して倒すべき (center=${sc.killCenter}, collab=${sc.killCollab})`);
+  });
+
+  await testAsync('デッキ火力解析: 効果込みの実効火力で主力火力カードを上位抽出する', async () => {
+    const reg = await buildRegistry(lib, deckMap);
+    const { topCards, allArts } = analyzeDeckFirepower(lib, deckMap, reg, { topN: 4 });
+    assert(topCards.length > 0 && topCards.length <= 4, `上位カード数が不正 (${topCards.length})`);
+    assert(allArts.length > 0, 'アーツ一覧が空');
+    // 実効火力は素火力以上（効果は加算方向のみ）
+    for (const r of allArts) assert(r.effective >= r.base, `実効<素 (${r.name}/${r.art}: ${r.effective}<${r.base})`);
+    // 主力カードは実効火力の降順
+    for (let i = 1; i < topCards.length; i++) {
+      assert(topCards[i - 1].effective >= topCards[i].effective, '主力カードが降順でない');
+    }
+  });
+
+  await testAsync('AIブルーム: 撃てないバックをHPを下げてまで2ndに無駄ブルームしない（前衛なら有用）', async () => {
+    const e = await setupMainStep(deckMap, 73);
+    const p0 = e.state.players[0];
+    // 1st(HP250・小技70) → 2nd(HP210・大技200・ブルーム効果なし)。ブルームするとHPが下がる（風真いろは型）。
+    const mk1st = () => e._createHolomem({ number: 'I1', name: 'I', kind: 'holomen', bloomLevel: '1st', hp: 250, color: '緑', tags: [], arts: [{ name: 's', dmg: 70, cost: [], tokkou: [] }], keywords: [] }, 0);
+    const card2nd = { number: 'I2', name: 'I', kind: 'holomen', bloomLevel: '2nd', hp: 210, color: '緑', tags: [], arts: [{ name: 'big', dmg: 200, cost: [], tokkou: [] }], keywords: [] };
+    // バックに1st・手札に2nd → 撃てない体のHP減・効果無しブルームはパス以下であるべき
+    p0.center = e._createHolomem({ number: 'C', name: 'C', kind: 'holomen', bloomLevel: 'Debut', hp: 100, color: '緑', tags: [], arts: [], keywords: [] }, 0);
+    p0.collab = null; p0.back = [mk1st()]; p0.hand = [card2nd];
+    const scBack = scoreOptions(e, 0, { type: 'main', player: 0, options: [
+      { id: 'bloomBack', kind: 'bloom', handIndex: 0, pos: { zone: 'back', index: 0 } },
+      { id: 'pass', kind: 'pass' },
+    ] });
+    assert(scBack.bloomBack <= (scBack.pass ?? 0), `撃てないバックのHP減・効果無しブルームはパス以下であるべき (bloom=${scBack.bloomBack})`);
+    // 同じ体が前衛(攻撃可)なら、ブルームして大技を撃てる＝有用なので高評価
+    p0.center = mk1st(); p0.back = []; p0.hand = [card2nd];
+    const scCenter = scoreOptions(e, 0, { type: 'main', player: 0, options: [
+      { id: 'bloomCenter', kind: 'bloom', handIndex: 0, pos: { zone: 'center', index: 0 } },
+      { id: 'pass', kind: 'pass' },
+    ] });
+    assert(scCenter.bloomCenter > scBack.bloomBack, `前衛(攻撃可)へのブルームはバックより高評価であるべき (center=${scCenter.bloomCenter}, back=${scBack.bloomBack})`);
   });
 
   await testAsync('AI効果選択: 相手狙いは「倒せる脅威の大きい主力2nd」を優先除去する（じゃあ敵だね等で引き出して倒す）', async () => {
