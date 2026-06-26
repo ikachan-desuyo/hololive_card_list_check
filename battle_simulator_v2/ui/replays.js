@@ -12,7 +12,7 @@
  */
 
 const LS_KEY = 'bsv2_replays';
-const FILE_DIR = 'replay_data';
+const FILE_DIR = 'battle_simulator_v2/replay_data';
 
 /** localStorage の安全な読み書き */
 function readCacheRaw() {
