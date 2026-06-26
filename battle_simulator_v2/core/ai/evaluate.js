@@ -172,11 +172,10 @@ export function opponentExtraCheerProjection(engine, oppIdx) {
   return 1 + Math.min(effGain + handGain, 4); // 基本1枚＋効果/手札で付けられそうな枚数（上限4）
 }
 
-/** アーツ a を defColor のセンターに当てた時の火力（特攻・実効修正込み） */
+/** アーツ a を defColor の相手に当てた時の実効火力。素の火力だけでなく、効果による加算
+ *  (dmgBonus／エール枚数・色数スケール等)・装着/継続修正・特攻(対象の色)をすべて含む。 */
 function artDamageVs(engine, h, a, defColor, attackerIdx) {
-  let d = (a.dmg || 0) + Math.max(0, engine.effects.artsBonus(h, attackerIdx));
-  for (const tk of a.tokkou || []) if (defColor === tk.color) d += tk.value;
-  return d;
+  return engine._artEffectiveDamage(h, a, attackerIdx, defColor);
 }
 
 /** コスト cost に対して cheers で満たせていない要求数（色一致を考慮）。少ないほど解放に近い。

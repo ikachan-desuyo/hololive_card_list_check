@@ -491,10 +491,9 @@ function scorePerformance(engine, idx, pending, out) {
     // 借用アーツ（hBP07-048）は artObj を使う。通常は自分のアーツ配列から引く。
     const art = opt.artObj || h.stack[0].arts?.[opt.artIndex];
     if (!art) { out[opt.id] = -Infinity; continue; }
-    let dmg = art.dmg;
     const targetTop = target.stack[0];
-    for (const tk of art.tokkou || []) if (targetTop.color === tk.color) dmg += tk.value;
-    dmg += engine.effects.artsBonus(h, idx);
+    // 素の火力だけでなく、効果による加算(dmgBonus／枚数・色数スケール)・装着/継続修正・特攻(対象の色)を含む実効ダメージで判定する。
+    const dmg = engine._artEffectiveDamage(h, art, idx, targetTop.color);
     const remain = engine.effectiveHp(target) - target.damage;
     // 脅威の即時性: コラボは次の相手ターンにお休み（バックへ移動）＝次ターンは攻撃できない＝即時脅威が低い。
     // センターは毎ターン攻撃してくる持続的脅威。よって「倒せるなら脅威度の高いセンター」を優先して除去する。
