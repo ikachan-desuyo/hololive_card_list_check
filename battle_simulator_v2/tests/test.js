@@ -2834,6 +2834,29 @@ export async function runTests() {
     assert(sc.killCenter > sc.killCollab, `毎ターン殴ってくる強いセンター2ndを優先して倒すべき (center=${sc.killCenter}, collab=${sc.killCollab})`);
   });
 
+  await testAsync('AIブルーム: 撃てないバックをHPを下げてまで2ndに無駄ブルームしない（前衛なら有用）', async () => {
+    const e = await setupMainStep(deckMap, 73);
+    const p0 = e.state.players[0];
+    // 1st(HP250・小技70) → 2nd(HP210・大技200・ブルーム効果なし)。ブルームするとHPが下がる（風真いろは型）。
+    const mk1st = () => e._createHolomem({ number: 'I1', name: 'I', kind: 'holomen', bloomLevel: '1st', hp: 250, color: '緑', tags: [], arts: [{ name: 's', dmg: 70, cost: [], tokkou: [] }], keywords: [] }, 0);
+    const card2nd = { number: 'I2', name: 'I', kind: 'holomen', bloomLevel: '2nd', hp: 210, color: '緑', tags: [], arts: [{ name: 'big', dmg: 200, cost: [], tokkou: [] }], keywords: [] };
+    // バックに1st・手札に2nd → 撃てない体のHP減・効果無しブルームはパス以下であるべき
+    p0.center = e._createHolomem({ number: 'C', name: 'C', kind: 'holomen', bloomLevel: 'Debut', hp: 100, color: '緑', tags: [], arts: [], keywords: [] }, 0);
+    p0.collab = null; p0.back = [mk1st()]; p0.hand = [card2nd];
+    const scBack = scoreOptions(e, 0, { type: 'main', player: 0, options: [
+      { id: 'bloomBack', kind: 'bloom', handIndex: 0, pos: { zone: 'back', index: 0 } },
+      { id: 'pass', kind: 'pass' },
+    ] });
+    assert(scBack.bloomBack <= (scBack.pass ?? 0), `撃てないバックのHP減・効果無しブルームはパス以下であるべき (bloom=${scBack.bloomBack})`);
+    // 同じ体が前衛(攻撃可)なら、ブルームして大技を撃てる＝有用なので高評価
+    p0.center = mk1st(); p0.back = []; p0.hand = [card2nd];
+    const scCenter = scoreOptions(e, 0, { type: 'main', player: 0, options: [
+      { id: 'bloomCenter', kind: 'bloom', handIndex: 0, pos: { zone: 'center', index: 0 } },
+      { id: 'pass', kind: 'pass' },
+    ] });
+    assert(scCenter.bloomCenter > scBack.bloomBack, `前衛(攻撃可)へのブルームはバックより高評価であるべき (center=${scCenter.bloomCenter}, back=${scBack.bloomBack})`);
+  });
+
   await testAsync('AI効果選択: 相手狙いは「倒せる脅威の大きい主力2nd」を優先除去する（じゃあ敵だね等で引き出して倒す）', async () => {
     const e = await setupMainStep(deckMap, 71);
     const p0 = e.state.players[0]; const p1 = e.state.players[1];

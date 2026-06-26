@@ -330,7 +330,13 @@ function scoreMainActions(engine, idx, pending, out) {
         };
         const immediateGain = Math.max(0, bestEff(newCard, newCard.arts) - bestEff(top, top.arts));
         const futureGain = Math.max(0, maxArtDmg(newCard) - maxArtDmg(top));
-        score = hpGain * 0.4 + immediateGain * 0.4 + futureGain * 0.15 + effVal;
+        // 「今ターン攻撃に使える前衛(センター/コラボ・お休みでない)」へのブルームだけ、火力の伸びを満額評価する。
+        // 撃てないバック/お休みのホロメンをブルームしても、その火力は今は使えない＝即時火力をほぼ計上しない
+        // （撃てない体をHPを下げてまで2ndにする“無駄ブルーム”を抑制。前衛強化＝攻撃に直結するブルームは満額）。
+        const canAttackNow = (h === myCenter || h === p.collab) && !h.rested;
+        const immW = canAttackNow ? 1 : 0.1;     // 即時火力の伸び: 後衛は撃てないのでほぼ計上しない
+        const futW = canAttackNow ? 0.15 : 0.05; // 火力上限(将来)の伸び: 後衛はさらに将来ぶんへ割引
+        score = hpGain * 0.4 + immediateGain * 0.4 * immW + futureGain * futW + effVal;
         if (h.damage > 0 && hpGain > 0) score += 10;
         if (underLethal && h === myCenter) {
           const newRemain = (newCard.hp || 0) - h.damage;
