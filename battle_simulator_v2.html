@@ -43,7 +43,7 @@
       </div>
 
       <!-- 更新確認用バージョン（コミット時に日時を更新）。ハードリロードで反映されたかの目印 -->
-      <div id="app-version">2026-06-26 22:55 リザルト整理(保存非表示/戻る改名)</div>
+      <div id="app-version">2026-06-27c 「↩ 1手戻す」が表示されないバグを修正（display制御の不具合）</div>
     </div>
 
     <!-- ゲーム画面 -->
@@ -58,6 +58,9 @@
       <div id="opp-hand"></div>
       <div id="hand-owner"></div>
       <div id="hand"></div>
+
+      <!-- 1手戻す（手動プレイ専用。CPU/観戦再生中は非表示）。押すたびに直前の人間の決定へ戻る -->
+      <button id="undo-button" title="直前の自分の操作を取り消して1手戻す">↩ 1手戻す</button>
 
       <!-- 設定ボタン（フィールド右上）と設定パネル -->
       <button id="settings-button" title="設定">⚙</button>
