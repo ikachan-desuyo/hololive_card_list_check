@@ -43,12 +43,6 @@ export function maxArtDmg(card) {
   return Math.max(0, ...((card?.arts || []).map((a) => a.dmg || 0)));
 }
 
-/** いま（現在のエールで）支払えるアーツがあるか */
-export function canActNow(engine, h) {
-  const arts = h.stack[0].arts || [];
-  return arts.some((a) => engine._canPayCheers(h.cheers, a.cost));
-}
-
 /**
  * 盤上ホロメン1体の価値（idx 視点・正の値）。
  *   生存力（残りHP）＋ 脅威（今実際に撃てる火力を重視）＋ 即アタッカー度。

@@ -232,7 +232,7 @@ async function startGame(opts = {}) {
     engine = new Engine({
       decks: [deck1, deck2],
       seed,
-      firstPlayer: opts.first != null ? opts.first : (forcedFirstPlayer != null ? forcedFirstPlayer : undefined), // リプレイ/観戦で先攻を固定
+      firstPlayer: opts.first != null ? opts.first : undefined, // リプレイ/観戦の先攻は opts.first で指定する
       names: ['プレイヤー1', 'プレイヤー2'],
       onChange: render,
       registry,
@@ -277,6 +277,13 @@ function selfPlayerIdx() {
   if (isOnline) return isSpectator ? null : myOnlineIdx;
   const humans = [0, 1].filter((i) => !aiEnabled(i));
   return humans.length === 1 ? humans[0] : null;
+}
+
+/** トースト/オーバーレイの .show を付け直して表示アニメを再生する（連続表示でも毎回再生されるよう一旦リフローを挟む）。 */
+function restartShowAnim(el) {
+  el.classList.remove('show');
+  void el.offsetWidth; // リフローを挟んでアニメーションを確実に再生させる
+  el.classList.add('show');
 }
 
 /** プレイヤー番号 → 盤面のDOM要素（視点 boardViewIdx に応じて手前/奥を割り当て）。 */
@@ -1254,9 +1261,7 @@ function pumpStepToast() {
   stepToastActive = true;
   const t = document.getElementById('step-toast');
   t.textContent = stepToastQueue.shift();
-  t.classList.remove('show');
-  void t.offsetWidth;
-  t.classList.add('show');
+  restartShowAnim(t);
   setTimeout(() => {
     stepToastActive = false;
     pumpStepToast();
@@ -1286,9 +1291,7 @@ function showDice(value) {
     die.appendChild(pip);
   }
   document.getElementById('dice-label').textContent = `サイコロ: ${value}`;
-  overlay.classList.remove('show');
-  void overlay.offsetWidth; // アニメーション再生のためリフロー
-  overlay.classList.add('show');
+  restartShowAnim(overlay);
 }
 
 /** 効果で公開されたカード（エール等）を中央に大きく表示 */
@@ -1304,9 +1307,7 @@ function handleCardReveal(s) {
   img.src = reveal.card.imageUrl || '';
   img.alt = reveal.card.name;
   document.getElementById('reveal-label').textContent = `公開: ${reveal.card.name}`;
-  overlay.classList.remove('show');
-  void overlay.offsetWidth;
-  overlay.classList.add('show');
+  restartShowAnim(overlay);
 }
 
 /** アタック演出: 攻撃元→対象を矢印・ハイライト・ダメージ表示で可視化（engine.state.lastAttack を監視） */
@@ -1425,9 +1426,7 @@ function notifyTurnChange(s) {
     toast.textContent = `ターン${s.turn} ─ ${s.players[s.turnPlayer].name} のターン`;
     toast.classList.remove('start-banner');
   }
-  toast.classList.remove('show');
-  void toast.offsetWidth; // アニメーション再生のためリフロー
-  toast.classList.add('show');
+  restartShowAnim(toast);
 }
 
 function render() {
@@ -1502,7 +1501,7 @@ function renderEffectChoiceModal(s) {
   // 公開されたエールがどのホロメンに行くかを分かりやすくするため、送り先を金色に光らせる
   const isCheerSend = s.pending?.type === 'attachCheer' || s.pending?.type === 'attachLifeCheer';
   if (isCheerSend && !aiEnabled(s.pending.player)) {
-    document.getElementById('choice-modal').classList.remove('active');
+    modal.classList.remove('active');
     for (const opt of s.pending.options) {
       if (!opt.pos) continue;
       const el = document.querySelector(`[data-drop="${s.pending.player}:mem:${opt.pos.zone}:${opt.pos.index}"]`);
@@ -1995,7 +1994,6 @@ function setupPreview() {
 
 const aiAgents = [null, null];
 let aiOverride = null; // URLパラメータによる一時上書き（保存しない）
-let forcedFirstPlayer = null; // 観戦再生(?replay)で先攻を固定する（通常はnull）
 let lookaheadOverride = null; // ?lookahead=1|2|both で先読みAIを使うプレイヤー（実験用）
 let aiTimer = null;
 let aiBusy = false; // AI処理中フラグ。apply中の再入render→handleAIが古いpending向けタイマーを予約するのを防ぐ

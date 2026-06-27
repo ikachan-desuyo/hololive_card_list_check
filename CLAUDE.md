@@ -11,7 +11,7 @@
 ## 構成
 
 - `index.html` — ランディング。各ツール（カード一覧 / スキル検索 / デッキビルダー / バインダー / バトルシミュレーター）へのリンク
-- `js/` — 各ページのスクリプト。`utils.js` `modal-ui.js` `deck_manager.js` はページ間共有
+- `js/` — 各ページのスクリプト。`utils.js`（チップ/ダークモード等の共通UI）と `offline-utils.js`（オフライン表示）がページ間共有
 - `json_file/card_data.json` — カードDB（カードID → カード情報）
 - `sw.js` + `sw-version.js` + `sw-utils.js` + `sw-handlers.js` — Service Worker。**JSファイルの追加・改名時は sw.js の urlsToCache と sw-version.js のバージョンを更新**しないとキャッシュで反映されない
 
