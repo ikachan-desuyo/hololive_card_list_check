@@ -116,9 +116,8 @@ export class EffectSystem {
     }
     // 常時アウラ（味方の別ホロメンが付与する被ダメージ軽減/増加。「コラボが受けるダメージ-10」「特殊ダメージを受けない」
     //  「自分が相手の1stから受けるアーツ-30」＝src===holomem の自己ギフトも auraDamageDelta で表現する）
-    const ownerIdx = this._ownerOf(holomem);
-    if (ownerIdx >= 0) {
-      total += this._auraSum(ownerIdx, (def, src) => def.auraDamageDelta?.(src, holomem, zone, this.engine, kind, attacker));
+    if (ownerIdx0 >= 0) {
+      total += this._auraSum(ownerIdx0, (def, src) => def.auraDamageDelta?.(src, holomem, zone, this.engine, kind, attacker));
     }
     return total;
   }

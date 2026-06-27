@@ -5,8 +5,8 @@
 //   - PAGE_VERSIONS は APP_VERSION から自動生成（手書きしない）
 //   ※ sw.js 本体のバージョンコメントも合わせて更新するとSW更新検知が最速（sw.js のバイト差分）
 
-const APP_VERSION = "4.20.0";
-const VERSION_DESCRIPTION = "バージョン管理を単一ソース化";
+const APP_VERSION = "4.21.0";
+const VERSION_DESCRIPTION = "リファクタ: 不要ファイル削除とSWキャッシュ整合・既知エラー修正";
 
 // ✅ 対象ページ一覧（バージョンは APP_VERSION に統一＝単一ソース。手書きの個別バージョンは持たない）
 const VERSIONED_PAGES = [

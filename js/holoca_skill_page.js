@@ -48,16 +48,6 @@
 
       window.addEventListener("resize", updateMobileLayout);
 
-      function selectAll(id) {
-        document.querySelectorAll(`#${id} input[type="checkbox"]`).forEach(cb => cb.checked = true);
-        renderTable();
-      }
-
-      function clearAll(id) {
-        document.querySelectorAll(`#${id} input[type="checkbox"]`).forEach(cb => cb.checked = false);
-        renderTable();
-      }
-
       function showImageModal(src) {
         const modal = document.getElementById("imageModal");
         modal.querySelector("img").src = src;
@@ -290,7 +280,6 @@
 
     function renderTable() {
       const keyword = window.normalizeText(document.getElementById("keywordSearch").value);
-      const getChecked = id => [...document.querySelectorAll(`#${id} input:checked`)].map(el => el.value);
       const ownedStates = getCheckedFromChips("ownedStateChipGroup");
       const rarity = getCheckedFromChips("rarityFilter");
       const color = getCheckedFromChips("colorFilter");
@@ -485,6 +474,7 @@
     // Online/Offline status
     function updateOnlineStatus() {
       const statusElement = document.getElementById('offline-status');
+      if (!statusElement) return; // このページには #offline-status が無いため何もしない（load時のnull参照を防ぐ）
       if (navigator.onLine) {
         statusElement.textContent = '🟢 オンライン';
         statusElement.style.color = '#4CAF50';
@@ -525,16 +515,6 @@ async function sendMessageToSW(type, data) {
 // ✅ バージョン情報を取得
 async function getVersionInfo() {
   return await sendMessageToSW('GET_VERSION_INFO');
-}
-
-// ✅ 更新メッセージを取得
-async function getUpdateMessage() {
-  return await sendMessageToSW('GET_UPDATE_MESSAGE');
-}
-
-// ✅ 古いページをチェック
-async function checkOutdatedPages() {
-  return await sendMessageToSW('CHECK_OUTDATED_PAGES');
 }
 
 // ✅ 更新確認機能 - 現在のページのみをチェック

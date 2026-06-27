@@ -618,7 +618,6 @@ export class Engine {
           break;
         }
         case 'redraw': {
-          const p = s.players[item.player];
           s.pending = {
             type: 'redraw', player: item.player,
             options: [
@@ -904,7 +903,6 @@ export class Engine {
     const s = this.state;
     const idx = s.turnPlayer;
     const p = s.players[idx];
-    const opp = s.players[1 - idx];
     const actions = [];
 
     // 8.2 手札のDebut/Spotホロメンをバックに出す

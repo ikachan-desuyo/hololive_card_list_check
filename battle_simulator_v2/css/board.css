@@ -321,7 +321,6 @@ body.dragging [data-drop].drop-ok { z-index: 60; }
   position: relative;
   flex-shrink: 0;
 }
-.pile.small { width: 66px; height: 92px; }
 /* ホロパワー: プレイシート準拠でカードを横向きに置くスロット */
 .pile.landscape {
   width: 100px;
@@ -1516,8 +1515,8 @@ body.dragging, body.dragging * { cursor: grabbing !important; }
   100% { opacity: 0; transform: translate(-50%, -110%) scale(1); }
 }
 /* 攻撃元・対象セルの一時ハイライト（再描画前まで） */
-.holomem.fx-attacking { outline: 3px solid #ffd54a; outline-offset: -2px; box-shadow: 0 0 18px rgba(255, 200, 60, 0.9); }
-.holomem.fx-hit { animation: fx-shake 0.45s ease-in-out; }
+.holomem-group.fx-attacking { outline: 3px solid #ffd54a; outline-offset: -2px; box-shadow: 0 0 18px rgba(255, 200, 60, 0.9); }
+.holomem-group.fx-hit { animation: fx-shake 0.45s ease-in-out; }
 @keyframes fx-shake {
   0%, 100% { transform: translateX(0); }
   20% { transform: translateX(-4px); }

@@ -309,16 +309,6 @@ function setViewMode(mode) {
         localStorage.setItem("darkMode", document.body.classList.contains("dark"));
       }
 
-      function selectAll(id) {
-        document.querySelectorAll(`#${id} input[type="checkbox"]`).forEach(cb => cb.checked = true);
-        renderTable();
-      }
-
-      function clearAll(id) {
-        document.querySelectorAll(`#${id} input[type="checkbox"]`).forEach(cb => cb.checked = false);
-        renderTable();
-      }
-
   function showImageModal(src, cardData = null) {
         const modal = document.getElementById("imageModal");
         const isMobile = window.innerWidth <= 768;
@@ -730,7 +720,6 @@ function setViewMode(mode) {
 
   function performRender() {
     const keyword = window.normalizeText(document.getElementById("nameSearch").value);
-    const getChecked = id => [...document.querySelectorAll(`#${id} input:checked`)].map(el => el.value);
     const ownedStates = getCheckedFromChips("ownedStateChipGroup");
     const rarity = getCheckedFromChips("rarityFilter");
     const color = getCheckedFromChips("colorFilter");
@@ -959,15 +948,6 @@ function setViewMode(mode) {
     alert(`CSVファイル "${filename}" として保存しました`);
   }
 
-  // 後方互換性のため、元の関数も残しておく
-  function importCSV() {
-    importCSVFromTextarea();
-  }
-
-  function exportCSV() {
-    exportCSVToClipboard();
-  }
-
   function isMobileScreen() {
     return window.innerWidth <= 540;
   }
@@ -1002,7 +982,7 @@ function setViewMode(mode) {
       if (filtersWrapper && filterToggleBtn) {
         // デスクトップでもデフォルトは非表示に変更
         filtersWrapper.style.display = 'none';
-        filterToggleBtn.textContent = '� フィルター表示';
+        filterToggleBtn.textContent = '🔽 フィルター表示';
       }
 
       if (wasMobile) console.log('Switched to desktop layout - filters always visible');
@@ -1180,9 +1160,12 @@ window.onload = async () => {
         setupFilters();
         renderTable();
 
-        // Show offline message
-        document.getElementById("offline-status").textContent = "⚠️ オフライン - 保存されたデータを使用中";
-        document.getElementById("offline-status").style.color = "#FF9800";
+        // Show offline message（このページに #offline-status が無い場合は何もしない）
+        const offlineStatusEl = document.getElementById("offline-status");
+        if (offlineStatusEl) {
+          offlineStatusEl.textContent = "⚠️ オフライン - 保存されたデータを使用中";
+          offlineStatusEl.style.color = "#FF9800";
+        }
       } else {
         alert("データの読み込みに失敗しました！インターネット接続を確認してください。");
       }
@@ -1246,6 +1229,7 @@ window.onload = async () => {
   // Online/Offline status
   function updateOnlineStatus() {
     const statusElement = document.getElementById('offline-status');
+    if (!statusElement) return; // このページには #offline-status が無いため何もしない（null参照を防ぐ）
     if (navigator.onLine) {
       statusElement.textContent = '🟢 オンライン - 最新データを取得中';
       statusElement.style.color = '#4CAF50';
