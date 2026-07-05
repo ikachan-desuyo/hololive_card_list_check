@@ -1,0 +1,37 @@
+/**
+ * モココ・アビスガード 1st (hBP03-038) 赤・HP130（#EN #Advent #ケモミミ）
+ * ブルームエフェクト「遊びの時間だー！」:
+ *   DebutからBloomした時、自分のデッキから、1stホロメンの〈フワワ・アビスガード〉1枚を
+ *   公開し、手札に加える。そしてデッキをシャッフルする。
+ * アーツ「モココとドーナツクッキング」(30): テキスト効果なし（素のダメージのみ）。
+ *
+ * 注: 「DebutからBloomした時」の発火条件はエンジンの bloomEffect 呼び出し側で扱う想定。
+ *     ここではブルーム時に呼ばれた前提で効果本体のみ実装する（hBP02-022 と同形）。
+ */
+export default {
+  number: 'hBP03-038',
+  bloomEffect: {
+    name: '遊びの時間だー！',
+    *run(ctx) {
+      // 「DebutからBloomした時」: Bloom元（重なりの下＝stack[1]）がDebutの時のみ発動。
+      // 1st→1st の同レベルBloom（公式で可）では発動しない。
+      const prev = ctx.sourceHolomem?.stack?.[1];
+      if (prev && prev.bloomLevel !== 'Debut') return;
+      // 〈フワワ・アビスガード〉= 名称参照（FUWAMOCO のエクストラ「〈フワワ〉〈モココ〉として扱う」も一致）
+      const candidates = ctx.deckCards(
+        (c) => ctx.nameIs(c, 'フワワ・アビスガード') && c.bloomLevel === '1st'
+      );
+      const picked = yield ctx.chooseCard({
+        cards: candidates,
+        title: '手札に加える1stホロメンの〈フワワ・アビスガード〉を選択',
+        optional: true,
+        skipLabel: '見つからなかったことにする',
+      });
+      if (picked) {
+        ctx.removeFromDeck(picked);
+        ctx.addToHand(picked);
+      }
+      ctx.shuffleDeck();
+    },
+  },
+};

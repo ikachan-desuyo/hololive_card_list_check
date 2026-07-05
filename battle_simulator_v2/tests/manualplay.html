@@ -1,0 +1,19 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head><meta charset="UTF-8"><title>手動対戦ドライバ</title></head>
+<body>
+  <pre id="out"></pre>
+  <script>
+    (function mirror() {
+      const out = document.getElementById('out');
+      const orig = console.log.bind(console);
+      console.log = (...a) => { orig(...a); out.textContent += a.join(' ') + '\n'; };
+      console.error = (...a) => { orig(...a); out.textContent += a.join(' ') + '\n'; };
+    })();
+  </script>
+  <script type="module">
+    import { runManual } from './manualplay.js';
+    runManual().then(() => { document.title = 'MP-DONE'; }).catch((e) => { console.error('MP FAILED', e.message); document.title = 'MP-FAILED'; });
+  </script>
+</body>
+</html>

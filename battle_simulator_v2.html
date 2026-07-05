@@ -1,0 +1,232 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>ホロライブTCG バトルシミュレーター v2</title>
+  <link rel="stylesheet" href="battle_simulator_v2/css/board.css">
+</head>
+<body>
+  <div id="app">
+
+    <!-- ホームへ戻る -->
+    <a id="home-button" href="index.html" title="ホームへ戻る">🏠</a>
+
+    <!-- デッキ選択画面 -->
+    <div id="setup-screen">
+      <h1>⚔️ バトルシミュレーター v2</h1>
+      <label for="deck-p1">プレイヤー1 のデッキ</label>
+      <select id="deck-p1"></select>
+      <label for="deck-p2">プレイヤー2 のデッキ</label>
+      <select id="deck-p2"></select>
+      <label for="seed-input">シード値（空欄でランダム / 同じ値で同じ展開を再現）</label>
+      <input id="seed-input" type="number" placeholder="例: 42">
+      <div class="settings-label">CPU（自動操作するプレイヤー）</div>
+      <div class="settings-row" id="setup-ai-buttons">
+        <button data-ai="0">プレイヤー1</button>
+        <button data-ai="1">プレイヤー2</button>
+      </div>
+      <button id="start-button">ゲーム開始</button>
+      <div id="setup-error"></div>
+
+      <!-- リプレイ（観戦再生） -->
+      <div id="replay-panel">
+        <div class="settings-label">🎬 リプレイ観戦</div>
+        <div id="replay-list">読み込み中…</div>
+        <div class="settings-row">
+          <button id="replay-refresh">🔄 一覧更新</button>
+          <button id="replay-export">⬆ エクスポート</button>
+          <button id="replay-import">⬇ インポート</button>
+          <input id="replay-import-file" type="file" accept="application/json,.json" style="display:none">
+        </div>
+        <div id="replay-msg"></div>
+      </div>
+
+      <!-- オンライン対戦（フレンド対戦） -->
+      <div id="online-panel">
+        <div class="settings-label">🌐 オンライン対戦（フレンド対戦）</div>
+        <input id="online-name" type="text" placeholder="あなたの名前">
+        <div class="settings-row">
+          <button id="online-create">🏠 ルームを作る</button>
+        </div>
+        <div id="online-code-display"></div>
+        <div class="settings-row">
+          <input id="online-join-code" type="text" placeholder="ルームコード（例: ABCDE）" maxlength="8" style="text-transform:uppercase">
+          <button id="online-join">⚔ 参加</button>
+          <button id="online-spectate">👀 観戦</button>
+        </div>
+        <div id="online-status" class="settings-note"></div>
+        <div class="settings-note">自分のデッキは上の「プレイヤー1 のデッキ」を使います。観戦は両者の手札が見えます。</div>
+      </div>
+
+      <!-- 更新確認用バージョン（コミット時に日時を更新）。ハードリロードで反映されたかの目印 -->
+      <div id="app-version">2026-06-27 先攻後攻を分かりやすく＋スマホ次へボタン修正</div>
+    </div>
+
+    <!-- ゲーム画面 -->
+    <div id="game-screen">
+      <div class="scene">
+        <div class="table">
+          <div class="side opponent" id="side-opponent"></div>
+          <div class="side player" id="side-player"></div>
+        </div>
+      </div>
+
+      <div id="opp-hand"></div>
+      <div id="hand-owner"></div>
+      <div id="hand"></div>
+
+      <!-- 1手戻す（手動プレイ専用。CPU/観戦再生中は非表示）。押すたびに直前の人間の決定へ戻る -->
+      <button id="undo-button" title="直前の自分の操作を取り消して1手戻す">↩ 1手戻す</button>
+
+      <!-- 設定ボタン（フィールド右上）と設定パネル -->
+      <button id="settings-button" title="設定">⚙</button>
+      <div id="settings-panel">
+        <div class="settings-title">設定</div>
+        <div class="settings-section">
+          <div class="settings-label">AI適用（CPUが操作するプレイヤー）</div>
+          <div class="settings-row" id="ai-buttons">
+            <button data-ai="0">プレイヤー1</button>
+            <button data-ai="1">プレイヤー2</button>
+          </div>
+        </div>
+        <div class="settings-section">
+          <div class="settings-label">先読みの深さ（CPU・深いほど高精度＆重い）</div>
+          <div class="settings-row" id="lookahead-turns-buttons">
+            <button data-lookahead-turns="1">1手</button>
+            <button data-lookahead-turns="2">2手</button>
+            <button data-lookahead-turns="3">3手</button>
+            <button data-lookahead-turns="5">5手</button>
+          </div>
+          <div class="settings-note">各手を何ターン先まで擬似対戦して選ぶか。1手=自分のターンのみ（最速）。2手=相手の反撃まで。3手=自分の次のターンまで（既定・推奨）。5手=自分のターン3回ぶん＝「メイン火力を展開して大技を撃てる所」まで読む（最重・じっくり）。深いほど思考時間が増えます。</div>
+        </div>
+        <div class="settings-section">
+          <div class="settings-label">進行速度（CPUの指す速さ・ステップ送り）</div>
+          <div class="settings-row" id="pause-speed-buttons">
+            <button data-speed="fast">速い</button>
+            <button data-speed="normal">普通</button>
+            <button data-speed="slow">ゆっくり</button>
+            <button data-speed="manual">手動</button>
+          </div>
+          <div class="settings-note">速い/普通/ゆっくり＝CPUが指す速さとステップ境界の自動送りが連動。手動＝ステップ境界は▶で手動送り（CPU自身は自動で進みます）。</div>
+        </div>
+        <div class="settings-section">
+          <div class="settings-label">任意効果の発動確認</div>
+          <div class="settings-row" id="confirm-optional-buttons">
+            <button data-confirm-optional="on">確認する</button>
+            <button data-confirm-optional="off">自動で発動</button>
+          </div>
+          <div class="settings-note">強制でない効果（「〜できる」等）を発動するか毎回確認します</div>
+        </div>
+        <div class="settings-section">
+          <div class="settings-label">評価値を表示（CPUと同じ物差し）</div>
+          <div class="settings-row" id="show-eval-buttons">
+            <button data-show-eval="on">表示する</button>
+            <button data-show-eval="off">表示しない</button>
+          </div>
+          <div class="settings-note">各選択肢の「おすすめ度」を数値でカード上に表示します（高いほど有利）。CPUもこの数値で行動します。</div>
+        </div>
+        <div class="settings-section">
+          <button id="concede-p1-button" class="settings-action">🏳 プレイヤー1が投了</button>
+          <button id="concede-p2-button" class="settings-action">🏳 プレイヤー2が投了</button>
+          <button id="reset-game-button" class="settings-action danger">🔄 ゲームをリセット</button>
+          <button id="online-leave-button" class="settings-action danger" style="display:none">🚪 退室（デッキ選択へ戻る）</button>
+        </div>
+        <div class="settings-section">
+          <div class="settings-note" id="seed-display"></div>
+          <div class="settings-note">（同じシード値とデッキで同じ展開を再現できます）</div>
+        </div>
+      </div>
+
+      <!-- スマホ用コントロール（PCでは非表示） -->
+      <div id="mobile-status" class="mobile-only"></div>
+      <button id="mobile-advance" class="mobile-only">▶ 次へ</button>
+      <button id="panel-toggle-button" class="mobile-only" title="アクション・ログを表示">📋</button>
+
+      <div id="side-panel">
+        <div id="panel-sheet-handle" class="mobile-only">▼ 閉じる</div>
+        <div id="status"></div>
+        <div id="actions"></div>
+        <div id="log"></div>
+      </div>
+
+      <div id="card-preview">
+        <img src="" alt="">
+        <div class="preview-name"></div>
+      </div>
+
+      <!-- カード詳細 / アーカイブ一覧モーダル -->
+      <div id="inspector-modal">
+        <div id="inspector-content">
+          <div id="inspector-header">
+            <span id="inspector-title"></span>
+            <button id="inspector-close">×</button>
+          </div>
+          <div id="inspector-body"></div>
+        </div>
+      </div>
+
+      <!-- 複数選択ポップアップ（アーツ選択など） -->
+      <div id="chooser"></div>
+
+      <!-- 効果のホロメン選択バー（盤面クリック選択の案内） -->
+      <div id="choice-bar"></div>
+
+      <!-- カード効果のカード選択モーダル（デッキサーチ等） -->
+      <div id="choice-modal">
+        <div id="choice-content">
+          <div id="choice-header">
+            <div id="choice-title"></div>
+            <button id="choice-peek" title="モーダルを一時的に隠して盤面を確認">🔍 盤面を確認</button>
+          </div>
+          <div id="choice-grid"></div>
+          <div id="choice-footer"></div>
+        </div>
+      </div>
+      <!-- 盤面確認中に選択へ戻るボタン -->
+      <button id="choice-restore">▲ カード選択に戻る</button>
+
+      <!-- 対戦開始前のモーダル（先攻後攻の決定・最初の手札の引き直し） -->
+      <div id="pregame-modal">
+        <div id="pregame-content">
+          <div id="pregame-title"></div>
+          <div id="pregame-body"></div>
+          <div id="pregame-actions"></div>
+        </div>
+      </div>
+
+      <!-- ターン切り替え通知 -->
+      <div id="turn-toast"></div>
+
+      <!-- サイコロ結果の大型表示 -->
+      <div id="dice-overlay">
+        <div id="dice-face"></div>
+        <div id="dice-label"></div>
+      </div>
+
+      <!-- 効果で公開されたカードの大型表示 -->
+      <div id="reveal-overlay">
+        <img id="reveal-image" src="" alt="">
+        <div id="reveal-label"></div>
+      </div>
+
+      <!-- ステップ切り替え通知 + 進行バー -->
+      <div id="step-toast"></div>
+      <div id="step-bar"></div>
+
+      <div id="result-overlay">
+        <div id="result-message"></div>
+        <div id="result-buttons">
+          <button id="save-replay-button">💾 リプレイを保存</button>
+          <button id="view-board-button">盤面を確認</button>
+          <button id="restart-button">🏠 デッキ選択へ戻る</button>
+        </div>
+      </div>
+      <button id="show-result-button">🏆 結果を表示</button>
+    </div>
+
+  </div>
+
+  <script type="module" src="battle_simulator_v2/ui/app.js"></script>
+</body>
+</html>

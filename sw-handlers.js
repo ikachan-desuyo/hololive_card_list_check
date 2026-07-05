@@ -68,45 +68,19 @@ async function handleMessage(event) {
       break;
       
     case 'CHECK_VERSION_MISMATCH':
-      // 詳細なバージョンチェック
+      // 詳細なバージョンチェック（単一ソース: APP_VERSION 比較）
       console.log('Performing detailed version mismatch check...');
       try {
-        const versionCheckResult = await checkPageVersions();
-        
-        // 全ページ情報を収集
-        const allPages = [];
-        for (const [page, expectedVersion] of Object.entries(PAGE_VERSIONS)) {
-          try {
-            const response = await fetch(`./${page}`, { cache: 'no-cache' });
-            let actualVersion = expectedVersion; // デフォルトは期待バージョン
-            
-            if (response.ok) {
-              const htmlText = await response.text();
-              const versionMatch = htmlText.match(/<!-- Version: ([\d\.]+-?[A-Za-z-]*)/);
-              const displayVersionMatch = htmlText.match(/\[v([\d\.]+-?[A-Za-z-]*)\]/);
-              
-              if (versionMatch) {
-                actualVersion = versionMatch[1];
-              } else if (displayVersionMatch) {
-                actualVersion = displayVersionMatch[1];
-              }
-            }
-            
-            allPages.push({
-              page,
-              expectedVersion,
-              actualVersion
-            });
-          } catch (error) {
-            console.error(`Error checking ${page}:`, error);
-            allPages.push({
-              page,
-              expectedVersion,
-              actualVersion: 'error'
-            });
-          }
-        }
-        
+        const versionCheckResult = await checkPageVersions(); // 単一ソース比較
+        const liveVersion = versionCheckResult[0]?.expectedVersion || APP_VERSION;
+
+        // 全ページ情報（バージョンはアプリ単位で同一）
+        const allPages = Object.keys(PAGE_VERSIONS).map((page) => ({
+          page,
+          expectedVersion: liveVersion,
+          actualVersion: APP_VERSION
+        }));
+
         const detailedInfo = {
           hasUpdates: versionCheckResult.length > 0,
           outdatedPages: versionCheckResult,
@@ -115,7 +89,7 @@ async function handleMessage(event) {
           pageVersions: PAGE_VERSIONS,
           timestamp: new Date().toISOString()
         };
-        
+
         event.ports[0]?.postMessage({
           type: 'VERSION_MISMATCH_RESPONSE',
           data: detailedInfo
@@ -130,109 +104,32 @@ async function handleMessage(event) {
       break;
       
     case 'CHECK_SINGLE_PAGE_VERSION':
-      // 単一ページのバージョンチェック
+      // 単一ページのバージョンチェック（単一ソース: APP_VERSION 比較。ページ個別バージョンは持たない）
       console.log('Performing single page version check for:', data?.page);
       try {
         const targetPage = data?.page;
         if (!targetPage || !PAGE_VERSIONS[targetPage]) {
           throw new Error(`Invalid page: ${targetPage}`);
         }
-        
-        const expectedVersion = PAGE_VERSIONS[targetPage];
-        let pageInfo = null;
-        
-        // ネットワークから最新のページを取得
-        const response = await fetch(`./${targetPage}`, { cache: 'no-cache' });
-        if (!response.ok) {
-          pageInfo = {
-            page: targetPage,
-            reason: 'fetch_failed',
-            expectedVersion,
-            actualVersion: null,
-            cachedVersion: null
-          };
-        } else {
-          const htmlText = await response.text();
-          // より柔軟なバージョン検出
-          const versionMatch = htmlText.match(/<!-- Version: ([\d\.]+-?[A-Za-z-]*)/);
-          const displayVersionMatch = htmlText.match(/\[v([\d\.]+-?[A-Za-z-]*)\]/);
-          
-          let actualVersion = null;
-          if (versionMatch) {
-            actualVersion = versionMatch[1]; // サフィックスを削除しない
-          } else if (displayVersionMatch) {
-            actualVersion = displayVersionMatch[1];
-          }
-          
-          // キャッシュされたバージョンもチェック
-          const cache = await caches.open(CACHE_NAME);
-          const cachedResponse = await cache.match(`./${targetPage}`);
-          let cachedVersion = null;
-          
-          if (cachedResponse) {
-            const cachedText = await cachedResponse.text();
-            const cachedVersionMatch = cachedText.match(/<!-- Version: ([\d\.]+-?[A-Za-z-]*)/);
-            const cachedDisplayVersionMatch = cachedText.match(/\[v([\d\.]+-?[A-Za-z-]*)\]/);
-            
-            if (cachedVersionMatch) {
-              cachedVersion = cachedVersionMatch[1]; // サフィックスを削除しない
-            } else if (cachedDisplayVersionMatch) {
-              cachedVersion = cachedDisplayVersionMatch[1];
-            }
-          }
-          
-          console.log(`Single page ${targetPage}: expected=${expectedVersion}, actual=${actualVersion}, cached=${cachedVersion}`);
-          
-          // バージョン比較とミスマッチの理由を判定
-          let mismatchReason = null;
-          let needsUpdate = false;
 
-          // 🛠 Self-heal for single page checks: if expected==actual but cached outdated
-          try {
-            if (
-              actualVersion && expectedVersion && actualVersion === expectedVersion &&
-              cachedVersion && cachedVersion !== actualVersion
-            ) {
-              const freshResp = new Response(htmlText, { headers: { 'Content-Type': 'text/html' } });
-              const cache = await caches.open(CACHE_NAME);
-              await cache.put(`./${targetPage}`, freshResp);
-              cachedVersion = actualVersion;
-              console.log(`♻️ Self-healed cached HTML (single) for ${targetPage} -> ${cachedVersion}`);
-            }
-          } catch(e) {
-            console.warn('Single page self-heal failed for', targetPage, e);
+        const liveVersion = await getLiveAppVersion();
+        const needsUpdate = !!liveVersion && compareVersions(liveVersion, APP_VERSION);
+        const expectedVersion = liveVersion || APP_VERSION;
+
+        const pageInfo = needsUpdate ? {
+          page: targetPage,
+          reason: 'app_version_update',
+          expectedVersion,            // 配信中の新バージョン
+          actualVersion: APP_VERSION, // 稼働中（このSW）
+          cachedVersion: APP_VERSION,
+          details: {
+            expectedVersion,
+            actualVersion: APP_VERSION,
+            cachedVersion: APP_VERSION,
+            mismatchType: 'app_version_update'
           }
-          
-          if (!actualVersion) {
-            mismatchReason = 'actual_version_not_found';
-            needsUpdate = true;
-          } else if (expectedVersion !== actualVersion && compareVersions(expectedVersion, actualVersion)) {
-            mismatchReason = 'expected_vs_actual_mismatch';
-            needsUpdate = true;
-          // Relaxed: ignore case where only cachedVersion is older than actual while expected == actual
-          } else if (cachedVersion && actualVersion !== cachedVersion && compareVersions(actualVersion, cachedVersion) && expectedVersion !== actualVersion) {
-            mismatchReason = 'actual_vs_cached_mismatch';
-            needsUpdate = true;
-          }
-          // バージョンが同じ場合は更新不要
-          
-          if (needsUpdate) {
-            pageInfo = {
-              page: targetPage,
-              reason: mismatchReason || 'version_mismatch',
-              expectedVersion,
-              actualVersion,
-              cachedVersion,
-              details: {
-                expectedVersion,
-                actualVersion: actualVersion || 'unknown',
-                cachedVersion: cachedVersion || 'none',
-                mismatchType: mismatchReason
-              }
-            };
-          }
-        }
-        
+        } : null;
+
         const singlePageResult = {
           hasUpdates: pageInfo !== null,
           pageInfo: pageInfo,
@@ -241,7 +138,7 @@ async function handleMessage(event) {
           expectedVersion: expectedVersion,
           timestamp: new Date().toISOString()
         };
-        
+
         event.ports[0]?.postMessage({
           type: 'SINGLE_PAGE_VERSION_RESPONSE',
           data: singlePageResult

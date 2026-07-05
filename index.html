@@ -1,6 +1,6 @@
 <!DOCTYPE html>
 <html lang="ja">
-<!-- Version: 4.19.0 -->
+<!-- Version: sw-version.js の APP_VERSION が単一ソース（このコメントは表示・更新検知には使われません） -->
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
@@ -437,7 +437,7 @@
 <body>
   <div class="container">
     <h1>ホロライブカードゲーム<br>管理ツール
-  <span style="font-size: 0.4em; color: #999; display: block; margin-top: 5px; font-weight: normal;" id="versionDisplay">[v4.19.0]</span>
+  <span style="font-size: 0.4em; color: #999; display: block; margin-top: 5px; font-weight: normal;" id="versionDisplay"></span><script src="./sw-version.js"></script><script>(function(){var e=document.getElementById('versionDisplay');if(e)e.textContent='[v'+(self.APP_VERSION||'')+']';})();</script>
     </h1>
 
     <div class="menu-grid">
@@ -473,11 +473,11 @@
         </div>
       </div>
 
-      <div class="menu-card" onclick="safeNavigate('battle_simulator.html')" style="cursor: pointer;">
+      <div class="menu-card" onclick="safeNavigate('battle_simulator_v2.html')" style="cursor: pointer;">
         <span class="menu-icon">🎮</span>
         <div class="menu-title">バトルシミュレーター</div>
         <div class="menu-description">
-          作成したデッキでCPUと対戦。ホロライブTCGのルールに従った本格的なバトルが楽しめます。
+          3D盤面で対戦をシミュレート。公式ルール準拠のターン進行・ドラッグ&ドロップ操作・カード効果に対応。
         </div>
       </div>
     </div>
@@ -887,7 +887,7 @@
     // Store registration for manual update checks
     if ('serviceWorker' in navigator) {
       window.addEventListener('load', () => {
-        navigator.serviceWorker.register('./sw.js')
+        navigator.serviceWorker.register('./sw.js', { updateViaCache: 'none' })
           .then((registration) => {
             serviceWorkerRegistration = registration;
             // ... existing code above

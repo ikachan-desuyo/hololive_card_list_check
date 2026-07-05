@@ -48,16 +48,6 @@
 
       window.addEventListener("resize", updateMobileLayout);
 
-      function selectAll(id) {
-        document.querySelectorAll(`#${id} input[type="checkbox"]`).forEach(cb => cb.checked = true);
-        renderTable();
-      }
-
-      function clearAll(id) {
-        document.querySelectorAll(`#${id} input[type="checkbox"]`).forEach(cb => cb.checked = false);
-        renderTable();
-      }
-
       function showImageModal(src) {
         const modal = document.getElementById("imageModal");
         modal.querySelector("img").src = src;
@@ -290,7 +280,6 @@
 
     function renderTable() {
       const keyword = window.normalizeText(document.getElementById("keywordSearch").value);
-      const getChecked = id => [...document.querySelectorAll(`#${id} input:checked`)].map(el => el.value);
       const ownedStates = getCheckedFromChips("ownedStateChipGroup");
       const rarity = getCheckedFromChips("rarityFilter");
       const color = getCheckedFromChips("colorFilter");
@@ -367,11 +356,14 @@
         const now = Date.now();
         const cacheAge = now - (parseInt(cacheTimestamp) || 0);
         const maxCacheAge = 24 * 60 * 60 * 1000; // 24 hours
+        // アプリのバージョンが変わったらキャッシュを無効化（更新後に古いカードデータが残らないように）
+        const appVer = self.APP_VERSION || '';
+        const versionMatches = localStorage.getItem('dataVersion') === appVer;
 
         let rawData, releaseMapData;
 
-        // Use cached data if available and not too old, or if offline
-        if (cachedCardData && cachedReleaseData && (cacheAge < maxCacheAge || !navigator.onLine)) {
+        // バージョン一致 かつ 24時間以内（またはオフライン）の時だけキャッシュを使う
+        if (cachedCardData && cachedReleaseData && versionMatches && (cacheAge < maxCacheAge || !navigator.onLine)) {
           rawData = JSON.parse(cachedCardData);
           releaseMapData = JSON.parse(cachedReleaseData);
         } else {
@@ -383,10 +375,11 @@
           rawData = await cardRes.json();
           releaseMapData = await releaseRes.json();
 
-          // Cache the data
+          // Cache the data（バージョンも記録）
           localStorage.setItem('cardData', JSON.stringify(rawData));
           localStorage.setItem('releaseData', JSON.stringify(releaseMapData));
           localStorage.setItem('dataTimestamp', now.toString());
+          localStorage.setItem('dataVersion', appVer);
         }
 
         releaseMap = releaseMapData;
@@ -446,7 +439,7 @@
     // Service Worker registration with enhanced update notification for mobile
     if ('serviceWorker' in navigator) {
       window.addEventListener('load', () => {
-        navigator.serviceWorker.register('./sw.js')
+        navigator.serviceWorker.register('./sw.js', { updateViaCache: 'none' })
           .then((registration) => {
 
             // Listen for messages from Service Worker
@@ -481,6 +474,7 @@
     // Online/Offline status
     function updateOnlineStatus() {
       const statusElement = document.getElementById('offline-status');
+      if (!statusElement) return; // このページには #offline-status が無いため何もしない（load時のnull参照を防ぐ）
       if (navigator.onLine) {
         statusElement.textContent = '🟢 オンライン';
         statusElement.style.color = '#4CAF50';
@@ -521,16 +515,6 @@ async function sendMessageToSW(type, data) {
 // ✅ バージョン情報を取得
 async function getVersionInfo() {
   return await sendMessageToSW('GET_VERSION_INFO');
-}
-
-// ✅ 更新メッセージを取得
-async function getUpdateMessage() {
-  return await sendMessageToSW('GET_UPDATE_MESSAGE');
-}
-
-// ✅ 古いページをチェック
-async function checkOutdatedPages() {
-  return await sendMessageToSW('CHECK_OUTDATED_PAGES');
 }
 
 // ✅ 更新確認機能 - 現在のページのみをチェック
@@ -686,7 +670,7 @@ document.addEventListener('DOMContentLoaded', function() {
 
 // ✅ Service Worker登録
 if ('serviceWorker' in navigator) {
-  navigator.serviceWorker.register('./sw.js').then(function(registration) {
+  navigator.serviceWorker.register('./sw.js', { updateViaCache: 'none' }).then(function(registration) {
   }).catch(function(error) {
   });
 }

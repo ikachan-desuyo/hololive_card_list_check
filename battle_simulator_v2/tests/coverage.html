@@ -1,0 +1,100 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8">
+  <title>カード効果カバレッジ（発売日順）</title>
+  <style>
+    body { font-family: 'Segoe UI', sans-serif; max-width: 1000px; margin: 2em auto; background: #1b1b2f; color: #eee; }
+    table { border-collapse: collapse; width: 100%; }
+    th, td { border: 1px solid #444; padding: 6px 10px; text-align: right; }
+    th:first-child, td:first-child { text-align: left; }
+    th { background: #26305c; }
+    .done { color: #6ee76e; }
+    .partial { color: #ffd98a; }
+  </style>
+</head>
+<body>
+  <h1>📊 カード効果カバレッジ（発売日順）</h1>
+  <p>手書き = cards/*.js / 自動 = テキストコンパイラ / 各カードは最初に収録された製品に分類</p>
+  <div id="out">集計中...</div>
+  <script type="module">
+    import { CardLibrary } from '../core/cards.js';
+    import { compileCard } from '../core/effects/text-compiler.js';
+    import { IMPLEMENTED } from '../cards/index.js';
+
+    function needsEffect(card) {
+      return (card.keywords?.length > 0) || !!card.supportText ||
+        (card.arts || []).some((a) => a.text) || (card.oshiSkills?.length > 0);
+    }
+
+    async function main() {
+      const lib = await CardLibrary.load('../../json_file/card_data.json');
+      const releases = await (await fetch('../../json_file/release_dates.json')).json();
+
+      // 各ユニークカードを「最初に収録された（最古の）製品」に分類
+      const rawData = await (await fetch('../../json_file/card_data.json')).json();
+      const earliest = new Map(); // number -> {date, product}
+      for (const [id, raw] of Object.entries(rawData)) {
+        const number = raw.number || id.split('_')[0];
+        for (const part of (raw.product || '').split(',')) {
+          const product = part.trim();
+          const date = releases[product];
+          if (!date) continue;
+          const cur = earliest.get(number);
+          if (!cur || date < cur.date) earliest.set(number, { date, product });
+        }
+      }
+
+      // 製品ごとに集計
+      const byProduct = new Map();
+      for (const [number, { date, product }] of earliest) {
+        const card = lib.getByNumber(number);
+        if (!card || !needsEffect(card)) continue;
+        if (!byProduct.has(product)) byProduct.set(product, { date, total: 0, manual: 0, auto: 0 });
+        const row = byProduct.get(product);
+        row.total++;
+        if (IMPLEMENTED[number]) row.manual++;
+        else if (compileCard(card)) row.auto++;
+      }
+
+      // 未実装カードの一覧出力（?missing=製品名 で指定。?missing=all で全製品）
+      const params = new URLSearchParams(location.search);
+      const missingFilter = params.get('missing');
+      if (missingFilter) {
+        for (const [number, { product }] of earliest) {
+          if (missingFilter !== 'all' && !product.includes(missingFilter)) continue;
+          const card = lib.getByNumber(number);
+          if (!card || !needsEffect(card)) continue;
+          if (IMPLEMENTED[number] || compileCard(card)) continue;
+          const texts = [
+            ...(card.keywords || []).map((k) => `《${k.subtype}》${k.text}`),
+            card.supportText || '',
+            ...(card.arts || []).filter((a) => a.text).map((a) => `[アーツ]${a.text}`),
+            ...(card.oshiSkills || []).map((s) => `[推し]${s.text}`),
+          ].filter(Boolean).join(' / ').replace(/\n/g, ' ');
+          console.log(`MISSING: ${number} ${card.name} :: ${texts.slice(0, 180)}`);
+        }
+      }
+
+      const rows = [...byProduct.entries()].sort((a, b) => a[1].date.localeCompare(b[1].date));
+      let totalAll = 0, doneAll = 0;
+      let html = '<table><tr><th>製品（発売日順）</th><th>発売日</th><th>要効果</th><th>手書き</th><th>自動</th><th>未実装</th><th>実装率</th></tr>';
+      for (const [product, r] of rows) {
+        const done = r.manual + r.auto;
+        const pct = r.total ? Math.round(done * 100 / r.total) : 100;
+        totalAll += r.total; doneAll += done;
+        const cls = pct === 100 ? 'done' : pct > 0 ? 'partial' : '';
+        html += `<tr><td>${product}</td><td>${r.date}</td><td>${r.total}</td><td>${r.manual}</td><td>${r.auto}</td><td>${r.total - done}</td><td class="${cls}">${pct}%</td></tr>`;
+        console.log(`COVERAGE: ${r.date} ${product} ${done}/${r.total} (${pct}%)`);
+      }
+      html += `<tr><th>合計</th><th></th><th>${totalAll}</th><th colspan="2">${doneAll}</th><th>${totalAll - doneAll}</th><th>${Math.round(doneAll * 100 / totalAll)}%</th></tr></table>`;
+      document.getElementById('out').innerHTML = html;
+      console.log(`COVERAGE TOTAL: ${doneAll}/${totalAll}`);
+    }
+    main().catch((e) => {
+      document.getElementById('out').textContent = 'エラー: ' + e.message;
+      console.error('COVERAGE ERROR', e);
+    });
+  </script>
+</body>
+</html>

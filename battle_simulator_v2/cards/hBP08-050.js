@@ -1,0 +1,58 @@
+/**
+ * 水宮枢 (hBP08-050) 青・1st（#DEV_IS #FLOW #GLOW）
+ *
+ * [ギフト] 君に乗ってもいいかな？:
+ *   相手のターンで、自分のホロメンがダウンした時、自分のエールデッキの上から1枚を
+ *   自分のバックホロメンに送る。
+ *   → 傍観トリガー。「自分のホロメン」には自身も含むため、
+ *     他ホロメンのダウン＝onAnyDown / このホロメン自身のダウン＝onDown の両方で発揮する
+ *     （hSD13-005 と同じ二刀流）。[ターンに1回]制限は無い（ダウンのたびに発揮）。
+ *     送り先は自分のバックホロメン（複数なら選択／ダウンしたホロメンは除外）。
+ *     エールデッキが空、またはバックホロメンがいなければ何も起きない。
+ *
+ * [アーツ] 優しさます増し:
+ *   自分のアーカイブのエール1枚を自分のホロメンに送る。
+ */
+function* sendCheerDeckTopToBack(ctx, downed) {
+  if (ctx.state.turnPlayer === ctx.playerIdx) return;   // 相手のターン限定
+  if (ctx.player.cheerDeck.length === 0) return;        // エールデッキが空
+  const pickable = (e) => e.pos.zone === 'back' && e.holomem !== downed;
+  const backs = ctx.holomems('self', pickable);
+  if (backs.length === 0) return;                       // 送り先のバックホロメンがいない
+  const target = backs.length === 1
+    ? backs[0]
+    : yield ctx.chooseHolomem({ side: 'self', filter: pickable, title: 'エールデッキの上から1枚を送るバックホロメンを選択' });
+  if (!target) return;
+  ctx.sendCheerFromCheerDeckTop(target.holomem);
+}
+
+export default {
+  number: 'hBP08-050',
+  triggers: {
+    *onAnyDown(ctx) {
+      if (ctx.downedInfo?.ownerIdx !== ctx.playerIdx) return; // 自分のホロメンがダウンした時
+      yield* sendCheerDeckTopToBack(ctx, ctx.downedInfo?.holomem);
+    },
+    *onDown(ctx) {
+      // このホロメン自身（自分のホロメン）がダウンした時（onAnyDown はダウン本人を除くため onDown で拾う）
+      yield* sendCheerDeckTopToBack(ctx, ctx.sourceHolomem);
+    },
+  },
+  arts: {
+    '優しさます増し': {
+      *run(ctx) {
+        const cheers = ctx.player.archive.filter((c) => c.kind === 'cheer');
+        if (cheers.length === 0) return;
+        if (ctx.holomems('self').length === 0) return;
+        const cheer = cheers.length === 1
+          ? cheers[0]
+          : yield ctx.chooseCard({ cards: cheers, title: 'アーカイブから送るエールを選択' });
+        if (!cheer) return;
+        const target = yield ctx.chooseHolomem({ side: 'self', title: 'エールを送る自分のホロメンを選択' });
+        if (!target) return;
+        ctx.removeFromArchive(cheer);
+        ctx.attachCheer(cheer, target.holomem);
+      },
+    },
+  },
+};
