@@ -28,7 +28,7 @@ function createOfflineIndicator() {
     backdrop-filter: blur(5px);
     border: 1px solid rgba(255,255,255,0.2);
   `;
-  indicator.innerHTML = '� オフライン';
+  indicator.innerHTML = '🔴 オフライン';
 
   // アニメーション用CSS
   const style = document.createElement('style');

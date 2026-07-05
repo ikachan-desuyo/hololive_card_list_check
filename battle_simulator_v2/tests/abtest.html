@@ -1,0 +1,31 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8">
+  <title>AI A/Bテスト（NEW vs OLD）</title>
+</head>
+<body>
+  <h1>⚔️ AI A/Bテスト（現行 vs 凍結ベースライン）</h1>
+  <pre id="out"></pre>
+  <script>
+    // ヘッドレスEdge(--dump-dom)で確実に回収するため、console出力をDOMにも反映する。
+    (function mirrorConsole() {
+      const out = document.getElementById('out');
+      const orig = { log: console.log.bind(console), error: console.error.bind(console) };
+      const append = (args) => { out.textContent += args.map((a) => (typeof a === 'string' ? a : String(a))).join(' ') + '\n'; };
+      console.log = (...a) => { orig.log(...a); append(a); };
+      console.error = (...a) => { orig.error(...a); append(a); };
+    })();
+  </script>
+  <script type="module">
+    import { runAbtest } from './abtest.js';
+    runAbtest().then(() => {
+      console.log('ABTEST-DONE-MARKER');
+      document.title = 'ABTEST-DONE';
+    }).catch((e) => {
+      console.error('ABTEST FAILED', e.message);
+      document.title = 'ABTEST-FAILED';
+    });
+  </script>
+</body>
+</html>

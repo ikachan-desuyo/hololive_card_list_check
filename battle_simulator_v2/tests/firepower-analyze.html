@@ -1,0 +1,13 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head><meta charset="UTF-8"><title>デッキ火力解析</title></head>
+<body>
+  <h1>🔥 デッキ火力解析</h1>
+  <pre id="out">実行中...</pre>
+  <script type="module">
+    import { runFirepower } from './firepower-analyze.js';
+    runFirepower().then(() => { document.getElementById('out').textContent = '完了'; document.title = 'FP-DONE'; })
+      .catch((e) => { console.error('FP FAILED', e); document.getElementById('out').textContent = '失敗: ' + e.message; });
+  </script>
+</body>
+</html>

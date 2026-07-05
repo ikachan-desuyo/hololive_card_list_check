@@ -1,0 +1,13 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head><meta charset="UTF-8"><title>ロールアウト診断</title></head>
+<body>
+  <h1>🔬 ロールアウト診断（信号 vs ノイズ）</h1>
+  <pre id="out">実行中...</pre>
+  <script type="module">
+    import { runDiag } from './rollout-diag.js';
+    runDiag().then(() => { document.getElementById('out').textContent = '完了'; document.title = 'DIAG-DONE'; })
+      .catch((e) => { console.error('DIAG FAILED', e); document.getElementById('out').textContent = '失敗: ' + e.message; });
+  </script>
+</body>
+</html>

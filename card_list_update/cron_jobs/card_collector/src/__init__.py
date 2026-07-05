@@ -1,0 +1,1 @@
+"""Cards Collector package"""

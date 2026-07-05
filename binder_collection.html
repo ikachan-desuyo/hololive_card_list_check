@@ -1,6 +1,6 @@
 <!DOCTYPE html>
 <html lang="ja">
-<!-- Version: 4.19.0 -->
+<!-- Version: sw-version.js の APP_VERSION が単一ソース（このコメントは表示・更新検知には使われません） -->
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
@@ -15,7 +15,7 @@
   <div class="header">
     <div class="header-content">
       <h1>📚 バインダーコレクション
-  <span style="font-size: 12px; color: #999; font-weight: normal; margin-left: 10px;" id="versionDisplay">[v4.15.1]</span>
+  <span style="font-size: 12px; color: #999; font-weight: normal; margin-left: 10px;" id="versionDisplay"></span><script src="./sw-version.js"></script><script>(function(){var e=document.getElementById('versionDisplay');if(e)e.textContent='[v'+(self.APP_VERSION||'')+']';})();</script>
       </h1>
       <div class="header-controls">
         <button class="control-btn" onclick="exportBinderCollection()">📤 エクスポート</button>

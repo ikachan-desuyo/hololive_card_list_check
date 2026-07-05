@@ -1,0 +1,105 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8">
+  <title>再現性デバッグ</title>
+  <style>
+    body { font-family: 'Consolas','Meiryo',monospace; max-width: 1100px; margin: 2em auto; background:#14152b; color:#eee; }
+    h1 { font-size: 1.2em; }
+    .ok { color:#6ee76e; } .ng { color:#ff6b6b; font-weight:bold; }
+    pre { background:#1d1f3d; padding:10px; border-radius:8px; white-space:pre-wrap; }
+    .a { color:#8fbcff; } .b { color:#ffd98a; }
+  </style>
+</head>
+<body>
+  <h1>🔬 同一シード再現性デバッグ</h1>
+  <div id="out">実行中…</div>
+
+  <script type="module">
+    import { CardLibrary } from '../core/cards.js';
+    import { EffectRegistry } from '../core/effects/registry.js';
+    import { Engine } from '../core/engine.js';
+    import { createRng } from '../core/rng.js';
+
+    const SEED = 7; // 再現性テストと同じシード
+
+    async function buildRegistry(lib, deckMap) {
+      const r = new EffectRegistry();
+      await r.preload(Object.keys(deckMap).map((id) => lib.get(id)?.number).filter(Boolean), lib);
+      return r;
+    }
+
+    // randomPlayout と同じロジック。各 apply 前に「選んだ action.id」も記録する
+    async function playout(lib, deckMap) {
+      const deck0 = lib.buildGameDeck(deckMap);
+      const deck1 = lib.buildGameDeck(deckMap);
+      const registry = await buildRegistry(lib, deckMap);
+      const engine = new Engine({ decks: [deck0, deck1], seed: SEED, names: ['P1','P2'], registry });
+      const rng = createRng(SEED + 999);
+      engine.start();
+      const trace = []; // 各手で選んだ action.id
+      let applies = 0;
+      while (engine.state.phase !== 'ended' && applies < 5000) {
+        const actions = engine.actions();
+        if (actions.length === 0) { trace.push('<no-actions>'); break; }
+        const action = actions[Math.floor(rng() * actions.length)];
+        trace.push(`${actions.length}|${action.id}`);
+        engine.apply(action.id);
+        applies++;
+      }
+      return { applies, winner: engine.state.winner, logs: engine.state.logs, trace };
+    }
+
+    function firstDiff(arrA, arrB) {
+      const n = Math.max(arrA.length, arrB.length);
+      for (let i = 0; i < n; i++) {
+        if (arrA[i] !== arrB[i]) return i;
+      }
+      return -1;
+    }
+
+    (async () => {
+      const out = document.getElementById('out');
+      try {
+        const lib = await CardLibrary.load('../../json_file/card_data.json');
+        const deckRes = await fetch('../test_deck/' + encodeURIComponent('ラミィデッキ.json'));
+        const deckMap = await deckRes.json();
+
+        const a = await playout(lib, deckMap);
+        const b = await playout(lib, deckMap);
+
+        const same = a.applies === b.applies && a.winner === b.winner;
+        let html = `<p class="${same ? 'ok' : 'ng'}">手数 A=${a.applies} / B=${b.applies}　勝者 A=${a.winner} / B=${b.winner}　→ ${same ? '一致（再現性OK）' : '不一致（非決定性あり）'}</p>`;
+
+        if (!same) {
+          // 1) 選択トレースの最初の食い違い（= どの手で分岐したか）
+          const td = firstDiff(a.trace, b.trace);
+          html += `<h3>選択トレースの最初の食い違い: ${td < 0 ? 'なし' : td + '手目'}</h3>`;
+          if (td >= 0) {
+            const ctx = (arr, label) => arr.slice(Math.max(0, td - 1), td + 2)
+              .map((x, k) => `${label} [${Math.max(0, td - 1) + k}] ${x}`).join('\n');
+            html += `<pre><span class="a">${ctx(a.trace, 'A')}</span>\n<span class="b">${ctx(b.trace, 'B')}</span></pre>`;
+          }
+          // 2) ログの最初の食い違い（= どの処理で状態が分岐したか）
+          const ld = firstDiff(a.logs, b.logs);
+          html += `<h3>ログの最初の食い違い: ${ld < 0 ? 'なし' : ld + '行目'}</h3>`;
+          if (ld >= 0) {
+            const ctxL = (arr, label) => arr.slice(Math.max(0, ld - 2), ld + 1)
+              .map((x, k) => `${label} [${Math.max(0, ld - 2) + k}] ${x}`).join('\n');
+            html += `<pre><span class="a">${ctxL(a.logs, 'A')}</span>\n<span class="b">${ctxL(b.logs, 'B')}</span></pre>`;
+          }
+        }
+        out.innerHTML = html;
+        // コンソールにも要点を出す
+        console.log(`REPRO applies A=${a.applies} B=${b.applies} winner A=${a.winner} B=${b.winner}`);
+        if (!same) {
+          const ld = firstDiff(a.logs, b.logs);
+          console.log('REPRO firstLogDiff', ld, '\nA:', a.logs[ld], '\nB:', b.logs[ld]);
+        }
+      } catch (e) {
+        out.innerHTML = `<p class="ng">エラー: ${e.message}</p><pre>${e.stack}</pre>`;
+      }
+    })();
+  </script>
+</body>
+</html>

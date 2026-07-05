@@ -1,0 +1,14 @@
+<!DOCTYPE html>
+<html lang="ja"><head><meta charset="UTF-8"><title>オンライン同期テスト</title></head>
+<body><pre id="out"></pre>
+<script>
+  (function () { const out = document.getElementById('out'); const o = console.log.bind(console);
+    console.log = (...a) => { o(...a); out.textContent += a.join(' ') + '\n'; };
+    console.error = (...a) => { o(...a); out.textContent += a.join(' ') + '\n'; }; })();
+</script>
+<script type="module">
+  import { runOnlineSyncTest } from './online-test.js';
+  runOnlineSyncTest().then(() => { document.title = 'ONLINE-TEST-DONE'; })
+    .catch((e) => { console.error('FAILED', e.message, e.stack); document.title = 'ONLINE-TEST-FAILED'; });
+</script>
+</body></html>
