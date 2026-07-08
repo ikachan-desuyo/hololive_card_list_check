@@ -77,7 +77,7 @@
         // 既存のバインダーをチェック
         const saved = window.storageProvider.getBinderCollection();
         if (saved) {
-          const collection = JSON.parse(saved);
+          const collection = saved;
           if (collection.binders && collection.binders.length > 0) {
             // 最初のバインダーにリダイレクト
             const firstBinder = collection.binders[0];
@@ -308,7 +308,7 @@
       const saved = window.storageProvider.getBinderCollection();
 
       if (saved) {
-        binderCollection = JSON.parse(saved);
+        binderCollection = saved;
       }
 
 

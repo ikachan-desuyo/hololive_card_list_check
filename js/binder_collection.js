@@ -19,7 +19,7 @@
     function loadBinderCollection() {
       const saved = window.storageProvider.getBinderCollection();
       if (saved) {
-        binderCollection = JSON.parse(saved);
+        binderCollection = saved;
       }
     }
 
