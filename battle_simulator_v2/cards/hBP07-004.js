@@ -24,23 +24,21 @@ export default {
 
   // 推しステージスキル「はあちゃまなう」[ターンに1回]:
   //   自分のターンで〈赤井はあと〉が自分の能力でステージからデッキに戻った時、デッキを2枚引く。
-  //   ※強制ではなく、条件成立時に [ターンに1回] 発動するかどうかを選べる（発動しないことも可）。
-  //     発動しなかった場合は [ターンに1回] を消費しないため、同ターンの次の機会に再び選べる。
-  //   シグネチャは (ctx, returnedCards)。ジェネレータにして ctx.confirm で発動可否を選ばせる。
+  //   ※テキストは「2枚引く」（「引ける」でない）＝自動能力は強制（総合ルール10.8）。
+  //     2026-07-17 監査: 公式Q&A（Q584/Q587）にも任意とする裁定は無いため、旧実装の任意発動
+  //     （ctx.confirm ゲート・不発時はターン1回を未消費）を撤回し、条件成立で強制発動に戻した。
+  //   シグネチャは (ctx, returnedCards)。
   oshiStageSkill: {
     name: 'はあちゃまなう',
     *onReturnedToDeck(ctx, cards) {
       if (ctx.state.turnPlayer !== ctx.playerIdx) return; // 自分のターン限定
       const p = ctx.player;
-      if (p._haachamaNowTurn === ctx.state.turn) return;  // [ターンに1回]（既に発動済みなら出さない）
-      if (!cards.some((c) => c.name === '赤井はあと')) return;
-      // 任意発動（既定ラベルなので「任意効果の発動確認」設定にも従う）
-      const ok = yield ctx.confirm('はあちゃまなう: 〈赤井はあと〉がデッキに戻った。デッキを2枚引きますか？（ターンに1回）');
-      if (!ok) return; // 発動しない → [ターンに1回] は消費しない（同ターンの次の機会に再び選べる）
-      p._haachamaNowTurn = ctx.state.turn;
+      if (p._haachamaNowTurn === ctx.state.turn) return;  // [ターンに1回]
+      if (!cards.some((c) => ctx.nameIs(c, '赤井はあと'))) return;
+      p._haachamaNowTurn = ctx.state.turn; // 強制発動＝このターンの発動権を消費
       let drawn = 0;
       for (let i = 0; i < 2 && p.deck.length > 0; i++) { p.hand.push(p.deck.shift()); drawn++; }
-      ctx.log(`はあちゃまなう: 〈赤井はあと〉がデッキに戻った→${drawn}枚引く`);
+      ctx.log(`はあちゃまなう: 〈赤井はあと〉がデッキに戻った→${drawn}枚引く（強制・ターンに1回）`);
     },
   },
 

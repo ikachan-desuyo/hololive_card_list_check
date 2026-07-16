@@ -2176,7 +2176,7 @@ export async function runTests() {
     const h1 = e._createHolomem(lib.getByNumber(haatoDebut.number), 0);
     p0.back = [h1];
     const handBefore = p0.hand.length;
-    drive(ctx.returnHolomemToDeck(h1), true); // 任意発動の確認に「引く(true)」で答える
+    drive(ctx.returnHolomemToDeck(h1), true); // 強制発動（確認は出ない）
     assertEq(p0.hand.length, handBefore + 2, 'はあちゃまなうで2枚引いていない');
     assert(!p0.back.includes(h1), 'はあとがバックから除去されていない');
 
@@ -2188,24 +2188,19 @@ export async function runTests() {
     assertEq(p0.hand.length, handBefore2, '[ターンに1回]を超えて引いている');
   });
 
-  await testAsync('はあちゃまなう: 任意発動（発動しないと引かず、[ターンに1回]も消費しない）', async () => {
+  await testAsync('はあちゃまなう: 強制発動（テキスト「引く」＝自動能力は強制。断る確認は出ない）', async () => {
+    // 2026-07-17 監査: 旧実装の任意発動（confirmゲート）を撤回。総合ルール10.8（自動能力は強制）準拠
     const e = await setupMainStep(deckMap, 154);
     await e.registry.preload(['hBP07-004'], lib);
     const p0 = e.state.players[0];
     p0.oshi = lib.getByNumber('hBP07-004');
     const haatoDebut = [...lib.byNumber.values()].find((c) => c.name === '赤井はあと' && c.bloomLevel === 'Debut');
     const ctx = new EffectContext(e, 0, {});
-    // 1回目: 発動しない(false) → 引かない
     const h1 = e._createHolomem(lib.getByNumber(haatoDebut.number), 0);
     p0.back = [h1];
     const before = p0.hand.length;
-    drive(ctx.returnHolomemToDeck(h1), false);
-    assertEq(p0.hand.length, before, '発動しないを選んだのに引いている');
-    // 2回目（同ターン）: 1回目で消費していないので、再び発動を選べて2枚引ける
-    const h2 = e._createHolomem(lib.getByNumber(haatoDebut.number), 0);
-    p0.back = [h2];
-    drive(ctx.returnHolomemToDeck(h2), true);
-    assertEq(p0.hand.length, before + 2, '発動しない後の同ターンに発動できない（[ターンに1回]を誤って消費している）');
+    drive(ctx.returnHolomemToDeck(h1), false); // false を答えても（確認自体が無く）強制で引く
+    assertEq(p0.hand.length, before + 2, '強制発動なのに2枚引いていない');
   });
 
   await testAsync('装着: ネリッサの杖（2ndネリッサの能力で手札アーカイブ→相手前衛に特殊20・ターンに1回）', async () => {
