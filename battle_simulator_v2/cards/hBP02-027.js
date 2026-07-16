@@ -17,6 +17,7 @@ export default {
         const top = ctx.player.deck[0];
         ctx.removeFromDeck(top);
         ctx.player.archive.push(top);
+        ctx.recordDeckArchive(1); // デッキ→アーカイブの枚数カウント（hBP08-020 等が参照）
         ctx.log(`${ctx.player.name}: デッキの上の ${top.name} をアーカイブ`);
         if (top.kind === 'holomen') {
           ctx.addArtBonus(20, 'アーカイブしたカードがホロメン');

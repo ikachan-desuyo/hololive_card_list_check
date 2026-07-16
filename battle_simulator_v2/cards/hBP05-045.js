@@ -7,14 +7,22 @@
  *   相手のセンターホロメンに与える特殊ダメージ+20。
  *   → 常時アウラ（auraSpecialDmgPlus）。自分(おかゆ)がセンターにいる間、
  *     発生源が〈猫又おかゆ〉で相手センターを対象とする特殊ダメージに+20。
+ *     推しホロメンの〈猫又おかゆ〉発（推しスキル hBP05-005 等）は auraOshiSpecialDmgPlus で+20（2026-07-17 監査対応）。
  */
 export default {
   number: 'hBP05-045',
   // [センター限定] 〈猫又おかゆ〉が相手センターに与える特殊ダメージ+20
   auraSpecialDmgPlus(src, sourceHolomem, targetEntry, engine) {
     if (engine._zoneOf(src) !== 'center') return 0;
-    if (src.stack[0].name !== '猫又おかゆ') return 0;
-    if (sourceHolomem?.stack[0].name !== '猫又おかゆ') return 0;
+    if (!engine._nameIs(src.stack[0], '猫又おかゆ')) return 0;
+    if (!sourceHolomem || !engine._nameIs(sourceHolomem.stack[0], '猫又おかゆ')) return 0;
+    return targetEntry.pos.zone === 'center' ? 20 : 0;
+  },
+  // [センター限定] 推しホロメンの〈猫又おかゆ〉が相手センターに与える特殊ダメージ+20（推しスキル発の経路）
+  auraOshiSpecialDmgPlus(src, oshiCard, targetEntry, engine) {
+    if (engine._zoneOf(src) !== 'center') return 0;
+    if (!engine._nameIs(src.stack[0], '猫又おかゆ')) return 0;
+    if (!oshiCard || !engine._nameIs(oshiCard, '猫又おかゆ')) return 0;
     return targetEntry.pos.zone === 'center' ? 20 : 0;
   },
   arts: {

@@ -10,9 +10,9 @@
  *
  * 解釈:
  *  - 条件は「後攻で最初のターンなら」→ ctx.isFirstTurnGoingSecond()。
- *  - 「1枚ずつを…公開し、手札に加える」= 各カード名の1stホロメンを1枚ずつ加える（任意ではない）。
- *    デッキに同名の該当カードが複数あれば、どの1枚を加えるかをプレイヤーが選ぶ。
- *  - 該当が無い名前はスキップ（無くても残りは加える）。
+ *  - 「1stホロメンの」は〈エリザベス・ローズ・ブラッドフレイム〉のみに掛かる。
+ *    〈Thorn〉(hBP07-104) はサポート・ツールなので種別はサポートで検索する。
+ *  - 非公開領域（デッキ）のサーチ＝「見つからなかったことにできる」（総合ルール 4.1.2.3）。
  *  - 条件成立時はデッキを必ずシャッフルする（加えた枚数に関わらず、テキスト通り実行）。
  */
 export default {
@@ -24,24 +24,29 @@ export default {
         ctx.log('後攻で最初のターンではないため、効果は発動しない');
         return;
       }
-      const targetNames = ['エリザベス・ローズ・ブラッドフレイム', 'Thorn'];
-      for (const name of targetNames) {
-        const candidates = ctx.deckCards(
-          (c) => c.kind === 'holomen' && c.bloomLevel === '1st' && c.name === name);
-        if (candidates.length === 0) {
-          ctx.log(`デッキに1stの〈${name}〉が無いためスキップ`);
-          continue;
+      const searches = [
+        {
+          label: '1stホロメンの〈エリザベス・ローズ・ブラッドフレイム〉',
+          filter: (c) => c.kind === 'holomen' && c.bloomLevel === '1st'
+            && ctx.nameIs(c, 'エリザベス・ローズ・ブラッドフレイム'),
+        },
+        {
+          label: '〈Thorn〉',
+          filter: (c) => c.kind === 'support' && ctx.nameIs(c, 'Thorn'),
+        },
+      ];
+      for (const s of searches) {
+        const candidates = ctx.deckCards(s.filter);
+        const picked = yield ctx.chooseCard({
+          cards: candidates,
+          title: `デッキから${s.label}1枚を公開して手札に加える`,
+          optional: true,
+          skipLabel: '見つからなかった（加えない）',
+        });
+        if (picked) {
+          ctx.removeFromDeck(picked);
+          ctx.addToHand(picked, { reveal: true });
         }
-        let picked = candidates[0];
-        if (candidates.length > 1) {
-          picked = yield ctx.chooseCard({
-            cards: candidates,
-            title: `手札に加える1stの〈${name}〉を選択`,
-          });
-          if (!picked) picked = candidates[0];
-        }
-        ctx.removeFromDeck(picked);
-        ctx.addToHand(picked); // 公開ログ付き
       }
       ctx.shuffleDeck();
     },

@@ -12,7 +12,8 @@
  *   自分のステージのホロメンが相手のバックホロメンにダメージを与えた時に使える：
  *   その相手のバックホロメン1人に特殊ダメージ50を与える。
  *   → onDamageDealtOshiSkills（攻撃時誘発・sp）で実装。アーツが相手バックにダメージを与えていたら
- *     （attackInfo.dealtList に zone==='back'）、相手バック1人に特殊50。hBP01-007 と同形。
+ *     （attackInfo.dealtList に zone==='back'）、実際にダメージを受けたそのバックホロメン1人に特殊50。
+ *     hBP01-007「ほうき星」と同形（対象は dealtList のバックに限定）。
  */
 export default {
   number: 'hSD03-001',
@@ -26,9 +27,12 @@ export default {
         return (info.dealtList || []).some((d) => d.zone === 'back');
       },
       *run(ctx) {
-        if (ctx.holomems('opp', (e) => e.pos.zone === 'back').length === 0) return;
+        // 「その相手のバックホロメン」＝実際にダメージを受けたバックホロメンに限定（hBP01-007 と同形）
+        const dealtBacks = new Set((ctx.attackInfo.dealtList || []).filter((d) => d.zone === 'back').map((d) => d.target));
+        // ダメージを受けたバックが既にダウンしてステージに残っていなければ対象なし
+        if (ctx.holomems('opp', (e) => dealtBacks.has(e.holomem)).length === 0) return;
         const entry = yield ctx.chooseHolomem({
-          side: 'opp', filter: (e) => e.pos.zone === 'back',
+          side: 'opp', filter: (e) => dealtBacks.has(e.holomem),
           title: '特殊ダメージ50を与える相手のバックホロメンを選択',
         });
         if (entry) yield* ctx.dealSpecialDamage(entry, 50);

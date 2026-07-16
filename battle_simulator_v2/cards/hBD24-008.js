@@ -11,6 +11,8 @@
  *   → spOshiSkill（能動）。デッキ内の白ホロメンを1枚選び、公開して手札に加え、デッキをシャッフルする。
  *     コスト[ホロパワー：-2]と[ゲームに1回]制限はエンジンが処理するため run には書かない。
  *     ※「白ホロメン」=色が白のホロメンカード。デッキ内に該当が無ければ何も加えずシャッフルのみ。
+ * 修正（2026-07-17 監査）: 色判定を engine._hasColor / (color||'').includes に統一（多色ホロメン対応、総合ルール 2.4.3）。
+ * 修正（2026-07-17 監査）: SPスキルのデッキサーチに「加えない」を追加（非公開領域は見つからなかったことにできる、総合ルール 4.1.2.3）。
  */
 export default {
   number: 'hBD24-008',
@@ -20,12 +22,12 @@ export default {
     canUse(engine, ownerIdx) {
       // 自分の白ホロメンが1人以上いる時のみ意味がある
       const p = engine.state.players[ownerIdx];
-      return engine._stageHolomems(p).some((h) => h.stack[0].color === '白');
+      return engine._stageHolomems(p).some((h) => engine._hasColor(h, '白'));
     },
     *run(ctx) {
       const entry = yield ctx.chooseHolomem({
         side: 'self',
-        filter: (e) => e.top.color === '白',
+        filter: (e) => ctx.engine._hasColor(e.holomem, '白'),
         title: 'アーツ+20する自分の白ホロメンを選択',
       });
       if (!entry) return;
@@ -43,10 +45,10 @@ export default {
     canUse(engine, ownerIdx) {
       // デッキ内に白ホロメンがいる時のみ意味がある
       const p = engine.state.players[ownerIdx];
-      return p.deck.some((c) => c.kind === 'holomen' && c.color === '白');
+      return p.deck.some((c) => c.kind === 'holomen' && (c.color || '').includes('白'));
     },
     *run(ctx) {
-      const cand = ctx.deckCards((c) => c.kind === 'holomen' && c.color === '白');
+      const cand = ctx.deckCards((c) => c.kind === 'holomen' && (c.color || '').includes('白'));
       if (cand.length === 0) {
         ctx.log(`${ctx.player.name}: デッキに白ホロメンが無い`);
         ctx.shuffleDeck();
@@ -55,6 +57,8 @@ export default {
       const picked = yield ctx.chooseCard({
         cards: cand,
         title: '手札に加える白ホロメンを選択',
+        optional: true,
+        skipLabel: '加えない',
       });
       if (picked) {
         ctx.removeFromDeck(picked);

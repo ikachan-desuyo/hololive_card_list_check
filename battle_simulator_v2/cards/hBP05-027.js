@@ -1,24 +1,26 @@
 /**
  * アキ・ローゼンタール (hBP05-027) 緑・2nd・HP210
- * キーワード「ゲーム？ スポーティー？ キャンプ？！」:
+ * ブルームエフェクト「ゲーム？ スポーティー？ キャンプ？！」(13.3):
  *   このホロメンに付いているツール1枚をアーカイブできる：自分のデッキから、[ホロメンかツール]1枚を
  *   公開し、手札に加える。そしてデッキをシャッフルする。
- *   → メインステップの起動型能力（コスト: 付いているツール1枚をアーカイブ）
+ *   → Bloomした時に誘発。「できる」なのでコスト（ツール1枚アーカイブ）は任意。
  * アーツ「ワンフォーオール」(130):
  *   このアーツで相手のホロメンをダウンさせた時、自分のデッキを1枚引く。その後、
  *   自分の推しホロメンが〈アキ・ローゼンタール〉なら、自分のホロメン全員のHP20回復。
  */
 export default {
   number: 'hBP05-027',
-  activatedAbilities: [{
+  bloomEffect: {
     name: 'ゲーム？ スポーティー？ キャンプ？！',
-    oncePerTurn: false,
-    canUse(ctx) {
-      return ctx.sourceHolomem.attachments.some((a) => a.supportType === 'ツール');
-    },
     *run(ctx) {
       const tools = ctx.sourceHolomem.attachments.filter((a) => a.supportType === 'ツール');
-      const tool = yield ctx.chooseCard({ cards: tools, title: 'コスト: アーカイブするツールを選択' });
+      if (tools.length === 0) return;
+      const tool = yield ctx.chooseCard({
+        cards: tools,
+        title: 'コスト: アーカイブするツールを選択（任意）',
+        optional: true,
+        skipLabel: 'アーカイブしない',
+      });
       if (!tool) return;
       const i = ctx.sourceHolomem.attachments.indexOf(tool);
       ctx.sourceHolomem.attachments.splice(i, 1);
@@ -38,7 +40,7 @@ export default {
       }
       ctx.shuffleDeck();
     },
-  }],
+  },
   arts: {
     'ワンフォーオール': {
       *onDownDealt(ctx) {

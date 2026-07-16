@@ -2,7 +2,8 @@
  * 虎金妃笑虎 (hBP07-090) 黄・2nd・HP210（#DEV_IS #FLOW #GLOW）
  * コラボエフェクト「ここで終わっちゃう虎じゃないんだ！」:
  *   自分のアーカイブのエール2枚を #FLOW #GLOW を持つ自分のホロメン1人に送れる。
- *   ※「送れる」=任意。送るのは別々の2枚（アーカイブにエールが1枚しか無ければ1枚だけ送れる）。
+ *   ※「送れる」=効果全体の任意（送り先選択をスキップで不使用）。使うと決めたら2枚を強制で送る
+ *     （アーカイブにエールが1枚しか無ければ可能な限り＝1枚）。枚数を自由に減らす裁量は無い。
  * アーツ「ぶち上げる気合いだ！」(80+):
  *   このホロメンのエール1枚につき、このアーツ+20。
  */
@@ -21,13 +22,14 @@ export default {
         optional: true,
       });
       if (!target) return;
-      // アーカイブのエールを最大2枚（別々の枚）まとめて選んで送る
+      // 使うと決めたら2枚送る（アーカイブに1枚しか無ければ可能な限り＝1枚）。枚数を自由に減らすことはできない
       const remaining = ctx.player.archive.filter((c) => c.kind === 'cheer');
+      const n = Math.min(2, remaining.length);
       const picked = yield ctx.chooseCards({
         cards: remaining,
-        min: 0,
-        max: 2,
-        title: 'アーカイブから送るエールを選択（最大2枚・任意）',
+        min: n,
+        max: n,
+        title: `アーカイブから送るエール${n}枚を選択`,
       });
       for (const cheer of picked) {
         ctx.removeFromArchive(cheer);

@@ -11,13 +11,19 @@ export default {
   bloomEffect: {
     name: 'わたビーーーーーーーム！！！！！！',
     *run(ctx) {
-      const target = yield ctx.chooseHolomem({
-        side: 'opp',
-        filter: (e) => e.pos.zone === 'center' || e.pos.zone === 'collab',
-        title: '特殊ダメージ30を与える相手ホロメンを選択（センターかコラボ）',
-        optional: true,
-      });
-      if (target) yield* ctx.dealSpecialDamage(target, 30);
+      // 「与える」= 強制。対象がいれば必ずどちらかに与える（センター/コラボのどちらに与えるかのみ選択）
+      const isTarget = (e) => e.pos.zone === 'center' || e.pos.zone === 'collab';
+      const candidates = ctx.holomems('opp', isTarget);
+      if (candidates.length > 0) {
+        const target = candidates.length === 1
+          ? candidates[0]
+          : yield ctx.chooseHolomem({
+            side: 'opp',
+            filter: isTarget,
+            title: '特殊ダメージ30を与える相手ホロメンを選択（センターかコラボ）',
+          });
+        if (target) yield* ctx.dealSpecialDamage(target, 30);
+      }
       // その後、相手は自身のデッキを1枚引く（条件なし）
       const opp = ctx.opponent;
       if (opp.deck.length > 0) {

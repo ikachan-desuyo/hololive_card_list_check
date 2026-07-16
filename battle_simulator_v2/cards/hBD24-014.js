@@ -13,8 +13,10 @@
  *     コスト[ホロパワー：-2]はエンジンが処理するため run には書かない。
  *
  * 保留: なし
+ * 修正（2026-07-17 監査）: 色判定を engine._hasColor / (color||'').includes に統一（多色ホロメン対応、総合ルール 2.4.3）。
+ * 修正（2026-07-17 監査）: SPスキルのデッキサーチに「加えない」を追加（非公開領域は見つからなかったことにできる、総合ルール 4.1.2.3）。
  */
-const isBlueHolomem = (card) => card && card.kind === 'holomen' && card.color === '青';
+const isBlueHolomem = (card) => card && card.kind === 'holomen' && (card.color || '').includes('青');
 
 export default {
   number: 'hBD24-014',
@@ -24,12 +26,12 @@ export default {
     canUse(engine, ownerIdx) {
       // 自分の青ホロメンが1人でもいれば使える
       const p = engine.state.players[ownerIdx];
-      return engine._stageHolomems(p).some((h) => h.stack[0].color === '青');
+      return engine._stageHolomems(p).some((h) => engine._hasColor(h, '青'));
     },
     *run(ctx) {
       const entry = yield ctx.chooseHolomem({
         side: 'self',
-        filter: (e) => e.top.color === '青',
+        filter: (e) => ctx.engine._hasColor(e.holomem, '青'),
         title: 'このターン アーツ+20する青ホロメン1人を選択',
       });
       if (!entry) return;
@@ -59,6 +61,8 @@ export default {
       const picked = yield ctx.chooseCard({
         cards: candidates,
         title: 'デッキから手札に加える青ホロメン1枚を選択',
+        optional: true,
+        skipLabel: '加えない',
       });
       if (picked) {
         ctx.removeFromDeck(picked);

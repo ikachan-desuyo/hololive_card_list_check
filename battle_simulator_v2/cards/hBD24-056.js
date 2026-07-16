@@ -19,12 +19,12 @@ export default {
     name: 'イエローエンハンス',
     canUse(engine, ownerIdx) {
       const p = engine.state.players[ownerIdx];
-      return engine._stageHolomems(p).some((h) => h.stack[0].color === '黄');
+      return engine._stageHolomems(p).some((h) => engine._hasColor(h, '黄'));
     },
     *run(ctx) {
       const entry = yield ctx.chooseHolomem({
         side: 'self',
-        filter: (e) => e.top.color === '黄',
+        filter: (e) => ctx.engine._hasColor(e.holomem, '黄'),
         title: 'このターン アーツ+20する黄ホロメンを選択',
       });
       if (!entry) return;
@@ -39,7 +39,7 @@ export default {
   spOshiSkill: {
     name: 'Birthday Gift ～Yellow～',
     *run(ctx) {
-      const holomems = ctx.deckCards((c) => c.kind === 'holomen' && c.color === '黄');
+      const holomems = ctx.deckCards((c) => c.kind === 'holomen' && (c.color || '').includes('黄'));
       if (holomems.length === 0) {
         ctx.log(`${ctx.player.name}: デッキに黄ホロメンが無い`);
         ctx.shuffleDeck();

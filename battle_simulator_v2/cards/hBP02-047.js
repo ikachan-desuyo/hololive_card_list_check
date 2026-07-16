@@ -12,10 +12,10 @@ export default {
   bloomEffect: {
     name: 'いたずらの魔法',
     *run(ctx) {
-      // 相手ステージにエールが1枚以上ある時のみ意味がある
+      // 相手ステージにエールが1枚以上あり、付け替え先（別のホロメン）が存在する時のみ意味がある
       const oppMembers = ctx.holomems('opp');
       const hasCheer = oppMembers.some((e) => e.holomem.cheers.length > 0);
-      if (!hasCheer) return;
+      if (!hasCheer || oppMembers.length < 2) return;
       const ok = yield ctx.confirm('サイコロを振りますか？（4以上で相手のエール1枚を付け替える）');
       if (!ok) return;
       const roll = (yield* ctx.rollDice());
@@ -32,8 +32,10 @@ export default {
       });
       if (!pickedCheer) return;
       const src = cheerChoices.find((c) => c.cheer === pickedCheer);
+      // 付け替え先は元のホロメン以外（「付け替える」=別のホロメンへ移す。hBP02-046 と同様）
       const dest = yield ctx.chooseHolomem({
         side: 'opp',
+        filter: (e) => e.holomem !== src.from,
         title: 'エールの付け替え先（相手のホロメン）を選択',
       });
       if (!dest) return;

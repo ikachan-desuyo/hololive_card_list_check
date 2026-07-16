@@ -431,7 +431,7 @@ export class EffectContext {
         };
         if (use) {
           me.archive.push(...me.holoPower.splice(0, oshiDef.cost));
-          if (oshiDef.sp) me.usedSpOshiSkillThisGame = true; else me.usedOshiSkillThisTurn += 1;
+          if (oshiDef.sp) eng._markSpOshiSkillUsed(me, oshiDef.title || ''); else me.usedOshiSkillThisTurn += 1;
           value = oshiDef.apply(eng, this.playerIdx, { ...info, value });
         }
       }
@@ -774,10 +774,8 @@ export class EffectContext {
     this.log(`${holomem.stack[0].name} に ${cheer.name} を送った`);
     // 「（このホロメンに）エールが付いた時」の装着カード同期トリガー（hBP03-113 等）。
     // 効果が即時・選択不要のものに限る（attachCheer はジェネレータでないため）。
-    for (const att of holomem.attachments) {
-      const fn = this.engine.registry.get(att.number)?.attached?.onCheerAttached;
-      if (fn) fn(holomem, this.engine, att);
-    }
+    // エンジン直処理の経路（エールステップ/ライフ処理）と同じヘルパーで発火する。
+    this.engine._dispatchCheerAttached(holomem);
   }
 
   /** サポートカード（ファン/マスコット等）をホロメンに付ける */
@@ -932,7 +930,7 @@ export class EffectContext {
             };
             if (use) {
               p.archive.push(...p.holoPower.splice(0, od.cost || 0));
-              if (od.sp) p.usedSpOshiSkillThisGame = true; else p.usedOshiSkillThisTurn += 1;
+              if (od.sp) this.engine._markSpOshiSkillUsed(p, od.title || ''); else p.usedOshiSkillThisTurn += 1;
               yield* od.run(new EffectContext(this.engine, this.playerIdx, { sourceCard: p.oshi, cheerArchivedInfo: info }));
             }
           }
@@ -980,9 +978,14 @@ export class EffectContext {
    */
   *dealSpecialDamage(targetEntry, amount, opts = {}) {
     let total = amount;
+    // 発生源が推しホロメンか（推しスキル等。sourceHolomem は存在しない）
+    const sourceIsOshi = !this.sourceHolomem && !!this.sourceCard && this.sourceCard === this.player.oshi;
     // 発生源ホロメンの装着カードによる特殊ダメージ修正
     if (this.sourceHolomem) {
       total += this.engine.effects.specialDamageBonus(this.sourceHolomem, targetEntry, this.playerIdx);
+    } else if (sourceIsOshi) {
+      // 推し発の特殊ダメージ+N（専用アウラ auraOshiSpecialDmgPlus。hBP05-045「推しホロメンの〈猫又おかゆ〉が与える特殊+20」等）
+      total += this.engine.effects.specialDamageBonusForOshi(targetEntry, this.playerIdx, this.sourceCard);
     }
     // 受け手の「受けるダメージ」修正（軽減/増加）。特殊ダメージにも適用される（攻撃元=発生源ホロメン）
     total = this.engine._applyDamageReceived(targetEntry.holomem, total, 'special', this.sourceHolomem || null);
@@ -1016,13 +1019,18 @@ export class EffectContext {
     targetEntry.holomem.damage += total;
     if (total > 0) this.engine._dispatchDamageReceivedForced(targetEntry.holomem); // 強制被ダメージトリガー (hBP07-108)
     // 特殊ダメージを「与えた時」のトリガー（発生源=自分側、対象=相手のホロメンの時のみ）。hBP05-028/hBP06-101 等
-    if (total > 0 && this.sourceHolomem && defIdx !== this.playerIdx) {
-      const info = { source: this.sourceHolomem, target: targetEntry.holomem, amount: total };
+    // 推しホロメン発（sourceIsOshi）でも発火する。info.source=null / info.sourceOshiCard=推しカード で発生源を判定できる。
+    if (total > 0 && (this.sourceHolomem || sourceIsOshi) && defIdx !== this.playerIdx) {
+      const info = {
+        source: this.sourceHolomem || null,
+        sourceOshiCard: sourceIsOshi ? this.sourceCard : null,
+        target: targetEntry.holomem, amount: total,
+      };
       for (const wh of eng._stageHolomems(this.player)) {
         const wt = eng.registry.get(wh.stack[0].number)?.triggers?.onSpecialDamageDealt;
         if (wt) yield* wt(new EffectContext(eng, this.playerIdx, { sourceHolomem: wh, specialDealt: info }));
       }
-      for (const att of this.sourceHolomem.attachments) {
+      for (const att of (this.sourceHolomem ? this.sourceHolomem.attachments : [])) {
         const at = eng.registry.get(att.number)?.triggers?.onSpecialDamageDealt;
         if (at) yield* at(new EffectContext(eng, this.playerIdx, { sourceHolomem: this.sourceHolomem, sourceCard: att, specialDealt: info }));
       }
@@ -1043,7 +1051,7 @@ export class EffectContext {
           };
           if (use) {
             pp.archive.push(...pp.holoPower.splice(0, od.cost || 0));
-            if (od.sp) pp.usedSpOshiSkillThisGame = true; else pp.usedOshiSkillThisTurn += 1;
+            if (od.sp) eng._markSpOshiSkillUsed(pp, od.title || ''); else pp.usedOshiSkillThisTurn += 1;
             yield* od.run(new EffectContext(eng, this.playerIdx, { sourceCard: pp.oshi, specialDealt: info }));
           }
         }

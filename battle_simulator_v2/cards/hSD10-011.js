@@ -9,6 +9,8 @@
  *  - 送り先はセンター/コラボのみ。「ホロメン1人に送る枚数は2枚まで」を上限として割り振る。
  *  - アーカイブのエールが3枚未満の場合は、ある分だけ（上限の許す範囲で）送る。
  *  - 「割り振って送る」= 1枚選ぶごとに送り先（センター or コラボ）を選択する形で実装。
+ *  - 「エール3枚を選び…送る」は可能な限り強制（アーカイブ残数と1人2枚制限の許す範囲で
+ *    必ず送る。任意に打ち切ることはできない）。
  */
 export default {
   number: 'hSD10-011',
@@ -35,11 +37,10 @@ export default {
         const dests = [center, collab].filter((h) => h && destOf(h) < 2);
         if (dests.length === 0) break;
 
+        // 「3枚を選び…送る」=強制（可能な限り送る。途中で任意にやめることはできない）
         const cheer = yield ctx.chooseCard({
           cards: cheers,
-          title: `アーカイブから送るエールを選択（残り${3 - i}枚まで）`,
-          optional: true,
-          skipLabel: 'これ以上送らない',
+          title: `アーカイブから送るエールを選択（残り${3 - i}枚）`,
         });
         if (!cheer) break;
 

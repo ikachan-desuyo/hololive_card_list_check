@@ -20,12 +20,12 @@ export default {
     canUse(engine, ownerIdx) {
       const p = engine.state.players[ownerIdx];
       // 自分の青ホロメンが1人でもいれば使える
-      return engine._stageHolomems(p).some((h) => h.stack[0] && h.stack[0].color === '青');
+      return engine._stageHolomems(p).some((h) => h.stack[0] && engine._hasColor(h, '青'));
     },
     *run(ctx) {
       const entry = yield ctx.chooseHolomem({
         side: 'self',
-        filter: (e) => e.top.color === '青',
+        filter: (e) => ctx.engine._hasColor(e.holomem, '青'),
         title: 'このターン アーツ+20する青ホロメンを選択',
       });
       if (!entry) return;
@@ -42,10 +42,10 @@ export default {
     name: 'Birthday Gift ～Blue～',
     canUse(engine, ownerIdx) {
       const p = engine.state.players[ownerIdx];
-      return p.deck.some((c) => c.kind === 'holomen' && c.color === '青');
+      return p.deck.some((c) => c.kind === 'holomen' && (c.color || '').includes('青'));
     },
     *run(ctx) {
-      const blues = ctx.deckCards((c) => c.kind === 'holomen' && c.color === '青');
+      const blues = ctx.deckCards((c) => c.kind === 'holomen' && (c.color || '').includes('青'));
       if (blues.length === 0) {
         ctx.log(`${ctx.player.name}: デッキに青ホロメンが無い`);
         ctx.shuffleDeck();

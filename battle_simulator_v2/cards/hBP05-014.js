@@ -9,7 +9,10 @@ export default {
       *run(ctx) {
         const ok = yield ctx.confirm('サイコロを振りますか？', '振る', '振らない');
         if (!ok) return;
-        if ((yield* ctx.rollDice()) % 2 === 0) ctx.draw(1);
+        const v = (yield* ctx.rollDice());
+        // 〈兎田ぺこら〉の能力でサイコロを振った（hBP03-023「カードするぺこ」の判定用共有フラグ）
+        ctx.markOncePerTurn('兎田ぺこら:diceRolled');
+        if (v % 2 === 0) ctx.draw(1);
       },
     },
   },

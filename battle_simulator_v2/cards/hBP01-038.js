@@ -12,6 +12,8 @@ export default {
         const ok = yield ctx.confirm('「こんぺこー！」: サイコロを1回振りますか？（偶数でこのアーツ+20）', '振る', '振らない');
         if (!ok) return;
         const roll = (yield* ctx.rollDice());
+        // 〈兎田ぺこら〉の能力でサイコロを振った（hBP03-023「カードするぺこ」の判定用共有フラグ）
+        ctx.markOncePerTurn('兎田ぺこら:diceRolled');
         if (roll % 2 === 0) {
           ctx.addArtBonus(20, `サイコロ${roll}（偶数）`);
         } else {

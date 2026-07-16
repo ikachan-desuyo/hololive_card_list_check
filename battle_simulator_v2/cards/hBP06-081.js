@@ -34,8 +34,8 @@ export default {
       });
       if (!cheer) return;
       yield* ctx.archiveCheer(holder.holomem, cheer);
-      // 効果: デッキから〈大空スバル〉1枚を公開し手札に加える
-      const targets = ctx.deckCards((c) => c.name === '大空スバル');
+      // 効果: デッキから〈大空スバル〉1枚を公開し手札に加える（ラムダック等の別名も候補に含める）
+      const targets = ctx.deckCards((c) => ctx.nameIs(c, '大空スバル'));
       if (targets.length > 0) {
         const picked = yield ctx.chooseCard({
           cards: targets,

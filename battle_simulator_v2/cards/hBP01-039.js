@@ -17,6 +17,8 @@ export default {
       const ok = yield ctx.confirm('サイコロを1回振りますか？（偶数でエールデッキの上から1枚を自分のホロメンに送る）');
       if (!ok) return;
       const value = (yield* ctx.rollDice());
+      // 〈兎田ぺこら〉の能力でサイコロを振った（hBP03-023「カードするぺこ」の判定用共有フラグ）
+      ctx.markOncePerTurn('兎田ぺこら:diceRolled');
       if (value % 2 !== 0) return; // 偶数の時のみ
       if (ctx.player.cheerDeck.length === 0) return;
       const target = yield ctx.chooseHolomem({

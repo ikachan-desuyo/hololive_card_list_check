@@ -22,11 +22,11 @@ export default {
         });
         if (!entry) continue;
         chosen.push(entry.holomem);
-        // アーカイブのエールを1枚送る
+        // アーカイブのエールを1枚送る（「送る」＝強制。アーカイブは公開領域なのでエールがあれば必ず送る）
         const cheers = ctx.player.archive.filter((c) => c.kind === 'cheer');
         if (cheers.length > 0) {
           const picked = yield ctx.chooseCard({
-            cards: cheers, title: `${name} に送るエールを選択（アーカイブ・任意）`, optional: true, skipLabel: '送らない',
+            cards: cheers, title: `${name} に送るエールを選択（アーカイブ）`,
           });
           if (picked) { ctx.removeFromArchive(picked); ctx.attachCheer(picked, entry.holomem); }
         }

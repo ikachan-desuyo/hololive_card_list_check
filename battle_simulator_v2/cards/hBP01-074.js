@@ -32,13 +32,12 @@ export default {
       ctx.removeFromArchive(picked);
       ctx.addToHand(picked, { reveal: true });
 
-      // 戻したカードが#ENを持つ時、相手のコラボホロメンに特殊ダメージ20
+      // 戻したカードが#ENを持つ時、相手のコラボホロメンに特殊ダメージ20（「与える」= 強制）
       if (ctx.hasTag(picked, 'EN')) {
         const target = yield ctx.chooseHolomem({
           side: 'opp',
           filter: (e) => e.pos.zone === 'collab',
           title: '特殊ダメージ20を与える相手のコラボホロメンを選択',
-          optional: true,
         });
         if (target) yield* ctx.dealSpecialDamage(target, 20);
       }

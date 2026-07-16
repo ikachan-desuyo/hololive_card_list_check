@@ -13,6 +13,7 @@
  *      その後デッキをシャッフルする。コスト[ホロパワー：-2]はエンジンが処理する。
  *
  * 保留: なし（両スキルとも既存プリミティブで実装可能）。
+ * 修正（2026-07-17 監査）: SPスキルのデッキサーチに「加えない」を追加（非公開領域は見つからなかったことにできる、総合ルール 4.1.2.3）。
  */
 export default {
   number: 'hBD24-039',
@@ -22,12 +23,12 @@ export default {
     canUse(engine, ownerIdx) {
       const p = engine.state.players[ownerIdx];
       // 自分の黄ホロメンが1人でもいれば使える
-      return engine._stageHolomems(p).some((h) => h.stack[0] && h.stack[0].color === '黄');
+      return engine._stageHolomems(p).some((h) => h.stack[0] && (h.stack[0].color || '').includes('黄'));
     },
     *run(ctx) {
       const entry = yield ctx.chooseHolomem({
         side: 'self',
-        filter: (e) => e.top.color === '黄',
+        filter: (e) => (e.top.color || '').includes('黄'),
         title: 'このターン アーツ+20する黄ホロメンを選択',
       });
       if (!entry) return;
@@ -44,10 +45,10 @@ export default {
     name: 'Birthday Gift ～Yellow～',
     canUse(engine, ownerIdx) {
       const p = engine.state.players[ownerIdx];
-      return p.deck.some((c) => c.kind === 'holomen' && c.color === '黄');
+      return p.deck.some((c) => c.kind === 'holomen' && (c.color || '').includes('黄'));
     },
     *run(ctx) {
-      const yellows = ctx.deckCards((c) => c.kind === 'holomen' && c.color === '黄');
+      const yellows = ctx.deckCards((c) => c.kind === 'holomen' && (c.color || '').includes('黄'));
       if (yellows.length === 0) {
         ctx.log(`${ctx.player.name}: デッキに黄ホロメンが無い`);
         ctx.shuffleDeck();
@@ -56,6 +57,8 @@ export default {
       const picked = yield ctx.chooseCard({
         cards: yellows,
         title: '手札に加える黄ホロメンを選択',
+        optional: true,
+        skipLabel: '加えない',
       });
       if (picked) {
         ctx.removeFromDeck(picked);

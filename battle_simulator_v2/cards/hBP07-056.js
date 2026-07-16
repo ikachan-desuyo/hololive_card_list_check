@@ -6,6 +6,7 @@
  *   このホロメンに重なっているホロメンを使ってBloomできる。
  *   → triggers.onPerformanceStepStart で実装。自分のパフォーマンス開始時、センターのこのオーロの
  *      重なっているホロメン（stack[1..]）1枚を取り出し、別の〈オーロ・クロニー〉にBloomさせる。
+ *      「できる」= 任意なので、候補が一意でも必ず選択（スキップ可）を挟む。
  *      通常Bloomなので _canBloomIgnoreName で判定する（このターンに出た/Bloomしたホロメンは対象外）。
  *      ブルームエフェクトも誘発する。
  *
@@ -33,15 +34,18 @@ export default {
         && bloomCards.some((c) => ctx.engine._canBloomIgnoreName(e.holomem, c));
       const valid = ctx.holomems('self', matches);
       if (valid.length === 0) return;
-      const entry = valid.length === 1
-        ? valid[0]
-        : yield ctx.chooseHolomem({ side: 'self', filter: matches, title: 'Bloomさせる別の〈オーロ・クロニー〉を選択', optional: true });
+      // 「Bloomできる」= 任意。候補が一意でも必ずプレイヤーの選択（スキップ可）を挟む
+      const entry = yield ctx.chooseHolomem({
+        side: 'self', filter: matches,
+        title: 'Bloomさせる別の〈オーロ・クロニー〉を選択（任意）', optional: true,
+      });
       if (!entry) return;
       const target = entry.holomem;
       const usable = bloomCards.filter((c) => ctx.engine._canBloomIgnoreName(target, c));
-      const card = usable.length === 1
-        ? usable[0]
-        : yield ctx.chooseCard({ cards: usable, title: '重なっているホロメンから使うカードを選択', optional: true });
+      const card = yield ctx.chooseCard({
+        cards: usable, title: '重なっているホロメンから使うカードを選択（任意）',
+        optional: true, skipLabel: 'Bloomしない',
+      });
       if (!card) return;
       const i = self.stack.indexOf(card);
       if (i === -1) return;

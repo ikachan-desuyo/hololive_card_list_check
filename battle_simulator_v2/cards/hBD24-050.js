@@ -15,6 +15,7 @@
  *     ※コスト[ホロパワー：-2]・[ゲームに1回]制限はエンジンが処理するため run には書かない。
  *
  * 保留: なし（全効果実装済み）。
+ * 修正（2026-07-17 監査）: SPスキルのデッキサーチに「加えない」を追加（非公開領域は見つからなかったことにできる、総合ルール 4.1.2.3）。
  */
 export default {
   number: 'hBD24-050',
@@ -27,7 +28,7 @@ export default {
       for (const pos of engine._stagePositions(p)) {
         const h = engine._holomemAt(p, pos);
         const top = h && h.stack[0];
-        if (top && top.color === '黄') return true;
+        if (top && (top.color || '').includes('黄')) return true;
       }
       return false;
     },
@@ -35,7 +36,7 @@ export default {
       // 自分の黄ホロメン1人を選ぶ
       const entry = yield ctx.chooseHolomem({
         side: 'self',
-        filter: (e) => e.top && e.top.color === '黄',
+        filter: (e) => e.top && (e.top.color || '').includes('黄'),
         title: 'アーツ+20する黄ホロメンを選択',
       });
       if (!entry) return;
@@ -55,10 +56,10 @@ export default {
     canUse(engine, ownerIdx) {
       // デッキに黄ホロメンが1枚以上ある時のみ意味がある
       const p = engine.state.players[ownerIdx];
-      return p.deck.some((c) => c.kind === 'holomen' && c.color === '黄');
+      return p.deck.some((c) => c.kind === 'holomen' && (c.color || '').includes('黄'));
     },
     *run(ctx) {
-      const cand = ctx.deckCards((c) => c.kind === 'holomen' && c.color === '黄');
+      const cand = ctx.deckCards((c) => c.kind === 'holomen' && (c.color || '').includes('黄'));
       if (cand.length === 0) {
         ctx.shuffleDeck();
         return;
@@ -66,8 +67,10 @@ export default {
       const picked = yield ctx.chooseCard({
         cards: cand,
         title: '手札に加える黄ホロメンを選択',
+        optional: true,
+        skipLabel: '加えない',
       });
-      // 「公開し、手札に加える」=必須。候補があるため通常 picked は非null
+      // 非公開領域のサーチのため「加えない」も選べる（総合ルール 4.1.2.3）。選ばなければシャッフルのみ
       if (picked) {
         ctx.removeFromDeck(picked);
         ctx.flashReveal(picked);

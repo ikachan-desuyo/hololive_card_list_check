@@ -16,13 +16,12 @@ export default {
         ctx.player.archive.push(cheer);
         ctx.log(`エールデッキの上から ${cheer.name} をアーカイブ`);
       }
-      const radens = ctx.player.archive.filter((c) => c.kind === 'holomen' && c.name === '儒烏風亭らでん');
+      // 「手札に戻す」＝強制（アーカイブは公開領域なので候補があれば必ず戻す）
+      const radens = ctx.player.archive.filter((c) => c.kind === 'holomen' && ctx.nameIs(c, '儒烏風亭らでん'));
       if (radens.length === 0) return;
       const picked = yield ctx.chooseCard({
         cards: radens,
-        title: '手札に戻す〈儒烏風亭らでん〉を選択（任意）',
-        optional: true,
-        skipLabel: '戻さない',
+        title: '手札に戻す〈儒烏風亭らでん〉を選択',
       });
       if (picked) {
         ctx.removeFromArchive(picked);

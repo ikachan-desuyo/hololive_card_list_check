@@ -11,7 +11,8 @@
  * アーツ「💥¡¡SSꓵHƆSꓶƎԀԀOꓷ💥」(100):
  *   このゲーム中に、自分のSP推しスキル「🎲ƎNOZ N∩Ⅎ ƎH⊥ O⊥ ƎWOϽ˥ƎM🎲」を使っていたなら、
  *   相手のセンターホロメンかコラボホロメンに特殊ダメージ100を与える。
- *   → SP推しスキルは1プレイヤーにつき1種なので usedSpOshiSkillThisGame で判定。
+ *   → 指定スキルは推し〈ハコス・ベールズ〉(hBP06-005) のSP。spOshiSkillUsedInfo.oshiNumber で
+ *     どの推しのSPスキルかまで判定する（別の推しのSPスキルでは成立しない）。
  */
 export default {
   number: 'hBP06-045',
@@ -37,8 +38,9 @@ export default {
     },
     '💥¡¡SSꓵHƆSꓶƎԀԀOꓷ💥': {
       *run(ctx) {
-        // このゲーム中にSP推しスキルを使っていたなら特殊ダメージ100
-        if (!ctx.player.usedSpOshiSkillThisGame) return;
+        // SP推しスキル「🎲ƎNOZ N∩Ⅎ ƎH⊥ O⊥ ƎWOϽ˥ƎM🎲」（推し hBP06-005）をこのゲーム中に使っていたなら特殊ダメージ100
+        const info = ctx.player.spOshiSkillUsedInfo;
+        if (!info || info.oshiNumber !== 'hBP06-005') return;
         const target = yield ctx.chooseHolomem({
           side: 'opp',
           filter: (e) => e.pos.zone === 'center' || e.pos.zone === 'collab',

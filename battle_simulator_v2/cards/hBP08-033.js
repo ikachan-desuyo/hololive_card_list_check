@@ -4,9 +4,10 @@
  * [コラボエフェクト] 監視者の眼差し:
  *   自分のエールデッキから、エール1枚を自分の#IDを持つホロメンに送る。
  *   そしてエールデッキをシャッフルする。
- *   → 「公開して選ぶ」記述が無いので、エールデッキの上から1枚を送る（非公開デッキから任意の1枚は選べない）。
- *     送り先は #ID を持つ自分のホロメン1人（プレイヤー選択）。送った後にエールデッキをシャッフル。
- *     送り先が居ない／エールデッキが空なら何もしない（強制効果だが対象/エールが無ければ不発）。
+ *   → 「エールデッキから…そしてシャッフルする」はデッキ内から任意の1枚を選ぶサーチ（hBP02-023 と同型）。
+ *     非公開領域のサーチなので「見つからなかったことにする」を選べる（総合ルール 4.1.2.3 → optional）。
+ *     送り先は #ID を持つ自分のホロメン1人（プレイヤー選択）。最後にエールデッキをシャッフル。
+ *     送り先が居ない／エールデッキが空なら何もしない。
  *
  * [アーツ] ノックアウト・ツイスト (140):
  *   自分のアーカイブのエール1～2枚を自分の〈パヴォリア・レイネ〉1人に送る。
@@ -34,13 +35,26 @@ export default {
         ctx.log('#IDを持つホロメンがいない');
         return;
       }
-      const dest = yield ctx.chooseHolomem({
-        side: 'self',
-        filter: (e) => ctx.hasTag(e.top, 'ID'),
-        title: 'エールデッキから送る先の#IDホロメンを選択',
+      // エールデッキ内から送るエール1枚を選ぶ（非公開領域のサーチ＝見つからなかったことにできる）
+      const picked = yield ctx.chooseCard({
+        cards: ctx.player.cheerDeck,
+        title: 'エールデッキから送るエールを選択',
+        optional: true,
+        skipLabel: '見つからなかったことにする',
       });
-      if (!dest) return;
-      ctx.sendCheerFromCheerDeckTop(dest.holomem);
+      if (picked) {
+        const dest = yield ctx.chooseHolomem({
+          side: 'self',
+          filter: (e) => ctx.hasTag(e.top, 'ID'),
+          title: 'エールを送る#IDホロメンを選択',
+        });
+        if (dest) {
+          ctx.removeFromCheerDeck(picked);
+          ctx.log(`${ctx.player.name}: エールデッキから ${picked.name} を公開`);
+          ctx.flashReveal(picked);
+          ctx.attachCheer(picked, dest.holomem);
+        }
+      }
       ctx.shuffleCheerDeck();
     },
   },

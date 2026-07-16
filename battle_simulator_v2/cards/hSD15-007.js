@@ -3,7 +3,8 @@
  * コラボエフェクト「旅の前日」:
  *   自分のデッキの上から1枚をアーカイブする。
  *   その後、自分のアーカイブのDebutホロメン1枚をステージに出せる（任意・「出せる」）。
- *   → デッキ先頭をアーカイブへ移動 → アーカイブのDebutホロメン候補から1枚を選び putToBack。
+ *   → デッキ先頭をアーカイブへ移動 → アーカイブのDebutホロメン候補から1枚を選び
+ *     putToBackWithTrigger（効果でステージに出すため「ステージに出た時」onEnter を誘発 Q575）。
  *     アーカイブしたばかりのカードがDebutホロメンなら、それも候補に含まれる。
  *     ステージ上限(6)に空きがなければ出せない。
  * アーツ「この博物館おもしろそう！」(30):
@@ -35,7 +36,12 @@ export default {
       });
       if (!picked) return;
       ctx.removeFromArchive(picked);
-      ctx.putToBack(picked);
+      // 効果でステージに出す → onEnter（「ステージに出た時」）を誘発する (Q575)
+      const placed = yield* ctx.putToBackWithTrigger(picked);
+      if (!placed) {
+        // 出せなかった場合はアーカイブに戻す（どの領域にも属さない瞬間を作らない）
+        ctx.player.archive.push(picked);
+      }
     },
   },
 };

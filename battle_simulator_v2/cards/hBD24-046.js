@@ -24,12 +24,12 @@ export default {
     canUse(engine, ownerIdx) {
       const p = engine.state.players[ownerIdx];
       // 自分のステージに紫ホロメンがいること
-      return engine._stageHolomems(p).some((h) => h.stack[0]?.color === '紫');
+      return engine._stageHolomems(p).some((h) => engine._hasColor(h, '紫'));
     },
     *run(ctx) {
       const entry = yield ctx.chooseHolomem({
         side: 'self',
-        filter: (e) => e.top.color === '紫',
+        filter: (e) => (e.top.color || '').includes('紫'),
         title: 'アーツ+20する紫ホロメンを選択',
       });
       if (!entry) return;
@@ -49,10 +49,10 @@ export default {
     canUse(engine, ownerIdx) {
       const p = engine.state.players[ownerIdx];
       // デッキに紫ホロメンが1枚以上あること
-      return p.deck.some((c) => c.kind === 'holomen' && c.color === '紫');
+      return p.deck.some((c) => c.kind === 'holomen' && (c.color || '').includes('紫'));
     },
     *run(ctx) {
-      const cand = ctx.deckCards((c) => c.kind === 'holomen' && c.color === '紫');
+      const cand = ctx.deckCards((c) => c.kind === 'holomen' && (c.color || '').includes('紫'));
       const picked = yield ctx.chooseCard({
         cards: cand,
         title: 'デッキから紫ホロメン1枚を公開して手札に加える',

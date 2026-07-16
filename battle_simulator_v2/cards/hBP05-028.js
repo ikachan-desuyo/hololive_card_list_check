@@ -7,7 +7,7 @@
  *   〈獅白ぼたん〉が相手のホロメンに30以上の特殊ダメージを与えた時、自分のデッキを1枚引く。
  *   → triggers.onSpecialDamageDealt で実装。engine が dealSpecialDamage 時に自分のステージへ発火する。
  *     発生源が〈獅白ぼたん〉で30以上、このぼたんがセンターなら[ターンに1回]ドロー1。
- *     （推しホロメンの〈獅白ぼたん〉が与えた場合は発生源が推し＝レア経路のため、ステージ発生源を主対象とする）
+ *     推しホロメンの〈獅白ぼたん〉発（推しスキル「狙撃」hBP03-002）も info.sourceOshiCard 経由で発火する（2026-07-17 監査対応）
  */
 export default {
   number: 'hBP05-028',
@@ -18,7 +18,11 @@ export default {
       if (ctx.engine._zoneOf(self) !== 'center') return; // [センター限定]
       const info = ctx.specialDealt;
       if (!info || info.amount < 30) return;              // 30以上の特殊ダメージ
-      if (info.source?.stack[0].name !== '獅白ぼたん') return; // ステージの〈獅白ぼたん〉が与えた
+      // 発生源が〈獅白ぼたん〉: ステージのホロメン、または推しホロメン（推しスキル「狙撃」hBP03-002 等）
+      const fromBotan = info.source
+        ? ctx.engine._nameIs(info.source.stack[0], '獅白ぼたん')
+        : (info.sourceOshiCard ? ctx.engine._nameIs(info.sourceOshiCard, '獅白ぼたん') : false);
+      if (!fromBotan) return;
       if (ctx.oncePerTurnUsed('hBP05-028:draw')) return;  // [ターンに1回]
       ctx.markOncePerTurn('hBP05-028:draw');
       ctx.draw(1);

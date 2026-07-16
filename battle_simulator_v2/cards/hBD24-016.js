@@ -14,6 +14,7 @@
  *     コスト[ホロパワー：-2]と[ゲームに1回]制限はエンジンが処理するため run には書かない。
  *
  * 保留: なし
+ * 修正（2026-07-17 監査）: 色判定を engine._hasColor / (color||'').includes に統一（多色ホロメン対応、総合ルール 2.4.3）。
  */
 export default {
   number: 'hBD24-016',
@@ -23,12 +24,12 @@ export default {
     canUse(engine, ownerIdx) {
       const p = engine.state.players[ownerIdx];
       // 自分のステージに青ホロメンがいること
-      return engine._stageHolomems(p).some((h) => h.stack[0]?.color === '青');
+      return engine._stageHolomems(p).some((h) => engine._hasColor(h, '青'));
     },
     *run(ctx) {
       const entry = yield ctx.chooseHolomem({
         side: 'self',
-        filter: (e) => e.top.color === '青',
+        filter: (e) => ctx.engine._hasColor(e.holomem, '青'),
         title: 'アーツ+20する青ホロメンを選択',
       });
       if (!entry) return;
@@ -48,10 +49,10 @@ export default {
     canUse(engine, ownerIdx) {
       const p = engine.state.players[ownerIdx];
       // デッキに青ホロメンがいること
-      return p.deck.some((c) => c.kind === 'holomen' && c.color === '青');
+      return p.deck.some((c) => c.kind === 'holomen' && (c.color || '').includes('青'));
     },
     *run(ctx) {
-      const cand = ctx.deckCards((c) => c.kind === 'holomen' && c.color === '青');
+      const cand = ctx.deckCards((c) => c.kind === 'holomen' && (c.color || '').includes('青'));
       const picked = yield ctx.chooseCard({
         cards: cand,
         title: 'デッキから青ホロメン1枚を公開して手札に加える',

@@ -3,7 +3,7 @@
  * ブルームエフェクト「ちょっこーん！」:
  *   自分のアーカイブのLIMITED以外のイベント1枚を手札に戻せる。（「戻せる」=任意・対象0可）
  * アーツ「大好き！ちゅっ♡」(30):
- *   自分のバックホロメン1人のHP20回復。
+ *   自分のバックホロメン1人のHP20回復。（「できる」の記載なし=強制。バックがいれば必ず1人回復）
  */
 export default {
   number: 'hSD04-007',
@@ -28,11 +28,12 @@ export default {
   arts: {
     '大好き！ちゅっ♡': {
       *run(ctx) {
+        // 強制効果: バックホロメンがいれば必ず1人選んで回復する
+        if (ctx.holomems('self', (e) => e.pos.zone === 'back').length === 0) return;
         const target = yield ctx.chooseHolomem({
           side: 'self',
           filter: (e) => e.pos.zone === 'back',
           title: 'HP20回復するバックホロメンを選択',
-          optional: true,
         });
         if (target) ctx.heal(target.holomem, 20);
       },

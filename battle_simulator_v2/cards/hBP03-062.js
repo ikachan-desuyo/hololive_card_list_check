@@ -3,23 +3,21 @@
  * キーワード/コラボエフェクト「ころねダイナー」:
  *   このホロメンのエール1枚をアーカイブできる：
  *   自分のデッキから、#ゲーマーズを持つDebutホロメン1枚を公開し、手札に加える。そしてデッキをシャッフルする。
- *   → メインステップの起動型能力（コスト: 自分のエール1枚アーカイブ）
+ *   → コラボした時に1回誘発（13.2）。「アーカイブできる」= 任意コスト（選択キャンセルでゲート）。
  * アーツ「ご注文はこれだでな」(30): テキスト効果なし。
  */
 export default {
   number: 'hBP03-062',
-  activatedAbilities: [{
+  collabEffect: {
     name: 'ころねダイナー',
-    oncePerTurn: false, // ターン制限の記載なし
-    canUse(ctx) {
-      if (ctx.sourceHolomem.cheers.length < 1) return false;
-      // デッキに #ゲーマーズ を持つ Debut ホロメンがいる時に意味がある
-      return ctx.deckCards((c) => c.kind === 'holomen' && c.bloomLevel === 'Debut' && ctx.hasTag(c, 'ゲーマーズ')).length > 0;
-    },
     *run(ctx) {
+      if (ctx.sourceHolomem.cheers.length < 1) return;
+      // 「アーカイブできる」= 任意コスト（選ばなければ効果なし）
       const cheer = yield ctx.chooseCard({
         cards: [...ctx.sourceHolomem.cheers],
         title: 'コスト: アーカイブするエールを選択',
+        optional: true,
+        skipLabel: 'アーカイブしない',
       });
       if (!cheer) return;
       yield* ctx.archiveCheer(ctx.sourceHolomem, cheer);
@@ -36,5 +34,5 @@ export default {
       }
       ctx.shuffleDeck();
     },
-  }],
+  },
 };

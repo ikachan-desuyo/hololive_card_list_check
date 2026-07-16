@@ -19,11 +19,11 @@ export default {
         return;
       }
       // 奇数: 相手のバックホロメンのうちHPが40以上減っている1人をダウン（ライフは減らない）
+      // 「ダウンさせる」= 強制（該当バックがいれば必ず選ぶ。いなければ何もしない）
       const target = yield ctx.chooseHolomem({
         side: 'opp',
         filter: (e) => e.pos.zone === 'back' && e.holomem.damage >= 40,
         title: 'ダウンさせる相手のバックホロメンを選択（HPが40以上減っているもの）',
-        optional: true,
       });
       if (!target) return;
       ctx.forceDown(target, { noLifeOnDown: true });

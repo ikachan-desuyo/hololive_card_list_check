@@ -11,25 +11,21 @@
  *
  * ツールは、自分のホロメン1人につき1枚だけ付けられる。
  *   → 既定のツール制限（engine._canAttachSupport がツールの重複付けを禁止）に従う。
- *      attachRule では付け先を〈桃鈴ねね〉に限定するのみ。
+ *
+ * ※装着先の制限は無い（テキストは「付いている〈桃鈴ねね〉の～」と効果の適用対象を限定しているだけ）。
+ *   〈桃鈴ねね〉以外に付けた場合は各修正が発動しないのみ（hBP07-104 Thorn / hBP07-101 ASMRマイクと同型）。
  */
 export default {
   number: 'hBP07-103',
-  attachRule: {
-    canAttach(holomem) {
-      return holomem.stack[0].name === '桃鈴ねね';
-    },
-    // unlimited は指定しない → 既定のツール重複禁止（1人につき1枚）が適用される
-  },
   attached: {
     // 付いている〈桃鈴ねね〉のアーツ+20（常時修正）
-    artsPlus(holomem, _engine) {
-      return holomem.stack[0].name === '桃鈴ねね' ? 20 : 0;
+    artsPlus(holomem, engine) {
+      return engine._nameIs(holomem.stack[0], '桃鈴ねね') ? 20 : 0;
     },
     // ◆1st以上の〈桃鈴ねね〉に付いていたら: このホロメンのアーツダメージは軽減されない
-    artsDamageNotReduced(holomem) {
+    artsDamageNotReduced(holomem, engine) {
       const top = holomem.stack[0];
-      return top.name === '桃鈴ねね' && (top.bloomLevel === '1st' || top.bloomLevel === '2nd');
+      return engine._nameIs(top, '桃鈴ねね') && (top.bloomLevel === '1st' || top.bloomLevel === '2nd');
     },
   },
 };

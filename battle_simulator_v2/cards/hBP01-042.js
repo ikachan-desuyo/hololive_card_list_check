@@ -13,6 +13,8 @@ export default {
         const ok = yield ctx.confirm('サイコロを1回振りますか？（出た目×10このアーツ+）', '振る', '振らない');
         if (!ok) return;
         const v = (yield* ctx.rollDice());
+        // 〈兎田ぺこら〉の能力でサイコロを振った（hBP03-023「カードするぺこ」の判定用共有フラグ）
+        ctx.markOncePerTurn('兎田ぺこら:diceRolled');
         ctx.addArtBonus(v * 10, `サイコロの目${v}×10`);
       },
     },

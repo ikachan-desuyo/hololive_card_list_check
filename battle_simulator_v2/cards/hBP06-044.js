@@ -3,8 +3,8 @@
  * アーツ「ホイールオブフォーチュン」(30+):
  *   このゲーム中に、自分のSP推しスキル「🎲ƎNOZ N∩Ⅎ ƎH⊥ O⊥ ƎWOϽ˥ƎM🎲」を使っていたなら、
  *   サイコロを1回振る。出た目の数1につき、このアーツ+10。
- *   → エンジンが追跡している ctx.player.usedSpOshiSkillThisGame を条件に使用。
- *     （SP推しスキルは各推しに1つなので「自分のSP推しスキルを使っていたなら」と一致）
+ *   → 指定スキルは推し〈ハコス・ベールズ〉(hBP06-005) のSP。ctx.player.spOshiSkillUsedInfo の
+ *     oshiNumber が hBP06-005 であることを条件にする（別の推しのSPスキルでは成立しない）。
  * アーツ「ありがチュー！」(70): 効果テキストなし（素のダメージのみ）→ 実装不要。
  */
 export default {
@@ -12,7 +12,9 @@ export default {
   arts: {
     'ホイールオブフォーチュン': {
       *run(ctx) {
-        if (!ctx.player.usedSpOshiSkillThisGame) return; // SP推しスキル未使用なら何もしない
+        // SP推しスキル「🎲ƎNOZ N∩Ⅎ ƎH⊥ O⊥ ƎWOϽ˥ƎM🎲」（推し hBP06-005）をこのゲーム中に使っていること
+        const info = ctx.player.spOshiSkillUsedInfo;
+        if (!info || info.oshiNumber !== 'hBP06-005') return;
         const value = (yield* ctx.rollDice());
         ctx.addArtBonus(value * 10, `サイコロの目${value}×10`);
       },

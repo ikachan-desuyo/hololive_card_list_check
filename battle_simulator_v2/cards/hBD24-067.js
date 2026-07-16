@@ -18,12 +18,12 @@ export default {
     canUse(engine, ownerIdx) {
       // 自分の黄ホロメンが1人以上いる時のみ意味がある
       const p = engine.state.players[ownerIdx];
-      return engine._stageHolomems(p).some((h) => h.stack[0].color === '黄');
+      return engine._stageHolomems(p).some((h) => engine._hasColor(h, '黄'));
     },
     *run(ctx) {
       const target = yield ctx.chooseHolomem({
         side: 'self',
-        filter: (e) => e.top.color === '黄',
+        filter: (e) => ctx.engine._hasColor(e.holomem, '黄'),
         title: 'アーツ+20する自分の黄ホロメンを選択',
       });
       if (!target) return;
@@ -39,10 +39,10 @@ export default {
     name: 'Birthday Gift ～Yellow～',
     canUse(engine, ownerIdx) {
       const p = engine.state.players[ownerIdx];
-      return p.deck.some((c) => c.kind === 'holomen' && c.color === '黄');
+      return p.deck.some((c) => c.kind === 'holomen' && (c.color || '').includes('黄'));
     },
     *run(ctx) {
-      const cand = ctx.deckCards((c) => c.kind === 'holomen' && c.color === '黄');
+      const cand = ctx.deckCards((c) => c.kind === 'holomen' && (c.color || '').includes('黄'));
       if (cand.length === 0) {
         ctx.log(`${ctx.player.name}: デッキに黄ホロメンが無い`);
         ctx.shuffleDeck();

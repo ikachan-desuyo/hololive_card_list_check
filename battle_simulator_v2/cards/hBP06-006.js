@@ -12,7 +12,9 @@
  *   お互いのステージのエールが合計6枚以上あるなら、自分のエールデッキから、エール1～3枚を公開し、
  *   自分の#ID1期生を持つホロメンに割り振って送る。そしてエールデッキをシャッフルする。
  *   → メインステップの能動SP推しスキルとして実装。コストはエンジンが処理するので run では支払わない。
- *     「公開」はエールデッキの上から1枚ずつ公開（任意の山札からの選択ではない）→ sendCheerFromCheerDeckTop を使用。
+ *     「エールデッキから、～を公開し…そしてエールデッキをシャッフルする」はエールデッキ内から選ぶサーチ
+ *     （hBP06-049/059 と同型）。送るエール（色）はプレイヤーが1枚ずつ選んで公開し、#ID1期生に割り振る。
+ *     非公開領域のサーチなので「見つからなかったことにする」も可（総合ルール 4.1.2.3）。
  */
 export default {
   number: 'hBP06-006',
@@ -52,22 +54,31 @@ export default {
       return me.cheerDeck.length > 0;
     },
     *run(ctx) {
-      // 最大送付枚数 = min(3, エールデッキ残数)
-      const maxSend = Math.min(3, ctx.player.cheerDeck.length);
+      // エールデッキ内から送るエールを1枚ずつ選んで公開し、#ID1期生に割り振る（最大3枚）
+      const maxSend = 3;
       for (let i = 0; i < maxSend; i++) {
-        // 送り先候補（#ID1期生）
+        if (ctx.player.cheerDeck.length === 0) break;
+        // 送り先候補（#ID1期生）がいなければ中断
         const targets = ctx.holomems('self', (e) => ctx.hasTag(e.top, 'ID1期生'));
         if (targets.length === 0) break;
-        if (ctx.player.cheerDeck.length === 0) break;
-        // 「1～3枚」なので2枚目以降は中断可能（optional）。1枚目は最低1枚送るため必須。
+        // 送るエールをエールデッキ内から選ぶ（非公開領域のサーチ: 見つからなかったことにできる）
+        const cheer = yield ctx.chooseCard({
+          cards: [...ctx.player.cheerDeck],
+          title: `公開して送るエールを選択（${i + 1}/${maxSend}枚目・エールデッキ）`,
+          optional: true,
+          skipLabel: i === 0 ? '見つからなかったことにする' : 'これ以上送らない',
+        });
+        if (!cheer) break;
         const target = yield ctx.chooseHolomem({
           side: 'self',
           filter: (e) => ctx.hasTag(e.top, 'ID1期生'),
-          title: `エールデッキの上から公開して送る #ID1期生 ホロメンを選択（${i + 1}/${maxSend}）`,
-          optional: i > 0,
+          title: `${cheer.name} を送る #ID1期生 ホロメンを選択`,
         });
-        if (!target) break; // 中断（0～2枚で止めることも可能）
-        ctx.sendCheerFromCheerDeckTop(target.holomem);
+        if (!target) break;
+        ctx.removeFromCheerDeck(cheer);
+        ctx.log(`${ctx.player.name}: エールデッキから ${cheer.name} を公開`);
+        ctx.flashReveal(cheer);
+        ctx.attachCheer(cheer, target.holomem);
       }
       ctx.shuffleCheerDeck();
     },

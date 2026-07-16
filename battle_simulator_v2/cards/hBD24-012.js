@@ -14,6 +14,8 @@
  *     コスト[ホロパワー：-2]と[ゲームに1回]制限はエンジンが処理するため run には書かない。
  *
  * 保留点: なし（両スキルとも実装済み）。
+ * 修正（2026-07-17 監査）: 色判定を engine._hasColor / (color||'').includes に統一（多色ホロメン対応、総合ルール 2.4.3）。
+ * 修正（2026-07-17 監査）: SPスキルのデッキサーチに「加えない」を追加（非公開領域は見つからなかったことにできる、総合ルール 4.1.2.3）。
  */
 export default {
   number: 'hBD24-012',
@@ -25,7 +27,7 @@ export default {
       const p = engine.state.players[ownerIdx];
       for (const pos of engine._stagePositions(p)) {
         const h = engine._holomemAt(p, pos);
-        if (h && h.stack[0] && h.stack[0].color === '白') return true;
+        if (h && h.stack[0] && engine._hasColor(h, '白')) return true;
       }
       return false;
     },
@@ -33,7 +35,7 @@ export default {
       // 自分の白ホロメン1人を選ぶ
       const entry = yield ctx.chooseHolomem({
         side: 'self',
-        filter: (e) => e.top && e.top.color === '白',
+        filter: (e) => ctx.engine._hasColor(e.holomem, '白'),
         title: 'アーツ+20する白ホロメンを選択',
       });
       if (!entry) return;
@@ -54,10 +56,10 @@ export default {
     canUse(engine, ownerIdx) {
       const p = engine.state.players[ownerIdx];
       // デッキに白ホロメンが居ること
-      return p.deck.some((c) => c.kind === 'holomen' && c.color === '白');
+      return p.deck.some((c) => c.kind === 'holomen' && (c.color || '').includes('白'));
     },
     *run(ctx) {
-      const cand = ctx.deckCards((c) => c.kind === 'holomen' && c.color === '白');
+      const cand = ctx.deckCards((c) => c.kind === 'holomen' && (c.color || '').includes('白'));
       if (cand.length === 0) {
         ctx.shuffleDeck();
         return;
@@ -65,6 +67,8 @@ export default {
       const picked = yield ctx.chooseCard({
         cards: cand,
         title: '手札に加える白ホロメンを選択',
+        optional: true,
+        skipLabel: '加えない',
       });
       if (picked) {
         ctx.removeFromDeck(picked);

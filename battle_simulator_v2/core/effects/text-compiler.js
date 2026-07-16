@@ -107,7 +107,7 @@ export function parseCardFilter(spec) {
       preds.push((c) => c.kind === 'holomen' && c.bloomLevel === lv);
     } else if ((m = /^(白|緑|赤|青|紫|黄)ホロメン$/.exec(part))) {
       const color = m[1];
-      preds.push((c) => c.kind === 'holomen' && c.color === color);
+      preds.push((c) => c.kind === 'holomen' && (c.color || '').includes(color)); // 多色（'白緑'等）は構成色すべてに一致 (2.4.3)
     } else if (part === 'Buzzホロメン') {
       preds.push((c) => c.kind === 'holomen' && c.buzz);
     } else if (part === 'ホロメン') {
@@ -147,20 +147,25 @@ export function parseSelfTarget(spec) {
   }
   if ((m = /^(?:自分の)?(白|緑|赤|青|紫|黄)センターホロメン$/.exec(spec))) {
     const color = m[1];
-    return { make: () => (e) => e.pos.zone === 'center' && e.top.color === color };
+    // 多色カード（'白緑'等）は構成色すべてを持つ (2.4.3)。全色扱いの継続効果も engine._hasColor が判定する
+    return { make: (ctx) => (e) => e.pos.zone === 'center' && ctx.engine._hasColor(e.holomem, color) };
   }
   if ((m = /^(?:自分の)?(白|緑|赤|青|紫|黄)ホロメン$/.exec(spec))) {
     const color = m[1];
-    return { make: () => (e) => e.top.color === color };
+    return { make: (ctx) => (e) => ctx.engine._hasColor(e.holomem, color) };
   }
-  if (/^(?:自分の)?ホロメン$/.test(spec) || spec === 'このホロメン') {
+  if (spec === 'このホロメン') {
+    // 「このホロメン」= 効果の発生源ホロメン自身のみ（全ホロメンではない）
+    return { make: (ctx) => (e) => e.holomem === ctx.sourceHolomem };
+  }
+  if (/^(?:自分の)?ホロメン$/.test(spec)) {
     return { make: () => () => true };
   }
   if ((m = /^自分の〈(.+?)〉以外の#(\S+?)を持つホロメン$/.exec(spec)) ||
       (m = /^〈(.+?)〉以外の#(\S+?)を持つ(?:自分の)?ホロメン$/.exec(spec))) {
     const name = m[1];
     const tag = m[2];
-    return { make: () => (e) => e.top.name !== name && (e.top.tags || []).includes(tag) };
+    return { make: (ctx) => (e) => !ctx.engine._nameIs(e.top, name) && (e.top.tags || []).includes(tag) };
   }
   if ((m = /^(?:自分の)?#(\S+?)を持つ(?:自分の)?ホロメン$/.exec(spec))) {
     const tag = m[1];
@@ -168,7 +173,8 @@ export function parseSelfTarget(spec) {
   }
   if ((m = /^自分の〈(.+?)〉$/.exec(spec))) {
     const name = m[1];
-    return { make: () => (e) => e.top.name === name };
+    // 〈名称〉参照はエクストラ「としても扱う」(nameAliases) にも一致させる
+    return { make: (ctx) => (e) => ctx.engine._nameIs(e.top, name) };
   }
   if ((m = /^自分の他の#(\S+?)を持つホロメン$/.exec(spec))) {
     const tag = m[1];
@@ -385,7 +391,7 @@ export function compileSentence(s) {
   if ((m = /^自分のアーカイブの(.+?)(\d+)(?:～(\d+))?枚を手札に戻(す|せる)$/.exec(s))) {
     const filter = parseCardFilter(m[1]);
     if (!filter) return null;
-    return { kind: 'archiveToHand', n: Number(m[3] || m[2]), optional: m[4] === 'せる' };
+    return { kind: 'archiveToHand', filter, n: Number(m[3] || m[2]), optional: m[4] === 'せる' };
   }
   // アーカイブのツール等をホロメンに付ける
   if ((m = /^自分のアーカイブの(.+?)(\d+)枚を(.+?)に付け(る|られる)$/.exec(s))) {
@@ -1212,23 +1218,27 @@ function compileAttached(text) {
     }
     if ((m = /^このファンは、自分の〈(.+?)〉だけに付けられ、1人につき何枚でも付けられる$/.exec(b))) {
       const name = m[1];
-      def.attachRule = { canAttach: (h) => h.stack[0].name === name, unlimited: true };
+      // 〈名称〉参照はエクストラ「としても扱う」(nameAliases) にも一致させる
+      def.attachRule = { canAttach: (h) => h.stack[0].name === name || (h.stack[0].nameAliases || []).includes(name), unlimited: true };
       i++; continue;
     }
-    if ((m = /^◆(?:1st以上の)?〈(.+?)〉に付いていたら能力追加$/.exec(b))) {
-      const name = m[1];
+    if ((m = /^◆(1st以上の)?〈(.+?)〉に付いていたら能力追加$/.exec(b))) {
+      const needLevel = !!m[1]; // 「1st以上の」= Bloomレベルが 1st/2nd のホロメンに付いている時のみ（Debut/Spot は対象外）
+      const name = m[2];
+      const nameMatches = (card) => card.name === name || (card.nameAliases || []).includes(name);
+      const hostOk = (h) => nameMatches(h.stack[0]) && (!needLevel || h.stack[0].bloomLevel === '1st' || h.stack[0].bloomLevel === '2nd');
       const next = (blocks[i + 1] || '').replace(/^■/, '').replace(/。$/, '');
       const hm = /^この(マスコット|ツール|ファン)が付いているホロメンのHP\+(\d+)$/.exec(next);
       const am = /^この(マスコット|ツール|ファン)が付いているホロメンのアーツ\+(\d+)$/.exec(next);
       if (hm) {
         const n = Number(hm[2]);
-        attached.hpPlus = (h) => (h.stack[0].name === name ? n : 0);
+        attached.hpPlus = (h) => (hostOk(h) ? n : 0);
         i += 2; continue;
       }
       if (am) {
         const n = Number(am[2]);
         const prev = attached.artsPlus;
-        attached.artsPlus = (h, e) => (prev ? prev(h, e) : 0) + (h.stack[0].name === name ? n : 0);
+        attached.artsPlus = (h, e) => (prev ? prev(h, e) : 0) + (hostOk(h) ? n : 0);
         i += 2; continue;
       }
       // HP+N / アーツ+N 以外の能力追加（トリガー型）は解釈不能 → この枠は不採用にする（安全側）

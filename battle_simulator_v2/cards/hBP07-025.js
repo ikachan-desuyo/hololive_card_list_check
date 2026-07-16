@@ -12,11 +12,13 @@ export default {
   collabEffect: {
     name: '抹茶パフェ～！きゅんです',
     *run(ctx) {
+      // 「選ぶ」= 強制。対象が存在する場合は必ず選ぶ（不在時のみ効果なし）
+      const isTarget = (e) => ctx.hasTag(e.top, 'ゲーマーズ') && e.holomem.attachments.length > 0;
+      if (ctx.holomems('self', isTarget).length === 0) return;
       const target = yield ctx.chooseHolomem({
         side: 'self',
-        filter: (e) => ctx.hasTag(e.top, 'ゲーマーズ') && e.holomem.attachments.length > 0,
+        filter: isTarget,
         title: 'このターン アーツ+20する #ゲーマーズ ホロメンを選択（サポートカードが付いている）',
-        optional: true,
       });
       if (!target) return;
       const chosen = target.holomem;

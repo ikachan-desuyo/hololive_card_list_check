@@ -17,8 +17,9 @@ export default {
         ctx.log('ブルームエフェクト「グルグルシープ」はこのターン既に使用済み');
         return;
       }
+      // 「1stホロメン」は Buzz の 1st も含む（Buzz を除外する場合はテキストに明記される。hBP07-040 参照）
       const candidates = ctx.deckCards(
-        (c) => c.kind === 'holomen' && c.bloomLevel === '1st' && !c.buzz && c.name === '角巻わため',
+        (c) => c.kind === 'holomen' && c.bloomLevel === '1st' && ctx.nameIs(c, '角巻わため'),
       );
       if (candidates.length === 0) {
         // 公開対象が無くてもデッキシャッフルは行う（効果の発動自体は成立）
@@ -30,6 +31,8 @@ export default {
       const picked = yield ctx.chooseCard({
         cards: candidates,
         title: '手札に加える 1stホロメン〈角巻わため〉を選択',
+        optional: true,
+        skipLabel: '見つからなかったことにする',
       });
       if (picked) {
         ctx.removeFromDeck(picked);

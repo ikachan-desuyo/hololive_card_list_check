@@ -4,8 +4,9 @@
  * ブルームエフェクト「エールリバース」:
  *   相手のアーカイブのエール1枚を、相手のセンターホロメンに送れる。
  *   → 「送れる」=任意。コントローラー（自分）が相手アーカイブのエールを1枚選び、相手センターへ送る。
- *     相手のアーカイブ/相手センターを直接操作する（context の removeFromArchive/attachCheer は
- *     this.player 向けのため、相手側は配列を直接操作）。相手センターが居ない/エールが無ければ何もしない。
+ *     相手アーカイブからの取り出しは配列操作（context の removeFromArchive は this.player 向け）だが、
+ *     付与は ctx.attachCheer を使う（所有者非依存。「エールが付いた時」の装着カード同期トリガーを発火させるため）。
+ *     相手センターが居ない/エールが無ければ何もしない。
  *     ※自分のアーツ「ゲーム配信中」が相手センターのエール数に比例するため、相手にエールを与えて
  *       火力を伸ばすコンボ。
  *
@@ -40,8 +41,9 @@ export default {
       if (!cheer) return;
       const i = ctx.opponent.archive.indexOf(cheer);
       if (i !== -1) ctx.opponent.archive.splice(i, 1);
-      oppCenter.cheers.push(cheer);
-      ctx.log(`相手のアーカイブの ${cheer.name} を相手のセンターホロメン（${oppCenter.stack[0].name}）に送った`);
+      ctx.log(`相手のアーカイブの ${cheer.name} を相手のセンターホロメン（${oppCenter.stack[0].name}）に送る`);
+      // attachCheer 経由で「エールが付いた時」の装着カード同期トリガー（hBP03-113 等）を発火させる
+      ctx.attachCheer(cheer, oppCenter);
     },
   },
   arts: {

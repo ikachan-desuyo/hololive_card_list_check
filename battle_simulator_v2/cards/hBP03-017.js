@@ -3,23 +3,20 @@
  * キーワード/コラボエフェクト「プリペア」:
  *   自分の推しホロメンが〈獅白ぼたん〉の時、自分のエールデッキの上から1枚をアーカイブできる：
  *   自分のホロメン1人のHP10回復。
- *   → メインステップの起動型能力（コスト: エールデッキの上から1枚をアーカイブ）
- *      ターン回数制限の記載は無いので無制限。
+ *   → コラボした時に1回誘発（13.2）。「アーカイブできる」= 任意コスト（confirm でゲート）。
  * アーツ「ぼ。」(20): テキスト効果なし。
  */
 export default {
   number: 'hBP03-017',
-  activatedAbilities: [{
+  collabEffect: {
     name: 'プリペア',
-    oncePerTurn: false, // ターン制限の記載なし
-    canUse(ctx) {
-      // 自分の推しホロメンが〈獅白ぼたん〉の時のみ（使用条件）
-      if (ctx.player.oshi?.name !== '獅白ぼたん') return false;
-      // コスト: エールデッキの上から1枚をアーカイブできること（このコスト支払い自体が状態変化）。
-      // → HPが減ったホロメンが居なくても起動可能（Q309: エールアーカイブ目的でも使える）。
-      return ctx.player.cheerDeck.length >= 1;
-    },
     *run(ctx) {
+      // 条件: 自分の推しホロメンが〈獅白ぼたん〉
+      if (!ctx.player.oshi || !ctx.nameIs(ctx.player.oshi, '獅白ぼたん')) return;
+      if (ctx.player.cheerDeck.length === 0) return;
+      // 「アーカイブできる」= 任意コスト
+      const ok = yield ctx.confirm('プリペア: エールデッキの上から1枚をアーカイブしますか？（自分のホロメン1人のHP10回復）', 'アーカイブする', 'しない');
+      if (!ok) return;
       // コスト: エールデッキの上から1枚をアーカイブ
       const top = ctx.player.cheerDeck.shift();
       if (!top) return;
@@ -33,5 +30,5 @@ export default {
       });
       if (target) ctx.heal(target.holomem, 10);
     },
-  }],
+  },
 };

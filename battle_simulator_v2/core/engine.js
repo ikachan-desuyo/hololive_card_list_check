@@ -439,6 +439,27 @@ export class Engine {
   }
 
   /**
+   * 「このホロメンにエールが付いた時」の装着カード同期トリガー（attached.onCheerAttached）を発火する。
+   * エールが付くあらゆる経路（エールステップ 7.4.2 / ライフ処理 11.5 / 効果 ctx.attachCheer）から呼ぶこと。
+   */
+  _dispatchCheerAttached(holomem) {
+    for (const att of [...holomem.attachments]) {
+      const fn = this.registry.get(att.number)?.attached?.onCheerAttached;
+      if (fn) fn(holomem, this, att);
+    }
+  }
+
+  /**
+   * SP推しスキルの使用を記録する（usedSpOshiSkillThisGame と併せて「いつ・どの推しが」を残す）。
+   * 「このターンに（特定の）SP推しスキルを使っていたなら」系の条件（hBP06-044/045/056, hBP07-107, hSD06-010 等）が
+   * p.spOshiSkillUsedInfo = { turn, oshiNumber, text } を参照する。推し1人のSPスキルは1つなので oshiNumber で特定できる。
+   */
+  _markSpOshiSkillUsed(p, text = '') {
+    p.usedSpOshiSkillThisGame = true;
+    p.spOshiSkillUsedInfo = { turn: this.state.turn, oshiNumber: p.oshi?.number || null, text };
+  }
+
+  /**
    * 「相手のターンで、このホロメンがダメージを受けた時」に必ず発火する強制トリガー（選択なし・同期）。
    * 対象の装着カード定義 attached.onDamageReceivedForced(holomem, engine, self, ownerIdx) を呼ぶ。
    * 自分のターンに自分が受けた場合は発火しない（相手から受けた時のみ）。(hBP07-108 等)
@@ -711,6 +732,7 @@ export class Engine {
             return;
           }
           this.log(`${p.name}: 手札にDebutホロメンが無いため引き直し（${p.mulliganCount + 1}回目）`);
+          this.log(`${p.name}: 手札を公開 → ${p.hand.map((c) => c.name).join('、') || '-'}`); // 6.2.1.9: 公開してから戻す
           p.deck.push(...p.hand);
           p.hand = [];
           shuffle(p.deck, this.rng);
@@ -1444,6 +1466,7 @@ export class Engine {
         p.revealed.splice(p.revealed.indexOf(pending.cheer), 1);
         h.cheers.push(pending.cheer);
         this.log(`${p.name}: ${topCard(h).name} に ${pending.cheer.name} を付けた`);
+        this._dispatchCheerAttached(h); // 「エールが付いた時」装着トリガー（エールステップ経路）
         this._mainStep();
         break;
       }
@@ -1452,6 +1475,7 @@ export class Engine {
         const h = this._holomemAt(p, action.pos);
         p.revealed.splice(p.revealed.indexOf(pending.cheer), 1);
         h.cheers.push(pending.cheer);
+        this._dispatchCheerAttached(h); // 「エールが付いた時」装着トリガー（ライフ処理 11.5 経路）
         p.lifeDamage--;
         this.log(`${p.name}: ライフ ${pending.cheer.name} を ${topCard(h).name} に送った（残りライフ${p.life.length}）`);
         this._checkTiming(pending.resume);
@@ -1637,7 +1661,7 @@ export class Engine {
       }
       case 'oshiSkill': {
         const skill = p.oshi.oshiSkills[action.skillIndex];
-        if (skill.sp) p.usedSpOshiSkillThisGame = true;
+        if (skill.sp) this._markSpOshiSkillUsed(p, skill.text || '');
         else p.usedOshiSkillThisTurn += 1;
         const def = this.registry.get(p.oshi.number);
         const skillDef = skill.sp ? def?.spOshiSkill : def?.oshiSkill;
@@ -2076,13 +2100,28 @@ export class Engine {
       // 1) ダウン処理 (11.3): ターンプレイヤー側から1体ずつ。HPは実効値で判定
       for (const idx of [s.turnPlayer, 1 - s.turnPlayer]) {
         const p = s.players[idx];
-        const downed = this._stagePositions(p).find((pos) => {
+        const downedList = this._stagePositions(p).filter((pos) => {
           const h = this._holomemAt(p, pos);
           // 実効HP以上のダメージ、または効果による強制ダウン (4.4.9)
           return h.damage >= this.effectiveHp(h) || h.forcedDown;
         });
-        if (downed) {
-          this._processDown(p, downed, step); // 処理後に step へ再入
+        if (downedList.length === 1) {
+          this._processDown(p, downedList[0], step); // 処理後に step へ再入
+          return;
+        }
+        if (downedList.length >= 2) {
+          // 11.3.2: 同一プレイヤーの複数同時ダウンは、所有プレイヤーが処理順を選ぶ（1体処理後に step 再入で残りを再判定）
+          s.pending = {
+            type: 'effectChoice', player: idx,
+            request: { kind: 'chooseOption', title: '同時にダウンしたホロメンの処理順を選択（先に処理する1人）' },
+            options: downedList.map((pos, i) => ({
+              id: `downorder_${i}`,
+              label: `${topCard(this._holomemAt(p, pos)).name}（${pos.zone === 'center' ? 'センター' : pos.zone === 'collab' ? 'コラボ' : `バック${pos.index + 1}`}）`,
+              value: i,
+            })),
+            resume: (i) => this._processDown(p, downedList[i], step),
+          };
+          this.onChange();
           return;
         }
       }
@@ -2106,6 +2145,41 @@ export class Engine {
       if (losses.length === 1) {
         this._setWinner(1 - losses[0].player, losses[0].reason, losses[0].player);
         return;
+      }
+
+      // 2.5) 不正カード処理 (11.4): 付け上限超過（ツール1/マスコット1 per ホロメン 5.17.3）の装着カードを
+      //   所有プレイヤーが選んで1枚残し、他をアーカイブする。効果経由の装着（ctx.attachSupport 直呼び等）で
+      //   上限を超えた場合の受け皿。attachRule.unlimited のカードと、hostAttachRule.mascot を持つホストは対象外。
+      for (const idx of [s.turnPlayer, 1 - s.turnPlayer]) {
+        const p = s.players[idx];
+        for (const pos of this._stagePositions(p)) {
+          const h = this._holomemAt(p, pos);
+          for (const type of ['ツール', 'マスコット']) {
+            if (type === 'マスコット' && this.registry.get(topCard(h).number)?.hostAttachRule?.mascot) continue;
+            const list = h.attachments.filter((a) => a.supportType === type &&
+              !this.registry.get(a.number)?.attachRule?.unlimited);
+            if (list.length <= 1) continue;
+            s.pending = {
+              type: 'effectChoice', player: idx,
+              request: { kind: 'chooseOption', title: `${type}の付け上限超過（${topCard(h).name}）: 残す1枚を選択（他はアーカイブ 11.4）` },
+              options: list.map((a, i) => ({ id: `keepattach_${i}`, label: `${a.name} を残す`, value: i })),
+              resume: (keep) => {
+                for (let i = list.length - 1; i >= 0; i--) {
+                  if (i === keep) continue;
+                  const ai = h.attachments.indexOf(list[i]);
+                  if (ai !== -1) {
+                    h.attachments.splice(ai, 1);
+                    p.archive.push(list[i]);
+                    this.log(`${list[i].name} を付け上限超過のためアーカイブ (11.4)`);
+                  }
+                }
+                step();
+              },
+            };
+            this.onChange();
+            return;
+          }
+        }
       }
 
       // 3) ライフダメージ処理 (11.5): ターンプレイヤー優先
@@ -2227,7 +2301,7 @@ export class Engine {
           if (!use) { offerDownSkill(si + 1); return; }
           if (sd.run) {
             p.archive.push(...p.holoPower.splice(0, sd.cost || 0));
-            if (sd.sp) p.usedSpOshiSkillThisGame = true; else p.usedOshiSkillThisTurn += 1; // ダウン時推しスキル使用
+            if (sd.sp) this._markSpOshiSkillUsed(p, sd.title || ''); else p.usedOshiSkillThisTurn += 1; // ダウン時推しスキル使用
             this._runEffect({ run: sd.run }, { playerIdx: ownerIdx, downedHolomem: h }, () => offerDownSkill(si + 1));
           } else {
             sd.apply(this, ownerIdx, h);
@@ -2293,7 +2367,7 @@ export class Engine {
         resume: (use) => {
           if (!use) { run(i + 1); return; }
           p.archive.push(...p.holoPower.splice(0, skill.cost));
-          if (skill.sp) p.usedSpOshiSkillThisGame = true;
+          if (skill.sp) this._markSpOshiSkillUsed(p, skill.title || '');
           else p.usedOshiSkillThisTurn += 1;
           this._runEffect(skill, { playerIdx: ownerIdx, sourceCard: p.oshi, attackInfo }, () => run(i + 1));
         },
@@ -2326,7 +2400,7 @@ export class Engine {
         const eng = this;
         const payAndMark = () => {
           defender.archive.push(...defender.holoPower.splice(0, skill.cost));
-          if (skill.sp) defender.usedSpOshiSkillThisGame = true;
+          if (skill.sp) this._markSpOshiSkillUsed(defender, skill.title || '');
           else defender.usedOshiSkillThisTurn += 1;
         };
         const desc = {
@@ -2469,7 +2543,7 @@ export class Engine {
     };
     if (!use) return;
     p.archive.push(...p.holoPower.splice(0, od.cost || 0));
-    if (od.sp) p.usedSpOshiSkillThisGame = true; else p.usedOshiSkillThisTurn += 1;
+    if (od.sp) this._markSpOshiSkillUsed(p, od.title || ''); else p.usedOshiSkillThisTurn += 1;
     this.log(`${p.name}: ${od.sp ? 'SP' : ''}推しスキル発動（アーカイブしたエール${count}枚ぶん）`);
     yield* od.run(this._effectContext(ownerIdx, { sourceCard: p.oshi, cheerArchivedInfo: info }));
   }
@@ -2795,14 +2869,22 @@ export class Engine {
     });
     const specific = cost.filter((c) => c !== COLORLESS);
     const anyCount = cost.length - specific.length;
+    if (sets.length < cost.length) return false;
+    // 指定色の割り当ては貪欲でなくバックトラックで全探索する。
+    // 色エイリアスで複数色を持つエールが混在すると、貪欲法は本来支払える組み合わせを
+    // 「支払えない」と誤判定しうる（例: コスト[赤,青]、エールA={赤,青}, B={赤}）。コスト・エールとも少数なので全探索で十分。
     const used = new Array(sets.length).fill(false);
-    for (const color of specific) {
-      let ok = false;
+    const assign = (ci) => {
+      if (ci >= specific.length) return true;
       for (let i = 0; i < sets.length; i++) {
-        if (!used[i] && sets[i].has(color)) { used[i] = true; ok = true; break; }
+        if (used[i] || !sets[i].has(specific[ci])) continue;
+        used[i] = true;
+        if (assign(ci + 1)) return true;
+        used[i] = false;
       }
-      if (!ok) return false;
-    }
+      return false;
+    };
+    if (!assign(0)) return false;
     return used.filter((u) => !u).length >= anyCount;
   }
 

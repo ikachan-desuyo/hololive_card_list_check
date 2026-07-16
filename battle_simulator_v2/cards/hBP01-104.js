@@ -25,7 +25,8 @@ export default {
       });
       if (picked) {
         ctx.removeFromDeck(picked);
-        ctx.putToBack(picked);
+        // 「ステージに出た時」の onEnter トリガーを誘発する経路で出す
+        yield* ctx.putToBackWithTrigger(picked);
       }
       ctx.shuffleDeck();
     },

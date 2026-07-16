@@ -11,7 +11,8 @@
  *
  * SP推しスキル「握りつぶしちゃうぞ」[ホロパワー：-2][ゲームに1回]:
  *   このターンの間、自分のホロメン1人のアーツ+50。そのホロメンの色が白の時、さらに、そのアーツ+50。
- *   → spOshiSkill（能動）。選んだホロメンに artsPlus のターン修正を付与。白なら合計+100。
+ *   → spOshiSkill（能動）。選んだホロメンに artsPlus のターン修正を付与。
+ *     白（engine._hasColor: 多色・全色扱い対応）なら合計+100。
  */
 export default {
   number: 'hBP01-001',
@@ -50,7 +51,8 @@ export default {
       });
       if (!entry) return;
       const chosen = entry.holomem;
-      const isWhite = entry.top.color === '白';
+      // 「色が白の時」: 多色（白緑等）・「すべての色を持つ」扱いも白を持つ (2.4.3)
+      const isWhite = ctx.engine._hasColor(chosen, '白');
       const amount = isWhite ? 100 : 50;
       ctx.addTurnModifier({
         kind: 'artsPlus', amount, ownerIdx: ctx.playerIdx,

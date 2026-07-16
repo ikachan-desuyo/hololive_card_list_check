@@ -5,6 +5,8 @@
  *   相手のターンで、自分の〈ロボ子さん〉がダウンした時に使える：
  *   自分のデッキの上から2枚をアーカイブする。その後、自分のアーカイブの〈ロボ子さん〉1枚を手札に戻す。
  *   → ダウン処理中に使える推しスキル (12.1.5.2) なので onDownOshiSkill で実装。
+ *     手札に戻す〈ロボ子さん〉はプレイヤーが選ぶ（Debut/1st等が混在しうる）ため、
+ *     対話的ジェネレータ run 方式（コスト・使用フラグはエンジンが処理）。
  *
  * SP推しスキル「ボクの『高性能っぷり』を堪能してよね♡」[ホロパワー：-1][ゲームに1回]:
  *   自分のデッキを2枚引いた後、手札2枚をアーカイブする。その後、自分のアーカイブの〈ろぼさー〉を
@@ -20,28 +22,29 @@ export default {
     title: '推しスキル「PONじゃないもん！！」: デッキ上2枚をアーカイブし、アーカイブの〈ロボ子さん〉1枚を手札に戻しますか？',
     canUse(engine, ownerIdx, downedHolomem) {
       const p = engine.state.players[ownerIdx];
-      return engine.state.turnPlayer !== ownerIdx &&        // 相手のターン
-        !p.usedOshiSkillThisTurn &&                          // ターンに1回
-        p.holoPower.length >= 2 &&                           // [ホロパワー：-2]
-        downedHolomem.stack[0].name === 'ロボ子さん';        // ダウンしたのが〈ロボ子さん〉
+      return engine.state.turnPlayer !== ownerIdx &&                     // 相手のターン
+        p.usedOshiSkillThisTurn < engine._oshiSkillCap(ownerIdx) &&      // ターンに1回（上限増加効果に対応）
+        p.holoPower.length >= 2 &&                                       // [ホロパワー：-2]
+        engine._nameIs(downedHolomem.stack[0], 'ロボ子さん');            // ダウンしたのが〈ロボ子さん〉
     },
-    apply(engine, ownerIdx) {
-      const p = engine.state.players[ownerIdx];
-      // コスト [ホロパワー：-2]
-      p.archive.push(...p.holoPower.splice(0, 2));
-      p.usedOshiSkillThisTurn += 1;
+    // コスト（ホロパワー-2）と使用フラグはエンジンが処理する（run 方式）
+    *run(ctx) {
       // デッキの上から2枚をアーカイブ
-      const moved = p.deck.splice(0, 2);
-      p.archive.push(...moved);
-      p.deckArchivedThisTurn = (p.deckArchivedThisTurn || 0) + moved.length; // デッキ→アーカイブ枚数を計上（hBP08-020）
-      engine.log(`推しスキル「PONじゃないもん！！」: デッキ上${moved.length}枚をアーカイブ`);
-      // アーカイブの〈ロボ子さん〉1枚を手札に戻す
-      const i = p.archive.findIndex((c) => c.name === 'ロボ子さん');
-      if (i !== -1) {
-        const robo = p.archive.splice(i, 1)[0];
-        p.hand.push(robo);
-        engine.log(`推しスキル「PONじゃないもん！！」: アーカイブの ${robo.name} を手札に戻した`);
-      }
+      const moved = ctx.player.deck.splice(0, 2);
+      ctx.player.archive.push(...moved);
+      ctx.recordDeckArchive(moved.length); // デッキ→アーカイブ枚数を計上（hBP08-020）
+      ctx.log(`推しスキル「PONじゃないもん！！」: デッキ上${moved.length}枚をアーカイブ`);
+      // その後、アーカイブの〈ロボ子さん〉1枚を手札に戻す（複数種いる場合はプレイヤーが選ぶ）
+      const cands = ctx.player.archive.filter((c) => ctx.nameIs(c, 'ロボ子さん'));
+      if (cands.length === 0) return;
+      const robo = yield ctx.chooseCard({
+        cards: cands,
+        title: '手札に戻す〈ロボ子さん〉を選択（アーカイブ）',
+      });
+      if (!robo) return;
+      ctx.removeFromArchive(robo);
+      ctx.player.hand.push(robo);
+      ctx.log(`推しスキル「PONじゃないもん！！」: アーカイブの ${robo.name} を手札に戻した`);
     },
   },
 

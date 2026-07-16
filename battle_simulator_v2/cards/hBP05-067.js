@@ -18,9 +18,11 @@ export default {
       if (!ok) return;
       const dest = yield ctx.chooseHolomem({ side: 'self', filter: (e) => e.pos.zone === 'back', title: 'エール2枚を送るバックホロメンを選択' });
       if (!dest) return;
-      for (let i = 0; i < 2; i++) {
-        const cheer = h.cheers[0];
-        if (!cheer) break;
+      // どの2枚を送るかはプレイヤーが選ぶ（エールは色を保持したまま移動するため色の選択権がある）
+      const picked = h.cheers.length === 2
+        ? [...h.cheers]
+        : yield ctx.chooseCards({ cards: [...h.cheers], count: 2, title: '送るエール2枚を選択' });
+      for (const cheer of picked || []) {
         ctx.moveCheer(cheer, h, dest.holomem);
       }
       // 送られたホロメンと同名の1stホロメンをアーカイブから手札へ

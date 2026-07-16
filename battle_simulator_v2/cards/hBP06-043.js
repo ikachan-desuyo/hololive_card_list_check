@@ -13,7 +13,7 @@ export default {
     *run(ctx) {
       // コスト: 手札の#Promiseを持つホロメン1枚をアーカイブ（任意）
       const promiseHolomems = ctx.player.hand.filter(
-        (c) => c.card_type === 'ホロメン' && (c.tags || []).includes('Promise'),
+        (c) => c.kind === 'holomen' && (c.tags || []).includes('Promise'),
       );
       if (promiseHolomems.length === 0) return; // コストを払えない
       const ok = yield ctx.confirm('手札の#Promiseホロメン1枚をアーカイブして特殊ダメージ30を与えますか？');

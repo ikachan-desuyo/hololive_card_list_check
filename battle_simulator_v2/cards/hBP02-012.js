@@ -4,8 +4,10 @@
  * ブルームエフェクト「ちょっと動かしますね」:
  *   自分のステージのマスコット1枚を、自分のホロメンに付け替えられる。
  *   解釈: 自分のステージのホロメンに付いているマスコット1枚を選び（任意）、
- *         別の付け先（マスコット未装着のホロメン）に移し替える。元の付け先から外して
- *         新しい付け先に付ける。「まで」表現ではなく「付け替えられる」=任意。
+ *         別の付け先に移し替える。付け先の可否はエンジンの装着ルール
+ *         engine._canAttachSupport で判定（既定はマスコット1枚だが、hBP02-013
+ *         「みんなと一緒！」の hostAttachRule＝異なる名前2枚まで等も考慮される）。
+ *         「まで」表現ではなく「付け替えられる」=任意。
  *
  * アーツ「力をかしてくださいね」(50+):
  *   このターンの間、自分のマスコットが付いている[センターホロメンとコラボホロメン]のアーツ+20。
@@ -39,11 +41,11 @@ export default {
       if (!picked) return;
       const entry = mascots.find((m) => m.card === picked);
       const from = entry.from;
-      // 付け替え先（マスコット未装着のホロメン。元の付け先と同じでも意味が無いので除外）
+      // 付け替え先（エンジンの装着ルールで判定。元の付け先と同じでも意味が無いので除外）
       const target = yield ctx.chooseHolomem({
         side: 'self',
         filter: (e) => e.holomem !== from
-          && !e.holomem.attachments.some((a) => a.supportType === 'マスコット'),
+          && ctx.engine._canAttachSupport(e.holomem, picked),
         title: `${picked.name} を付け替えるホロメンを選択`,
         optional: true,
       });

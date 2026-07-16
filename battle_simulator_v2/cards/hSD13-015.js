@@ -5,9 +5,9 @@
  *   自分のステージのエール1枚をエールデッキの下に戻せる。戻したなら、自分のエールデッキから、
  *   エール1枚を公開し、自分のホロメンに送る。そしてエールデッキをシャッフルする。
  *   → 任意（「戻せる」）。ステージのエール1枚を自分のエールデッキの下（末尾）へ。
- *     戻したら、エールデッキの上から1枚を公開し自分のホロメンに送り、最後にシャッフルする。
- *     （「エールデッキから、エール1枚を公開し送る」= 上から1枚を送る sendCheerFromCheerDeckTop。
- *      その後シャッフルなので、どのエールが出るかはランダムで問題ない。）
+ *     戻したら、「エールデッキから、エール1枚を公開し送る」= エールデッキ内から任意の1枚を
+ *     選ぶサーチ（hBP02-023 と同じ）。非公開領域のサーチなので「見つからなかったことに
+ *     できる」= optional。最後にエールデッキをシャッフルする。
  *
  * アーツ「コーヒーをどうぞ！」(30+):
  *   自分の#Justiceを持つ[センターホロメンとコラボホロメン]に異なる色のエールが付いているなら、
@@ -43,13 +43,24 @@ export default {
       ctx.player.cheerDeck.push(picked);
       ctx.log(`${from.stack[0].name} の ${picked.name} をエールデッキの下に戻した`);
 
-      // 戻したなら、エールデッキから1枚を公開して自分のホロメンに送る
-      if (ctx.player.cheerDeck.length > 0) {
+      // 戻したなら、エールデッキから1枚を選んで公開し、自分のホロメンに送る（hBP02-023 と同パターン）
+      const cheer = yield ctx.chooseCard({
+        cards: ctx.player.cheerDeck,
+        title: 'エールデッキから送るエールを選択',
+        optional: true,
+        skipLabel: '見つからなかったことにする',
+      });
+      if (cheer) {
         const target = yield ctx.chooseHolomem({
           side: 'self',
-          title: 'エールデッキから公開する1枚を送る自分のホロメンを選択',
+          title: 'エールを送る自分のホロメンを選択',
         });
-        if (target) ctx.sendCheerFromCheerDeckTop(target.holomem);
+        if (target) {
+          ctx.removeFromCheerDeck(cheer);
+          ctx.log(`${ctx.player.name}: エールデッキから ${cheer.name} を公開`);
+          ctx.flashReveal(cheer);
+          ctx.attachCheer(cheer, target.holomem);
+        }
       }
 
       // そしてエールデッキをシャッフルする

@@ -18,7 +18,7 @@ export default {
   // 推しスキル「女幹部の采配」: 赤ホロメンの能力での手札アーカイブを、ホロパワー1枚アーカイブに置換できる。
   //   ctx.archiveHandCard から呼ばれる。replaced=true を返すと手札カードは残り、ホロパワーが代わりにアーカイブされる。
   * handArchiveCostReplace(ctx, host, card) {
-    if (!host || host.stack[0].color !== '赤') return false; // 赤ホロメンの能力のみ
+    if (!host || !ctx.engine._hasColor(host, '赤')) return false; // 赤ホロメンの能力のみ（多色・全色扱い対応）
     const p = ctx.player;
     if (p.holoPower.length === 0) return false; // 払うホロパワーが無い
     // [ターンに1回]: 既にこのターン別の発生源で使っていたら不可（同一発生源の能力中は継続可）

@@ -5,6 +5,7 @@
  * 好きな枚数公開し、公開したホロメンを手札に加える。
  * そして残ったカードを好きな順でデッキの下に戻す。
  * LIMITED：ターンに1枚しか使えない。
+ * ※名称判定は ctx.nameIs（hSD01-013 SorAZ の「〈ときのそら〉〈AZKi〉としても扱う」に対応）。
  */
 const TARGET_NAMES = ['ときのそら', 'AZKi'];
 
@@ -18,8 +19,9 @@ export default {
     *run(ctx) {
       const looked = ctx.lookTopDeck(4);
       const pool = [...looked];
+      // 〈名称〉参照は別名（SorAZ「〈ときのそら〉〈AZKi〉としても扱う」）も一致させる
       const candidates = pool.filter(
-        (c) => c.kind === 'holomen' && TARGET_NAMES.includes(c.name));
+        (c) => c.kind === 'holomen' && TARGET_NAMES.some((n) => ctx.nameIs(c, n)));
       const picked = yield ctx.chooseCards({
         cards: candidates,
         min: 0,

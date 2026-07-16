@@ -8,7 +8,7 @@
  * アーツ「Just a Humble, Kind Witch」(30):
  *   自分のアーカイブにサポートカードが4枚以上あるなら、
  *   自分のエールデッキの上から1枚を自分の#Adventを持つホロメンに送る。
- *   → run で実装。
+ *   → run で実装。「送る」（「できる」の記載なし）＝対象がいる限り強制（スキップ不可）。
  */
 export default {
   number: 'hSD12-004',
@@ -23,12 +23,11 @@ export default {
         const supportCount = ctx.player.archive.filter((c) => c.kind === 'support').length;
         if (supportCount < 4) return;
         if (!ctx.player.cheerDeck || ctx.player.cheerDeck.length === 0) return;
-        // 送り先: 自分の#Adventを持つホロメン
+        // 送り先: 自分の#Adventを持つホロメン（「送る」=強制。対象がいればスキップ不可）
         const target = yield ctx.chooseHolomem({
           side: 'self',
           filter: (e) => ctx.hasTag(e.top, 'Advent'),
           title: 'エールデッキの上から1枚を送る#Adventホロメンを選択',
-          optional: true,
         });
         if (target) ctx.sendCheerFromCheerDeckTop(target.holomem);
       },

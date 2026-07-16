@@ -88,6 +88,8 @@
  *     auraDamageDelta(src, target, zone, engine, kind, attacker) { return -N; }, // 「コラボが受けるダメージ-10」「特殊のみ無効＝kind==='special'で-100000」「相手1stから受けるアーツ-30＝src===target&&attacker条件」等
  *       // kind='arts'|'special'、attacker=攻撃元ホロメン（無ければnull）。src===target で自己ギフトも表現できる
  *     auraSpecialDmgPlus(src, sourceHolomem, targetEntry, engine) { return N; }, // 「〈X〉が相手センターに与える特殊+20」等
+ *     auraOshiSpecialDmgPlus(src, oshiCard, targetEntry, engine) { return N; }, // 推しホロメン発の特殊ダメージ+N（推しスキル等。sourceHolomemが無い経路。hBP05-045）
+ *       // ※推し発の特殊ダメージでは triggers.onSpecialDamageDealt も発火する（ctx.specialDealt = { source:null, sourceOshiCard, target, amount }）
  *     oshiSkill / spOshiSkill: { canUse(engine, idx), *run(ctx) },  // メインステップの起動型推しスキル（spは次相手ターンの前衛移動禁止 hBP01-005 等）
  *     onDownOshiSkill: { cost, title, canUse(engine, idx, holomem), apply(engine, idx, holomem) },
  *     onDamageOshiSkill: { cost, sp?, title, canUse(engine, defIdx, target, dmg, kind), reduce(engine,..)=>N | *run(ctx,{target,dmg}) | *redirect(ctx,{target,dmg})=>新しい受け手ホロメン },

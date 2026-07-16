@@ -10,6 +10,7 @@
  *   → spOshiSkill（能動）。デッキ内の黄ホロメンを1枚選び手札へ（公開）、その後シャッフル。
  *
  * 保留: なし
+ * 修正（2026-07-17 監査）: SPスキルのデッキサーチに「加えない」を追加（非公開領域は見つからなかったことにできる、総合ルール 4.1.2.3）。
  */
 export default {
   number: 'hBD24-003',
@@ -18,12 +19,12 @@ export default {
     canUse(engine, ownerIdx) {
       // 自分の黄ホロメンが1人以上いる時のみ意味がある
       const p = engine.state.players[ownerIdx];
-      return engine._stageHolomems(p).some((h) => h.stack[0].color === '黄');
+      return engine._stageHolomems(p).some((h) => (h.stack[0].color || '').includes('黄'));
     },
     *run(ctx) {
       const target = yield ctx.chooseHolomem({
         side: 'self',
-        filter: (e) => e.top.color === '黄',
+        filter: (e) => (e.top.color || '').includes('黄'),
         title: 'アーツ+20する自分の黄ホロメンを選択',
       });
       if (!target) return;
@@ -39,10 +40,10 @@ export default {
     name: 'Birthday Gift ～Yellow～',
     canUse(engine, ownerIdx) {
       const p = engine.state.players[ownerIdx];
-      return p.deck.some((c) => c.kind === 'holomen' && c.color === '黄');
+      return p.deck.some((c) => c.kind === 'holomen' && (c.color || '').includes('黄'));
     },
     *run(ctx) {
-      const cand = ctx.deckCards((c) => c.kind === 'holomen' && c.color === '黄');
+      const cand = ctx.deckCards((c) => c.kind === 'holomen' && (c.color || '').includes('黄'));
       if (cand.length === 0) {
         ctx.log(`${ctx.player.name}: デッキに黄ホロメンが無い`);
         ctx.shuffleDeck();
@@ -51,6 +52,8 @@ export default {
       const picked = yield ctx.chooseCard({
         cards: cand,
         title: 'デッキから黄ホロメン1枚を公開し手札に加える',
+        optional: true,
+        skipLabel: '加えない',
       });
       if (picked) {
         ctx.removeFromDeck(picked);

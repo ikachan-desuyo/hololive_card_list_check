@@ -7,6 +7,8 @@
  *   → 「好きな枚数」=0枚も可（任意）。1枚ずつ選び、すべて同一の付け替え先
  *      （選んだ1人の〈モココ・アビスガード〉）へ移す。付け替え先が場にいなければ
  *      付け替えステップはスキップ（その後のアーツ+40判定だけ行う）。
+ *      〈モココ・アビスガード〉判定は ctx.nameIs（エクストラ「としても扱う」を持つ
+ *      FUWAMOCO も対象）。
  *      「8枚以上」判定は付け替え後の自分ステージ上の総エール枚数で行う（付け替えは
  *      自ステージ内での移動なので総数は変わらないが、テキストの順序どおり付け替え後に判定）。
  *      アーツ+40 はこのホロメン（sourceHolomem）にこのターンの間付与する。
@@ -24,13 +26,13 @@ export default {
   collabEffect: {
     name: '木漏れ日のブランコ',
     *run(ctx) {
-      // 付け替え先候補: 自分の〈モココ・アビスガード〉
-      const partners = ctx.holomems('self', (e) => e.top.name === PARTNER);
+      // 付け替え先候補: 自分の〈モココ・アビスガード〉（FUWAMOCO の「としても扱う」別名も含む）
+      const partners = ctx.holomems('self', (e) => ctx.nameIs(e.top, PARTNER));
       if (partners.length > 0) {
         // 付け替え先を1人選ぶ（任意。選ばなければ付け替えステップを行わない）
         const dest = yield ctx.chooseHolomem({
           side: 'self',
-          filter: (e) => e.top.name === PARTNER,
+          filter: (e) => ctx.nameIs(e.top, PARTNER),
           title: `エールの付け替え先〈${PARTNER}〉を選択`,
           optional: true,
         });

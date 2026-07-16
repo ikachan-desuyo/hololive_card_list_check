@@ -15,6 +15,7 @@
  *     ※コスト[ホロパワー：-2]はエンジン側が処理するため run には書かない。
  *
  * 保留: なし（全効果実装済み）。
+ * 修正（2026-07-17 監査）: 色判定を engine._hasColor / (color||'').includes に統一（多色ホロメン対応、総合ルール 2.4.3）。
  */
 export default {
   number: 'hBD24-040',
@@ -24,12 +25,12 @@ export default {
     canUse(engine, ownerIdx) {
       // 白ホロメンが1人以上いる時のみ意味がある
       const p = engine.state.players[ownerIdx];
-      return engine._stageHolomems(p).some((h) => h.stack[0] && h.stack[0].color === '白');
+      return engine._stageHolomems(p).some((h) => engine._hasColor(h, '白'));
     },
     *run(ctx) {
       const entry = yield ctx.chooseHolomem({
         side: 'self',
-        filter: (e) => e.top && e.top.color === '白',
+        filter: (e) => ctx.engine._hasColor(e.holomem, '白'),
         title: 'アーツ+20する白ホロメンを選択',
       });
       if (!entry) return;
@@ -49,10 +50,10 @@ export default {
     canUse(engine, ownerIdx) {
       // デッキに白ホロメンが1枚以上ある時のみ使える
       const p = engine.state.players[ownerIdx];
-      return p.deck.some((c) => c && c.kind === 'holomen' && c.color === '白');
+      return p.deck.some((c) => c && c.kind === 'holomen' && (c.color || '').includes('白'));
     },
     *run(ctx) {
-      const whites = ctx.deckCards((c) => c && c.kind === 'holomen' && c.color === '白');
+      const whites = ctx.deckCards((c) => c && c.kind === 'holomen' && (c.color || '').includes('白'));
       const picked = yield ctx.chooseCard({
         cards: whites,
         title: '手札に加える白ホロメンを選択',

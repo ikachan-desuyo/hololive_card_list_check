@@ -1425,13 +1425,21 @@ export async function runTests() {
     const target = e._createHolomem(fakeHolomen({ name: 'オーロ・クロニー', bloomLevel: 'Debut', hp: 130 }), s.turn); // このターン出た
     p0.center = center; p0.collab = null; p0.back = [target];
     const def = e.registry.get('hBP07-056');
-    const drive = (gen) => { let r = gen.next(); while (!r.done) r = gen.next(null); };
-    // このターン出たtarget → Bloomされない
-    drive(def.triggers.onPerformanceStepStart(e._effectContext(0, { sourceHolomem: center, sourceCard: center.stack[0] })));
+    // 「Bloomできる」は任意効果のため必ず選択が挟まる（2026-07 監査対応）。エンジン経由で先頭の選択肢を選んで駆動する
+    const driveEffect = () => {
+      let done = false;
+      e._runEffect({ run: def.triggers.onPerformanceStepStart },
+        { playerIdx: 0, sourceHolomem: center, sourceCard: center.stack[0] }, () => { done = true; });
+      let guard = 0;
+      while (!done && e.state.pending && guard++ < 10) e.apply(e.state.pending.options[0].id);
+      return done;
+    };
+    // このターン出たtarget → Bloomされない（候補なしで選択も出ない）
+    assert(driveEffect(), '実行が完了しない');
     assertEq(target.stack[0].bloomLevel, 'Debut', 'このターン出たホロメンがBloomされてしまった（出たばかりは不可）');
-    // 前ターンに出ていれば Bloomできる
+    // 前ターンに出ていれば Bloomできる（対象→カードを選択して実行）
     target.placedTurn = s.turn - 1;
-    drive(def.triggers.onPerformanceStepStart(e._effectContext(0, { sourceHolomem: center, sourceCard: center.stack[0] })));
+    assert(driveEffect(), '実行が完了しない');
     assertEq(target.stack[0].bloomLevel, '1st', '前ターンに出たホロメンがBloomされていない');
   });
 
@@ -1581,6 +1589,58 @@ export async function runTests() {
     const shion = { stack: [lib.get('hBP02-042_C')] };
     assertEq(def.attached.hpPlus(lamy), 20, 'ラミィでHP+20になっていない');
     assertEq(def.attached.hpPlus(shion), 0, 'ラミィ以外でHP+20になっている');
+  });
+
+  await testAsync('コンパイラ: 「このホロメン」対象は発生源ホロメン自身のみ（全員バフにならない）', async () => {
+    const def = compileCard(lib.getByNumber('hSD17-009')); // コラボエフェクト「このターンの間、このホロメンのアーツ+20」
+    assert(def?.collabEffect?.run, 'コラボエフェクトがコンパイルされていない');
+    const e = await setupMainStep(deckMap, 106);
+    const p0 = e.state.players[0];
+    if (p0.back.length === 0) p0.back = [e._createHolomem(lib.getByNumber('hBP02-018'), 1)];
+    assert(p0.center && p0.back.length > 0, 'テスト前提: センターとバックが必要');
+    let done = false;
+    e._runEffect(def.collabEffect, { playerIdx: 0, sourceHolomem: p0.center }, () => { done = true; });
+    let guard = 0;
+    while (!done && e.state.pending && guard++ < 10) e.apply(e.state.pending.options[0].id);
+    assert(done, '実行が完了しない');
+    assertEq(e.effects.artsBonus(p0.center, 0), 20, '発生源にアーツ+20が乗っていない');
+    assertEq(e.effects.artsBonus(p0.back[0], 0), 0, '発生源以外にまでアーツ+20が乗っている');
+    e.effects.expireTurnModifiers();
+  });
+
+  await testAsync('コンパイラ: アーカイブ回収の候補がカード指定（〈限界飯〉）に限定される', async () => {
+    const def = compileCard(lib.getByNumber('hBP04-035')); // ブルームエフェクト「アーカイブの〈限界飯〉1枚を手札に戻せる」
+    assert(def?.bloomEffect?.run, 'ブルームエフェクトがコンパイルされていない');
+    const e = await setupMainStep(deckMap, 107);
+    const p0 = e.state.players[0];
+    p0.archive.push({ ...lib.getByNumber('hBP04-091') }); // 限界飯
+    p0.archive.push({ ...lib.getByNumber('hBP01-104') }); // ふつうのパソコン（対象外）
+    let done = false;
+    e._runEffect(def.bloomEffect, { playerIdx: 0, sourceHolomem: p0.center }, () => { done = true; });
+    let guard = 0;
+    while (!done && e.state.pending && guard++ < 10) {
+      const opts = e.state.pending.options;
+      assert(!opts.some((o) => (o.label || '').includes('ふつうのパソコン')), '指定外のカードが回収候補に出ている');
+      e.apply(opts[0].id);
+    }
+    assert(done, '実行が完了しない');
+    assert(p0.hand.some((c) => c.name === '限界飯'), '限界飯が手札に戻っていない');
+  });
+
+  test('コンパイラ: ◆「1st以上の〈X〉」条件はBloomレベルと別名を判定する', () => {
+    const def = compileCard({
+      number: 'TEST-LV', kind: 'support', supportType: 'ツール', keywords: [], arts: [],
+      supportText: 'このツールが付いているホロメンのアーツ+10。\n◆1st以上の〈紫咲シオン〉に付いていたら能力追加。\n■このツールが付いているホロメンのHP+20。',
+    });
+    assert(def?.attached?.hpPlus, '装着修正がコンパイルされていない');
+    const debut = { stack: [{ name: '紫咲シオン', bloomLevel: 'Debut' }] };
+    const first = { stack: [{ name: '紫咲シオン', bloomLevel: '1st' }] };
+    const alias2nd = { stack: [{ name: '別ユニット', nameAliases: ['紫咲シオン'], bloomLevel: '2nd' }] };
+    const other = { stack: [{ name: '雪花ラミィ', bloomLevel: '2nd' }] };
+    assertEq(def.attached.hpPlus(debut), 0, 'DebutなのにHP+20が乗っている');
+    assertEq(def.attached.hpPlus(first), 20, '1stでHP+20が乗らない');
+    assertEq(def.attached.hpPlus(alias2nd), 20, '別名（としても扱う）でHP+20が乗らない');
+    assertEq(def.attached.hpPlus(other), 0, '対象外ホロメンにHP+20が乗っている');
   });
 
   await testAsync('コンパイラ: 「上からN枚見る→選ぶ→残りを下へ」（シオン1stと同等挙動）', async () => {

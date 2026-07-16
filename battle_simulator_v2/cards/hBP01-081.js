@@ -17,12 +17,11 @@ export default {
   collabEffect: {
     name: '空を駆ける光',
     *run(ctx) {
-      // 送り先: 自分の青ホロメン
+      // 送り先: 自分の青ホロメン（「送る」= 強制。青ホロメンがいなければ何もしない）
       const target = yield ctx.chooseHolomem({
         side: 'self',
-        filter: (e) => e.top.color === '青',
+        filter: (e) => ctx.engine._hasColor(e.holomem, '青'),
         title: 'エールデッキの上から1枚を送る青ホロメンを選択',
-        optional: true,
       });
       if (target) ctx.sendCheerFromCheerDeckTop(target.holomem);
     },

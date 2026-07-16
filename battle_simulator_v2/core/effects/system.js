@@ -155,6 +155,16 @@ export class EffectSystem {
   }
 
   /**
+   * 推しホロメン発の特殊ダメージ+N（推しスキル等。発生源ホロメンが存在しない経路）。
+   * 専用アウラ def.auraOshiSpecialDmgPlus(src, oshiCard, targetEntry, engine) を合算する
+   * （「自分の推しホロメンの〈猫又おかゆ〉が相手センターに与える特殊+20」hBP05-045 等）。
+   * 既存の auraSpecialDmgPlus は sourceHolomem 前提の実装が多いため、null を渡さず専用フックに分離している。
+   */
+  specialDamageBonusForOshi(targetEntry, ownerIdx, oshiCard) {
+    return this._auraSum(ownerIdx, (def, src) => def.auraOshiSpecialDmgPlus?.(src, oshiCard, targetEntry, this.engine));
+  }
+
+  /**
    * アーツの必要エール軽減を集約する。戻り値: { 色: 軽減数 }（例 {'無色':1} / {'黄':1}）。
    * 2系統: ①ステージ上のカードの常時オーラ def.artsCostReduceAura(自分, 対象, engine)
    *         ②ターン修正 kind:'artCostReduce'（「このターン、〜のアーツ必要〜-1」）

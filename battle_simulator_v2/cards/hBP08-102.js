@@ -11,6 +11,8 @@
  *   - アーツ+10は attached.artsPlus で常時修正として実装（全ホロメンに対して+10）。
  *   - Buzz付与時の追加能力「相手をダウンさせた時にデッキを2枚引く（ターンに1回）」は
  *     triggers.onOpponentDown として記述し、付け先がBuzzホロメンの時のみ発火・ターン1回制限を入れている。
+ *   - [ターンに1回] は装着コピー単位（キー=ctx.sourceCard のオブジェクト同一性）。
+ *     同一ターンに別々のBuzzホロメンに付いた2枚がそれぞれダウンを取った場合、両方誘発する。
  *
  * 実装済み（旧保留解消）:
  *   - 以前はエンジンの onOpponentDown ディスパッチが「アーツを使ったホロメンのトップカード」
@@ -33,7 +35,11 @@ export default {
     *onOpponentDown(ctx) {
       const host = ctx.sourceHolomem?.stack?.[0];
       if (!host || !host.buzz) return; // Buzzホロメンに付いている時のみ追加能力が有効
-      const key = 'hBP08-102:onOpponentDownDraw';
+      // [ターンに1回] は装着コピー（この能力）単位の制限。キーにこのツール個体
+      // （ctx.sourceCard。エンジンが装着カードトリガーに渡す）を使い、
+      // 別のホロメンに付いた2枚目のパーカーの誘発を誤って封じないようにする。
+      // oncePerTurnUsed/markOncePerTurn の key 比較は === なのでオブジェクト同一性で判定できる。
+      const key = ctx.sourceCard || 'hBP08-102:onOpponentDownDraw';
       if (ctx.oncePerTurnUsed(key)) return; // [ターンに1回]
       ctx.markOncePerTurn(key);
       ctx.draw(2);

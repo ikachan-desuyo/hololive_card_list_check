@@ -14,9 +14,9 @@
  *   自分のデッキから、[〈一条莉々華〉と〈限界飯〉]1枚ずつを公開し、手札に加える。
  *   そしてデッキをシャッフルする。
  *   → 「ダウンした時に使える」＝ダウン処理中に使える推しスキル (12.1.5.2) として onDownOshiSkill で実装。
- *     エンジンの onDownOshiSkill 経路は apply が同期関数で、コストもこの apply 内で支払う。
- *     探索は「〈一条莉々華〉1枚」「〈限界飯〉1枚」を各1枚取るだけ（プレイヤー選択を伴わない確定処理）なので
- *     同期処理で公開→手札へ→シャッフルまで完結できる。SPなので usedSpOshiSkillThisGame で[ゲームに1回]を管理。
+ *     run（対話的ジェネレータ）方式: コスト支払いと[ゲームに1回]の記録（sp:true）はエンジン側が行う。
+ *     〈一条莉々華〉は同名の別カード（別番号・別性能）が複数あるため、どれを加えるかはプレイヤーが
+ *     chooseCard で選ぶ。デッキ＝非公開領域なので「見つからなかったことにする」も選べる（総合ルール 4.1.2.3）。
  */
 export default {
   number: 'hBP04-003',
@@ -48,6 +48,7 @@ export default {
   // 「ダウンした時に使える」SP推しスキル (12.1.5.2)。相手のターンで自分の〈一条莉々華〉がダウンした時。
   onDownOshiSkill: {
     cost: 1,
+    sp: true, // SP推しスキル（コスト支払いと[ゲームに1回]の記録はエンジン側で処理）
     title: 'SP推しスキル「かわいい！ ポジティブ！ ジーニアス！」: 〈一条莉々華〉と〈限界飯〉をデッキから手札に加えますか？',
     canUse(engine, ownerIdx, downedHolomem) {
       const p = engine.state.players[ownerIdx];
@@ -55,33 +56,26 @@ export default {
       return engine.state.turnPlayer !== ownerIdx &&   // 相手のターン
         !p.usedSpOshiSkillThisGame &&                   // [ゲームに1回]
         p.holoPower.length >= 1 &&                       // [ホロパワー：-1]
-        top?.name === '一条莉々華';                      // ダウンしたのが〈一条莉々華〉
+        engine._nameIs(top, '一条莉々華');               // ダウンしたのが〈一条莉々華〉
     },
-    apply(engine, ownerIdx) {
-      const p = engine.state.players[ownerIdx];
-      // コスト支払い＆[ゲームに1回]の消費
-      p.archive.push(...p.holoPower.splice(0, 1));
-      p.usedSpOshiSkillThisGame = true;
-
-      // デッキから〈一条莉々華〉1枚・〈限界飯〉1枚を取り出して公開し手札に加える
-      const grabbed = [];
+    *run(ctx) {
+      // デッキから〈一条莉々華〉1枚・〈限界飯〉1枚を公開し手札に加える
+      // （〈一条莉々華〉は同名の別カードが複数あるため、どれを加えるかプレイヤーが選ぶ）
       for (const name of ['一条莉々華', '限界飯']) {
-        const i = p.deck.findIndex((c) => c.name === name);
-        if (i !== -1) {
-          const card = p.deck.splice(i, 1)[0];
-          p.hand.push(card);
-          engine.flashReveal(card);
-          grabbed.push(card.name);
+        const candidates = ctx.deckCards((c) => ctx.nameIs(c, name));
+        const picked = yield ctx.chooseCard({
+          cards: candidates,
+          title: `デッキから公開して手札に加える〈${name}〉を選択`,
+          optional: true,
+          skipLabel: '見つからなかったことにする',
+        });
+        if (picked) {
+          ctx.removeFromDeck(picked);
+          ctx.addToHand(picked); // 公開して手札へ
         }
       }
-      if (grabbed.length > 0) {
-        engine.log(`SP推しスキル「かわいい！ ポジティブ！ ジーニアス！」: ${grabbed.join(' / ')} を公開し手札に加えた`);
-      } else {
-        engine.log('SP推しスキル「かわいい！ ポジティブ！ ジーニアス！」: デッキに対象カードが無かった');
-      }
       // そしてデッキをシャッフルする
-      engine._shuffle(p.deck);
-      engine.log(`${p.name}: デッキをシャッフル`);
+      ctx.shuffleDeck();
     },
   },
 };

@@ -6,8 +6,9 @@
  * LIMITED：ターンに1枚しか使えない（LIMITED制限はエンジン側で処理）。
  *
  * 解釈: 見た4枚の中から Debutホロメン1枚・1stホロメン1枚を各1枚選んで手札へ。
- *   該当が無ければその枠は加えない（見つからなかったことにする＝0枚可）。
- *   手札に加えなかった残りは好きな順でデッキの下へ。
+ *   「1枚ずつを公開し…加える」＝可能な限り強制（見た4枚は確認済みの確定情報なので、
+ *   該当があれば各1枚必ず加える。「できる」表記が無いため任意化しない）。
+ *   該当が無い枠のみ加えない。手札に加えなかった残りは好きな順でデッキの下へ。
  */
 export default {
   number: 'hBP03-085',
@@ -22,15 +23,13 @@ export default {
       const looked = ctx.lookTopDeck(4);
       const taken = [];
 
-      // Debutホロメン1枚を公開して手札へ
+      // Debutホロメン1枚を公開して手札へ（候補があれば必ず加える＝強制）
       const debutCands = looked.filter(
         (c) => c.kind === 'holomen' && c.bloomLevel === 'Debut');
       if (debutCands.length > 0) {
         const picked = yield ctx.chooseCard({
           cards: debutCands,
           title: '公開して手札に加えるDebutホロメンを選択',
-          optional: true,
-          skipLabel: '加えない',
         });
         if (picked) {
           ctx.addToHand(picked); // revealed領域から手札へ（公開）
@@ -38,15 +37,13 @@ export default {
         }
       }
 
-      // 1stホロメン1枚を公開して手札へ（既に取ったカードは除外）
+      // 1stホロメン1枚を公開して手札へ（候補があれば必ず加える＝強制。既に取ったカードは除外）
       const firstCands = looked.filter(
         (c) => c.kind === 'holomen' && c.bloomLevel === '1st' && !taken.includes(c));
       if (firstCands.length > 0) {
         const picked = yield ctx.chooseCard({
           cards: firstCands,
           title: '公開して手札に加える1stホロメンを選択',
-          optional: true,
-          skipLabel: '加えない',
         });
         if (picked) {
           ctx.addToHand(picked);

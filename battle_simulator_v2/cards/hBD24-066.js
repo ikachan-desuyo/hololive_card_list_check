@@ -3,7 +3,7 @@
  *
  * 推しスキル「レッドエンハンス」[ホロパワー：-2][ターンに1回]:
  *   このターンの間、自分の赤ホロメン1人のアーツ+20。
- *   → oshiSkill（能動）。自分の赤ホロメン（トップカードの色が赤）を1人選び、
+ *   → oshiSkill（能動）。自分の赤ホロメン（engine._hasColor: 多色・全色扱い対応）を1人選び、
  *     そのホロメン限定で「このターンの間アーツ+20」のターン修正を付与する。
  *     match は選んだホロメン実体に一致（ブルーム/移動しても同じスタックを追う）。
  *     ※コスト[ホロパワー：-2]はエンジン側が処理するため run には書かない。
@@ -24,12 +24,12 @@ export default {
     canUse(engine, ownerIdx) {
       // 赤ホロメンが1人以上いる時のみ意味がある
       const p = engine.state.players[ownerIdx];
-      return engine._stageHolomems(p).some((h) => h.stack[0] && h.stack[0].color === '赤');
+      return engine._stageHolomems(p).some((h) => h.stack[0] && engine._hasColor(h, '赤'));
     },
     *run(ctx) {
       const entry = yield ctx.chooseHolomem({
         side: 'self',
-        filter: (e) => e.top && e.top.color === '赤',
+        filter: (e) => e.top && ctx.engine._hasColor(e.holomem, '赤'),
         title: 'アーツ+20する赤ホロメンを選択',
       });
       if (!entry) return;
@@ -49,10 +49,10 @@ export default {
     canUse(engine, ownerIdx) {
       // デッキに赤ホロメンが1枚以上ある時のみ使える
       const p = engine.state.players[ownerIdx];
-      return p.deck.some((c) => c && c.kind === 'holomen' && c.color === '赤');
+      return p.deck.some((c) => c && c.kind === 'holomen' && (c.color || '').includes('赤'));
     },
     *run(ctx) {
-      const reds = ctx.deckCards((c) => c && c.kind === 'holomen' && c.color === '赤');
+      const reds = ctx.deckCards((c) => c && c.kind === 'holomen' && (c.color || '').includes('赤'));
       const picked = yield ctx.chooseCard({
         cards: reds,
         title: '手札に加える赤ホロメンを選択',

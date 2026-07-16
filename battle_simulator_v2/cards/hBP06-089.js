@@ -31,11 +31,11 @@ export default {
         }
       }
       ctx.shuffleCheerDeck();
-      // アーカイブの#絵ホロメン1枚を手札に戻す
+      // アーカイブの#絵ホロメン1枚を手札に戻す（強制。アーカイブは公開領域なので候補があれば必ず戻す）
       const arts = ctx.player.archive.filter((c) => c.kind === 'holomen' && (c.tags || []).includes('絵'));
       if (arts.length === 0) return;
       const back = yield ctx.chooseCard({
-        cards: arts, title: '手札に戻す #絵 のホロメンを選択（任意）', optional: true, skipLabel: '戻さない',
+        cards: arts, title: '手札に戻す #絵 のホロメンを選択',
       });
       if (back) { ctx.removeFromArchive(back); ctx.addToHand(back, { reveal: false }); }
     },

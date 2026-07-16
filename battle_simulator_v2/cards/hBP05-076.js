@@ -2,6 +2,7 @@
  * ちょこのビーフストロガノフ (hBP05-076) サポート・イベント（#食べ物）
  * このターンの間、自分のステージのホロメン1人のアーツ+10。
  * その後、このターンの間、自分のステージの2ndホロメンの〈癒月ちょこ〉1人のアーツ+10。
+ *   → ②は「できる」表記なし=強制。対象の2nd〈癒月ちょこ〉がいれば必ず1人に+10を付与する。
  */
 export default {
   number: 'hBP05-076',
@@ -17,14 +18,13 @@ export default {
           description: `このターン、${h1.stack[0].name} のアーツ+10`,
         });
       }
-      // ②2ndの〈癒月ちょこ〉1人 +10（いれば）
-      const choco = ctx.holomems('self', (e) => e.top.name === '癒月ちょこ' && e.top.bloomLevel === '2nd');
+      // ②2ndの〈癒月ちょこ〉1人 +10（「できる」表記なし=強制。対象がいれば必ず付与）
+      const choco = ctx.holomems('self', (e) => ctx.nameIs(e.top, '癒月ちょこ') && e.top.bloomLevel === '2nd');
       if (choco.length === 0) return;
       const second = yield ctx.chooseHolomem({
         side: 'self',
-        filter: (e) => e.top.name === '癒月ちょこ' && e.top.bloomLevel === '2nd',
+        filter: (e) => ctx.nameIs(e.top, '癒月ちょこ') && e.top.bloomLevel === '2nd',
         title: 'さらにアーツ+10する2ndの〈癒月ちょこ〉を選択',
-        optional: true,
       });
       if (second) {
         const h2 = second.holomem;

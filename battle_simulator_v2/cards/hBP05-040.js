@@ -4,8 +4,8 @@
  * [コラボエフェクト] ビジネスフレンド:
  *   自分のライフが3以下なら、自分のこのターンにBloomしたセンターホロメンの
  *   〈さくらみこ〉か〈星街すいせい〉を、自分の手札のホロメンを使ってもう1回Bloomできる。
- *   → センターがこのターンにBloom済み（bloomedTurn===turn）で、かつトップ名が
- *      さくらみこ/星街すいせいのとき、手札のホロメンで「もう1回」Bloomできる。
+ *   → センターがこのターンにBloom済み（bloomedTurn===turn）で、かつトップが
+ *      さくらみこ/星街すいせい（別名「としても扱う」込み）のとき、手札のホロメンで「もう1回」Bloomできる。
  *      通常Bloomの判定（同名・レベル遷移・新HP>ダメージ 8.3.2-3）は満たす必要があるが、
  *      「このターンBloom済みは不可」の制限のみ迂回する。Bloom後はブルームエフェクトも誘発する。
  *
@@ -21,7 +21,7 @@ function canReBloom(engine, h, card) {
   if (card.kind !== 'holomen') return false;
   if (h.faceDown) return false;
   if (top.bloomLevel === 'Spot') return false;
-  if (top.name !== card.name) return false;          // 同名であること
+  if (!engine._bloomNameMatches(top, card)) return false; // 同名（別名「としても扱う」込み 8.3.2）
   if ((card.hp || 0) <= h.damage) return false;      // 新HPがダメージより大きいこと
   if (card.bloomLevel === '1st') {
     return top.bloomLevel === 'Debut' || top.bloomLevel === '1st';
@@ -45,8 +45,8 @@ export default {
       const centerTop = center.stack[0];
       // このターンにBloomしたセンターであること
       if (center.bloomedTurn !== ctx.state.turn) return;
-      // 〈さくらみこ〉か〈星街すいせい〉
-      if (centerTop.name !== 'さくらみこ' && centerTop.name !== '星街すいせい') return;
+      // 〈さくらみこ〉か〈星街すいせい〉（別名「としても扱う」込み）
+      if (!ctx.nameIs(centerTop, 'さくらみこ') && !ctx.nameIs(centerTop, '星街すいせい')) return;
 
       // 手札のホロメンのうち、このセンターへ「もう1回Bloom」できるもの
       const candidates = ctx.player.hand.filter(

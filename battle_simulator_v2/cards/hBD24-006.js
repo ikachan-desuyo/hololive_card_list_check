@@ -12,6 +12,7 @@
  *      （hBP01-002 のイベントサーチと同形。色＝紫・kind＝holomen で絞る）
  *
  * 保留: なし
+ * 修正（2026-07-17 監査）: SPスキルのデッキサーチに「加えない」を追加（非公開領域は見つからなかったことにできる、総合ルール 4.1.2.3）。
  */
 export default {
   number: 'hBD24-006',
@@ -21,12 +22,12 @@ export default {
     canUse(engine, ownerIdx) {
       const p = engine.state.players[ownerIdx];
       // 自分の紫ホロメンが1人以上いる時のみ意味がある
-      return engine._stageHolomems(p).some((h) => h.stack[0] && h.stack[0].color === '紫');
+      return engine._stageHolomems(p).some((h) => h.stack[0] && (h.stack[0].color || '').includes('紫'));
     },
     *run(ctx) {
       const entry = yield ctx.chooseHolomem({
         side: 'self',
-        filter: (e) => e.top && e.top.color === '紫',
+        filter: (e) => e.top && (e.top.color || '').includes('紫'),
         title: 'アーツ+20する紫ホロメンを選択',
       });
       if (!entry) return;
@@ -42,7 +43,7 @@ export default {
   spOshiSkill: {
     name: 'Birthday Gift ～Purple～',
     *run(ctx) {
-      const mems = ctx.deckCards((c) => c.kind === 'holomen' && c.color === '紫');
+      const mems = ctx.deckCards((c) => c.kind === 'holomen' && (c.color || '').includes('紫'));
       if (mems.length === 0) {
         ctx.log(`${ctx.player.name}: デッキに紫ホロメンが無い`);
         ctx.shuffleDeck();
@@ -51,6 +52,8 @@ export default {
       const picked = yield ctx.chooseCard({
         cards: mems,
         title: '手札に加える紫ホロメンを選択',
+        optional: true,
+        skipLabel: '加えない',
       });
       if (picked) {
         ctx.removeFromDeck(picked);

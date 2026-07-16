@@ -11,8 +11,9 @@ export default {
     name: 'この日が来た！',
     *run(ctx) {
       if (!ctx.isFirstTurnGoingSecond()) return;
-      // センターホロメン（〈オーロ・クロニー〉）を取得
-      const centerEntry = ctx.holomems('self', (e) => e.pos.zone === 'center')[0];
+      // センターホロメンが〈オーロ・クロニー〉であること（別名 nameAliases 込み）を確認
+      const centerEntry = ctx.holomems('self',
+        (e) => e.pos.zone === 'center' && ctx.nameIs(e.top, 'オーロ・クロニー'))[0];
       if (!centerEntry) return;
       const center = centerEntry.holomem;
       // 手札の1stホロメンで、このセンターにBloomできるもの（同名・HP>ダメージ）

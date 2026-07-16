@@ -12,6 +12,8 @@
  *      （「公開し」=reveal、加えた後にデッキをシャッフル）
  *
  * 保留: なし（両スキルとも既存プリミティブで実装済み）。
+ * 修正（2026-07-17 監査）: 色判定を engine._hasColor / (color||'').includes に統一（多色ホロメン対応、総合ルール 2.4.3）。
+ * 修正（2026-07-17 監査）: SPスキルのデッキサーチに「加えない」を追加（非公開領域は見つからなかったことにできる、総合ルール 4.1.2.3）。
  */
 export default {
   number: 'hBD24-015',
@@ -21,12 +23,12 @@ export default {
     canUse(engine, ownerIdx) {
       const p = engine.state.players[ownerIdx];
       // 自分の赤ホロメンが1人以上いる時のみ意味がある
-      return engine._stageHolomems(p).some((h) => h.stack[0].color === '赤');
+      return engine._stageHolomems(p).some((h) => engine._hasColor(h, '赤'));
     },
     *run(ctx) {
       const entry = yield ctx.chooseHolomem({
         side: 'self',
-        filter: (e) => e.top.color === '赤',
+        filter: (e) => ctx.engine._hasColor(e.holomem, '赤'),
         title: 'アーツ+20する自分の赤ホロメンを選択',
       });
       if (!entry) return;
@@ -42,7 +44,7 @@ export default {
   spOshiSkill: {
     name: 'Birthday Gift ～Red～',
     *run(ctx) {
-      const reds = ctx.deckCards((c) => c.kind === 'holomen' && c.color === '赤');
+      const reds = ctx.deckCards((c) => c.kind === 'holomen' && (c.color || '').includes('赤'));
       if (reds.length === 0) {
         ctx.log(`${ctx.player.name}: デッキに赤ホロメンが無い`);
         ctx.shuffleDeck();
@@ -51,6 +53,8 @@ export default {
       const picked = yield ctx.chooseCard({
         cards: reds,
         title: '手札に加える赤ホロメンを選択',
+        optional: true,
+        skipLabel: '加えない',
       });
       if (picked) {
         ctx.removeFromDeck(picked);

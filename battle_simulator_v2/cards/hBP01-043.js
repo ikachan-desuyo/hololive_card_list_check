@@ -21,6 +21,8 @@ export default {
         const ok = yield ctx.confirm('サイコロを3回振ってこのアーツを強化しますか？');
         if (!ok) return;
         const rolls = yield* ctx.rollDiceMany(3); // 1度に3回（hBP04-005「総帥のお仕事」が効く単位）
+        // 〈兎田ぺこら〉の能力でサイコロを振った（hBP03-023「カードするぺこ」の判定用共有フラグ）
+        ctx.markOncePerTurn('兎田ぺこら:diceRolled');
         const sum = rolls.reduce((a, b) => a + b, 0);
         ctx.addArtBonus(sum * 10, `サイコロ3回の合計${sum}×10`);
       },

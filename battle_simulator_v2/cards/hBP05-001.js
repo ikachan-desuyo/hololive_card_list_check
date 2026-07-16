@@ -65,7 +65,7 @@ export default {
     apply(engine, ownerIdx, downedHolomem) {
       const p = engine.state.players[ownerIdx];
       p.archive.push(...p.holoPower.splice(0, 2));
-      p.usedSpOshiSkillThisGame = true;
+      engine._markSpOshiSkillUsed(p); // SP使用の記録（ターン/推し番号つき）
       // 自分の減るライフ-1（_processDown.finish が h.lifeReductionOnDown を参照する）
       downedHolomem.lifeReductionOnDown = (downedHolomem.lifeReductionOnDown || 0) + 1;
       engine.log('SP推しスキル「スーパーまずった太郎」: 自分の減るライフ-1');

@@ -27,8 +27,8 @@ export default {
     cost: 1,
     title: '推しスキル「レイン・シャーマニズム」: 相手のホロメン1人に特殊ダメージ20を与えますか？',
     canUse(engine, ownerIdx, info) {
-      // アーカイブを起こした能力の発生源が青ホロメンであること
-      return !!info.source && info.source.stack[0].color === '青';
+      // アーカイブを起こした能力の発生源が青ホロメンであること（多色・全色扱い対応）
+      return !!info.source && engine._hasColor(info.source, '青');
     },
     *run(ctx) {
       if (ctx.holomems('opp').length === 0) return;

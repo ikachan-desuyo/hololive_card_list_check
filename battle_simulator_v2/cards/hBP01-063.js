@@ -37,9 +37,8 @@ export default {
         skipLabel: '発動しない',
       });
       if (!cost) return;
-      ctx.removeFromHand(cost);
-      ctx.player.archive.push(cost);
-      ctx.log(`${ctx.player.name}: ${cost.name} をアーカイブ`);
+      // 共通プリミティブ経由（推しスキルのコスト置換・装着ツールの誘発を有効にする）
+      yield* ctx.archiveHandCard(cost);
 
       // 効果: デッキからマスコット1枚を公開して手札に加える
       const mascots = ctx.deckCards((c) => c.supportType === 'マスコット');

@@ -3,7 +3,7 @@
  *
  * 推しスキル「グリーンエンハンス」[ホロパワー：-2][ターンに1回]:
  *   このターンの間、自分の緑ホロメン1人のアーツ+20。
- *   → oshiSkill（能動）。自分の緑ホロメン（トップカードの色が緑）を1人選び、
+ *   → oshiSkill（能動）。自分の緑ホロメン（engine._hasColor: 多色・全色扱い対応）を1人選び、
  *     そのホロメン限定で「このターンの間アーツ+20」のターン修正を付与する。
  *     match は選んだホロメン実体に一致（ブルーム/移動しても同じスタックを追う）。
  *     ※コスト[ホロパワー：-2]・[ターンに1回]はエンジン側が処理するため run には書かない。
@@ -24,12 +24,12 @@ export default {
     canUse(engine, ownerIdx) {
       // 緑ホロメンが1人以上いる時のみ意味がある
       const p = engine.state.players[ownerIdx];
-      return engine._stageHolomems(p).some((h) => h.stack[0] && h.stack[0].color === '緑');
+      return engine._stageHolomems(p).some((h) => h.stack[0] && engine._hasColor(h, '緑'));
     },
     *run(ctx) {
       const entry = yield ctx.chooseHolomem({
         side: 'self',
-        filter: (e) => e.top && e.top.color === '緑',
+        filter: (e) => e.top && ctx.engine._hasColor(e.holomem, '緑'),
         title: 'このターン アーツ+20する緑ホロメンを選択',
       });
       if (!entry) return;
@@ -49,10 +49,10 @@ export default {
     canUse(engine, ownerIdx) {
       // デッキに緑ホロメンが1枚以上ある時のみ使える
       const p = engine.state.players[ownerIdx];
-      return p.deck.some((c) => c && c.kind === 'holomen' && c.color === '緑');
+      return p.deck.some((c) => c && c.kind === 'holomen' && (c.color || '').includes('緑'));
     },
     *run(ctx) {
-      const greens = ctx.deckCards((c) => c && c.kind === 'holomen' && c.color === '緑');
+      const greens = ctx.deckCards((c) => c && c.kind === 'holomen' && (c.color || '').includes('緑'));
       const picked = yield ctx.chooseCard({
         cards: greens,
         title: '手札に加える緑ホロメンを選択',

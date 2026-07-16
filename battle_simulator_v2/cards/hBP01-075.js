@@ -1,26 +1,39 @@
 /**
  * ハコス・ベールズ (hBP01-075)
- * コラボエフェクト: お互い、手札すべてを好きな順でデッキの下に戻す。
- * 次に、お互い、デッキに戻したカード1枚につき、それぞれのデッキを1枚引く。
+ * コラボエフェクト「カオスシャッフル」:
+ *   お互い、手札すべてを好きな順でデッキの下に戻す。
+ *   次に、お互い、デッキに戻したカード1枚につき、それぞれのデッキを1枚引く。
+ *   → 「好きな順で」= 各プレイヤーが自分の手札の戻し順を選ぶ（orderCardsFlow）。
+ *     相手側の順序選択は相手プレイヤーが行う（相手所有の EffectContext を使う）。
  */
+import { EffectContext } from '../core/effects/context.js';
+
 export default {
   number: 'hBP01-075',
   collabEffect: {
-    name: 'コラボエフェクト',
+    name: 'カオスシャッフル',
     *run(ctx) {
+      // 自分→相手の順に処理（順序選択は各自が行う）
+      const ctxes = [ctx, new EffectContext(ctx.engine, 1 - ctx.playerIdx, {})];
       const counts = [];
-      for (const p of [ctx.player, ctx.opponent]) {
+      for (const c of ctxes) {
+        const p = c.player;
         const n = p.hand.length;
         counts.push(n);
-        p.deck.push(...p.hand); // 順序選択は省略（戻した順）
-        p.hand = [];
+        if (n > 1) {
+          // 好きな順でデッキの下に戻す（戻し順は持ち主が選ぶ）
+          const ordered = yield* c.orderCardsFlow(p.hand.slice(), 'デッキの下に戻す順番');
+          p.hand = [];
+          c.deckToBottom(ordered);
+        } else {
+          c.deckToBottom(p.hand);
+          p.hand = [];
+        }
         ctx.log(`${p.name}: 手札${n}枚をデッキの下に戻した`);
       }
-      [ctx.player, ctx.opponent].forEach((p, i) => {
-        for (let k = 0; k < counts[i] && p.deck.length > 0; k++) {
-          p.hand.push(p.deck.shift());
-        }
-        ctx.log(`${p.name}: ${counts[i]}枚ドロー`);
+      // 次に、戻した1枚につきそれぞれ1枚引く
+      ctxes.forEach((c, i) => {
+        if (counts[i] > 0) c.draw(counts[i]);
       });
     },
   },

@@ -12,6 +12,8 @@
  *      （「公開し」=reveal、加えた後にデッキをシャッフル。該当が無くてもシャッフルは行う）
  *
  * 保留: なし
+ * 修正（2026-07-17 監査）: 色判定を engine._hasColor / (color||'').includes に統一（多色ホロメン対応、総合ルール 2.4.3）。
+ * 修正（2026-07-17 監査）: SPスキルのデッキサーチに「加えない」を追加（非公開領域は見つからなかったことにできる、総合ルール 4.1.2.3）。
  */
 export default {
   number: 'hBD24-005',
@@ -20,12 +22,12 @@ export default {
     canUse(engine, ownerIdx) {
       const p = engine.state.players[ownerIdx];
       // 自分の白ホロメンが1人でもいれば使える
-      return engine._stageHolomems(p).some((h) => h.stack[0].color === '白');
+      return engine._stageHolomems(p).some((h) => engine._hasColor(h, '白'));
     },
     *run(ctx) {
       const entry = yield ctx.chooseHolomem({
         side: 'self',
-        filter: (e) => e.top.color === '白',
+        filter: (e) => ctx.engine._hasColor(e.holomem, '白'),
         title: 'このターン アーツ+20する白ホロメンを選択',
       });
       if (!entry) return;
@@ -40,7 +42,7 @@ export default {
   spOshiSkill: {
     name: 'Birthday Gift ～White～',
     *run(ctx) {
-      const whites = ctx.deckCards((c) => c.kind === 'holomen' && c.color === '白');
+      const whites = ctx.deckCards((c) => c.kind === 'holomen' && (c.color || '').includes('白'));
       if (whites.length === 0) {
         ctx.log(`${ctx.player.name}: デッキに白ホロメンが無い`);
         ctx.shuffleDeck();
@@ -49,6 +51,8 @@ export default {
       const picked = yield ctx.chooseCard({
         cards: whites,
         title: '手札に加える白ホロメンを選択',
+        optional: true,
+        skipLabel: '加えない',
       });
       if (picked) {
         ctx.removeFromDeck(picked);

@@ -21,9 +21,9 @@ export default {
   collabEffect: {
     name: 'おしまいのあじまり',
     *run(ctx) {
-      // コスト: 手札の〈大空スバル〉1枚を公開してデッキの下に戻す（任意）
+      // コスト: 手札の〈大空スバル〉1枚を公開してデッキの下に戻す（任意。別のラムダック等の別名も可）
       const subaruInHand = ctx.player.hand.filter(
-        (c) => c.kind === 'holomen' && c.name === '大空スバル');
+        (c) => c.kind === 'holomen' && ctx.nameIs(c, '大空スバル'));
       if (subaruInHand.length === 0) return; // コストを払えないので効果も発動しない
 
       const ok = yield ctx.confirm(
@@ -39,9 +39,9 @@ export default {
       ctx.log(`${ctx.player.name}: ${picked.name} を公開しデッキの下に戻した`);
       ctx.deckToBottom([picked]);
 
-      // 効果: アーカイブの〈角巻わため〉か〈大空スバル〉1枚を手札に戻す
+      // 効果: アーカイブの〈角巻わため〉か〈大空スバル〉1枚を手札に戻す（ラムダック等の別名も候補に含める）
       const candidates = ctx.player.archive.filter(
-        (c) => c.name === '角巻わため' || c.name === '大空スバル');
+        (c) => ctx.nameIs(c, '角巻わため') || ctx.nameIs(c, '大空スバル'));
       if (candidates.length === 0) return;
       const ret = yield ctx.chooseCard({
         cards: candidates,
@@ -63,9 +63,9 @@ export default {
     if (ownerIdx === -1) return [];
     const p = engine.state.players[ownerIdx];
 
-    // 「かわりに」: センターが2ndホロメンの〈角巻わため〉なら黄-3（こちらを優先）
+    // 「かわりに」: センターが2ndホロメンの〈角巻わため〉なら黄-3（こちらを優先。別名も含めて名称参照）
     const center = p.center;
-    if (center && center.stack[0].name === '角巻わため' && center.stack[0].bloomLevel === '2nd') {
+    if (center && engine._nameIs(center.stack[0], '角巻わため') && center.stack[0].bloomLevel === '2nd') {
       return [{ color: '黄', amount: 3 }];
     }
 

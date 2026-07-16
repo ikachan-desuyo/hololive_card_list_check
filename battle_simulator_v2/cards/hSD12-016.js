@@ -10,8 +10,9 @@
  *   → triggers.onAttach（手札からのマスコット装着＝engine の supportAttach 経由で発火）。
  *     付け先が〈古石ビジュー〉かつ bloomLevel が 1st 以上（1st/2nd）の時のみ誘発。
  *     コスト（自分のステージのエール1枚をアーカイブ）は任意（「できる：」）なので confirm + 選択で支払う。
- *     コストを支払えた場合のみ、エールデッキの上から1枚を公開し、選んだ自分のホロメンに送り、
- *     エールデッキをシャッフルする。
+ *     コストを支払えた場合、エールデッキ内から任意のエール1枚を選んで公開し（非公開領域の
+ *     サーチ＝見つからなかったことにできる。参考: hBP02-023）、選んだ自分のホロメンに送り、
+ *     エールデッキをシャッフルする（トップ固定ではない。だから後でシャッフルする）。
  *
  * マスコットは、自分のホロメン1人につき1枚だけ付けられる。
  *   → マスコットの既定ルール（1人1枚）。attachRule を特に指定しない。
@@ -53,12 +54,25 @@ export default {
       const owner = cheerOptions.find((o) => o.cheer === picked).owner;
       yield* ctx.archiveCheer(owner, picked);
 
-      // エールデッキから1枚を公開し、自分のホロメンに送る → エールデッキをシャッフル
-      const target = yield ctx.chooseHolomem({
-        side: 'self',
-        title: 'エールデッキの上から1枚を送る自分のホロメンを選択',
+      // エールデッキ内からエール1枚を選んで公開し、自分のホロメンに送る → エールデッキをシャッフル
+      const cheer = yield ctx.chooseCard({
+        cards: ctx.player.cheerDeck,
+        title: 'エールデッキから送るエールを選択',
+        optional: true,
+        skipLabel: '見つからなかったことにする',
       });
-      if (target) ctx.sendCheerFromCheerDeckTop(target.holomem);
+      if (cheer) {
+        const target = yield ctx.chooseHolomem({
+          side: 'self',
+          title: 'エールを送る自分のホロメンを選択',
+        });
+        if (target) {
+          ctx.removeFromCheerDeck(cheer);
+          ctx.log(`${ctx.player.name}: エールデッキから ${cheer.name} を公開`);
+          ctx.flashReveal(cheer);
+          ctx.attachCheer(cheer, target.holomem);
+        }
+      }
       ctx.shuffleCheerDeck();
     },
   },

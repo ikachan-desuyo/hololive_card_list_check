@@ -6,13 +6,10 @@
  *
  * 実装メモ:
  *   - 「コラボポジション限定」→ ctx.engine._zoneOf(sourceHolomem) === 'collab' で判定。
- *   - 「このターンの自分のメインステップにSP推しスキルを使っていた」条件について、
- *     エンジンが追跡しているのはゲーム単位の usedSpOshiSkillThisGame のみで、
- *     「このターン使ったか」を厳密に判定する per-turn フラグが無い。
- *     SP推しスキルは1ゲームに1回しか使えないため、フラグが立つのは実際に使った1ターンだけ
- *     だが、それ以降のターンでも立ちっぱなしになる。よって本来「使ったそのターンのみ」+50の
- *     ところを「SP使用後の全ターンで」+50と過剰適用する近似実装になっている（厳密には不正確）。
- *     per-turn の SP使用追跡が入ったら usedSpOshiSkillThisTurn 等に差し替えること。
+ *   - 「このターンの自分のメインステップにSP推しスキルを使っていた」→
+ *     ctx.player.spOshiSkillUsedInfo（{ turn, oshiNumber, text }）の turn が現在ターンと
+ *     一致するかで判定。相手ターンに使うSP（クイックガード等）はターン番号が異なるため
+ *     自動的に除外され、自分ターンに使えるSPはメインステップでの使用になる。
  */
 export default {
   number: 'hSD06-010',
@@ -21,8 +18,9 @@ export default {
       dmgBonus(ctx) {
         // コラボポジション限定
         if (ctx.engine._zoneOf(ctx.sourceHolomem) !== 'collab') return 0;
-        // このターン（近似: このゲーム）SP推しスキルを使っていたなら +50
-        return ctx.player.usedSpOshiSkillThisGame ? 50 : 0;
+        // このターンに自分のSP推しスキルを使っていたなら +50
+        const info = ctx.player.spOshiSkillUsedInfo;
+        return info && info.turn === ctx.state.turn ? 50 : 0;
       },
     },
   },

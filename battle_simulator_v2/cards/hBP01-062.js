@@ -16,8 +16,8 @@ export default {
           title: 'アーカイブする手札を選択',
         });
         if (!card) return;
-        ctx.removeFromHand(card);
-        ctx.player.archive.push(card);
+        // 共通プリミティブ経由（推しスキルのコスト置換・装着ツールの誘発を有効にする）
+        yield* ctx.archiveHandCard(card);
         ctx.addArtBonus(20, '手札1枚をアーカイブ');
       },
     },

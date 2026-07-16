@@ -3,7 +3,11 @@
  * コラボエフェクト: 相手のバックホロメン1人をDebutホロメンに戻す
  *   （ダメージを無くした後、Debutホロメン1枚とエールすべてを残し、他のカードすべてを手札に戻す）。
  * アーツ: 自分のこのターンに出したDebutバックホロメン1人を、自分の手札の1stホロメンにBloomできる。
+ *   → 効果によるBloom。通常Bloom（engine.js の bloom 処理）と同様に、ブルームエフェクトは
+ *     Bloomしたホロメンを sourceHolomem にした新しい ctx で解決し、装着カードの onBloom も発火する。
  */
+import { EffectContext } from '../core/effects/context.js';
+
 export default {
   number: 'hBP01-095',
   collabEffect: {
@@ -52,13 +56,26 @@ export default {
         });
         if (!entry) return;
         ctx.removeFromHand(card);
-        entry.holomem.stack.unshift(card);
-        entry.holomem.bloomedTurn = turn;
-        ctx.log(`${entry.holomem.stack[1].name} → ${card.name}〔1st〕にBloom（効果による）`);
+        const h = entry.holomem;
+        h.stack.unshift(card);
+        h.bloomedTurn = turn;
+        ctx.log(`${h.stack[1].name} → ${card.name}〔1st〕にBloom（効果による）`);
+        // 通常Bloomと同様、Bloomしたホロメンを sourceHolomem にした ctx でブルームエフェクトを解決
         const def = ctx.engine.registry.get(card.number)?.bloomEffect;
         if (def) {
           ctx.log(`《ブルームエフェクト》${def.name}`);
-          yield* def.run(ctx);
+          yield* def.run(new EffectContext(ctx.engine, ctx.playerIdx, {
+            sourceCard: card, sourceHolomem: h,
+          }));
+        }
+        // 装着カードの「Bloomした時」トリガー（通常Bloom時と同様に発火）
+        for (const att of [...h.attachments]) {
+          const atrig = ctx.engine.registry.get(att.number)?.triggers?.onBloom;
+          if (atrig) {
+            yield* atrig(new EffectContext(ctx.engine, ctx.playerIdx, {
+              sourceCard: att, sourceHolomem: h,
+            }));
+          }
         }
       },
     },

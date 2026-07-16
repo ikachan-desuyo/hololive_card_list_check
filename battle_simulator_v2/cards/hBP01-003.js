@@ -23,7 +23,7 @@ export default {
     },
     *run(ctx) {
       // 付け先候補（自分の緑ホロメン）が無ければ付けずにシャッフルのみ
-      const greenTargets = ctx.holomems('self', (e) => e.top.color === '緑');
+      const greenTargets = ctx.holomems('self', (e) => ctx.engine._hasColor(e.holomem, '緑'));
       const cand = ctx.deckCards((c) => c.name === '石の斧');
       if (cand.length === 0 || greenTargets.length === 0) {
         ctx.shuffleDeck();
@@ -38,7 +38,7 @@ export default {
       if (picked) {
         const target = yield ctx.chooseHolomem({
           side: 'self',
-          filter: (e) => e.top.color === '緑',
+          filter: (e) => ctx.engine._hasColor(e.holomem, '緑'),
           title: '〈石の斧〉を付ける緑ホロメンを選択',
         });
         if (target) {
@@ -54,12 +54,12 @@ export default {
     name: '大地の唄',
     canUse(engine, ownerIdx) {
       const p = engine.state.players[ownerIdx];
-      // センターホロメンが居て、その色が緑であること
-      return !!p.center && p.center.stack[0].color === '緑';
+      // センターホロメンが居て、その色が緑であること（多色・全色扱い対応）
+      return !!p.center && engine._hasColor(p.center, '緑');
     },
     *run(ctx) {
       const center = ctx.player.center;
-      if (center && center.stack[0].color === '緑') {
+      if (center && ctx.engine._hasColor(center, '緑')) {
         ctx.healAll(center);
       }
     },

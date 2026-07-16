@@ -23,12 +23,12 @@ export default {
     canUse(engine, ownerIdx) {
       const p = engine.state.players[ownerIdx];
       // 自分のステージに黄ホロメンがいること
-      return engine._stageHolomems(p).some((h) => h.stack[0]?.color === '黄');
+      return engine._stageHolomems(p).some((h) => engine._hasColor(h, '黄'));
     },
     *run(ctx) {
       const entry = yield ctx.chooseHolomem({
         side: 'self',
-        filter: (e) => e.top.color === '黄',
+        filter: (e) => (e.top.color || '').includes('黄'),
         title: 'このターン アーツ+20する黄ホロメンを選択',
       });
       if (!entry) return;
@@ -48,10 +48,10 @@ export default {
     canUse(engine, ownerIdx) {
       const p = engine.state.players[ownerIdx];
       // デッキに黄ホロメンがいること
-      return p.deck.some((c) => c.kind === 'holomen' && c.color === '黄');
+      return p.deck.some((c) => c.kind === 'holomen' && (c.color || '').includes('黄'));
     },
     *run(ctx) {
-      const cand = ctx.deckCards((c) => c.kind === 'holomen' && c.color === '黄');
+      const cand = ctx.deckCards((c) => c.kind === 'holomen' && (c.color || '').includes('黄'));
       const picked = yield ctx.chooseCard({
         cards: cand,
         title: 'デッキから黄ホロメン1枚を公開して手札に加える',

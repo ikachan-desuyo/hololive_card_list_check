@@ -33,6 +33,7 @@ export default {
     },
     *run(ctx) {
       // #5期生 を持つ 2nd ホロメン全員に、アーカイブのエールを1枚ずつ送る
+      // （「送る」= 強制。アーカイブは公開領域なので、エールがある限り各対象へ必ず送る）
       const targets = ctx.holomems('self', (e) => isTarget2nd(ctx, e));
       for (const t of targets) {
         const cheers = ctx.player.archive.filter((c) => c.kind === 'cheer');
@@ -40,8 +41,6 @@ export default {
         const picked = yield ctx.chooseCard({
           cards: cheers,
           title: `${t.top.name} に送るエールを選択（アーカイブから）`,
-          optional: true,
-          skipLabel: 'このホロメンには送らない',
         });
         if (picked) {
           ctx.removeFromArchive(picked);

@@ -10,7 +10,8 @@
  *   このホロメンに付いている〈35P〉1枚につき、このアーツ+20。
  *   ※特攻〈緑+50〉はエンジン側で処理されるためここでは扱わない。
  */
-const count35P = (holomem) => (holomem?.cheers || []).filter((c) => c.name === '35P').length;
+// 〈35P〉はサポート・ファン。装着カードは attachments に入る（cheers はエール専用）
+const count35P = (ctx, holomem) => (holomem?.attachments || []).filter((c) => ctx.nameIs(c, '35P')).length;
 
 export default {
   number: 'hBP03-030',
@@ -21,7 +22,7 @@ export default {
       // [センターポジション限定]
       if (ctx.sourceHolomemPos()?.zone !== 'center') return false;
       // このホロメンに〈35P〉が付いている時
-      return count35P(ctx.sourceHolomem) > 0;
+      return count35P(ctx, ctx.sourceHolomem) > 0;
     },
     *run(ctx) {
       const value = (yield* ctx.rollDice());
@@ -38,7 +39,7 @@ export default {
   arts: {
     'エリート巫女': {
       dmgBonus(ctx) {
-        return count35P(ctx.sourceHolomem) * 20;
+        return count35P(ctx, ctx.sourceHolomem) * 20;
       },
     },
   },

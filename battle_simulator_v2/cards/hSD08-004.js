@@ -11,6 +11,7 @@
  *   → onDownDealt で実装。攻撃対象（=通常はセンター）がダウンした時に発火するが、
  *      テキストは「相手のセンターホロメンをダウンさせた時」なので、相手センターが
  *      実際にダウン状態（damage>=実効HP）であることを確認してから発動する。
+ *      「できる」の記載なし=強制の誘発効果。相手に2ndホロメンがいれば必ず1人に40を与える。
  *      ［ターンに1回］は markOncePerTurn で制御。
  *      特攻（特殊効果アイコン 赤+50）はエンジン側のアイコン処理に委ねる。
  */
@@ -35,14 +36,13 @@ export default {
         if (!center) return;
         const centerDowned = center.holomem.damage >= ctx.engine.effectiveHp(center.holomem);
         if (!centerDowned) return;
-        // 相手の2ndホロメン1人に特殊ダメージ40
+        // 相手の2ndホロメン1人に特殊ダメージ40（強制: 2ndホロメンがいれば必ず与える）
         const targets = ctx.holomems('opp', (e) => e.top.bloomLevel === '2nd');
         if (targets.length === 0) return;
         const target = yield ctx.chooseHolomem({
           side: 'opp',
           filter: (e) => e.top.bloomLevel === '2nd',
           title: '特殊ダメージ40を与える相手の2ndホロメンを選択',
-          optional: true,
         });
         if (!target) return;
         ctx.markOncePerTurn('hSD08-004-arts');

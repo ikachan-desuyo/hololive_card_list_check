@@ -8,7 +8,8 @@
  * 解釈:
  *  - 条件は ctx.isFirstTurnGoingSecond()（後攻かつ自分の最初のターン）。満たさなければ何もしない。
  *  - 「Debutホロメン」= デッキ内の c.kind==='holomen' かつ c.bloomLevel==='Debut'。
- *  - 「ステージに出す」= バックポジションへ（ctx.putToBack。ステージ上限6人チェック付き）。
+ *  - 「ステージに出す」= バックポジションへ（ctx.putToBackWithTrigger。ステージ上限6人チェック付き。
+ *    効果でステージに出すため「ステージに出た時」onEnter を誘発する (Q575)）。
  *  - 公開して出す部分は実質強制効果。ただしデッキに該当カードが無い／ステージが満杯で出せない場合は
  *    その部分をスキップし、シャッフルのみ行う（出せないものは出さない）。
  *  - 公開対象（=どのDebutホロメンを出すか）は非公開のデッキからの探索なのでプレイヤーが選択する。
@@ -37,7 +38,9 @@ export default {
         ctx.removeFromDeck(picked);
         ctx.flashReveal(picked);
         ctx.log(`${ctx.player.name}: ${picked.name} を公開`);
-        if (!ctx.putToBack(picked)) {
+        // 効果でステージに出す → onEnter（「ステージに出た時」）を誘発する (Q575)
+        const placed = yield* ctx.putToBackWithTrigger(picked);
+        if (!placed) {
           // ステージが満杯などで出せない場合はデッキに戻す（どの領域にも属さない瞬間を作らない）
           ctx.player.deck.push(picked);
           ctx.log(`${ctx.player.name}: ステージに出せないため ${picked.name} をデッキに戻した`);

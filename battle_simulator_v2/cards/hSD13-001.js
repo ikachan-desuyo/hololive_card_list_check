@@ -30,15 +30,16 @@ export default {
       // 受け手候補（自分のステージの[Buzzか2nd]の赤ホロメン）が1人以上いること
       return engine._stageHolomems(p).some((h) => {
         const top = h.stack[0];
-        const isRed = top.color === '赤' || engine._isTreatedAllColors(h);
-        return isRed && (top.bloomLevel === 'Buzz' || top.bloomLevel === '2nd');
+        // 「赤ホロメン」= 赤を持つ（多色・全色扱い対応の _hasColor で判定）
+        return engine._hasColor(h, '赤') && (top.bloomLevel === 'Buzz' || top.bloomLevel === '2nd');
       });
     },
     *redirect(ctx) {
       const entry = yield ctx.chooseHolomem({
         side: 'self',
         filter: (e) => {
-          const isRed = e.top.color === '赤' || ctx.engine._isTreatedAllColors(e.holomem);
+          // 「赤ホロメン」= 赤を持つ（多色・全色扱い対応の _hasColor で判定）
+          const isRed = ctx.engine._hasColor(e.holomem, '赤');
           return isRed && (e.top.bloomLevel === 'Buzz' || e.top.bloomLevel === '2nd');
         },
         title: 'かわりにダメージを受ける[Buzzか2nd]の赤ホロメンを選択',

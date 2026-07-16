@@ -5,6 +5,7 @@
  *   [ターンに1回]このホロメンが相手のホロメンをダウンさせた時、
  *   自分のアーカイブのLIMITED以外のサポートカード1枚を手札に戻す。
  *   → triggers.onOpponentDown（ダウンさせた時に発火）。ターン1回制限は oncePerTurn で管理。
+ *     「戻す」（「できる」の記載なし）＝候補があれば必ず1枚戻す（強制・スキップ不可）。
  *
  * アーツ「私達を見くびらないで貰える？」(110):
  *   相手のDebut以外のホロメン1人に、自分のステージの#Adventを持つホロメン1人につき、特殊ダメージ10を与える。
@@ -17,11 +18,10 @@ export default {
       if (ctx.oncePerTurnUsed(key)) return; // [ターンに1回]
       const cand = ctx.player.archive.filter((c) => c.kind === 'support' && !c.limited);
       if (cand.length === 0) return;
+      // 「戻す」=強制（候補があればスキップ不可）
       const picked = yield ctx.chooseCard({
         cards: cand,
-        title: 'アーカイブから手札に戻すLIMITED以外のサポートを選択（任意）',
-        optional: true,
-        skipLabel: '戻さない',
+        title: 'アーカイブから手札に戻すLIMITED以外のサポートを選択',
       });
       if (!picked) return;
       ctx.removeFromArchive(picked);

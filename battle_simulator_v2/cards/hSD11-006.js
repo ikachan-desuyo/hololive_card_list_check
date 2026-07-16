@@ -10,7 +10,8 @@
  *   自分のパフォーマンスステップが開始する時、自分の手札の#FLOW GLOWを持つホロメン1枚を
  *   アーカイブできる：自分のアーカイブの黄エール1枚を自分の〈虎金妃笑虎〉に送る。
  *   → triggers.onPerformanceStepStart で実装（自分のパフォーマンス開始時。コスト=手札の#FLOW GLOW
- *     ホロメン1枚アーカイブ、効果=アーカイブの黄エール1枚をこのホロメンへ送る）。
+ *     ホロメン1枚アーカイブ、効果=アーカイブの黄エール1枚を自分の〈虎金妃笑虎〉へ送る。
+ *     送り先はステージ上の同名〈虎金妃笑虎〉から選択できる＝ギフト所持者固定ではない）。
  */
 export default {
   number: 'hSD11-006',
@@ -26,9 +27,17 @@ export default {
       if (!toArchive) return;
       ctx.removeFromHand(toArchive);
       ctx.player.archive.push(toArchive);
-      // 効果: アーカイブの黄エール1枚をこのホロメン（笑虎）に送る
-      const cheer = yield ctx.chooseCard({ cards: ctx.player.archive.filter((c) => c.kind === 'cheer' && c.color === '黄'), title: 'このホロメンに送る黄エールを選択' });
-      if (cheer) { ctx.removeFromArchive(cheer); ctx.attachCheer(cheer, ctx.sourceHolomem); }
+      // 効果: アーカイブの黄エール1枚を自分の〈虎金妃笑虎〉に送る（複数いる場合は選択）
+      const cheer = yield ctx.chooseCard({ cards: ctx.player.archive.filter((c) => c.kind === 'cheer' && c.color === '黄'), title: '〈虎金妃笑虎〉に送る黄エールを選択' });
+      if (!cheer) return;
+      const target = yield ctx.chooseHolomem({
+        side: 'self',
+        filter: (e) => ctx.nameIs(e.top, '虎金妃笑虎'),
+        title: '黄エールを送る〈虎金妃笑虎〉を選択',
+      });
+      if (!target) return;
+      ctx.removeFromArchive(cheer);
+      ctx.attachCheer(cheer, target.holomem);
     },
   },
   arts: {

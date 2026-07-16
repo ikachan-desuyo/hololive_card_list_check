@@ -7,7 +7,8 @@
  * LIMITED：ターンに1枚しか使えない。
  *
  * 実装メモ:
- * - ホロパワー1枚アーカイブのコスト と LIMITED（ターン1回）はエンジンのサポート処理側で扱う。
+ * - ホロパワー1枚アーカイブのコストは run 冒頭で自前で支払う（hBP01-103 と同型。
+ *   エンジンのサポート処理はコストを扱わない）。LIMITED はエンジンが card.limited で処理。
  * - 色を決めるホロメン1人をプレイヤーが選ぶ（位置制限なし）。
  *   そのホロメンの色と同色のエールをエールデッキから公開（複数あれば選択）。
  *   送り先のホロメンは別途選ぶ（同色制限はなく、自分のホロメンなら誰でも可）。
@@ -18,6 +19,7 @@ export default {
   ai: {
     // エール加速。盤面にホロメンがいて、エールデッキが残っているほど有用。
     supportValue({ engine, player }) {
+      if (player.holoPower.length < 1) return 0; // コストを払えない
       if (player.cheerDeck.length === 0 || engine._stageHolomems(player).length === 0) return 0;
       return 22;
     },
@@ -28,6 +30,13 @@ export default {
       return ctx.player.holoPower.length > 0;
     },
     *run(ctx) {
+      const p = ctx.player;
+      // コスト: ホロパワーの上から1枚をアーカイブ（払えなければ使えない）
+      if (p.holoPower.length < 1) return;
+      const paid = p.holoPower.shift();
+      p.archive.push(paid);
+      ctx.log(`${p.name}: ホロパワー1枚をアーカイブ（${paid.name}）`);
+
       // 色を決めるホロメン1人を選ぶ
       const colorSource = yield ctx.chooseHolomem({
         side: 'self',

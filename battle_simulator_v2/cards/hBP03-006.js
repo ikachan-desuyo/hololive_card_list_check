@@ -9,6 +9,7 @@
  *   そのホロメンのエール1枚を自分の他のホロメンに付け替え、
  *   ダウンしたホロメンを含め重なっているホロメンの中から1枚を手札に戻す。
  *   → ダウン処理中に使えるSP推しスキル (11.3.1.1) として onDownOshiSkill(sp:true).run で実装。
+ *     スキル使用を宣言した後の付け替え・手札戻しはいずれも強制（「できる」の記載なし）。
  */
 
 // お休みしている「戌神ころね」（重なりの一番上の名前で判定）
@@ -62,11 +63,12 @@ export default {
       const downed = ctx.downedHolomem;
       if (!downed) return;
       // 1) そのホロメンのエール1枚を自分の他のホロメンに付け替え
+      //    スキル使用を宣言した後の手順は強制（「付け替え」に「できる」の記載なし）
       const others = ctx.holomems('self', (e) => e.holomem !== downed);
       if (downed.cheers.length > 0 && others.length > 0) {
         const cheer = downed.cheers.length === 1
           ? downed.cheers[0]
-          : yield ctx.chooseCard({ cards: [...downed.cheers], title: '付け替えるエール1枚を選択', optional: true });
+          : yield ctx.chooseCard({ cards: [...downed.cheers], title: '付け替えるエール1枚を選択' });
         if (cheer) {
           const entry = yield ctx.chooseHolomem({
             side: 'self', filter: (e) => e.holomem !== downed,

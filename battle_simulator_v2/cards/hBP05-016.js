@@ -52,6 +52,8 @@ export default {
             `サイコロを振りますか？（残り${stacked - i}回振れる）`, '振る', '振らない');
           if (!ok) break;
           const v = (yield* ctx.rollDice());
+          // 〈兎田ぺこら〉の能力でサイコロを振った（hBP03-023「カードするぺこ」の判定用共有フラグ）
+          ctx.markOncePerTurn('兎田ぺこら:diceRolled');
           sum += v;
         }
         // 出た目の合計1につき、このアーツ+10

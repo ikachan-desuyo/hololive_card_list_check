@@ -2,8 +2,8 @@
  * 鷹嶺ルイ (hBP06-046) 赤・2nd・HP200（#秘密結社holoX）
  * キーワード/ギフト「間違っているぞ！」:
  *   このゲーム中に、自分のSP推しスキル「ホークアイ」を使っていたなら、このホロメンのアーツ+20。
- *   → SP推しスキル「ホークアイ」は推し〈鷹嶺ルイ〉のSPスキル。プレイヤーは推し1枚なので
- *     「SPスキル使用済み(usedSpOshiSkillThisGame) かつ 推しが鷹嶺ルイ」で判定。
+ *   → SP推しスキル「ホークアイ」は推し〈鷹嶺ルイ〉(hBP01-005) のSP。鷹嶺ルイ推しは
+ *     hBD24-052 等も存在するため、spOshiSkillUsedInfo.oshiNumber が hBP01-005 であることで判定。
  *   → アーツへの常時+20なので arts.<名>.dmgBonus で実装（このカードのアーツは1種）。
  * アーツ「永久不滅の絆」(120, 特攻 紫+50):
  *   自分の推しホロメンが〈鷹嶺ルイ〉なら、自分の手札2枚をアーカイブできる：
@@ -13,9 +13,10 @@ export default {
   number: 'hBP06-046',
   arts: {
     '永久不滅の絆': {
-      // ギフト「間違っているぞ！」: SP推しスキル「ホークアイ」使用済みなら +20
+      // ギフト「間違っているぞ！」: SP推しスキル「ホークアイ」（推し hBP01-005）使用済みなら +20
       dmgBonus(ctx) {
-        return (ctx.player.usedSpOshiSkillThisGame && ctx.player.oshi?.name === '鷹嶺ルイ') ? 20 : 0;
+        const info = ctx.player.spOshiSkillUsedInfo;
+        return (info && info.oshiNumber === 'hBP01-005') ? 20 : 0;
       },
       *run(ctx) {
         // 自分の推しホロメンが〈鷹嶺ルイ〉でないと発動できない

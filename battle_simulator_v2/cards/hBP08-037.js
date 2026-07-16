@@ -10,7 +10,9 @@
  * アーツ「がんBAUるねー！」(30):
  *   このホロメンに青エールが2枚以上付いているなら、自分のエールデッキの上から1枚を
  *   自分の〈フワワ・アビスガード〉に送る。
- *   → 自分のステージに〈フワワ・アビスガード〉が複数いる場合は送り先をプレイヤーが選択。
+ *   → 青エール判定は ctx.cheerCountOfColor（実効色）。推しFUWAMOCO（hBP08-003）の
+ *     「赤エールすべては青エールとしても扱う」エイリアスを反映する。
+ *     自分のステージに〈フワワ・アビスガード〉が複数いる場合は送り先をプレイヤーが選択。
  *     ダメージは固定30で増減なし。
  */
 export default {
@@ -38,8 +40,8 @@ export default {
       *run(ctx) {
         const self = ctx.sourceHolomem;
         if (!self) return;
-        const blueCheers = (self.cheers || []).filter((c) => c.color === '青');
-        if (blueCheers.length < 2) return;
+        // 青エール2枚以上（実効色: FUWAMOCO推しの赤→青エイリアス対応）
+        if (ctx.cheerCountOfColor(self, '青') < 2) return;
         const fuwawa = ctx.holomems('self', (e) => ctx.nameIs(e.top, 'フワワ・アビスガード'));
         if (fuwawa.length === 0) return;
         let dest = fuwawa[0];

@@ -24,12 +24,12 @@ export default {
     canUse(engine, ownerIdx) {
       const p = engine.state.players[ownerIdx];
       // 自分の黄ホロメンが1人でもいれば使える
-      return engine._stageHolomems(p).some((h) => h.stack[0] && h.stack[0].color === '黄');
+      return engine._stageHolomems(p).some((h) => h.stack[0] && (h.stack[0].color || '').includes('黄'));
     },
     *run(ctx) {
       const entry = yield ctx.chooseHolomem({
         side: 'self',
-        filter: (e) => e.top && e.top.color === '黄',
+        filter: (e) => e.top && (e.top.color || '').includes('黄'),
         title: 'このターン アーツ+20する黄ホロメンを選択',
       });
       if (!entry) return;
@@ -49,10 +49,10 @@ export default {
     canUse(engine, ownerIdx) {
       const p = engine.state.players[ownerIdx];
       // デッキに黄ホロメンが1枚以上ある時のみ使える
-      return p.deck.some((c) => c && c.kind === 'holomen' && c.color === '黄');
+      return p.deck.some((c) => c && c.kind === 'holomen' && (c.color || '').includes('黄'));
     },
     *run(ctx) {
-      const yellows = ctx.deckCards((c) => c && c.kind === 'holomen' && c.color === '黄');
+      const yellows = ctx.deckCards((c) => c && c.kind === 'holomen' && (c.color || '').includes('黄'));
       const picked = yield ctx.chooseCard({
         cards: yellows,
         title: '手札に加える黄ホロメンを選択',

@@ -14,18 +14,19 @@
  *   相手のセンターホロメンに、自分のアーカイブの[#Adventを持つホロメンとエール]1枚につき、
  *   特殊ダメージ10を与える。
  *   → spOshiSkill（能動）。自分のアーカイブにある「#Advent を持つホロメンカード」と
- *     「#Advent を持つエールカード」の合計枚数 × 10 の特殊ダメージを相手センターに与える。
+ *     「エールカード（タグ条件なし。#Advent はホロメンにのみ掛かる）」の合計枚数 × 10 の
+ *     特殊ダメージを相手センターに与える。エールカードにタグは存在しないため、
+ *     エール側にも #Advent を要求すると死文になる。
  *     ※コスト[ホロパワー：-2]はエンジン側が処理するため run には書かない。
  *     ※特殊ダメージのライフ減少抑止（noLifeOnDown）はテキストに記載が無いため付けない。
  */
 
-// アーカイブが #Advent を持つホロメン or エール かを判定
+// アーカイブが「#Advent を持つホロメン」or「エール」かを判定
+// （#Advent はホロメンに掛かる条件。エールは全カードがタグなしのため無条件で数える）
 function isAdventHolomemOrCheer(card) {
   if (!card) return false;
-  const tags = card.tags || [];
-  const hasAdvent = tags.includes('Advent');
-  if (!hasAdvent) return false;
-  return card.kind === 'holomen' || card.kind === 'cheer';
+  if (card.kind === 'cheer') return true;
+  return card.kind === 'holomen' && (card.tags || []).includes('Advent');
 }
 
 export default {

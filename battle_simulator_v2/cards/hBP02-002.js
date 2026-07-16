@@ -6,6 +6,8 @@
  *   エール1枚を公開し、自分のホロメンに送る。そしてエールデッキをシャッフルする。
  *   → メインステップの能動推しスキル。コストはエンジンが処理するので run では支払わない。
  *      効果コスト（緑エール1枚アーカイブ）は run 内で支払う。
+ *   → 「エールデッキから〜公開し」＋末尾シャッフル＝エールデッキ内から選ぶサーチ
+ *      （hBP02-023「Kanjeng」と同型。非公開領域なので「見つからなかったことにできる」）。
  *
  * SP推しスキル「極彩色の宴」[ホロパワー：2消費][ゲームに1回]:
  *   このターンの間、自分のステージの#ID2期生を持つホロメン全員は、
@@ -53,14 +55,23 @@ export default {
       if (!cheer) return;
       yield* ctx.archiveCheer(fromHolomem.holomem, cheer);
 
-      // エールデッキから1枚公開して自分のホロメンに送る
-      if (ctx.player.cheerDeck.length > 0) {
+      // エールデッキから、エール1枚を公開し、自分のホロメンに送る（サーチ。非公開領域なので任意）
+      const picked = yield ctx.chooseCard({
+        cards: ctx.player.cheerDeck,
+        title: 'エールデッキから送るエールを選択',
+        optional: true,
+        skipLabel: '見つからなかったことにする',
+      });
+      if (picked) {
         const target = yield ctx.chooseHolomem({
           side: 'self',
-          title: 'エールデッキから公開したエールを送るホロメンを選ぶ',
+          title: 'エールを送るホロメンを選択',
         });
         if (target) {
-          ctx.sendCheerFromCheerDeckTop(target.holomem);
+          ctx.removeFromCheerDeck(picked);
+          ctx.log(`${ctx.player.name}: エールデッキから ${picked.name} を公開`);
+          ctx.flashReveal(picked);
+          ctx.attachCheer(picked, target.holomem);
         }
       }
       // エールデッキをシャッフルする

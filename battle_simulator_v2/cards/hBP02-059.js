@@ -3,7 +3,8 @@
  *
  * [キーワード/ブルームエフェクト] Soul Voice:
  *   自分のデッキから、カード1枚を公開し、アーカイブする。そしてデッキをシャッフルする。
- *   → デッキは非公開のため、上から1枚を公開してアーカイブする実装（「1枚」に選択の指定なし）。
+ *   → 「デッキから、〜公開し」の定型サーチ書式（だから直後にシャッフルがある）。
+ *     プレイヤーがデッキから任意の1枚を選んで公開しアーカイブする（同型: hBP06-066）。
  *
  * [アーツ] Featuring Myth (80+, 紫紫無 / 特攻 青+50):
  *   自分のアーカイブに#Mythを持つホロメンが4枚以上ある時、このアーツ+40。
@@ -14,14 +15,19 @@ export default {
   bloomEffect: {
     name: 'Soul Voice',
     *run(ctx) {
-      const seen = ctx.lookTopDeck(1);
-      if (seen.length === 0) return;
-      for (const c of seen) {
-        ctx._unreveal(c);
-        ctx.player.archive.push(c);
-        ctx.log(`${ctx.player.name}: ${c.name} を公開しアーカイブした`);
+      if (ctx.player.deck.length === 0) return;
+      // デッキからカード1枚を選んで公開しアーカイブ（サーチ）→シャッフル
+      const picked = yield ctx.chooseCard({
+        cards: ctx.deckCards(() => true),
+        title: 'デッキから公開してアーカイブするカードを選択',
+      });
+      if (picked) {
+        ctx.removeFromDeck(picked);
+        ctx.flashReveal(picked);
+        ctx.player.archive.push(picked);
+        ctx.log(`${ctx.player.name}: ${picked.name} を公開しアーカイブした`);
+        ctx.recordDeckArchive(1);
       }
-      ctx.recordDeckArchive(seen.length);
       ctx.shuffleDeck();
     },
   },
