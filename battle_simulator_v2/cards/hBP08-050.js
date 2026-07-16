@@ -1,17 +1,19 @@
 /**
- * 水宮枢 (hBP08-050) 青・1st（#DEV_IS #FLOW #GLOW）
+ * 水宮枢 (hBP08-050) 青・1st（#DEV_IS #FLOW GLOW）
  *
- * [ギフト] 君に乗ってもいいかな？:
- *   相手のターンで、自分のホロメンがダウンした時、自分のエールデッキの上から1枚を
+ * [キーワード] 君に任せちゃおうかな？:
+ *   相手のターンで、このホロメンがダウンした時、自分のエールデッキの上から1枚を
  *   自分のバックホロメンに送る。
- *   → 傍観トリガー。「自分のホロメン」には自身も含むため、
- *     他ホロメンのダウン＝onAnyDown / このホロメン自身のダウン＝onDown の両方で発揮する
- *     （hSD13-005 と同じ二刀流）。[ターンに1回]制限は無い（ダウンのたびに発揮）。
- *     送り先は自分のバックホロメン（複数なら選択／ダウンしたホロメンは除外）。
+ *   → 「このホロメン」自身のダウン時のみ（onDown）。[ターンに1回]制限は無い。
+ *     送り先は自分のバックホロメン（複数なら選択／ダウンした自身は除外）。
  *     エールデッキが空、またはバックホロメンがいなければ何も起きない。
  *
- * [アーツ] 優しさます増し:
+ * [アーツ] 雪だるまつくろっ (20):
  *   自分のアーカイブのエール1枚を自分のホロメンに送る。
+ *
+ * ※2026-07-17 監査対応: 旧実装はスキル名「君に乗ってもいいかな？」「優しさます増し」・
+ *   発動条件「自分のホロメンがダウンした時」(onAnyDown併用) だったが、公式カードリスト現物
+ *   （C/S両レアリティ・エラッタ履歴なし）と照合してテキストごと訂正した。
  */
 function* sendCheerDeckTopToBack(ctx, downed) {
   if (ctx.state.turnPlayer === ctx.playerIdx) return;   // 相手のターン限定
@@ -29,17 +31,13 @@ function* sendCheerDeckTopToBack(ctx, downed) {
 export default {
   number: 'hBP08-050',
   triggers: {
-    *onAnyDown(ctx) {
-      if (ctx.downedInfo?.ownerIdx !== ctx.playerIdx) return; // 自分のホロメンがダウンした時
-      yield* sendCheerDeckTopToBack(ctx, ctx.downedInfo?.holomem);
-    },
     *onDown(ctx) {
-      // このホロメン自身（自分のホロメン）がダウンした時（onAnyDown はダウン本人を除くため onDown で拾う）
+      // 「このホロメン」自身がダウンした時のみ（相手のターン限定は sendCheerDeckTopToBack 側で判定）
       yield* sendCheerDeckTopToBack(ctx, ctx.sourceHolomem);
     },
   },
   arts: {
-    '優しさます増し': {
+    '雪だるまつくろっ': {
       *run(ctx) {
         const cheers = ctx.player.archive.filter((c) => c.kind === 'cheer');
         if (cheers.length === 0) return;

@@ -909,21 +909,22 @@ export async function runTests() {
     assert(!r.done && r.value?.kind === 'confirm', '個体がアーツ使用したのに発動確認が出ない');
   });
 
-  await testAsync('hBP08-050 水宮枢ギフト: 相手ターンに自ホロメンがダウン→エールデッキ上1枚を自バックへ', async () => {
+  await testAsync('hBP08-050 水宮枢ギフト: 相手ターンにこのホロメンがダウン→エールデッキ上1枚を自バックへ', async () => {
+    // 公式テキスト（2026-07-17 現物確認）: 「相手のターンで、このホロメンがダウンした時」= 自身のダウン時のみ（onDown）
     const e = await setupMainStep(deckMap, 156);
     await e.registry.preload(['hBP08-050'], lib);
     const p0 = e.state.players[0];
     e.state.turnPlayer = 1; // 相手のターン
-    const guard = e._createHolomem(lib.getByNumber('hBP08-050'), 1); // ギフト保持者
+    const guard = e._createHolomem(lib.getByNumber('hBP08-050'), 1); // ギフト保持者（＝ダウンする本人）
     const backH = e._createHolomem(fakeHolomen({ name: 'バック' }), 1);
     p0.center = guard; p0.collab = null; p0.back = [backH];
     const cheer = { number: 'c', name: '青エール', kind: 'cheer', color: '青' };
     p0.cheerDeck.unshift(cheer);
     const before = backH.cheers.length;
-    const downed = e._createHolomem(fakeHolomen({ name: 'やられ役' }), 1);
     const def = e.registry.get('hBP08-050');
-    const ctx = e._effectContext(0, { sourceHolomem: guard, downedInfo: { holomem: downed, card: downed.stack[0], ownerIdx: 0, zone: 'center' } });
-    let r = def.triggers.onAnyDown(ctx).next(); // バック1体→自動選択でエール送付（追加yieldなし）
+    assert(!def.triggers.onAnyDown, '他ホロメンのダウンでは発動しない（onAnyDownは持たない）');
+    const ctx = e._effectContext(0, { sourceHolomem: guard, sourceCard: guard.stack[0] });
+    let r = def.triggers.onDown(ctx).next(); // バック1体→自動選択でエール送付（追加yieldなし）
     assertEq(backH.cheers.length, before + 1, 'バックホロメンにエールデッキ上の1枚が送られていない');
     assertEq(backH.cheers[backH.cheers.length - 1], cheer, '送られたエールが違う');
     void r;
