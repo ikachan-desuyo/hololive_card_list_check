@@ -1786,7 +1786,9 @@ function renderPregameModal(s) {
 
 // ============ 評価値オーバーレイ（CPUと同じ score.js の数値をカード上に表示） ============
 
-function showEvalOn() { return getSettings().showEval === true; }
+// オンライン対戦中は常にOFF: 評価値はAIの脅威見積り（相手手札のエール付与サポート等【全情報許可】）を
+// 織り込むため、対人戦で表示すると間接的な情報漏えいになる（設定持ち越し・?showeval=1 でも無効化）。
+function showEvalOn() { return !isOnline && getSettings().showEval === true; }
 
 function clearEvalBadges() {
   for (const b of document.querySelectorAll('.eval-badge')) b.remove();
@@ -2004,6 +2006,7 @@ const AI_DELAYS = { fast: 150, normal: 600, slow: 1200, manual: 600 };
 function aiDelayMs() { return AI_DELAYS[getSettings().stepSpeed] ?? 600; }
 
 function aiEnabled(idx) {
+  if (isOnline) return false; // オンラインは常にAI無効（先読みAIは完全情報シミュレーションのため対人では不正になる）
   if (aiOverride) return aiOverride[idx];
   return !!(getSettings().aiPlayers || [false, false])[idx];
 }

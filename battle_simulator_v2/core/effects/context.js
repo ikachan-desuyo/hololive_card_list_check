@@ -462,7 +462,7 @@ export class EffectContext {
    * 決定ポイントの所有者は相手プレイヤーになる（request.player = 相手）。戻り値は選ばれたエントリ {pos, holomem, top}。
    * 強制選択（「選ばない」なし）。候補が無ければ null で再開される。
    */
-  opponentChoosesHolomem({ filter = null, title }) {
+  opponentChoosesHolomem({ filter = null, title, intent = 'sacrifice' }) {
     const oppIdx = 1 - this.playerIdx;
     const opp = this.opponent;
     const entries = [];
@@ -475,6 +475,9 @@ export class EffectContext {
       kind: 'chooseHolomem',
       player: oppIdx,
       title,
+      // AI用の意図ヒント。相手への強制選択は多くが不利益（引きずり出し・移動等）なので、
+      // 既定は 'sacrifice'（=選択者は自分の価値の低い個体を差し出す）。利益になる効果は呼び出し側で上書きする。
+      intent,
       buildOptions: () => entries.map((e) => ({
         id: `mem_${e.pos.zone}_${e.pos.index}`,
         label: `${e.top.name}（${e.pos.zone === 'center' ? 'センター' : e.pos.zone === 'collab' ? 'コラボ' : 'バック'}）`,

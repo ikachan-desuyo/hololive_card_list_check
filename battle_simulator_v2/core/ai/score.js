@@ -177,6 +177,14 @@ export function scoreOptions(engine, idx, pending = engine.state.pending) {
     case 'effectChoice':
       scoreEffect(engine, idx, pending, out);
       break;
+    case 'endOfTurnOshiSkill': {
+      // ターン終了時の起動型推しスキル（hBP08-007 等）。カード定義 ai.value があれば従い、
+      // 無ければ控えめな既定値で「使う」（負を返す ai.value で見送りも表現できる）。
+      const od = engine.registry.get(p.oshi?.number)?.onEndOfTurnOshiSkill;
+      const yes = od?.ai?.value ? od.ai.value({ engine, idx, player: p }) : 8;
+      for (const o of pending.options) out[o.id] = o.value ? yes : 0;
+      break;
+    }
     default:
       for (const o of pending.options) out[o.id] = 0;
   }
@@ -653,6 +661,12 @@ function scoreEffect(engine, idx, pending, out) {
       const v = cardGainValue(engine, idx, opt.card);
       out[opt.id] = intent === 'discard' ? -v : v; // 破棄系は不要なカードを選ぶ
     }
+    return;
+  }
+  if (kind === 'chooseOption') {
+    // 汎用の順序/択一選択（同時ダウンの処理順・付け上限超過のkeep・同時誘発の解決順 等）。
+    // 選択肢がカード参照(opt.card)を持つ場合は価値の高いカードを残す/選ぶ。順序系は0のまま（先頭=従来挙動）。
+    for (const opt of pending.options) out[opt.id] = opt.card ? cardGainValue(engine, idx, opt.card) : 0;
     return;
   }
   for (const o of pending.options) out[o.id] = 0;

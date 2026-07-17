@@ -2162,7 +2162,7 @@ export class Engine {
             s.pending = {
               type: 'effectChoice', player: idx,
               request: { kind: 'chooseOption', title: `${type}の付け上限超過（${topCard(h).name}）: 残す1枚を選択（他はアーカイブ 11.4）` },
-              options: list.map((a, i) => ({ id: `keepattach_${i}`, label: `${a.name} を残す`, value: i })),
+              options: list.map((a, i) => ({ id: `keepattach_${i}`, label: `${a.name} を残す`, value: i, card: a })), // card: AIが価値の高い方を残すための参照
               resume: (keep) => {
                 for (let i = list.length - 1; i >= 0; i--) {
                   if (i === keep) continue;

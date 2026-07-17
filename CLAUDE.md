@@ -36,7 +36,10 @@
 - 開発用URLパラメータ: `?autostart=1&seed=42&autoplay=12` で自動開始・自動プレイ
 - エンジンは「決定ポイント」方式: `engine.actions()` で選択肢取得 → `engine.apply(id)`。乱数はシード固定可（Math.random 禁止）
 - CPU/AI: `core/ai/heuristic.js`（決定ポイントごとのスコアリング）。設定パネル「AI適用」または `?ai=1|2|both` で有効化。
-  **AIは公開情報のみ使用**（相手の手札・山札の中身は見ない設計原則。heuristic.js 冒頭コメント参照）
+  **情報アクセスの原則**: ヒューリスティック層（score/evaluate）は原則公開情報のみ。例外は2系統だけ許可済み（コード内に【全情報許可】と明記）:
+  ①相手手札のエール付与サポート枚数（脅威見積り。evaluate.js opponentExtraCheerProjection）、
+  ②先読みAI（lookahead.js）は再生ベースの完全情報シミュレーション（未来の乱数・ドロー順も既知になる点に注意）。
+  **AIと評価値表示はソロ専用**（オンラインでは app.js の isOnline ガードで強制無効。全情報AIを対人で動かさないこと）
 
 ### カード効果の実装方法（v2）
 
