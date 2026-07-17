@@ -27,6 +27,7 @@ import { HeuristicAI } from './heuristic.js';
 import { evaluateState } from './evaluate.js';
 import { reconstruct } from './rollout.js';
 import { scoreOptions, bestOptionId, isDevelopSupport, isFreePlaySupport } from './score.js';
+import { gamePlanOf } from './gameplan.js';
 import { createRng } from '../rng.js';
 
 // ロールアウト評価が「ほぼ互角」とみなす差（この範囲内の候補は、ヒューリスティック事前評価で優劣を割る）。
@@ -107,6 +108,20 @@ export class LookaheadAI {
     if (pending.type === 'main') {
       const filtered = cands.filter((o) => !(o.kind === 'baton' && (hscores[o.id] ?? 0) < 0));
       if (filtered.length > 0) pool = filtered;
+    }
+    // デッキプロファイルの noCheerNames（エールを付けない対象。ラムダック等＝コストを払えない/付けても無駄）は
+    // 先読みの候補からも除外する（ロールアウトの揺らぎで-8の事前評価が覆り、無駄付けが選ばれるのを防ぐ。
+    // 2026-07 決定監査2周目で観測）。他に付け先が無い場合のみ許容。
+    if (pending.type === 'attachCheer') {
+      const noCheer = gamePlanOf(engine, this.playerIdx).profile?.noCheerNames;
+      if (noCheer?.length) {
+        const me = s.players[this.playerIdx];
+        const filtered = cands.filter((o) => {
+          const h = o.pos ? engine._holomemAt(me, o.pos) : null;
+          return !h || !noCheer.includes(h.stack[0].name);
+        });
+        if (filtered.length > 0) pool = filtered;
+      }
     }
     // 各候補を samples 回ロールアウトして平均（方策に揺らぎを入れ、脆い1本の偏りを打ち消す）。
     // 標本kは全候補で同じ乱数列（common random numbers）を使い、候補間の比較分散を抑える。
