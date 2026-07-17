@@ -14,6 +14,7 @@
  */
 
 import { maxArtDmg, incomingDamageToCenter, unmetCost, cheerBudgetThisTurn, opponentExtraCheerProjection } from './evaluate.js';
+import { planLineBonus, planNeedsColor } from './gameplan.js';
 
 /** 今のエールで撃てるアーツの最大実効火力（dmgBonus/枚数依存込み）。攻撃要員としての即戦力。 */
 function bestPayableEffDmg(engine, h, idx) {
@@ -260,9 +261,11 @@ function scoreCheerTargets(engine, idx, pending, out) {
         if (alreadyLethal) score += isActive ? 4 : 2; // 既に倒せる＝オーバーキル。追いエールはほぼ無価値
         else score += isActive ? Math.min(70, 18 + gain * 0.35) : Math.min(20, 6 + gain * 0.08);
       } else {
-        // 火力は増えないが、未解放アーツへ色が前進したか（将来の解放準備）
+        // 火力は増えないが、未解放アーツへ色が前進したか（将来の解放準備）。
+        // 現フォームだけでなく「同名の上位フォーム（Bloom後）のアーツ」への前進も数える＝
+        // 主役2ndの大技に向けて土台Debut/1stの段階から正しい色を貯められる（ゲームプラン層と対）。
         let advanced = false;
-        for (const a of arts) {
+        for (const a of allArts) {
           if (engine._canPayCheers(h.cheers, a.cost)) continue;
           if (unmetCost(afterCheers, a.cost) < unmetCost(h.cheers, a.cost)) { advanced = true; break; }
         }
@@ -300,6 +303,11 @@ function scoreCheerTargets(engine, idx, pending, out) {
       if (opt.pos.zone === 'center' && afterCheers.length <= cap && !alreadyLethal && !myCenterDoomed) {
         const big = allArts.reduce((m, a) => ((a.dmg || 0) > ((m && m.dmg) || 0) ? a : m), null);
         if (big && unmetCost(afterCheers, big.cost) < unmetCost(h.cheers, big.cost)) score += 12;
+      }
+      // ゲームプラン一致ボーナス: 主役ライン（デッキ火力解析で導出）のホロメンへ、
+      // 主役アーツが必要とする色のエールを送る配分を優先する（序盤の方向付け。過剰付与には足さない）。
+      if (afterCheers.length <= cap && planNeedsColor(engine, idx, h.stack[0], cheer?.color)) {
+        score += planLineBonus(engine, idx, h.stack[0], 10, 6);
       }
       // リーサル到達（前衛のみ）。センター＋コラボの「合算」実効火力で判定する＝
       // 1体に盛るより両前衛に振った方が合計火力が高く倒し切れる、というケースも拾う。
@@ -366,6 +374,9 @@ function scoreMainActions(engine, idx, pending, out) {
         const immW = canAttackNow ? 1 : 0.1;     // 即時火力の伸び: 後衛は撃てないのでほぼ計上しない
         const futW = canAttackNow ? 0.15 : 0.05; // 火力上限(将来)の伸び: 後衛はさらに将来ぶんへ割引
         score = hpGain * 0.4 + immediateGain * 0.4 * immW + futureGain * futW + effVal;
+        // ゲームプラン一致ボーナス: 主役ラインのBloom（勝ち筋の完成）を「他の同格Bloomより」優先する。
+        // あくまで正の価値があるBloom同士の順位付けであり、利益ゼロ/負のBloomを実行させる加点にはしない。
+        if (score > 0) score += planLineBonus(engine, idx, newCard, 10, 6);
         if (h.damage > 0 && hpGain > 0) score += 10;
         if (underLethal && h === myCenter) {
           const newRemain = (newCard.hp || 0) - h.damage;
