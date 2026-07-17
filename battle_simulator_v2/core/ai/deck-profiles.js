@@ -20,6 +20,8 @@
  *   keyCards:     温存・優先確保するカード番号（ペナルティ戻し/破棄で残す・サーチで優先）
  *   supportHints: { 番号: 値 | ({engine,player,card})=>値 } サポート使用価値の上書き
  *   noCheerNames: エールを付けない名前（コストが払えない/付けても無駄なサブライン。ラムダック等）
+ *   centerPreferNames: センターに優先して置く名前（持続アタッカー/推しステージスキルの発動条件。
+ *                      FUWAMOCO=モココ（フワワの+50はコラボから合わせる）、ルイ系=鷹嶺ルイ（手札補充条件）等）
  *   notes:        人間向けメモ（挙動には影響しない）
  *
  * 各プロファイルの分析根拠はデッキ分析（2026-07-17 マルチエージェント。test_deck の構成＋cards/*.js の
@@ -62,6 +64,7 @@ export const PROFILES = [
       { names: ['フワワ・アビスガード', 'FUWAMOCO'], colors: ['赤', '青'] },
     ],
     keyCards: ['hBP08-039', 'hBP08-059', 'hBP03-050'],
+    centerPreferNames: ['モココ・アビスガード'], // 持続枠=モココ（エール枚数スケール）。フワワの+50はコラボから合わせる
     supportHints: {
       // 思い出のドーナツショップ: 2ndが手札に揃っていない時のサーチ価値が高い（LIMITED枠の使い先）
       'hBP08-092': ({ engine, player }) => {
@@ -163,6 +166,7 @@ export const PROFILES = [
       { names: ['紫咲シオン'], colors: ['紫'] },
     ],
     keyCards: ['hBP08-067', 'hBP08-109'],
+    centerPreferNames: ['鷹嶺ルイ'], // 推しステージスキル（手札4枚補充）の発動条件=センターがルイ
     notes: '手札使い切り型。推しステージスキル（センタールイ＋コラボ有→ターン終了時4枚補充）が生命線＝毎ターンコラボ必須',
   },
   {
@@ -176,6 +180,7 @@ export const PROFILES = [
       { names: ['ムーナ・ホシノヴァ'], colors: ['青'] },
     ],
     keyCards: ['hBP08-067', 'hBP08-109'],
+    centerPreferNames: ['鷹嶺ルイ'], // 推しステージスキル（手札4枚補充）の発動条件=センターがルイ
     notes: '紫はルイ集中・青はムーナ。コラボ常設（推しステージスキルの手札4枚補充条件）',
   },
   {
@@ -186,6 +191,7 @@ export const PROFILES = [
     signatureMin: 3,
     lines: [{ names: ['鷹嶺ルイ'], colors: ['紫'] }],
     keyCards: ['hBP08-067', 'hBP06-093'],
+    centerPreferNames: ['鷹嶺ルイ'], // 推しステージスキル（手札4枚補充）の発動条件=センターがルイ
     notes: '手札0-2枚でアーツ最大化＋ターン終了時4枚補充。手札温存より使い切りが正着（補充条件=センタールイ＋コラボ）',
   },
   {
@@ -229,6 +235,7 @@ export const PROFILES = [
       { names: ['ジジ・ムリン'], colors: ['黄'] },
     ],
     keyCards: ['hBP08-027', 'hBP08-107'],
+    centerPreferNames: ['セシリア・イマーグリーン'], // 主砲シュトルムのセンター。黄ジジはバック/コラボ運用
     notes: 'お休み#Justiceが燃料（火力/回収/ドロー）。黄エール7枚はジジ(hBP07-086)専用に温存',
   },
   {

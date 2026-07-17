@@ -181,6 +181,10 @@ export function scoreOptions(engine, idx, pending = engine.state.pending) {
         // コラボエフェクト持ちはバックに温存したい（コラボはバック→コラボ位置への移動で誘発するため、
         // センターに置くと活かせない）。同程度のステータスなら効果無しをセンターへ回す。
         if (engine.registry.get(card.number)?.collabEffect) v -= 25;
+        // デッキプロファイルのセンター優先名（初期配置から持続アタッカーのラインをセンターに据える）
+        const prefer = gamePlanOf(engine, idx).profile?.centerPreferNames;
+        const names = [card.name, ...(card.nameAliases || [])];
+        if (prefer?.some((n) => names.includes(n))) v += 30;
         out[o.id] = v;
       }
       break;
@@ -199,7 +203,15 @@ export function scoreOptions(engine, idx, pending = engine.state.pending) {
     case 'chooseCenter':
       for (const o of pending.options) {
         const h = p.back[o.backIndex];
-        out[o.id] = h ? holomenValue(h.stack[0]) + engine.effectiveHp(h) - h.damage : -Infinity;
+        let v = h ? holomenValue(h.stack[0]) + engine.effectiveHp(h) - h.damage : -Infinity;
+        // デッキプロファイルのセンター優先名（持続アタッカー/推しステージスキルの発動条件。
+        // FUWAMOCO=モココ・ルイ系=鷹嶺ルイ等）。別名（としても扱う）にも一致させる
+        if (h) {
+          const prefer = gamePlanOf(engine, idx).profile?.centerPreferNames;
+          const names = [h.stack[0].name, ...(h.stack[0].nameAliases || [])];
+          if (prefer?.some((n) => names.includes(n))) v += 60;
+        }
+        out[o.id] = v;
       }
       break;
     case 'attachCheer':
