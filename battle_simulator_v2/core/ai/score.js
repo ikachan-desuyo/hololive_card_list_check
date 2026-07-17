@@ -14,7 +14,7 @@
  */
 
 import { maxArtDmg, incomingDamageToCenter, unmetCost, cheerBudgetThisTurn, opponentExtraCheerProjection } from './evaluate.js';
-import { planLineBonus, planNeedsColor } from './gameplan.js';
+import { planLineBonus, planNeedsColor, gamePlanOf } from './gameplan.js';
 
 /** 今のエールで撃てるアーツの最大実効火力（dmgBonus/枚数依存込み）。攻撃要員としての即戦力。 */
 function bestPayableEffDmg(engine, h, idx) {
@@ -32,16 +32,25 @@ export function holomenValue(card) {
   return (card.hp || 0) + maxArtDmg(card) * 0.5;
 }
 
-/** 手札に残す価値（ペナルティで戻す時は低い順に捨てる） */
-function cardKeepValue(card) {
-  if (card.kind === 'holomen') return card.bloomLevel === 'Debut' ? 50 : 35;
-  if (card.kind === 'support') return 25;
-  return 10;
+/** 手札に残す価値（ペナルティで戻す時は低い順に捨てる）。デッキプロファイルのキーカードは残す */
+function cardKeepValue(card, engine = null, idx = -1) {
+  let v = 10;
+  if (card.kind === 'holomen') v = card.bloomLevel === 'Debut' ? 50 : 35;
+  else if (card.kind === 'support') v = 25;
+  if (engine && idx >= 0) {
+    const prof = gamePlanOf(engine, idx).profile;
+    if (prof?.keyCards?.includes(card.number)) v += 30; // テーマの要は手放さない
+  }
+  return v;
 }
 
-/** サポートカードの価値（カード定義 ai.supportValue 優先、無ければテキスト汎用評価） */
+/** サポートカードの価値（デッキプロファイルのヒント ＞ カード定義 ai.supportValue ＞ テキスト汎用評価） */
 function supportValue(engine, p, card) {
   const def = engine.registry.get(card.number);
+  // デッキプロファイルの「使いどころ」ヒント（デッキ文脈はカード単体ヒントより強い）
+  const prof = gamePlanOf(engine, engine.state.players.indexOf(p)).profile;
+  const hint = prof?.supportHints?.[card.number];
+  if (hint != null) return typeof hint === 'function' ? hint({ engine, player: p, card }) : hint;
   if (def?.ai?.supportValue) return def.ai.supportValue({ engine, player: p, card });
   const text = card.supportText || '';
   // 用途ゲート（ポケカAI Decision Gate の移植・ホロカ流に調整。docs/AI_REFERENCE_POKEMON.md ②）:
@@ -168,7 +177,7 @@ export function scoreOptions(engine, idx, pending = engine.state.pending) {
       }
       break;
     case 'placementPenalty':
-      for (const o of pending.options) out[o.id] = -cardKeepValue(p.hand[o.handIndex]);
+      for (const o of pending.options) out[o.id] = -cardKeepValue(p.hand[o.handIndex], engine, idx);
       break;
     case 'placementBack':
       for (const o of pending.options) {
@@ -324,9 +333,13 @@ function scoreCheerTargets(engine, idx, pending, out) {
         const big = allArts.reduce((m, a) => ((a.dmg || 0) > ((m && m.dmg) || 0) ? a : m), null);
         if (big && unmetCost(afterCheers, big.cost) < unmetCost(h.cheers, big.cost)) score += 12;
       }
-      // ゲームプラン一致ボーナス: 主役ライン（デッキ火力解析で導出）のホロメンへ、
+      // ゲームプラン一致ボーナス: 主役ライン（デッキ火力解析/プロファイルで導出）のホロメンへ、
       // 主役アーツが必要とする色のエールを送る配分を優先する（序盤の方向付け。過剰付与には足さない）。
-      if (afterCheers.length <= cap && planNeedsColor(engine, idx, h.stack[0], cheer?.color)) {
+      // プロファイルが「エールを付けない」と指定する名前（コストを払えないサブライン等）は逆に避ける。
+      const noCheer = gamePlanOf(engine, idx).profile?.noCheerNames?.includes(h.stack[0].name);
+      if (noCheer) {
+        score -= 8;
+      } else if (afterCheers.length <= cap && planNeedsColor(engine, idx, h.stack[0], cheer?.color)) {
         score += planLineBonus(engine, idx, h.stack[0], 10, 6);
       }
       // リーサル到達（前衛のみ）。センター＋コラボの「合算」実効火力で判定する＝
@@ -613,9 +626,16 @@ function cardGainValue(engine, idx, card) {
         if (dupInHand) v *= 0.6;
       }
     }
+    // デッキプロファイルのキーカード（主役ラインの部材等）はサーチ/取得で優先
+    if (gamePlanOf(engine, idx).profile?.keyCards?.includes(card.number)) v += 15;
     return v;
   }
-  if (card.kind === 'support') return supportValue(engine, p, card);
+  if (card.kind === 'support') {
+    // デッキプロファイルのキーカードはサーチ/取得で優先（テーマの要を先に確保する）
+    const prof = gamePlanOf(engine, idx).profile;
+    const bonus = prof?.keyCards?.includes(card.number) ? 15 : 0;
+    return supportValue(engine, p, card) + bonus;
+  }
   if (card.kind === 'cheer') return 15;
   return 12;
 }

@@ -16,6 +16,7 @@ import { HeuristicAI } from '../core/ai/heuristic.js';
 import { evaluateState, WEIGHTS, incomingDamageToCenter, cheerBudgetThisTurn, opponentExtraCheerProjection, holomemBoardValue, unmetCost } from '../core/ai/evaluate.js';
 import { scoreOptions, bestOptionId, holomenValue, isFreePlaySupport } from '../core/ai/score.js';
 import { reconstruct, evaluateCandidate } from '../core/ai/rollout.js';
+import { detectProfile } from '../core/ai/deck-profiles.js';
 import { LookaheadAI } from '../core/ai/lookahead.js';
 import { analyzeDeckFirepower } from '../core/ai/firepower.js';
 import { createRng } from '../core/rng.js';
@@ -829,6 +830,17 @@ export async function runTests() {
     // ステージ全滅は実質敗北の大ペナルティ
     p0.center = null; p0.collab = null; p0.back = [];
     assert(evaluateState(e, 0).parts.structure <= WEIGHTS.noBoard, 'ホロメン不在の崩壊ペナルティが効いていない');
+  });
+
+  test('AI: デッキプロファイルの自動判別（デッキ名でなく構成ベース）', () => {
+    // FUWAMOCO 構成: 推し＋シグネチャ3枚以上
+    const fm = detectProfile(new Set(['hBP08-039', 'hBP08-059', 'hBP03-050', 'hBP08-034', 'hBP01-104']), 'hBP08-003');
+    assertEq(fm?.key, 'fuwamoco', 'FUWAMOCO構成が判別されない');
+    // 同じ推し（AZKi hBP07-006）でも、シグネチャで さかまた と判別される（推しだけでは誤爆しない）
+    const sk = detectProfile(new Set(['hBP02-040', 'hBP02-038', 'hBP02-035', 'hBP06-093']), 'hBP07-006');
+    assertEq(sk?.key, 'sakamata-tan', 'さかまた構成が判別されない');
+    // 未知の構成にはマッチしない（汎用AIにフォールバック）
+    assertEq(detectProfile(new Set(['hBP01-104', 'hSD01-016']), 'hBP99-999'), null, '未知構成に誤マッチ');
   });
 
   await testAsync('AI評価関数: デッキ切れレース（山が薄いと減点・相手が薄ければ加点）', async () => {

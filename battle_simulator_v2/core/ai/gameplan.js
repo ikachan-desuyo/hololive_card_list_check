@@ -14,6 +14,8 @@
  * 公平性: 参照するのは自分のカード群のみ（自分のデッキリストは既知＝適法）。相手側は見ない。
  */
 
+import { detectProfile } from './deck-profiles.js';
+
 const COLORS = ['赤', '青', '黄', '緑', '紫', '白'];
 const PROBE_CHEERS = 6;
 
@@ -95,19 +97,34 @@ function computePlan(engine, idx) {
 
 /**
  * プレイヤー idx のゲームプラン（デッキ構成キャッシュ付き）。
- * @returns {{ lines: Array<{names: string[], dmg: number, colors: string[]}> }}
+ * デッキプロファイル（deck-profiles.js）が構成にマッチすれば、その知識（主役ライン等）で自動導出を上書きする。
+ * @returns {{ lines: Array<{names: string[], dmg: number, colors: string[]}>, profile: object|null }}
  */
 export function gamePlanOf(engine, idx) {
   const p = engine.state.players[idx];
-  if (!p) return { lines: [] };
+  if (!p) return { lines: [], profile: null };
   // キャッシュキー = 自分のユニーク番号集合（構成は試合中不変。先読みの別エンジンでも同一キーになる）
+  // プロファイル判別はサポート等も見るため、番号は全カード種から集める
   const nums = new Set();
-  for (const c of [...p.deck, ...p.hand, ...p.archive]) if (c?.kind === 'holomen') nums.add(c.number);
-  for (const h of engine._stageHolomems(p)) for (const c of h.stack) if (c?.kind === 'holomen') nums.add(c.number);
-  const key = idx + '|' + [...nums].sort().join(',');
+  for (const c of [...p.deck, ...p.hand, ...p.archive]) if (c?.number) nums.add(c.number);
+  for (const h of engine._stageHolomems(p)) {
+    for (const c of h.stack) if (c?.number) nums.add(c.number);
+    for (const c of h.attachments) if (c?.number) nums.add(c.number);
+  }
+  const key = idx + '|' + (p.oshi?.number || '') + '|' + [...nums].sort().join(',');
   let plan = _cache.get(key);
   if (!plan) {
     plan = computePlan(engine, idx);
+    const profile = detectProfile(nums, p.oshi?.number || null);
+    if (profile) {
+      plan.profile = profile;
+      // 主役ラインの上書き（プロファイルが lines を持つ場合のみ。色は明示指定を尊重）
+      if (profile.lines?.length) {
+        plan.lines = profile.lines.map((l) => ({ names: [...l.names], colors: [...(l.colors || [])], dmg: 0 }));
+      }
+    } else {
+      plan.profile = null;
+    }
     if (_cache.size >= CACHE_MAX) _cache.clear();
     _cache.set(key, plan);
   }
