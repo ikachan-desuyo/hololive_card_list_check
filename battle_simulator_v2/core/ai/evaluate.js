@@ -41,6 +41,19 @@ export const WEIGHTS = {
   noCenter: -40, // センターが空（バックから補充が要る／攻撃を受けやすい）
 };
 
+/**
+ * デッキ残量リスク（デッキ切れレース 7.3.2.1）。手札ステップで引けなければ敗北なので、
+ * 山が薄くなるほど加速度的に危険。互いのAIが強くなり試合が長期化するとデッキ切れ敗北が現実になる
+ * （2026-07 ゲームプラン導入後のミラー戦で観測）。薄い山では任意ドロー/サーチの価値が下がり、
+ * 相手の山が薄ければ長期戦（受け）も選択肢になる、をこの項で表現する。
+ */
+export function deckOutRisk(deckLen) {
+  if (deckLen <= 0) return -400; // 次の手札ステップで敗北確定
+  if (deckLen <= 2) return -150;
+  if (deckLen <= 4) return -60;
+  return 0; // 5枚以上は通常プレイを歪めない（A/Bで山7-8枚への軽微ペナルティが悪化要因と判明し撤去）
+}
+
 /** カード（ホロメンカード）の最大アーツ火力（素点。特攻・修正は含まない目安） */
 export function maxArtDmg(card) {
   return Math.max(0, ...((card?.arts || []).map((a) => a.dmg || 0)));
@@ -312,6 +325,9 @@ export function evaluateState(engine, idx) {
   // 自分のリーサル好機は「今ターン効果で足せるエール（cheer budget）で解放されるアーツ」も見込む
   const meToOpp = incomingDamageToCenter(engine, me, idx, opp.center, { extraCheers: cheerBudgetThisTurn(engine, idx) });
   if (opp.center && meToOpp >= oppCenterRemain) parts.lethal += WEIGHTS.lethalChanceToOpp;
+
+  // 5.5) デッキ切れレース (7.3.2.1): 山が薄いほど危険（自分は減点・相手は加点）
+  parts.deckRace = deckOutRisk(me.deck.length) - deckOutRisk(opp.deck.length);
 
   // 6) 継続攻撃力: 最大火力のホロメンがコラボにいると次のリセットで休む＝来ターン殴れない。
   //    大技要員はセンター（持続）に据えるべき、という方向に評価を寄せる（自分は減点・相手は加点）。

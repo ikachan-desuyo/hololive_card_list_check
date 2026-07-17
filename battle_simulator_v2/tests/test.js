@@ -831,6 +831,20 @@ export async function runTests() {
     assert(evaluateState(e, 0).parts.structure <= WEIGHTS.noBoard, 'ホロメン不在の崩壊ペナルティが効いていない');
   });
 
+  await testAsync('AI評価関数: デッキ切れレース（山が薄いと減点・相手が薄ければ加点）', async () => {
+    const e = await setupMainStep(deckMap, 164);
+    const p0 = e.state.players[0]; const p1 = e.state.players[1];
+    assertEq(evaluateState(e, 0).parts.deckRace, 0, '序盤（山が厚い）のに deckRace が効いている');
+    const saved0 = p0.deck;
+    p0.deck = saved0.slice(0, 2); // 自分の山2枚＝危険
+    assert(evaluateState(e, 0).parts.deckRace < -100, '自分の山が薄いのに大きく減点されていない');
+    p0.deck = saved0;
+    const saved1 = p1.deck;
+    p1.deck = saved1.slice(0, 2); // 相手の山2枚＝有利
+    assert(evaluateState(e, 0).parts.deckRace > 100, '相手の山が薄いのに加点されていない');
+    p1.deck = saved1;
+  });
+
   await testAsync('AI評価関数: 自センターへのリーサル脅威を検知', async () => {
     const e = await setupMainStep(deckMap, 161);
     const p0 = e.state.players[0]; const p1 = e.state.players[1];

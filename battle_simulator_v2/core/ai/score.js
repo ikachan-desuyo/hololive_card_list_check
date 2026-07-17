@@ -44,6 +44,26 @@ function supportValue(engine, p, card) {
   const def = engine.registry.get(card.number);
   if (def?.ai?.supportValue) return def.ai.supportValue({ engine, player: p, card });
   const text = card.supportText || '';
+  // 用途ゲート（ポケカAI Decision Gate の移植・ホロカ流に調整。docs/AI_REFERENCE_POKEMON.md ②）:
+  // 引きずり出し系（相手のセンターとバックを交代させる。じゃあ敵だね等）の価値は
+  //   ①引き出した相手を今KOできる（最高値）
+  //   ②相手の育った（エールの乗った）センターを退かす妨害（KOできなくても価値あり）
+  // の合成。どちらも無い早撃ちは温存する（LIMITED枠の浪費）。
+  if (/相手の.*ホロメン.*交代/.test(text)) {
+    const idx = engine.state.players.indexOf(p);
+    const opp = engine.state.players[1 - idx];
+    const fronts = [p.center, p.collab].filter(Boolean);
+    const canKOPulled = (opp.back || []).some((b) => {
+      const remain = engine.effectiveHp(b) - b.damage;
+      if (remain <= 0) return false;
+      return fronts.some((f) => !f.rested && (f.stack[0].arts || []).some((a) =>
+        engine._canPayCheers(f.cheers, a.cost) && engine._artEffectiveDamage(f, a, idx, b.stack[0].color) >= remain));
+    });
+    if (canKOPulled) return 46;
+    // 妨害価値: 相手センターの投資（エール枚数）が大きいほど、退かすテンポ価値が上がる
+    const oppCenterCheers = opp.center ? (opp.center.cheers || []).length : 0;
+    return Math.min(30, 8 + oppCenterCheers * 6);
+  }
   let score = 12;
   if (/[\d１２３４５６７８９]枚引/.test(text)) score = 24 + Math.max(0, 6 - p.hand.length) * 3;
   if (/デッキから/.test(text) && /(手札に加える|公開し)/.test(text)) score = Math.max(score, 26);
