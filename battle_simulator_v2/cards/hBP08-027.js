@@ -26,6 +26,18 @@ function isRestingJustice(e) {
 export default {
   number: 'hBP08-027',
 
+  ai: {
+    // ブルームエフェクト「絡繰のラプソディー」= お休み#Justice数×アーカイブのエール回収。
+    // お休み0または回収エールなしでBloomすると効果が丸ごと不発（2026-07 決定検分で観測）。
+    // 回収見込みぶんだけ価値を積む＝お休みを作ってからBloomする方向へ誘導する（HP+分の基礎価値は残す）。
+    bloomValue({ engine, player }) {
+      const resting = engine._stageHolomems(player).filter(
+        (h) => h.rested && (h.stack[0].tags || []).includes('Justice')).length;
+      const cheers = player.archive.filter((c) => c.kind === 'cheer').length;
+      return 18 + Math.min(resting, cheers) * 14;
+    },
+  },
+
   bloomEffect: {
     name: '絡繰のラプソディー',
     *run(ctx) {

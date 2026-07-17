@@ -348,7 +348,11 @@ function scoreCheerTargets(engine, idx, pending, out) {
       if (noCheer) {
         score -= 8;
       } else if (afterCheers.length <= cap && planNeedsColor(engine, idx, h.stack[0], cheer?.color)) {
-        score += planLineBonus(engine, idx, h.stack[0], 10, 6);
+        // 成長段階でスケール: 同名ライン内では育った個体（2nd>1st>Debut）へ寄せる。
+        // 使い捨てのDebut（コラボ燃料等）に同名2ndのコスト上限ぶんエールを死蔵する事故を抑える
+        // （2026-07 決定検分: 使い捨てDebutジジに黄4枚が死蔵された）。序盤にDebutしか居ない間は×0.6でも十分機能する。
+        const lvlW = h.stack[0].bloomLevel === '2nd' ? 1 : h.stack[0].bloomLevel === '1st' ? 0.8 : 0.6;
+        score += planLineBonus(engine, idx, h.stack[0], 10, 6) * lvlW;
       }
       // リーサル到達（前衛のみ）。センター＋コラボの「合算」実効火力で判定する＝
       // 1体に盛るより両前衛に振った方が合計火力が高く倒し切れる、というケースも拾う。
