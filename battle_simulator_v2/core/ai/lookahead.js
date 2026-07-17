@@ -5,7 +5,7 @@
  * 最後までヒューリスティックで進めた後の盤面評価(evaluateState)」で比較し、最も良くなる手を選ぶ。
  *   - 候補の試行は reconstruct（決定列の再生）で行うため、元の対戦を一切壊さない（スナップショット不要）。
  *   - ロールアウト中の細かい選択・相手の割り込みは HeuristicAI に委ねる（先読みの再帰はしない）。
- *   - メイン以外の決定（エール送付・効果選択・パフォーマンス等）は HeuristicAI に委ねる。
+ *   - 先読み対象はメイン・パフォーマンス・エール配置。それ以外の決定（効果選択・配置センター等）は HeuristicAI に委ねる。
  *
  * これにより「今ターン削り切れないなら攻めずに育てる」「センターに盛らずコラボ含めた方が良い」等、
  * 単発ヒューリスティックでは捉えにくい“ターンを通した結果”で手を選べる（デッキ非依存）。
@@ -15,7 +15,8 @@
  *   - turns=2: ＋相手の応手まで読む（攻めて倒し返される手を避ける）。
  *   - turns=3: ＋自分の次のターンまで読む（倒し返されても取り返せるかを見て、消極化を打ち消す＝攻めの精度UP）。
  *   - 情報前提【全情報許可】: 擬似実行は再生(replay)で相手の実際の手札・山札・順序を再現する＝完全情報の前方シミュレーション。
- *     相手の手は「最善で固定」して読み（最悪ケース想定）、揺らぎ(モンテカルロ)は自分の手だけに入れる。
+ *     標本0は両者「決定的な最善」の読み筋、標本1以降は両者の主要決定を最善付近で揺らして平均する
+ *     （ロールアウトのカオス感度＝KO1回の有無で±100点級に振れる軌跡運を、応手分布の平均で均す。2026-07 AI監査）。
  *   - コスト: turns を増やすほど重い（候補ごとに turns ターンぶんを再生・擬似実行）。UI設定で 1/2/3 を選択可。
  *
  * 注意: reconstruct は「apply() のみで到達した状態」を前提とする（状態を直接書き換えた局面は再現不可）。
@@ -29,9 +30,11 @@ import { scoreOptions, bestOptionId, isDevelopSupport, isFreePlaySupport } from 
 import { createRng } from '../rng.js';
 
 // ロールアウト評価が「ほぼ互角」とみなす差（この範囲内の候補は、ヒューリスティック事前評価で優劣を割る）。
-const ROLLOUT_TIE_EPS = 15;
+// ロールアウトはKO1回の有無で±100点級に振れる（軌跡のカオス性）ため、この幅は「1本の軌跡の運」を
+// 手の優劣と誤読しない程度に広く取る（2026-07 AI監査: 15では狭すぎて軌跡運が優劣を支配していた）。
+const ROLLOUT_TIE_EPS = 30;
 // モンテカルロ: 各候補のロールアウトを方策に揺らぎを入れて複数回回し平均する（脆い1本の偏りを打ち消す）。
-const ROLLOUT_RANDOM_MARGIN = 12; // 最善スコアからこの範囲内の手を「ほぼ同等」とみなしランダムに選ぶ（質は保つ）
+const ROLLOUT_RANDOM_MARGIN = 15; // 最善スコアからこの範囲内の手を「ほぼ同等」とみなしランダムに選ぶ（質は保つ）
 
 export class LookaheadAI {
   constructor(playerIdx, opts = {}) {
@@ -55,7 +58,7 @@ export class LookaheadAI {
     // 単発のヒューリスティック（score.js の貪欲評価）では1体に盛り過ぎる/前進の機会を逃す等が起きやすい。
     // 先読み（候補ごとに自ターンを擬似実行して評価）に載せると、これらをターン結果で正せる。
     // それ以外（効果選択・配置センター等）はヒューリスティックに委ねる。
-    const isLookaheadStep = (pending.type === 'main' || pending.type === 'performance')
+    const isLookaheadStep = (pending.type === 'main' || pending.type === 'performance' || pending.type === 'attachCheer')
       && pending.player === this.playerIdx;
     if (!isLookaheadStep) {
       return this.fallback.choose(engine);
@@ -108,7 +111,8 @@ export class LookaheadAI {
     const scored = pool.map((opt) => {
       let sum = 0; let n = 0;
       for (let k = 0; k < this.samples; k++) {
-        const v = this._rolloutValue(engine, opt.id, this.samples > 1 ? createRng(0x9e37 + k * 2654435761) : null);
+        // 標本0は両者決定的（最善読み筋）、標本1以降は両者に揺らぎ（応手分布の平均）。
+        const v = this._rolloutValue(engine, opt.id, (this.samples > 1 && k > 0) ? createRng(0x9e37 + k * 2654435761) : null);
         if (Number.isFinite(v)) { sum += v; n++; }
       }
       return {
@@ -135,10 +139,14 @@ export class LookaheadAI {
     const idx = this.playerIdx;
     const sim = reconstruct(engine);
     if (!sim.state.pending || !sim.state.pending.options.some((o) => o.id === candidateId)) return -Infinity;
+    // 基準ターンプレイヤーは「候補を適用する前」に取る。候補がターンを終わらせる場合（パス等で
+    // 残りステップが自動進行して次ターンに入る）でも遷移が1回として数えられ、全候補の評価地平線が揃う。
+    // ※適用後に取ると、ターンを終わらせる候補だけ相手の応手を1回多く受けた後に評価され、
+    //   「ターンを継続する手」が系統的に過大評価されるバイアスになる（2026-07 AI監査で発見）。
+    let prev = sim.state.turnPlayer;
     try { sim.apply(candidateId); } catch { return -Infinity; }
     const ais = [new HeuristicAI(0), new HeuristicAI(1)];
     const cap = this.maxRolloutMoves * this.turns;
-    let prev = sim.state.turnPlayer;
     let transitions = 0;
     let moves = 0;
     while (sim.state.phase !== 'ended' && sim.state.pending && moves < cap) {
@@ -149,9 +157,12 @@ export class LookaheadAI {
       const pd = sim.state.pending;
       let id;
       if (pd.player == null) id = pd.options[0].id;
-      // 【全情報許可】相手の手は「最善で固定」して読む（相手の最善応手を想定＝こちらの楽観バイアスを排除）。
-      // 揺らぎ(モンテカルロ)は自分の手だけに入れる＝「自分の指し回しの不確実性」を平均し、相手は最悪ケースで評価。
-      else if (rng && pd.player === idx) id = stochasticChoose(sim, pd.player, rng);
+      // 【全情報許可】モンテカルロ標本では両者の主要決定を「各自の最善付近」で揺らして平均する。
+      // ロールアウトはほぼ決定的で、相手を1本に固定すると「KO1回の有無」級の軌跡の偶然（カオス感度）を
+      // 手の優劣として誤読する（2026-07 AI監査）。相手も最善付近で散らす＝「ありそうな応手の分布」で
+      // 平均评価し、軌跡運への過適合を抑える（stochasticChoose は各プレイヤー自身の視点の最善付近から選ぶ）。
+      // ※標本0（rng=null）は両者決定的な最善＝従来の読み筋を必ず含める。
+      else if (rng) id = stochasticChoose(sim, pd.player, rng);
       else id = ais[pd.player].choose(sim);
       if (id == null) break;
       try { sim.apply(id); } catch { break; }

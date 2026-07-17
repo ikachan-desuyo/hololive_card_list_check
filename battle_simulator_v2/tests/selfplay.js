@@ -55,7 +55,7 @@ function boardCheerTotal(p) {
 function runGame(lib, dmA, dmB, registry, seed, turns) {
   const e = new Engine({
     decks: [lib.buildGameDeck(dmA), lib.buildGameDeck(dmB)],
-    seed, names: ['A', 'B'], registry, detailLog: true,
+    seed, names: ['A', 'B'], registry, cardLibrary: lib, detailLog: true,
   });
   e.start();
   const ais = [new LookaheadAI(0, { turns }), new LookaheadAI(1, { turns })];

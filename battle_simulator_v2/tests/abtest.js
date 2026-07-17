@@ -37,7 +37,7 @@ async function loadDeck(name) {
 function runGame(lib, decks, registry, seed, turns, aiKind, firstPlayer) {
   const e = new Engine({
     decks: [lib.buildGameDeck(decks[0]), lib.buildGameDeck(decks[1])],
-    seed, names: ['P0', 'P1'], registry, firstPlayer,
+    seed, names: ['P0', 'P1'], registry, cardLibrary: lib, firstPlayer,
   });
   e.start();
   const mk = (idx) => (aiKind[idx] === 'NEW' ? new LookaheadNEW(idx, { turns }) : new LookaheadOLD(idx, { turns }));
