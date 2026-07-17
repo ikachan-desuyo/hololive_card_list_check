@@ -841,6 +841,13 @@ export async function runTests() {
     assertEq(sk?.key, 'sakamata-tan', 'さかまた構成が判別されない');
     // 未知の構成にはマッチしない（汎用AIにフォールバック）
     assertEq(detectProfile(new Set(['hBP01-104', 'hSD01-016']), 'hBP99-999'), null, '未知構成に誤マッチ');
+    // 同一推し（鷹嶺ルイ hBP08-005）の3デッキをシグネチャで判別
+    assertEq(detectProfile(new Set(['hBP02-047', 'hBP02-045', 'hBP08-067', 'hBP02-083']), 'hBP08-005')?.key, 'shio-rui', '塩ルイが判別されない');
+    assertEq(detectProfile(new Set(['hBP06-049', 'hBP06-053', 'hBP08-067', 'hBP01-090']), 'hBP08-005')?.key, 'tsuki-rui', '月ルイが判別されない');
+    assertEq(detectProfile(new Set(['hBP08-065', 'hBP08-066', 'hBP08-067', 'hBP06-093']), 'hBP08-005')?.key, 'rui-tan', 'るい単が判別されない');
+    // ジジ と セシジジ（hBP07-086等を共有）の判別
+    assertEq(detectProfile(new Set(['hSD13-013', 'hSD13-008', 'hBP07-086', 'hSD13-017']), 'hSD13-002')?.key, 'gigi-riot', 'ジジが判別されない');
+    assertEq(detectProfile(new Set(['hBP08-027', 'hBP04-031', 'hBP08-107', 'hBP07-086']), 'hBP01-004')?.key, 'ceci-gigi', 'セシジジが判別されない');
   });
 
   await testAsync('AI評価関数: デッキ切れレース（山が薄いと減点・相手が薄ければ加点）', async () => {
