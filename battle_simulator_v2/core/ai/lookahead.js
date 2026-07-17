@@ -43,8 +43,10 @@ export class LookaheadAI {
     this.maxRolloutMoves = opts.maxRolloutMoves || 80; // 1ターンあたりのロールアウト暴走保険
     // 先読みターン数（1以上）。opts.depth は後方互換（2=2手）。
     this.turns = Math.max(1, opts.turns || opts.depth || 1);
-    // モンテカルロ標本数。1手は揺れが小さいので1、2手以上は複数回平均して頑健化（既定3）。
-    this.samples = Math.max(1, opts.samples != null ? opts.samples : (this.turns >= 2 ? 3 : 1));
+    // モンテカルロ標本数。1手は揺れが小さいので1、2手以上は複数回平均して頑健化。
+    // 既定5: 決定監査（2026-07）で3標本は6標本の審判と順位が一貫して食い違った＝分散が支配的だったため増量
+    //（標本0=両者決定的＋揺らぎ4本。計算コストは+66%だがソロ専用なので許容）。
+    this.samples = Math.max(1, opts.samples != null ? opts.samples : (this.turns >= 2 ? 5 : 1));
   }
 
   choose(engine) {

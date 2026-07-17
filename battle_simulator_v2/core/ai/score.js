@@ -81,6 +81,14 @@ function supportValue(engine, p, card) {
   const sd = text.match(/特殊ダメージ(\d+)/); // 特殊ダメージ系は火力ぶん価値を上げる
   if (sd) score = Math.max(score, 18 + Number(sd[1]) * 0.4);
   if (/回復/.test(text)) score = Math.max(score, 14);
+  // 手札リセット系（マネちゃん等「手札を…戻し…引く」）: 手札に「今すぐ使える装着カード」がある間は後回し
+  // （2026-07 決定監査: 雪民を付ける前にマネちゃんで手札ごと流す順序ミスが観測された）
+  if (/手札[^。]*(戻|引き直)/.test(text)) {
+    const usableFirst = p.hand.some((c) => c !== card && c.kind === 'support'
+      && ['ツール', 'マスコット', 'ファン'].includes(c.supportType)
+      && engine._stageHolomems(p).some((h) => engine._canAttachSupport(h, c)));
+    if (usableFirst) return 6;
+  }
   return score;
 }
 
@@ -485,13 +493,11 @@ function scoreMainActions(engine, idx, pending, out) {
         // バトンの「正当な理由」による便益。理由が無ければ benefit=0（＝この後コストを引いて負になる）。
         let benefit = 0;
         if (underLethal && backRemain > oppThreat && backRemain > centerRemain) benefit = 70;
-        // 育てた（エールを積んだ）センターは下げない。安易な入替は「センターが瀕死かつ実質エール無し」のときだけ。
-        // ただし「HPが低いだけ」では退かない: 残せば有効な攻撃（特に相手をKO）できる前衛は退かない。
-        else if (centerRemain <= 40 && backRemain > centerRemain + 30 && (p.center.cheers || []).length <= 1) {
-          const centerOff = bestPayableEffDmg(engine, p.center, idx);
-          const canKO = opp.center && centerOff >= (engine.effectiveHp(opp.center) - opp.center.damage);
-          if (centerOff < 30 && !canKO) benefit = 35; // 攻撃価値の無い置物のときだけ退避
-        }
+        // ※壁交代（育ったセンターを下げて安い体を差し出す退避）は2026-07に実装を試みたが、
+        //   A/Bで大幅悪化（2/12）し撤去。理由: underLethal は劣勢中ほぼ毎ターン成立し、退避が
+        //   連鎖してバトンコストのエールを毎ターン垂れ流す（壁は次ターン倒され、また退避…の中毒）。
+        //   単発の退避は正しくても「繰り返し」の損を1手のスコアでは表現できない。やるなら回数制限や
+        //   先読み側での評価が必要（docs/AI_AUDIT_2026-07.md 追補4）。
         else {
           // 明確に強いアタッカーがアクティブなバックにいるなら、センターへ据えて毎ターン殴る。
           const backOff = bestPayableEffDmg(engine, back, idx);
