@@ -5,8 +5,8 @@
 //   - PAGE_VERSIONS は APP_VERSION から自動生成（手書きしない）
 //   ※ sw.js 本体のバージョンコメントも合わせて更新するとSW更新検知が最速（sw.js のバイト差分）
 
-const APP_VERSION = "4.22.0";
-const VERSION_DESCRIPTION = "upstream(ikachan-desuyo)を取り込み: バトルシミュレーターv2・カードデータ更新";
+const APP_VERSION = "4.22.1";
+const VERSION_DESCRIPTION = "カードデータ更新";
 
 // ✅ 対象ページ一覧（バージョンは APP_VERSION に統一＝単一ソース。手書きの個別バージョンは持たない）
 const VERSIONED_PAGES = [
